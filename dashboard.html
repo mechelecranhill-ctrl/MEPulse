@@ -1,50 +1,136 @@
-<script>
-    const SUPABASE_URL = 'https://fppemnabevbcephyepwx.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48';
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M&E-Connect | Status Kakitangan</title>
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg: #f5f5f7;
+            --glass: rgba(255, 255, 255, 0.7);
+            --border: rgba(255, 255, 255, 0.4);
+            --ios-blue: #007AFF;
+            --ios-green: #34C759;
+            --ios-red: #FF3B30;
+            --text: #1d1d1f;
+        }
 
-    async function fetchRecords() {
-        const list = document.getElementById('attendanceList');
-        list.innerHTML = "<p style='text-align:center;'>Menarik data...</p>";
+        body {
+            background: #a1c4fd linear-gradient(120deg, #a1c4fd 0%, #c2e9fb 100%) fixed;
+            font-family: 'SF Pro Display', sans-serif;
+            margin: 0; padding: 15px; display: flex; justify-content: center;
+        }
+
+        .container { width: 100%; max-width: 500px; }
+
+        .header-card {
+            background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border-radius: 20px; padding: 20px; margin-bottom: 20px;
+            border: 1px solid var(--border); text-align: center;
+        }
+
+        .staf-row {
+            background: var(--glass); backdrop-filter: blur(15px);
+            border-radius: 18px; padding: 15px; margin-bottom: 10px;
+            display: flex; justify-content: space-between; align-items: center;
+            border: 1px solid var(--border); transition: 0.2s;
+        }
+
+        .staf-info h4 { margin: 0; font-size: 15px; color: var(--text); }
+        .staf-info p { margin: 2px 0 0; font-size: 11px; color: rgba(0,0,0,0.5); }
+
+        .status-badge {
+            padding: 6px 14px; border-radius: 12px; font-size: 11px; font-weight: 600; min-width: 70px; text-align: center;
+        }
+
+        /* Status Colors */
+        .status-hadir { background: var(--ios-green); color: white; }
+        .status-tidak-hadir { background: var(--ios-blue); color: white; }
+        .status-cuti { background: var(--ios-red); color: white; }
+
+        .refresh-btn {
+            background: var(--ios-blue); color: white; border: none;
+            padding: 10px 20px; border-radius: 12px; font-weight: 600; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-card">
+        <div style="display:flex; justify-content: space-between; align-items:center;">
+            <button onclick="window.location.href='index.html'" style="background:none; border:none; color:var(--ios-blue); cursor:pointer;">
+                <i class="fa-solid fa-chevron-left"></i> Utama
+            </button>
+            <button class="refresh-btn" onclick="fetchAllStatus()">Refresh</button>
+        </div>
+        <h2 style="margin:15px 0 5px;">Status Kakitangan</h2>
+        <p id="todayDate" style="font-size:12px; opacity:0.6;"></p>
+    </div>
+
+    <div id="mainList">Memuatkan senarai...</div>
+</div>
+
+<script>
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+    const SUPABASE_KEY = 'YOUR_SUPABASE_KEY';
+
+    document.getElementById('todayDate').innerText = new Date().toLocaleDateString('ms-MY', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    async function fetchAllStatus() {
+        const list = document.getElementById('mainList');
+        list.innerHTML = "<p style='text-align:center;'>Menyemak kehadiran...</p>";
 
         try {
-            // BARIS 98: Pastikan guna simbol ` (backtick) bukannya ' (single quote)
-            const res = await fetch(`${SUPABASE_URL}/rest/v1/attendance?select=*&order=created_at.desc`, {
-                headers: { 
-                    'apikey': SUPABASE_KEY, 
-                    'Authorization': `Bearer ${SUPABASE_KEY}` 
-                }
+            // 1. Ambil semua staf
+            const resStaff = await fetch(SUPABASE_URL + '/rest/v1/staff?select=*&order=nama.asc', {
+                headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
             });
-            
-            const data = await res.json();
-            
+            const allStaff = await resStaff.json();
+
+            // 2. Ambil kehadiran hari ini
+            const today = new Date().toISOString().split('T')[0];
+            const resAttendance = await fetch(SUPABASE_URL + '/rest/v1/attendance?select=*&tarikh_mula=lte.' + today + '&tarikh_akhir=gte.' + today, {
+                headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+            });
+            const activeAttendance = await resAttendance.json();
+
             list.innerHTML = "";
-            if (!data || data.length === 0) {
-                list.innerHTML = "<div class='record-card'>Tiada rekod aktif ditemui.</div>";
-                return;
-            }
 
-            data.forEach(item => {
-                const sebabText = item.sebab ? item.sebab.toLowerCase() : '';
-                const statusClass = sebabText.includes('onsite') ? 'onsite' : 
-                                    sebabText.includes('cuti') ? 'cuti' : 
-                                    sebabText.includes('fat') ? 'fat' : 'mesyuarat';
+            allStaff.forEach(staf => {
+                // Cari jika staf ini ada dalam senarai attendance hari ini
+                const record = activeAttendance.find(a => a.nama === staf.nama);
+                
+                let statusText = "HADIR";
+                let statusClass = "status-hadir";
+                let subText = staf.jawatan;
 
-                list.innerHTML += `
-                    <div class="record-card">
-                        <div class="info">
-                            <h4>${item.nama}</h4>
-                            <p>${item.jawatan} • <strong>${item.tarikh_mula}</strong> hingga <strong>${item.tarikh_akhir}</strong></p>
-                        </div>
-                        <div class="badge ${statusClass}">${item.sebab}</div>
-                    </div>
-                `;
+                if (record) {
+                    statusText = record.sebab.toUpperCase();
+                    statusClass = record.sebab.toLowerCase().includes('cuti') ? 'status-cuti' : 'status-tidak-hadir';
+                    subText = "Hingga: " + record.tarikh_akhir;
+                }
+
+                list.innerHTML += 
+                    '<div class="staf-row">' +
+                        '<div class="staf-info">' +
+                            '<h4>' + staf.nama + '</h4>' +
+                            '<p>' + subText + '</p>' +
+                        '</div>' +
+                        '<div class="status-badge ' + statusClass + '">' + statusText + '</div>' +
+                    '</div>';
             });
+
         } catch (e) {
-            console.error("Ralat fail:", e);
-            list.innerHTML = "<p style='color:red; text-align:center;'>Gagal memuatkan data. Sila semak konsol (F12).</p>";
+            list.innerHTML = "<p style='text-align:center; color:red;'>Ralat sambungan database.</p>";
+            console.error(e);
         }
     }
 
-    // Jalankan fungsi sebaik sahaja halaman siap dimuatkan
-    window.onload = fetchRecords;
+    window.onload = fetchAllStatus;
 </script>
+</body>
+</html>
