@@ -232,82 +232,115 @@
 </div>
 
 <script>
-    // MASUKKAN MAKLUMAT SUPABASE ANDA
-    const SUPABASE_URL = 'https://fppemnabevbcephyepwx.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48';
+    // 1. Pastikan URL dan KEY diletakkan dalam pembuka & penutup kata petikan yang betul
+const SUPABASE_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48'; 
 
-    let staffData = [];
+let staffData = [];
 
-    function showPage(pageId) {
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.getElementById(pageId).classList.add('active');
-        document.getElementById(pageId).scrollTop = 0; // Reset scroll ke atas
+// 2. Fungsi Navigasi (Pastikan ejaan showPage sama dengan di HTML)
+function showPage(pageId) {
+    console.log("Menukar ke halaman: " + pageId);
+    const pages = document.querySelectorAll('.page');
+    pages.forEach(p => {
+        p.classList.remove('active');
+    });
+
+    const target = document.getElementById(pageId);
+    if (target) {
+        target.classList.add('active');
+    } else {
+        console.error("ID halaman tidak dijumpai: " + pageId);
     }
+}
 
-    async function loadStaff() {
-        try {
-            const res = await fetch(${SUPABASE_URL}/rest/v1/staff?select=*, { 
-                headers: { 'apikey': SUPABASE_KEY, 'Authorization': Bearer ${SUPABASE_KEY} } 
-            });
-            staffData = await res.json();
-            const jSel = document.getElementById('jawatan');
-            jSel.innerHTML = '<option value="">Pilih Jawatan</option>';
-            [...new Set(staffData.map(s => s.jawatan))].forEach(j => {
-                const opt = document.createElement('option'); opt.value = opt.innerText = j; jSel.appendChild(opt);
-            });
-        } catch(e) { console.error("Database error"); }
-    }
+// 3. Ambil Data Staf
+async function loadStaff() {
+    try {
+        const res = await fetch(SUPABASE_URL + '/rest/v1/staff?select=*', {
+            headers: { 
+                'apikey': SUPABASE_KEY, 
+                'Authorization': 'Bearer ' + SUPABASE_KEY 
+            }
+        });
 
-    function filterNames() {
-        const selJ = document.getElementById('jawatan').value;
-        const nSel = document.getElementById('nama');
-        nSel.innerHTML = '<option value="">Pilih Nama</option>';
-        if(selJ) {
-            nSel.disabled = false;
-            staffData.filter(s => s.jawatan === selJ).forEach(s => {
-                const opt = document.createElement('option'); opt.value = opt.innerText = s.nama; nSel.appendChild(opt);
-            });
-        }
-    }
+        if (!res.ok) throw new Error("Gagal hubungi database");
 
-    async function loadUserDirectory() {
-        const list = document.getElementById('userList');
-        list.innerHTML = "Memuatkan...";
-        try {
-            const res = await fetch(${SUPABASE_URL}/rest/v1/user_directory?select=*, { 
-                headers: { 'apikey': SUPABASE_KEY, 'Authorization': Bearer ${SUPABASE_KEY} } 
-            });
-            const users = await res.json();
-            list.innerHTML = "";
-            users.forEach(u => {
-                list.innerHTML += <div class="user-card"><h4>${u.nama}</h4><p>${u.jawatan}</p><p style="color:var(--ios-blue); margin-top:5px;"><i class="fa-solid fa-phone"></i> ${u.no_tel}</p></div>;
-            });
-        } catch(e) { list.innerHTML = "Gagal memuatkan data."; }
-    }
-
-    document.getElementById('attendanceForm').onsubmit = async (e) => {
-        e.preventDefault();
-        const btn = document.getElementById('subBtn'); btn.disabled = true;
-        const data = { 
-            nama: document.getElementById('nama').value, 
-            jawatan: document.getElementById('jawatan').value, 
-            sebab: document.getElementById('sebab').value, 
-            tarikh_mula: document.getElementById('t1').value, 
-            tarikh_akhir: document.getElementById('t2').value 
-        };
+        staffData = await res.json();
+        const jSel = document.getElementById('jawatan');
+        jSel.innerHTML = '<option value="">Pilih Jawatan</option>';
         
-        try {
-            const res = await fetch(${SUPABASE_URL}/rest/v1/attendance, {
-                method: 'POST', 
-                headers: { 'apikey': SUPABASE_KEY, 'Authorization': Bearer ${SUPABASE_KEY}, 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-            if(res.ok) { alert("Berjaya!"); location.reload(); }
-            else { throw new Error(); }
-        } catch(err) { alert("Gagal!"); btn.disabled = false; }
+        const uniqueJawatan = [...new Set(staffData.map(s => s.jawatan))];
+        uniqueJawatan.forEach(j => {
+            const opt = document.createElement('option');
+            opt.value = j;
+            opt.innerText = j;
+            jSel.appendChild(opt);
+        });
+    } catch (err) {
+        console.error("Ralat Load:", err.message);
+    }
+}
+
+// 4. Filter Nama
+function filterNames() {
+    const selJ = document.getElementById('jawatan').value;
+    const nSel = document.getElementById('nama');
+    nSel.innerHTML = '<option value="">Pilih Nama</option>';
+    
+    if (selJ) {
+        nSel.disabled = false;
+        staffData.filter(s => s.jawatan === selJ).forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.nama;
+            opt.innerText = s.nama;
+            nSel.appendChild(opt);
+        });
+    }
+}
+
+// 5. Hantar Borang
+document.getElementById('attendanceForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('subBtn');
+    btn.disabled = true;
+    btn.innerText = "Menghantar...";
+
+    const payload = {
+        nama: document.getElementById('nama').value,
+        jawatan: document.getElementById('jawatan').value,
+        sebab: document.getElementById('sebab').value,
+        tarikh_mula: document.getElementById('t1').value,
+        tarikh_akhir: document.getElementById('t2').value
     };
 
-    window.onload = loadStaff;
+    try {
+        const res = await fetch(SUPABASE_URL + '/rest/v1/attendance', {
+            method: 'POST',
+            headers: {
+                'apikey': SUPABASE_KEY,
+                'Authorization': 'Bearer ' + SUPABASE_KEY,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            alert("✅ Berjaya Disimpan!");
+            location.reload();
+        } else {
+            throw new Error("Gagal simpan data");
+        }
+    } catch (err) {
+        alert("Ralat: " + err.message);
+        btn.disabled = false;
+        btn.innerText = "Hantar Rekod";
+    }
+};
+
+// Jalankan loadStaff bila window siap
+window.onload = loadStaff;
 </script>
 </body>
 </html>
