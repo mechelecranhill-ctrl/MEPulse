@@ -19,6 +19,7 @@
             text-align: center; margin-bottom: 20px;
             backdrop-filter: blur(10px);
             box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
         }
         .staf-card {
             background: white;
@@ -28,15 +29,14 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
         .badge {
-            padding: 6px 12px; border-radius: 10px;
+            padding: 8px 10px; border-radius: 10px;
             font-size: 10px; font-weight: bold; color: white;
             min-width: 100px; text-align: center;
             line-height: 1.2;
         }
-        /* WARNA IKUT JENIS KETIADAAN */
-        .status-hadir { background: #34C759; } /* HIJAU */
-        .status-kerja { background: #007AFF; }  /* BIRU (ONSITE, FAT, MESYUARAT) */
-        .status-cuti { background: #FF3B30; }   /* MERAH (CUTI REHAT/SAKIT, HALFDAY) */
+        .status-hadir { background: #34C759; } 
+        .status-kerja { background: #007AFF; } 
+        .status-cuti { background: #FF3B30; } 
         
         .refresh-btn { 
             background: #007AFF; color: white; border: none; 
@@ -51,7 +51,7 @@
 <div class="container">
     <div class="header">
         <div style="display:flex; justify-content:space-between; align-items: center;">
-            <button onclick="window.location.href='index.html'" style="border:none; background:none; color:#007AFF; cursor:pointer; font-weight: bold;">
+            <button onclick="window.location.href='index.html'" style="border:none; background:none; color:#007AFF; cursor:pointer; font-weight: bold; font-size: 16px;">
                 <i class="fa-solid fa-chevron-left"></i> UTAMA
             </button>
             <button class="refresh-btn" onclick="fetchAllStatus()">REFRESH</button>
@@ -88,8 +88,9 @@
             });
             const allAtt = await resA.json();
 
-            const hariIni = new Date();
-            hariIni.setHours(0, 0, 0, 0);
+            // FIX 1: Guna Tarikh Tempatan Malaysia (Elak isu 8 jam beza UTC)
+            const sekarang = new Date();
+            const hariIni = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate());
 
             allStaff.sort((a, b) => {
                 const jA = (a.jawatan || "").toUpperCase().trim();
@@ -105,12 +106,16 @@
             allStaff.forEach(staf => {
                 const sNama = (staf.nama || "").toUpperCase().trim();
                 
+                // FIX 2: Pencarian rekod yang lebih fleksibel
                 const record = allAtt.find(a => {
                     const namaAtt = (a.nama || "").toUpperCase().trim();
-                    const tMula = new Date(a.tarikh_mula);
-                    const tAkhir = new Date(a.tarikh_akhir);
-                    tMula.setHours(0,0,0,0);
-                    tAkhir.setHours(0,0,0,0);
+                    // Tukar string tarikh "YYYY-MM-DD" kepada objek Date yang bersih
+                    const tMulaParts = a.tarikh_mula.split('-');
+                    const tAkhirParts = a.tarikh_akhir.split('-');
+                    
+                    const tMula = new Date(tMulaParts[0], tMulaParts[1] - 1, tMulaParts[2]);
+                    const tAkhir = new Date(tAkhirParts[0], tAkhirParts[1] - 1, tAkhirParts[2]);
+
                     return namaAtt === sNama && hariIni >= tMula && hariIni <= tAkhir;
                 });
                 
@@ -121,15 +126,11 @@
                 if (record) {
                     sText = (record.sebab || "LUAR").toUpperCase();
                     
-                    // PENETAPAN WARNA IKUT JENIS KETIADAAN
                     if (sText.includes("CUTI") || sText.includes("SAKIT") || sText.includes("HALFDAY")) {
-                        sClass = "status-cuti"; // Merah
-                    } else if (sText.includes("ONSITE") || sText.includes("FAT") || sText.includes("MESYUARAT") || sText.includes("LAPANGAN")) {
-                        sClass = "status-kerja"; // Biru
+                        sClass = "status-cuti";
                     } else {
-                        sClass = "status-kerja"; // Default biru untuk ketiadaan lain
+                        sClass = "status-kerja";
                     }
-
                     sSub = sSub + " • SEHINGGA: " + record.tarikh_akhir;
                 }
 
