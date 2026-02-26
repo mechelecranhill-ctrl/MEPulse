@@ -246,14 +246,42 @@
         document.getElementById('formPage').style.display = 'block';
     }
 
-    window.onload = function() {
+  window.onload = function() {
         fetch(scriptURL + "?action=getStaff")
             .then(res => res.json())
             .then(data => {
                 allStaffData = data;
                 let jawatanSelect = document.getElementById('jawatan');
+                
+                // 1. Ambil jawatan unik dari data
                 let uniqueJawatan = [...new Set(data.map(item => item[1]))];
-                uniqueJawatan.sort().forEach(j => {
+
+                // 2. Takrifkan susunan tersuai (Custom Order)
+                const customOrder = [
+                    "Ketua Jabatan",
+                    "Ketua Seksyen",
+                    "Eksekutif Kanan",
+                    "Eksekutif",
+                    "Juruteknik",
+                    "Penyelia Pentadbiran",
+                    "Pembantu Pentadbiran",
+                    "Kerani"
+                ];
+
+                // 3. Susun uniqueJawatan berdasarkan customOrder
+                uniqueJawatan.sort((a, b) => {
+                    let indexA = customOrder.indexOf(a);
+                    let indexB = customOrder.indexOf(b);
+                    
+                    // Jika jawatan tidak ada dalam senarai customOrder, letak di bawah sekali
+                    if (indexA === -1) indexA = 99;
+                    if (indexB === -1) indexB = 99;
+                    
+                    return indexA - indexB;
+                });
+
+                // 4. Masukkan ke dalam dropdown
+                uniqueJawatan.forEach(j => {
                     if(j) {
                         let opt = document.createElement('option');
                         opt.value = opt.innerHTML = j;
