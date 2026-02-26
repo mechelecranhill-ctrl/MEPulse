@@ -7,6 +7,8 @@
     
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon.png">
+    
+    <meta name="color-scheme" content="light">
     <meta name="theme-color" content="#ffffff">
     
     <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;600&family=Plus+Jakarta+Sans:wght@400;600&display=swap" rel="stylesheet">
@@ -14,7 +16,7 @@
     
     <style>
         :root {
-            /* Light Mode Variables */
+            /* Light Mode Variables (Default) */
             --bg-color: #a1c4fd;
             --bg-gradient: linear-gradient(120deg, rgba(161, 196, 253, 1) 0%, rgba(194, 233, 251, 1) 33%, rgba(251, 194, 235, 1) 66%, rgba(161, 196, 253, 1) 100%);
             --glass-white: rgba(255, 255, 255, 0.45);
@@ -25,7 +27,7 @@
             --input-bg: rgba(255, 255, 255, 0.4);
         }
 
-        /* Dark Mode Variables */
+        /* Dark Mode Variables - Diaktifkan hanya oleh class .dark-mode */
         body.dark-mode {
             --bg-color: #0f172a;
             --bg-gradient: linear-gradient(120deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
@@ -36,11 +38,19 @@
             --input-bg: rgba(15, 23, 42, 0.5);
         }
 
+        /* Memastikan sistem phone tidak override warna asal */
+        @media (prefers-color-scheme: dark) {
+            body:not(.dark-mode) {
+                background-color: var(--bg-color);
+                background-image: var(--bg-gradient);
+            }
+        }
+
         * { 
             box-sizing: border-box; 
             -webkit-tap-highlight-color: transparent; 
             font-family: 'SF Pro Display', 'Plus Jakarta Sans', sans-serif;
-            transition: background 0.4s ease, border 0.4s ease;
+            transition: background 0.4s ease, color 0.4s ease, border 0.4s ease;
         }
 
         body {
@@ -82,14 +92,15 @@
         }
 
         .theme-toggle i {
-            font-size: 18px;
-            color: var(--ios-blue);
+            font-size: 20px;
+            color: #ffcc00; /* Warna Matahari */
             transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
+        /* Bila Dark Mode aktif, ikon pusing & tukar warna */
         body.dark-mode .theme-toggle i {
             transform: rotate(360deg);
-            color: #ffcc00;
+            color: #f8fafc; /* Warna Bulan */
         }
 
         @keyframes liquidMove {
@@ -97,6 +108,14 @@
             50% { background-position: 100% 50%; }
             100% { background-position: 0% 50%; }
         }
+
+        @-webkit-keyframes liquidMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        html { height: -webkit-fill-available; overflow: hidden; }
 
         .container {
             width: 100%;
@@ -171,10 +190,10 @@
             font-size: 20px;
         }
 
+        .menu-content { flex: 1; }
         .menu-content h3 { margin: 0; font-size: 16px; font-weight: 600; color: var(--text-primary); }
         .menu-content p { margin: 2px 0 0; font-size: 12px; color: var(--text-secondary); }
 
-        /* FORM PAGE */
         #formPage { display: none; animation: slideUp 0.6s cubic-bezier(0.23, 1, 0.32, 1); }
         .glass-card {
             background: var(--glass-white);
@@ -190,7 +209,7 @@
         }
 
         .header { text-align: center; margin-bottom: 5px; position: relative; }
-        .header h1 { font-size: 22px; margin: 0; font-weight: 600; color: var(--text-primary); }
+        .header h1 { font-size: 22px; margin: 0; color: var(--text-primary); }
         .back-btn { position: absolute; left: 0; top: 5px; color: var(--ios-blue); font-size: 18px; cursor: pointer; }
 
         label { font-size: 10px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; display: block; text-transform: uppercase; }
@@ -209,12 +228,17 @@
 
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes pulseGlow {
+            0% { box-shadow: 0 0 10px rgba(255,255,255,0.3); }
+            50% { box-shadow: 0 0 20px rgba(255,255,255,0.6); }
+            100% { box-shadow: 0 0 10px rgba(255,255,255,0.3); }
+        }
     </style>
 </head>
 <body>
 
 <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()">
-    <i class="fa-solid fa-moon"></i>
+    <i class="fa-solid fa-sun"></i>
 </div>
 
 <div class="container">
@@ -316,24 +340,25 @@
     function toggleTheme() {
         const body = document.body;
         const icon = document.querySelector('#themeToggle i');
+        
         body.classList.toggle('dark-mode');
         
         if(body.classList.contains('dark-mode')) {
-            icon.classList.replace('fa-moon', 'fa-sun');
-            localStorage.setItem('theme', 'dark');
-        } else {
             icon.classList.replace('fa-sun', 'fa-moon');
-            localStorage.setItem('theme', 'light');
+            localStorage.setItem('me-connect-theme', 'dark');
+        } else {
+            icon.classList.replace('fa-moon', 'fa-sun');
+            localStorage.setItem('me-connect-theme', 'light');
         }
     }
 
-    // Load saved theme
-    if(localStorage.getItem('theme') === 'dark') {
+    // Load saved theme (Ignore system settings)
+    if(localStorage.getItem('me-connect-theme') === 'dark') {
         document.body.classList.add('dark-mode');
-        document.querySelector('#themeToggle i').classList.replace('fa-moon', 'fa-sun');
+        document.querySelector('#themeToggle i').classList.replace('fa-sun', 'fa-moon');
     }
 
-    // --- PAGE NAVIGATION ---
+    // --- NAVIGATION ---
     function showForm() {
         document.getElementById('homePage').style.display = 'none';
         document.getElementById('formPage').style.display = 'block';
@@ -344,7 +369,7 @@
         document.getElementById('formPage').style.display = 'none';
     }
 
-    // --- STAFF DATA LOGIC ---
+    // --- DATA LOGIC ---
     window.onload = function() {
         fetch(scriptURL + "?action=getStaff")
             .then(res => res.json())
@@ -353,13 +378,7 @@
                 let jawatanSelect = document.getElementById('jawatan');
                 let uniqueJawatan = [...new Set(data.map(item => item[1]))];
                 const customOrder = ["Ketua Jabatan", "Ketua Seksyen", "Eksekutif Kanan", "Eksekutif", "Juruteknik", "Penyelia Pentadbiran", "Pembantu Pentadbiran", "Kerani"];
-                
-                uniqueJawatan.sort((a, b) => {
-                    let indexA = customOrder.indexOf(a);
-                    let indexB = customOrder.indexOf(b);
-                    return (indexA === -1 ? 99 : indexA) - (indexB === -1 ? 99 : indexB);
-                });
-
+                uniqueJawatan.sort((a, b) => (customOrder.indexOf(a) === -1 ? 99 : customOrder.indexOf(a)) - (customOrder.indexOf(b) === -1 ? 99 : customOrder.indexOf(b)));
                 uniqueJawatan.forEach(j => {
                     if(j) {
                         let opt = document.createElement('option');
@@ -377,32 +396,27 @@
         if (selectedJawatan) {
             namaSelect.disabled = false;
             allStaffData.filter(row => row[1] === selectedJawatan).forEach(row => {
-                if(row[0]) {
-                    let opt = document.createElement('option');
-                    opt.value = opt.innerHTML = row[0];
-                    namaSelect.appendChild(opt);
-                }
+                let opt = document.createElement('option');
+                opt.value = opt.innerHTML = row[0];
+                namaSelect.appendChild(opt);
             });
         }
     }
 
-    // --- FORM SUBMISSION ---
     document.getElementById('absenceForm').addEventListener('submit', function(e) {
         e.preventDefault();
         const btn = document.getElementById('submitBtn');
-        const loading = document.getElementById('loading');
         btn.disabled = true;
-        loading.style.display = 'block';
-
+        document.getElementById('loading').style.display = 'block';
         fetch(scriptURL, { method: 'POST', body: new URLSearchParams(new FormData(this)), mode: 'no-cors' })
             .then(() => {
                 alert("✅ Berjaya Dihantar!");
                 location.reload();
             })
             .catch(() => {
-                alert("❌ Ralat berlaku!");
+                alert("❌ Ralat!");
                 btn.disabled = false;
-                loading.style.display = 'none';
+                document.getElementById('loading').style.display = 'none';
             });
     });
 </script>
