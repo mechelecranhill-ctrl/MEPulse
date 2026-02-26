@@ -26,17 +26,16 @@
             margin-bottom: 10px;
             display: flex; justify-content: space-between; align-items: center;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            transition: transform 0.2s;
         }
-        .staf-card:active { transform: scale(0.98); }
         .badge {
             padding: 6px 12px; border-radius: 10px;
             font-size: 11px; font-weight: bold; color: white;
-            min-width: 85px; text-align: center;
+            min-width: 90px; text-align: center;
         }
-        .status-hadir { background: #34C759; }
-        .status-luar { background: #007AFF; }
-        .status-cuti { background: #FF3B30; }
+        .status-hadir { background: #34C759; } /* Hijau */
+        .status-luar { background: #007AFF; }  /* Biru (Onsite/FAT) */
+        .status-cuti { background: #FF3B30; }  /* Merah (Cuti/Sakit) */
+        
         .refresh-btn { 
             background: #007AFF; color: white; border: none; 
             padding: 8px 15px; border-radius: 10px; cursor: pointer;
@@ -70,49 +69,54 @@
         const list = document.getElementById('mainList');
         list.innerHTML = "<div style='text-align:center; padding:20px;'>MENYEMAK DATABASE...</div>";
 
-        // 1. DEFINISI HIERARKI (HURUF BESAR)
         const hierarki = {
-            'KETUA JABATAN': 1,
-            'KETUA SEKSYEN': 2,
-            'EKSEKUTIF KANAN': 3,
-            'EKSEKUTIF': 4,
-            'JURUTEKNIK': 5,
-            'PENYELIA PENTADBIRAN': 6,
-            'PEMBANTU PENTADBIRAN': 7,
-            'KERANI': 8
+            'KETUA JABATAN': 1, 'KETUA SEKSYEN': 2, 'EKSEKUTIF KANAN': 3,
+            'EKSEKUTIF': 4, 'PENYELIA PENTADBIRAN': 5, 'PEMBANTU PENTADBIRAN': 6,
+            'JURUTEKNIK': 7, 'KERANI': 8
         };
 
         try {
-            // 2. AMBIL DATA STAF
+            // 1. Ambil Data Staf
             const resS = await fetch(S_URL + '/rest/v1/staff?select=*', {
                 headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY }
             });
             let allStaff = await resS.json();
 
-            // 3. SUSUN STAF MENGIKUT PANGKAT
-            allStaff.sort((a, b) => {
-                const jA = (a.jawatan || "").toUpperCase();
-                const jB = (b.jawatan || "").toUpperCase();
-                const p1 = hierarki[jA] || 99;
-                const p2 = hierarki[jB] || 99;
-                
-                if (p1 !== p2) return p1 - p2;
-                return (a.nama || "").toUpperCase().localeCompare((b.nama || "").toUpperCase());
-            });
-
-            // 4. AMBIL KEHADIRAN HARI INI
-            const today = new Date().toISOString().split('T')[0];
-            const resA = await fetch(S_URL + '/rest/v1/attendance?select=*&tarikh_mula=lte.' + today + '&tarikh_akhir=gte.' + today, {
+            // 2. Ambil Semua Kehadiran
+            const resA = await fetch(S_URL + '/rest/v1/attendance?select=*', {
                 headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY }
             });
-            const activeAtt = await resA.json();
+            const allAtt = await resA.json();
+
+            // 3. Set Tarikh Hari Ini (Tanpa Jam)
+            const hariIni = new Date();
+            hariIni.setHours(0, 0, 0, 0);
+
+            // 4. Susun Staf mengikut Pangkat
+            allStaff.sort((a, b) => {
+                const jA = (a.jawatan || "").toUpperCase().trim();
+                const jB = (b.jawatan || "").toUpperCase().trim();
+                const p1 = hierarki[jA] || 99;
+                const p2 = hierarki[jB] || 99;
+                if (p1 !== p2) return p1 - p2;
+                return (a.nama || "").toUpperCase().trim().localeCompare((b.nama || "").toUpperCase().trim());
+            });
 
             list.innerHTML = "";
 
-            // 5. PAPARKAN SENARAI
+            // 5. Padankan Staf dengan Kehadiran
             allStaff.forEach(staf => {
-                const sNama = (staf.nama || "").toUpperCase();
-                const record = activeAtt.find(a => (a.nama || "").toUpperCase() === sNama);
+                const sNama = (staf.nama || "").toUpperCase().trim();
+                
+                // Cari rekod yang sepadan dengan nama DAN tarikh hari ini berada dalam range
+                const record = allAtt.find(a => {
+                    const namaAtt = (a.nama || "").toUpperCase().trim();
+                    const tMula = new Date(a.tarikh_mula);
+                    const tAkhir = new Date(a.tarikh_akhir);
+                    tMula.setHours(0,0,0,0);
+                    tAkhir.setHours(0,0,0,0);
+                    return namaAtt === sNama && hariIni >= tMula && hariIni <= tAkhir;
+                });
                 
                 let sText = "HADIR";
                 let sClass = "status-hadir";
@@ -120,17 +124,23 @@
 
                 if (record) {
                     sText = (record.sebab || "LUAR").toUpperCase();
-                    sClass = sText.includes('CUTI') ? 'status-cuti' : 'status-luar';
+                    // Jika sebab ada perkataan CUTI atau SAKIT, automatik jadi MERAH
+                    if (sText.includes("CUTI") || sText.includes("SAKIT")) {
+                        sClass = "status-cuti";
+                    } else {
+                        sClass = "status-luar";
+                    }
                     sSub = sSub + " • SEHINGGA: " + record.tarikh_akhir;
                 }
 
-                let itemHtml = '<div class="staf-card">';
-                itemHtml += '<div><div style="font-weight:bold">' + sNama + '</div>';
-                itemHtml += '<div style="font-size:11px; color:gray; margin-top:3px;">' + sSub + '</div></div>';
-                itemHtml += '<div class="badge ' + sClass + '">' + sText + '</div>';
-                itemHtml += '</div>';
-                
-                list.innerHTML += itemHtml;
+                list.innerHTML += `
+                    <div class="staf-card">
+                        <div>
+                            <div style="font-weight:bold">${sNama}</div>
+                            <div style="font-size:11px; color:gray; margin-top:3px;">${sSub}</div>
+                        </div>
+                        <div class="badge ${sClass}">${sText}</div>
+                    </div>`;
             });
 
         } catch (err) {
@@ -138,7 +148,6 @@
         }
     }
 
-    // Papar tarikh hari ini dalam format Malaysia
     const opsi = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
     document.getElementById('todayDate').innerText = new Date().toLocaleDateString('ms-MY', opsi).toUpperCase();
     
