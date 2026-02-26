@@ -16,7 +16,7 @@
     
     <style>
         :root {
-            /* Light Mode Variables (Default) */
+            /* Warna Mod Cahaya (Asal) */
             --bg-color: #a1c4fd;
             --bg-gradient: linear-gradient(120deg, rgba(161, 196, 253, 1) 0%, rgba(194, 233, 251, 1) 33%, rgba(251, 194, 235, 1) 66%, rgba(161, 196, 253, 1) 100%);
             --glass-white: rgba(255, 255, 255, 0.45);
@@ -27,7 +27,7 @@
             --input-bg: rgba(255, 255, 255, 0.4);
         }
 
-        /* Dark Mode Variables - Diaktifkan hanya oleh class .dark-mode */
+        /* Mod Gelap - Hanya aktif jika body mempunyai class .dark-mode */
         body.dark-mode {
             --bg-color: #0f172a;
             --bg-gradient: linear-gradient(120deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
@@ -38,11 +38,11 @@
             --input-bg: rgba(15, 23, 42, 0.5);
         }
 
-        /* Memastikan sistem phone tidak override warna asal */
+        /* Menyekat paksaan mod gelap daripada tetapan sistem Android/iOS */
         @media (prefers-color-scheme: dark) {
             body:not(.dark-mode) {
-                background-color: var(--bg-color);
-                background-image: var(--bg-gradient);
+                background-color: var(--bg-color) !important;
+                background-image: var(--bg-gradient) !important;
             }
         }
 
@@ -71,7 +71,7 @@
             padding: 15px;
         }
 
-        /* TOGGLE BUTTON STYLE */
+        /* BUTANG TOGGLE TEMA */
         .theme-toggle {
             position: fixed;
             top: 25px;
@@ -97,7 +97,7 @@
             transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
-        /* Bila Dark Mode aktif, ikon pusing & tukar warna */
+        /* Animasi Ikon bila bertukar tema */
         body.dark-mode .theme-toggle i {
             transform: rotate(360deg);
             color: #f8fafc; /* Warna Bulan */
@@ -173,6 +173,7 @@
             align-items: center;
             gap: 15px;
             cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             box-shadow: 0 8px 20px rgba(0,0,0,0.03);
         }
 
@@ -336,7 +337,7 @@
     const scriptURL = 'https://script.google.com/macros/s/AKfycbyevEpq-KgKJYRvNPge6OTAbf8Hl-bkr_0uAqQ6NhFuq0dzkq3l3ApShnhA2lDNP0ZfHQ/exec'; 
     let allStaffData = [];
 
-    // --- DARK MODE LOGIC ---
+    // --- LOGIK TEMA (DARK/LIGHT) ---
     function toggleTheme() {
         const body = document.body;
         const icon = document.querySelector('#themeToggle i');
@@ -344,21 +345,21 @@
         body.classList.toggle('dark-mode');
         
         if(body.classList.contains('dark-mode')) {
-            icon.classList.replace('fa-sun', 'fa-moon');
+            icon.classList.replace('fa-sun', 'fa-moon'); // Tukar kepada Bulan
             localStorage.setItem('me-connect-theme', 'dark');
         } else {
-            icon.classList.replace('fa-moon', 'fa-sun');
+            icon.classList.replace('fa-moon', 'fa-sun'); // Tukar kepada Matahari
             localStorage.setItem('me-connect-theme', 'light');
         }
     }
 
-    // Load saved theme (Ignore system settings)
+    // Kekalkan tema yang disimpan (abaikan mod sistem telefon)
     if(localStorage.getItem('me-connect-theme') === 'dark') {
         document.body.classList.add('dark-mode');
         document.querySelector('#themeToggle i').classList.replace('fa-sun', 'fa-moon');
     }
 
-    // --- NAVIGATION ---
+    // --- NAVIGASI HALAMAN ---
     function showForm() {
         document.getElementById('homePage').style.display = 'none';
         document.getElementById('formPage').style.display = 'block';
@@ -369,7 +370,7 @@
         document.getElementById('formPage').style.display = 'none';
     }
 
-    // --- DATA LOGIC ---
+    // --- LOGIK DATA STAF ---
     window.onload = function() {
         fetch(scriptURL + "?action=getStaff")
             .then(res => res.json())
@@ -378,7 +379,13 @@
                 let jawatanSelect = document.getElementById('jawatan');
                 let uniqueJawatan = [...new Set(data.map(item => item[1]))];
                 const customOrder = ["Ketua Jabatan", "Ketua Seksyen", "Eksekutif Kanan", "Eksekutif", "Juruteknik", "Penyelia Pentadbiran", "Pembantu Pentadbiran", "Kerani"];
-                uniqueJawatan.sort((a, b) => (customOrder.indexOf(a) === -1 ? 99 : customOrder.indexOf(a)) - (customOrder.indexOf(b) === -1 ? 99 : customOrder.indexOf(b)));
+                
+                uniqueJawatan.sort((a, b) => {
+                    let indexA = customOrder.indexOf(a);
+                    let indexB = customOrder.indexOf(b);
+                    return (indexA === -1 ? 99 : indexA) - (indexB === -1 ? 99 : indexB);
+                });
+
                 uniqueJawatan.forEach(j => {
                     if(j) {
                         let opt = document.createElement('option');
@@ -396,13 +403,16 @@
         if (selectedJawatan) {
             namaSelect.disabled = false;
             allStaffData.filter(row => row[1] === selectedJawatan).forEach(row => {
-                let opt = document.createElement('option');
-                opt.value = opt.innerHTML = row[0];
-                namaSelect.appendChild(opt);
+                if(row[0]) {
+                    let opt = document.createElement('option');
+                    opt.value = opt.innerHTML = row[0];
+                    namaSelect.appendChild(opt);
+                }
             });
         }
     }
 
+    // --- PENGHANTARAN BORANG ---
     document.getElementById('absenceForm').addEventListener('submit', function(e) {
         e.preventDefault();
         const btn = document.getElementById('submitBtn');
@@ -414,7 +424,7 @@
                 location.reload();
             })
             .catch(() => {
-                alert("❌ Ralat!");
+                alert("❌ Ralat berlaku!");
                 btn.disabled = false;
                 document.getElementById('loading').style.display = 'none';
             });
