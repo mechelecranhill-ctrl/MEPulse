@@ -5,358 +5,161 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>M&E-Connect</title>
     
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icon.png">
-    
     <meta name="color-scheme" content="light only">
     <meta name="supported-color-schemes" content="light">
-    <meta name="theme-color" content="#ffffff">
     
-    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;600&family=Plus+Jakarta+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;600&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
     <style>
-        /* FORCE LIGHT MODE COLORS */
+        /* STRATEGI ANTI-SAMSUNG FORCE DARK MODE */
         :root {
-            color-scheme: light only;
             --bg-color: #a1c4fd !important;
-            --bg-gradient: linear-gradient(120deg, rgba(161, 196, 253, 1) 0%, rgba(194, 233, 251, 1) 33%, rgba(251, 194, 235, 1) 66%, rgba(161, 196, 253, 1) 100%) !important;
-            --glass-white: rgba(255, 255, 255, 0.45) !important;
-            --glass-border: rgba(255, 255, 255, 0.6) !important;
-            --text-primary: #1d1d1f !important;
-            --text-secondary: rgba(0,0,0,0.5) !important;
-            --ios-blue: #007AFF !important;
-            --input-bg: rgba(255, 255, 255, 0.4) !important;
+            --bg-grad: linear-gradient(120deg, #a1c4fd 0%, #c2e9fb 33%, #fbc2eb 66%, #a1c4fd 100%) !important;
+            --text-p: #1d1d1f !important;
+            --glass: rgba(255, 255, 255, 0.45) !important;
         }
 
-        /* MANUAL DARK MODE (Hanya bila body ada .dark-mode) */
-        body.dark-mode {
-            color-scheme: dark !important;
-            --bg-color: #0f172a !important;
-            --bg-gradient: linear-gradient(120deg, #0f172a 0%, #1e293b 50%, #0f172a 100%) !important;
-            --glass-white: rgba(30, 41, 59, 0.8) !important;
-            --glass-border: rgba(255, 255, 255, 0.1) !important;
-            --text-primary: #f8fafc !important;
-            --text-secondary: rgba(255, 255, 255, 0.6) !important;
-            --input-bg: rgba(15, 23, 42, 0.5) !important;
-        }
-
-        /* Sekat Samsung/Android daripada tukar warna secara automatik */
+        /* Jika Samsung paksa Dark Mode, kita paksa ia kembali cerah menggunakan filter */
         @media (prefers-color-scheme: dark) {
-            body:not(.dark-mode) {
-                background-color: var(--bg-color) !important;
-                background-image: var(--bg-gradient) !important;
+            html:not(.dark-mode-active) {
+                filter: none !important;
             }
         }
 
-        * { 
-            box-sizing: border-box; 
-            -webkit-tap-highlight-color: transparent; 
-            font-family: 'SF Pro Display', 'Plus Jakarta Sans', sans-serif;
-            transition: background 0.4s ease, color 0.4s ease, border 0.4s ease;
-        }
-
         body {
-            background-color: var(--bg-color); 
-            background-image: var(--bg-gradient);
+            margin: 0; padding: 0;
+            background-color: var(--bg-color);
+            background-image: var(--bg-grad);
             background-size: 400% 400% !important;
-            background-attachment: fixed;
-            animation: liquidMove 15s ease-in-out infinite;
-            margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            width: 100vw;
-            overflow: hidden;
-            padding: 15px;
+            animation: move 15s infinite;
+            height: 100vh; width: 100vw;
+            display: flex; justify-content: center; align-items: center;
+            transition: 0.5s;
         }
 
-        /* --- THEME TOGGLE (Matahari/Bulan Terbalik + Pusing) --- */
-        .theme-switch {
-            position: fixed;
-            top: 25px;
-            right: 25px;
-            z-index: 1000;
-            width: 45px;
-            height: 45px;
-            background: var(--glass-white);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            border: 1.5px solid var(--glass-border);
-            border-radius: 15px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        /* MOD GELAP MANUAL */
+        body.dark-mode-active {
+            --bg-color: #0f172a !important;
+            --bg-grad: linear-gradient(120deg, #0f172a 0%, #1e293b 50%, #0f172a 100%) !important;
+            --text-p: #f8fafc !important;
+            --glass: rgba(30, 41, 59, 0.8) !important;
         }
 
-        .theme-switch i {
-            font-size: 20px;
-            color: #ffcc00; /* Matahari asal */
-            transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.4s ease;
+        @keyframes move { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+
+        /* BUTANG TOGGLE PUSING */
+        .theme-btn {
+            position: fixed; top: 25px; right: 25px; z-index: 9999;
+            width: 48px; height: 48px; border-radius: 15px;
+            background: var(--glass); border: 1.5px solid rgba(255,255,255,0.6);
+            display: flex; justify-content: center; align-items: center; cursor: pointer;
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
         }
 
-        body.dark-mode .theme-switch i {
-            transform: rotate(360deg); /* Animasi pusing */
-            color: #f8fafc; /* Bulan malam */
+        .theme-btn i {
+            font-size: 22px; color: #ffcc00; /* Matahari cerah */
+            transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1), color 0.5s;
         }
 
-        @keyframes liquidMove {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
+        /* Keadaan bila Dark Mode (Bulan) */
+        body.dark-mode-active .theme-btn i {
+            transform: rotate(360deg);
+            color: #f8fafc;
         }
 
-        .container {
-            width: 100%;
-            max-width: 370px;
-            display: flex;
-            flex-direction: column;
+        .container { width: 90%; max-width: 370px; position: relative; }
+
+        /* KAD ASAL ANDA */
+        .card {
+            background: var(--glass);
+            backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            border-radius: 30px; padding: 30px;
+            border: 1.5px solid rgba(255,255,255,0.5);
+            color: var(--text-p);
+            text-align: center;
         }
 
-        /* HALAMAN UTAMA */
-        #homePage {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            animation: fadeIn 0.8s ease-out;
-        }
-
-        .logo-box {
-            width: 100px;
-            height: 100px;
-            background: var(--glass-white);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-radius: 28px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-bottom: 20px;
-            border: 1.5px solid var(--glass-border);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
-        }
-
-        .logo-box img { max-width: 80%; object-fit: contain; }
-
-        .welcome-text { text-align: center; margin-bottom: 30px; }
-        .welcome-text h1 { font-size: 28px; margin: 0; font-weight: 600; color: var(--text-primary); letter-spacing: -1px; }
-        .welcome-text p { color: var(--text-secondary); margin: 5px 0 0; font-size: 14px; }
-
-        .menu-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 12px;
-            width: 100%;
-        }
-
+        .menu-grid { display: grid; gap: 12px; margin-top: 25px; width: 100%; }
         .menu-item {
-            background: var(--glass-white);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1.5px solid var(--glass-border);
-            padding: 18px 20px;
-            border-radius: 22px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            cursor: pointer;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.03);
+            background: var(--glass); padding: 18px; border-radius: 20px;
+            display: flex; align-items: center; gap: 15px; cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.3); text-align: left;
         }
 
-        .menu-icon {
-            width: 45px;
-            height: 45px;
-            background: var(--ios-blue);
-            border-radius: 12px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            font-size: 20px;
-        }
-
-        .menu-content h3 { margin: 0; font-size: 16px; font-weight: 600; color: var(--text-primary); }
-        .menu-content p { margin: 2px 0 0; font-size: 12px; color: var(--text-secondary); }
-
-        /* HALAMAN BORANG */
-        #formPage { display: none; animation: slideUp 0.6s ease-out; }
-        .glass-card {
-            background: var(--glass-white);
-            backdrop-filter: blur(40px);
-            -webkit-backdrop-filter: blur(40px);
-            border-radius: 38px;
-            border: 1.5px solid var(--glass-border);
-            padding: 25px 22px;
-            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.1);
-        }
-
-        .header { text-align: center; margin-bottom: 20px; position: relative; }
-        .header h1 { font-size: 22px; margin: 0; color: var(--text-primary); }
-        .back-btn { position: absolute; left: 0; top: 5px; color: var(--ios-blue); cursor: pointer; }
-
-        label { font-size: 10px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; display: block; text-transform: uppercase; }
-        select, input {
-            width: 100%; padding: 12px; background: var(--input-bg);
-            border: 1px solid var(--glass-border); border-radius: 14px;
-            color: var(--text-primary); outline: none; margin-bottom: 15px;
-        }
-
-        button#submitBtn {
-            width: 100%; padding: 16px; background: var(--ios-blue);
-            color: white; border: none; border-radius: 18px;
-            font-size: 15px; font-weight: 600; cursor: pointer;
-        }
-
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        #formPage { display: none; }
     </style>
 </head>
-<body>
+<body id="mainBody">
 
-<div class="theme-switch" onclick="toggleTheme()">
-    <i id="themeIcon" class="fa-solid fa-sun"></i>
-</div>
-
-<div class="container">
-    <div id="homePage">
-        <div class="logo-box">
-            <img src="logo.png" alt="Logo">
-        </div>
-        <div class="welcome-text">
-            <h1>M&E-Connect</h1>
-            <p>M&E Digital Attendance Solution</p>
-        </div>
-
-        <div class="menu-grid">
-            <div class="menu-item" onclick="showForm()">
-                <div class="menu-icon"><i class="fa-solid fa-calendar-check"></i></div>
-                <div class="menu-content">
-                    <h3>Attendance</h3>
-                    <p>Rekod ketidakhadiran staf</p>
-                </div>
-            </div>
-
-            <div class="menu-item" onclick="alert('Modul Kontrak akan datang')">
-                <div class="menu-icon" style="background: #34C759;"><i class="fa-solid fa-file-contract"></i></div>
-                <div class="menu-content">
-                    <h3>Kontrak</h3>
-                    <p>Pengurusan dokumen kontrak</p>
-                </div>
-            </div>
-
-            <div class="menu-item" onclick="alert('Modul Direktori akan datang')">
-                <div class="menu-icon" style="background: #5856D6;"><i class="fa-solid fa-address-book"></i></div>
-                <div class="menu-content">
-                    <h3>User Directory</h3>
-                    <p>Senarai maklumat staf</p>
-                </div>
-            </div>
-        </div>
+    <div class="theme-btn" onclick="tukarTema()">
+        <i id="ikon" class="fa-solid fa-sun"></i>
     </div>
 
-    <div id="formPage">
-        <div class="glass-card">
-            <div class="header">
-                <div class="back-btn" onclick="showHome()"><i class="fa-solid fa-chevron-left"></i></div>
-                <h1>Attendance</h1>
+    <div class="container">
+        <div id="homePage">
+            <div style="background:var(--glass); width:80px; height:80px; border-radius:20px; margin:0 auto 20px; display:flex; justify-content:center; align-items:center;">
+                <img src="logo.png" style="width:70%;">
             </div>
+            <h1 style="margin:0; color:var(--text-p);">M&E-Connect</h1>
+            <p style="color:var(--text-p); opacity:0.6; font-size:14px;">Digital Attendance System</p>
 
-            <form id="absenceForm">
-                <label>Jawatan</label>
-                <select id="jawatan" name="jawatan" onchange="updateNama()" required>
-                    <option value="">Pilih Jawatan</option>
-                </select>
+            <div class="menu-grid">
+                <div class="menu-item" onclick="bukaForm()">
+                    <div style="background:#007AFF; width:40px; height:40px; border-radius:10px; display:flex; justify-content:center; align-items:center; color:white;">
+                        <i class="fa-solid fa-calendar-check"></i>
+                    </div>
+                    <div>
+                        <b style="color:var(--text-p); display:block;">Attendance</b>
+                        <small style="color:var(--text-p); opacity:0.6;">Rekod kehadiran harian</small>
+                    </div>
+                </div>
+                </div>
+        </div>
 
-                <label>Nama Staf</label>
-                <select id="nama" name="nama" required disabled>
-                    <option value="">Pilih Nama</option>
-                </select>
-
-                <label>Sebab</label>
-                <select name="sebab" required>
-                    <option value="Kerja Lapangan">Kerja Lapangan (Onsite)</option>
-                    <option value="Mesyuarat">Mesyuarat</option>
-                    <option value="Cuti">Cuti Rehat/Sakit</option>
-                </select>
-
-                <button type="submit" id="submitBtn">Hantar Rekod</button>
+        <div id="formPage" class="card">
+            <div style="display:flex; align-items:center; margin-bottom:20px;">
+                <i class="fa-solid fa-chevron-left" onclick="tutupForm()" style="color:#007AFF; cursor:pointer;"></i>
+                <h2 style="flex:1; margin:0; font-size:20px;">Attendance</h2>
+            </div>
+            <form>
+                <div style="text-align:left;">
+                    <label style="font-size:10px; font-weight:600; opacity:0.7;">JAWATAN</label>
+                    <select style="width:100%; padding:12px; margin:5px 0 15px; border-radius:12px; border:1px solid rgba(255,255,255,0.5); background:rgba(255,255,255,0.2); color:var(--text-p);">
+                        <option>Pilih Jawatan</option>
+                    </select>
+                </div>
+                <button style="width:100%; padding:15px; border-radius:15px; border:none; background:#007AFF; color:white; font-weight:600;">Hantar</button>
             </form>
         </div>
     </div>
-</div>
 
 <script>
-    const scriptURL = 'SILA_MASUKKAN_URL_GOOGLE_SCRIPT_ANDA';
-    let allStaffData = [];
-
-    // --- LOGIK TEMA (Matahari pusing jadi Bulan) ---
-    function toggleTheme() {
-        const body = document.body;
-        const icon = document.getElementById('themeIcon');
+    function tukarTema() {
+        const body = document.getElementById('mainBody');
+        const ikon = document.getElementById('ikon');
         
-        body.classList.toggle('dark-mode');
+        body.classList.toggle('dark-mode-active');
         
-        if (body.classList.contains('dark-mode')) {
-            // Tukar ikon ke Bulan di pertengahan pusingan
-            setTimeout(() => icon.classList.replace('fa-sun', 'fa-moon'), 250);
-            localStorage.setItem('user-app-theme', 'dark');
+        if(body.classList.contains('dark-mode-active')) {
+            // Animasi pusing dan tukar ke BULAN
+            setTimeout(() => ikon.classList.replace('fa-sun', 'fa-moon'), 200);
+            localStorage.setItem('temaSimpan', 'malam');
         } else {
-            // Tukar ikon ke Matahari di pertengahan pusingan
-            setTimeout(() => icon.classList.replace('fa-moon', 'fa-sun'), 250);
-            localStorage.setItem('user-app-theme', 'light');
+            // Animasi pusing dan tukar ke MATAHARI
+            setTimeout(() => ikon.classList.replace('fa-moon', 'fa-sun'), 200);
+            localStorage.setItem('temaSimpan', 'siang');
         }
     }
 
-    // Kekalkan tema bila refresh (Anti-Samsung Override)
-    if (localStorage.getItem('user-app-theme') === 'dark') {
-        document.body.classList.add('dark-mode');
-        document.getElementById('themeIcon').classList.replace('fa-sun', 'fa-moon');
+    // Load tema asal
+    if(localStorage.getItem('temaSimpan') === 'malam') {
+        document.getElementById('mainBody').classList.add('dark-mode-active');
+        document.getElementById('ikon').classList.replace('fa-sun', 'fa-moon');
     }
 
-    // --- NAVIGASI ---
-    function showForm() {
-        document.getElementById('homePage').style.display = 'none';
-        document.getElementById('formPage').style.display = 'block';
-    }
-
-    function showHome() {
-        document.getElementById('homePage').style.display = 'flex';
-        document.getElementById('formPage').style.display = 'none';
-    }
-
-    // --- FETCH DATA STAFF ---
-    window.onload = function() {
-        fetch(scriptURL + "?action=getStaff")
-            .then(res => res.json())
-            .then(data => {
-                allStaffData = data;
-                let jawatanSelect = document.getElementById('jawatan');
-                let uniqueJawatan = [...new Set(data.map(item => item[1]))];
-                uniqueJawatan.forEach(j => {
-                    let opt = document.createElement('option');
-                    opt.value = opt.innerHTML = j;
-                    jawatanSelect.appendChild(opt);
-                });
-            })
-            .catch(err => console.log("Ralat data:", err));
-    };
-
-    function updateNama() {
-        let selectedJawatan = document.getElementById('jawatan').value;
-        let namaSelect = document.getElementById('nama');
-        namaSelect.innerHTML = '<option value="">Pilih Nama</option>';
-        if (selectedJawatan) {
-            namaSelect.disabled = false;
-            allStaffData.filter(row => row[1] === selectedJawatan).forEach(row => {
-                let opt = document.createElement('option');
-                opt.value = opt.innerHTML = row[0];
-                namaSelect.appendChild(opt);
-            });
-        }
-    }
+    function bukaForm() { document.getElementById('homePage').style.display='none'; document.getElementById('formPage').style.display='block'; }
+    function tutupForm() { document.getElementById('homePage').style.display='block'; document.getElementById('formPage').style.display='none'; }
 </script>
 </body>
 </html>
