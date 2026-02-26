@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M&E-Connect | Dashboard Kehadiran</title>
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #a1c4fd;
+            --bg-gradient: linear-gradient(120deg, #a1c4fd 0%, #c2e9fb 33%, #fbc2eb 66%, #a1c4fd 100%);
+            --glass: rgba(255, 255, 255, 0.45);
+            --border: rgba(255, 255, 255, 0.6);
+            --text: #1d1d1f;
+        }
+
+        body {
+            background: var(--bg-color) var(--bg-gradient) fixed;
+            background-size: 400% 400%;
+            animation: move 15s ease infinite;
+            font-family: 'SF Pro Display', sans-serif;
+            margin: 0; padding: 20px;
+            display: flex; justify-content: center;
+        }
+
+        @keyframes move { 0%, 100% {background-position:0% 50%} 50% {background-position:100% 50%} }
+
+        .dashboard-container { width: 100%; max-width: 800px; }
+
+        .glass-header {
+            background: var(--glass); backdrop-filter: blur(20px);
+            border: 1.5px solid var(--border); border-radius: 20px;
+            padding: 20px; margin-bottom: 20px; text-align: center;
+        }
+
+        .record-card {
+            background: var(--glass); backdrop-filter: blur(15px);
+            border: 1.5px solid var(--border); border-radius: 15px;
+            padding: 15px; margin-bottom: 10px;
+            display: grid; grid-template-columns: 1fr auto;
+            align-items: center; transition: 0.3s;
+        }
+
+        .badge {
+            padding: 5px 12px; border-radius: 10px; font-size: 11px; font-weight: 600;
+            color: white; text-transform: uppercase;
+        }
+
+        /* Warna Status */
+        .onsite { background: #007AFF; }
+        .cuti { background: #FF3B30; }
+        .fat { background: #34C759; }
+        .mesyuarat { background: #5856D6; }
+
+        .info h4 { margin: 0; font-size: 16px; color: var(--text); }
+        .info p { margin: 3px 0 0; font-size: 12px; color: rgba(0,0,0,0.6); }
+
+        .refresh-btn {
+            background: white; border: none; padding: 10px 20px;
+            border-radius: 12px; cursor: pointer; font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <div class="glass-header">
+        <h2 style="margin:0;">Rekod Kehadiran Semasa</h2>
+        <p style="font-size:13px; opacity:0.7;">Data dikemaskini terus dari Supabase</p>
+        <button class="refresh-btn" onclick="fetchRecords()"><i class="fa-solid fa-sync"></i> Refresh</button>
+    </div>
+
+    <div id="attendanceList">
+        </div>
+</div>
+
+<script>
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+    const SUPABASE_KEY = 'YOUR_SUPABASE_KEY';
+
+    async function fetchRecords() {
+        const list = document.getElementById('attendanceList');
+        list.innerHTML = "<p style='text-align:center;'>Menarik data...</p>";
+
+        try {
+            // Kita ambil data dan susun ikut tarikh paling baru (created_at DESC)
+            const res = await fetch(${SUPABASE_URL}/rest/v1/attendance?select=*&order=created_at.desc, {
+                headers: { 'apikey': SUPABASE_KEY, 'Authorization': Bearer ${SUPABASE_KEY} }
+            });
+            const data = await res.json();
+            
+            list.innerHTML = "";
+            if(data.length === 0) {
+                list.innerHTML = "<div class='record-card'>Tiada rekod aktif ditemui.</div>";
+                return;
+            }
+
+            data.forEach(item => {
+                const statusClass = item.sebab.toLowerCase().includes('onsite') ? 'onsite' : 
+                                    item.sebab.toLowerCase().includes('cuti') ? 'cuti' : 
+                                    item.sebab.toLowerCase().includes('fat') ? 'fat' : 'mesyuarat';
+
+                list.innerHTML += `
+                    <div class="record-card">
+                        <div class="info">
+                            <h4>${item.nama}</h4>
+                            <p>${item.jawatan} • <strong>${item.tarikh_mula}</strong> hingga <strong>${item.tarikh_akhir}</strong></p>
+                        </div>
+                        <div class="badge ${statusClass}">${item.sebab}</div>
+                    </div>
+                `;
+            });
+        } catch (e) {
+            list.innerHTML = "<p style='color:red;'>Gagal memuatkan data.</p>";
+        }
+    }
+
+    // Jalankan automatik bila buka page
+    window.onload = fetchRecords;
+</script>
+</body>
+</html>
