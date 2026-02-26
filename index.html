@@ -213,10 +213,23 @@
 </div>
 
 <script>
+<script>
 const SUPABASE_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48'; 
 
 let staffData = [];
+
+// DEFINISI HIERARKI JAWATAN
+const hierarki = {
+    'KETUA JABATAN': 1,
+    'KETUA SEKSYEN': 2,
+    'EKSEKUTIF KANAN': 3,
+    'EKSEKUTIF': 4,
+    'PENYELIA PENTADBIRAN': 5,
+    'PEMBANTU PENTADBIRAN': 6,
+    'JURUTEKNIK': 7,
+    'KERANI': 8
+};
 
 function showPage(pageId) {
     const pages = document.querySelectorAll('.page');
@@ -230,12 +243,24 @@ async function loadStaff() {
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
         });
         staffData = await res.json();
+        
         const jSel = document.getElementById('jawatan');
         jSel.innerHTML = '<option value="">Pilih Jawatan</option>';
-        const uniqueJawatan = [...new Set(staffData.map(s => s.jawatan))];
-        uniqueJawatan.sort().forEach(j => {
+        
+        // AMBIL JAWATAN UNIK
+        const uniqueJawatan = [...new Set(staffData.map(s => s.jawatan.toUpperCase().trim()))];
+        
+        // SUSUN JAWATAN MENGIKUT HIERARKI
+        uniqueJawatan.sort((a, b) => {
+            const p1 = hierarki[a] || 99;
+            const p2 = hierarki[b] || 99;
+            return p1 - p2;
+        });
+
+        uniqueJawatan.forEach(j => {
             const opt = document.createElement('option');
-            opt.value = j; opt.innerText = j.toUpperCase();
+            opt.value = j; 
+            opt.innerText = j;
             jSel.appendChild(opt);
         });
     } catch (err) { console.error(err); }
@@ -247,11 +272,18 @@ function filterNames() {
     nSel.innerHTML = '<option value="">Pilih Nama</option>';
     if (selJ) {
         nSel.disabled = false;
-        staffData.filter(s => s.jawatan === selJ).forEach(s => {
-            const opt = document.createElement('option');
-            opt.value = s.nama; opt.innerText = s.nama.toUpperCase();
-            nSel.appendChild(opt);
-        });
+        // Tapis nama ikut jawatan dan susun ikut abjad
+        staffData
+            .filter(s => s.jawatan.toUpperCase().trim() === selJ)
+            .sort((a, b) => a.nama.localeCompare(b.nama))
+            .forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.nama; 
+                opt.innerText = s.nama.toUpperCase();
+                nSel.appendChild(opt);
+            });
+    } else {
+        nSel.disabled = true;
     }
 }
 
@@ -269,22 +301,17 @@ document.getElementById('attendanceForm').onsubmit = async (e) => {
     btn.innerText = "Mengemaskini...";
 
     try {
-        // 1. CARI REKOD LAMA (NAMA & TARIKH MULA SAMA)
+        // 1. CARI REKOD LAMA
         const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/attendance?nama=eq.${nama}&tarikh_mula=eq.${t1}`, {
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
         });
         const existing = await checkRes.json();
 
-        // 2. JIKA WUJUD, TANYA PENGESAHAN UNTUK REPLACE
+        // 2. JIKA WUJUD, TANYA PENGESAHAN
         if (existing.length > 0) {
             const sahkan = confirm(`REKOD UNTUK ${nama.toUpperCase()} PADA ${t1} SUDAH ADA. ADAKAH ANDA MAHU GANTIKAN DENGAN DATA BARU INI?`);
-            if (!sahkan) {
-                btn.disabled = false;
-                btn.innerText = "Hantar Rekod";
-                return;
-            }
+            if (!sahkan) return;
 
-            // PADAM REKOD LAMA
             await fetch(`${SUPABASE_URL}/rest/v1/attendance?nama=eq.${nama}&tarikh_mula=eq.${t1}`, {
                 method: 'DELETE',
                 headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
@@ -311,6 +338,7 @@ document.getElementById('attendanceForm').onsubmit = async (e) => {
         if (res.ok) {
             alert("✅ REKOD TELAH DIKEMASKINI!");
             document.getElementById('attendanceForm').reset();
+            document.getElementById('nama').disabled = true;
             showPage('homePage');
         } else {
             throw new Error("Gagal simpan");
@@ -324,6 +352,8 @@ document.getElementById('attendanceForm').onsubmit = async (e) => {
 };
 
 window.onload = loadStaff;
+</script>
+
 </script>
 </body>
 </html>
