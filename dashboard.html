@@ -14,6 +14,7 @@
             --glass: rgba(255, 255, 255, 0.45);
             --border: rgba(255, 255, 255, 0.6);
             --text: #1d1d1f;
+            --ios-blue: #007AFF; /* Ditambah untuk back-link */
         }
 
         body {
@@ -46,9 +47,9 @@
         .badge {
             padding: 5px 12px; border-radius: 10px; font-size: 11px; font-weight: 600;
             color: white; text-transform: uppercase;
+            text-align: center; min-width: 80px;
         }
 
-        /* Warna Status */
         .onsite { background: #007AFF; }
         .cuti { background: #FF3B30; }
         .fat { background: #34C759; }
@@ -67,22 +68,19 @@
 
 <div class="dashboard-container">
     <div class="glass-header">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-        <button class="back-link" onclick="window.location.href='index.html'" style="background:none; border:none; color:var(--ios-blue); font-weight:600; cursor:pointer; display:flex; align-items:center; gap:5px; font-size:16px;">
-            <i class="fa-solid fa-chevron-left"></i> Utama
-        </button>
-        
-        <button class="refresh-btn" onclick="fetchRecords()" style="padding: 8px 15px; font-size: 13px;">
-            <i class="fa-solid fa-sync"></i> Refresh
-        </button>
-    </div>
-
-    <h2 style="margin:0; font-size: 24px;">Rekod Kehadiran</h2>
-    <p style="font-size:13px; opacity:0.7; margin-top:5px;">Senarai kakitangan yang tidak berada di pejabat</p>
-</div
-
-    <div id="attendanceList">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <button class="back-link" onclick="window.location.href='index.html'" style="background:none; border:none; color:var(--ios-blue); font-weight:600; cursor:pointer; display:flex; align-items:center; gap:5px; font-size:16px;">
+                <i class="fa-solid fa-chevron-left"></i> Utama
+            </button>
+            
+            <button class="refresh-btn" onclick="fetchRecords()" style="padding: 8px 15px; font-size: 13px;">
+                <i class="fa-solid fa-sync"></i> Refresh
+            </button>
         </div>
+
+        <h2 style="margin:0; font-size: 24px;">Rekod Kehadiran</h2>
+        <p style="font-size:13px; opacity:0.7; margin-top:5px;">Senarai kakitangan yang tidak berada di pejabat</p>
+    </div> <div id="attendanceList"></div>
 </div>
 
 <script>
@@ -94,9 +92,12 @@
         list.innerHTML = "<p style='text-align:center;'>Menarik data...</p>";
 
         try {
-            // Kita ambil data dan susun ikut tarikh paling baru (created_at DESC)
-            const res = await fetch(${SUPABASE_URL}/rest/v1/attendance?select=*&order=created_at.desc, {
-                headers: { 'apikey': SUPABASE_KEY, 'Authorization': Bearer ${SUPABASE_KEY} }
+            // Pembetulan backticks pada fetch URL
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/attendance?select=*&order=created_at.desc`, {
+                headers: { 
+                    'apikey': SUPABASE_KEY, 
+                    'Authorization': `Bearer ${SUPABASE_KEY}` // Pembetulan backticks di sini
+                }
             });
             const data = await res.json();
             
@@ -107,27 +108,4 @@
             }
 
             data.forEach(item => {
-                const statusClass = item.sebab.toLowerCase().includes('onsite') ? 'onsite' : 
-                                    item.sebab.toLowerCase().includes('cuti') ? 'cuti' : 
-                                    item.sebab.toLowerCase().includes('fat') ? 'fat' : 'mesyuarat';
-
-                list.innerHTML += `
-                    <div class="record-card">
-                        <div class="info">
-                            <h4>${item.nama}</h4>
-                            <p>${item.jawatan} • <strong>${item.tarikh_mula}</strong> hingga <strong>${item.tarikh_akhir}</strong></p>
-                        </div>
-                        <div class="badge ${statusClass}">${item.sebab}</div>
-                    </div>
-                `;
-            });
-        } catch (e) {
-            list.innerHTML = "<p style='color:red;'>Gagal memuatkan data.</p>";
-        }
-    }
-
-    // Jalankan automatik bila buka page
-    window.onload = fetchRecords;
-</script>
-</body>
-</html>
+                const sebabText =
