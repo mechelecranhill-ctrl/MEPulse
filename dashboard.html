@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Status Kakitangan M&E</title>
+    <title>STATUS KAKITANGAN M&E</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         body {
             background: #a1c4fd;
-            font-family: sans-serif;
+            font-family: 'SF Pro Display', sans-serif, Arial;
             margin: 0; padding: 20px;
             color: #1d1d1f;
         }
@@ -18,6 +18,7 @@
             padding: 20px; border-radius: 20px;
             text-align: center; margin-bottom: 20px;
             backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
         }
         .staf-card {
             background: white;
@@ -25,11 +26,13 @@
             margin-bottom: 10px;
             display: flex; justify-content: space-between; align-items: center;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
         }
+        .staf-card:active { transform: scale(0.98); }
         .badge {
             padding: 6px 12px; border-radius: 10px;
             font-size: 11px; font-weight: bold; color: white;
-            min-width: 80px; text-align: center;
+            min-width: 85px; text-align: center;
         }
         .status-hadir { background: #34C759; }
         .status-luar { background: #007AFF; }
@@ -37,43 +40,67 @@
         .refresh-btn { 
             background: #007AFF; color: white; border: none; 
             padding: 8px 15px; border-radius: 10px; cursor: pointer;
+            font-weight: bold;
         }
+        h2 { margin: 10px 0 0 0; letter-spacing: 1px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="header">
-        <div style="display:flex; justify-content:space-between">
-            <button onclick="window.location.href='index.html'" style="border:none; background:none; color:#007AFF; cursor:pointer;">
-                <i class="fa-solid fa-chevron-left"></i> Utama
+        <div style="display:flex; justify-content:space-between; align-items: center;">
+            <button onclick="window.location.href='index.html'" style="border:none; background:none; color:#007AFF; cursor:pointer; font-weight: bold;">
+                <i class="fa-solid fa-chevron-left"></i> UTAMA
             </button>
-            <button class="refresh-btn" onclick="fetchAllStatus()">Refresh</button>
+            <button class="refresh-btn" onclick="fetchAllStatus()">REFRESH</button>
         </div>
-        <h2>Status Kakitangan</h2>
-        <p id="todayDate" style="font-size:12px; opacity:0.6;"></p>
+        <h2>STATUS KAKITANGAN</h2>
+        <p id="todayDate" style="font-size:12px; opacity:0.6; font-weight: bold; margin-top: 5px;"></p>
     </div>
 
-    <div id="mainList">Memuatkan senarai...</div>
+    <div id="mainList">MEMUATKAN SENARAI...</div>
 </div>
 
 <script>
-    // PENTING: Masukkan URL & KEY anda di sini
     const S_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
     const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48'; 
 
     async function fetchAllStatus() {
         const list = document.getElementById('mainList');
-        list.innerHTML = "Menyemak database...";
+        list.innerHTML = "<div style='text-align:center; padding:20px;'>MENYEMAK DATABASE...</div>";
+
+        // 1. DEFINISI HIERARKI (HURUF BESAR)
+        const hierarki = {
+            'KETUA JABATAN': 1,
+            'KETUA SEKSYEN': 2,
+            'EKSEKUTIF KANAN': 3,
+            'EKSEKUTIF': 4,
+            'PENYELIA PENTADBIRAN': 5,
+            'PEMBANTU PENTADBIRAN': 6,
+            'JURUTEKNIK': 7,
+            'KERANI': 8
+        };
 
         try {
-            // 1. Ambil Semua Staf
-            const resS = await fetch(S_URL + '/rest/v1/staff?select=*&order=nama.asc', {
+            // 2. AMBIL DATA STAF
+            const resS = await fetch(S_URL + '/rest/v1/staff?select=*', {
                 headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY }
             });
-            const allStaff = await resS.json();
+            let allStaff = await resS.json();
 
-            // 2. Ambil Kehadiran Hari Ini
+            // 3. SUSUN STAF MENGIKUT PANGKAT
+            allStaff.sort((a, b) => {
+                const jA = (a.jawatan || "").toUpperCase();
+                const jB = (b.jawatan || "").toUpperCase();
+                const p1 = hierarki[jA] || 99;
+                const p2 = hierarki[jB] || 99;
+                
+                if (p1 !== p2) return p1 - p2;
+                return (a.nama || "").toUpperCase().localeCompare((b.nama || "").toUpperCase());
+            });
+
+            // 4. AMBIL KEHADIRAN HARI INI
             const today = new Date().toISOString().split('T')[0];
             const resA = await fetch(S_URL + '/rest/v1/attendance?select=*&tarikh_mula=lte.' + today + '&tarikh_akhir=gte.' + today, {
                 headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY }
@@ -82,23 +109,24 @@
 
             list.innerHTML = "";
 
+            // 5. PAPARKAN SENARAI
             allStaff.forEach(staf => {
-                const record = activeAtt.find(a => a.nama === staf.nama);
+                const sNama = (staf.nama || "").toUpperCase();
+                const record = activeAtt.find(a => (a.nama || "").toUpperCase() === sNama);
                 
                 let sText = "HADIR";
                 let sClass = "status-hadir";
-                let sSub = staf.jawatan;
+                let sSub = (staf.jawatan || "").toUpperCase();
 
                 if (record) {
-                    sText = record.sebab.toUpperCase();
+                    sText = (record.sebab || "LUAR").toUpperCase();
                     sClass = sText.includes('CUTI') ? 'status-cuti' : 'status-luar';
-                    sSub = "Sehingga: " + record.tarikh_akhir;
+                    sSub = sSub + " • SEHINGGA: " + record.tarikh_akhir;
                 }
 
-                // Guna String Biasa untuk elakkan Syntax Error
                 let itemHtml = '<div class="staf-card">';
-                itemHtml += '<div><div style="font-weight:bold">' + staf.nama + '</div>';
-                itemHtml += '<div style="font-size:11px; color:gray">' + sSub + '</div></div>';
+                itemHtml += '<div><div style="font-weight:bold">' + sNama + '</div>';
+                itemHtml += '<div style="font-size:11px; color:gray; margin-top:3px;">' + sSub + '</div></div>';
                 itemHtml += '<div class="badge ' + sClass + '">' + sText + '</div>';
                 itemHtml += '</div>';
                 
@@ -106,11 +134,14 @@
             });
 
         } catch (err) {
-            list.innerHTML = "Ralat: " + err.message;
+            list.innerHTML = "<div style='color:red; text-align:center;'>RALAT: " + err.message.toUpperCase() + "</div>";
         }
     }
 
-    document.getElementById('todayDate').innerText = new Date().toLocaleDateString('ms-MY');
+    // Papar tarikh hari ini dalam format Malaysia
+    const opsi = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+    document.getElementById('todayDate').innerText = new Date().toLocaleDateString('ms-MY', opsi).toUpperCase();
+    
     window.onload = fetchAllStatus;
 </script>
 
