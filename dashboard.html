@@ -29,7 +29,7 @@
         }
         .info-section { flex: 1; padding-right: 10px; }
         .status-section { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
-        
+
         .badge {
             padding: 6px 12px; border-radius: 10px;
             font-size: 10px; font-weight: bold; color: white;
@@ -50,12 +50,22 @@
         .status-hadir { background: #34C759; } 
         .status-kerja { background: #007AFF; } 
         .status-cuti { background: #FF3B30; } 
+
+        /* Gaya butang header */
+        .btn-group { display: flex; gap: 8px; }
         
         .refresh-btn { 
             background: #007AFF; color: white; border: none; 
-            padding: 8px 15px; border-radius: 10px; cursor: pointer;
-            font-weight: bold;
+            padding: 8px 12px; border-radius: 10px; cursor: pointer;
+            font-weight: bold; font-size: 12px;
         }
+        
+        .tv-btn {
+            background: #5856D6; color: white; border: none;
+            padding: 8px 12px; border-radius: 10px; cursor: pointer;
+            font-weight: bold; font-size: 12px;
+        }
+
         h2 { margin: 10px 0 0 0; letter-spacing: 1px; font-size: 20px; }
     </style>
 </head>
@@ -64,10 +74,18 @@
 <div class="container">
     <div class="header">
         <div style="display:flex; justify-content:space-between; align-items: center;">
-            <button onclick="window.location.href='index.html'" style="border:none; background:none; color:#007AFF; cursor:pointer; font-weight: bold;">
+            <button onclick="window.location.href='index.html'" style="border:none; background:none; color:#007AFF; cursor:pointer; font-weight: bold; font-size: 14px;">
                 <i class="fa-solid fa-chevron-left"></i> UTAMA
             </button>
-            <button class="refresh-btn" onclick="fetchAllStatus()">REFRESH</button>
+            
+            <div class="btn-group">
+                <button class="tv-btn" onclick="window.location.href='dashboard-tv.html'">
+                    <i class="fa-solid fa-tv"></i> TV MODE
+                </button>
+                <button class="refresh-btn" onclick="fetchAllStatus()">
+                    <i class="fa-solid fa-rotate"></i> REFRESH
+                </button>
+            </div>
         </div>
         <h2>STATUS KAKITANGAN</h2>
         <p id="todayDate" style="font-size:12px; opacity:0.6; font-weight: bold; margin-top: 5px;"></p>
@@ -114,8 +132,7 @@
 
             allStaff.forEach(staf => {
                 const sNama = (staf.nama || "").toUpperCase().trim();
-                
-                // Cari rekod ketiadaan aktif
+
                 const record = allAtt.find(a => {
                     const namaAtt = (a.nama || "").toUpperCase().trim();
                     const tMulaParts = a.tarikh_mula.split('-');
@@ -124,7 +141,7 @@
                     const tAkhir = new Date(tAkhirParts[0], tAkhirParts[1] - 1, tAkhirParts[2]);
                     return namaAtt === sNama && hariIni >= tMula && hariIni <= tAkhir;
                 });
-                
+
                 let sText = "HADIR";
                 let sClass = "status-hadir";
                 let sSub = (staf.jawatan || "").toUpperCase();
@@ -134,8 +151,7 @@
                     sText = (record.sebab || "LUAR").toUpperCase();
                     sClass = (sText.includes("CUTI") || sText.includes("SAKIT") || sText.includes("HALFDAY")) ? "status-cuti" : "status-kerja";
                     sSub = sSub + " • SEHINGGA: " + record.tarikh_akhir;
-                    
-                    // TAMBAH BUTANG PADAM JIKA ADA REKOD (Bukan Hadir)
+
                     deleteButtonHtml = `<button class="delete-btn" onclick="padamRekod('${sNama}', '${record.tarikh_mula}')">
                                             <i class="fa-solid fa-xmark"></i> HADIR
                                         </button>`;
@@ -159,7 +175,6 @@
         }
     }
 
-    // FUNGSI UNTUK PADAM REKOD (Jika staf tiba-tiba hadir)
     async function padamRekod(nama, tarikh) {
         if (!confirm(`ADAKAH ANDA PASTI ${nama} TELAH HADIR? REKOD KETIADAAN HARI INI AKAN DIPADAM.`)) return;
 
@@ -171,7 +186,7 @@
 
             if (res.ok) {
                 alert("REKOD DIPADAM. STATUS KEMBALI KEPADA HADIR.");
-                fetchAllStatus(); // Refresh senarai
+                fetchAllStatus();
             } else {
                 throw new Error("Gagal padam rekod");
             }
@@ -182,7 +197,7 @@
 
     const opsi = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
     document.getElementById('todayDate').innerText = new Date().toLocaleDateString('ms-MY', opsi).toUpperCase();
-    
+
     window.onload = fetchAllStatus;
 </script>
 
