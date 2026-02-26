@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TV DISPLAY - M&E (FIXED)</title>
+    <title>TV DISPLAY - M&E CONNECT</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -41,7 +41,6 @@
 
         #liveClock { font-size: 40px; font-weight: bold; color: var(--neon-blue); }
 
-        /* AREA DATA - PENTING: Jangan ubah ID ini */
         #mainList {
             display: flex;
             flex-direction: column;
@@ -55,26 +54,29 @@
 
         .staf-card {
             background: var(--card-bg);
-            padding: 12px 20px;
+            padding: 12px 18px;
             border-radius: 12px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             border: 1px solid var(--glass-border);
-            width: calc(33.33% - 15px); /* 3 Kolum */
+            width: calc(33.33% - 15px); 
             min-height: 70px;
+            animation: fadeIn 0.5s ease forwards;
         }
 
-        .staf-nama { font-size: 18px; font-weight: bold; text-transform: uppercase; margin-bottom: 4px; }
-        .staf-jawatan { font-size: 11px; color: #94a3b8; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .staf-nama { font-size: 16px; font-weight: bold; text-transform: uppercase; margin-bottom: 2px; }
+        .staf-jawatan { font-size: 10px; color: #94a3b8; }
 
         .badge {
-            padding: 8px 15px;
+            padding: 6px 12px;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 800;
             text-align: center;
-            min-width: 100px;
+            min-width: 90px;
         }
 
         .status-hadir { background: var(--neon-green); color: #052e16; }
@@ -83,9 +85,8 @@
 
         .back-btn {
             position: fixed; bottom: 15px; right: 15px;
-            background: rgba(255,255,255,0.1); color: white;
-            border: 1px solid var(--glass-border); padding: 8px 15px; 
-            border-radius: 8px; cursor: pointer; font-size: 12px;
+            background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.3);
+            border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer;
         }
     </style>
 </head>
@@ -93,26 +94,25 @@
 
 <div class="header">
     <div>
-        <h1 style="margin:0; font-size: 30px;">STATUS M&E CONNECT</h1>
-        <p id="todayDate" style="margin:0; font-size:16px; opacity:0.7;"></p>
+        <h1 style="margin:0; font-size: 28px;">STATUS M&E CONNECT</h1>
+        <p id="todayDate" style="margin:0; font-size:14px; opacity:0.7;"></p>
     </div>
     <div style="text-align:right">
         <div id="liveClock">--:--:--</div>
-        <div id="statusIndicator" style="font-size:12px; color: var(--neon-green);">
-            <i class="fa-solid fa-sync fa-spin"></i> MENGEMASKINI DATA...
+        <div id="statusIndicator" style="font-size:11px; color: #f59e0b;">
+            <i class="fa-solid fa-spinner fa-spin"></i> MEMUAT DATA...
         </div>
     </div>
 </div>
 
 <div id="mainList">
-    <div style="padding: 50px; text-align: center; width: 100%;">
-        <h2>MEMUATKAN DATA STAF...</h2>
+    <div style="width:100%; text-align:center; padding-top:100px;">
+        <i class="fa-solid fa-database fa-fade" style="font-size: 50px; margin-bottom: 20px;"></i>
+        <p>Menyambung ke Supabase Database...</p>
     </div>
 </div>
 
-<button class="back-btn" onclick="window.location.href='dashboard.html'">
-    <i class="fa-solid fa-mobile-screen"></i> MOBILE MODE
-</button>
+<button class="back-btn" onclick="window.location.href='dashboard.html'">MOBILE</button>
 
 <script>
     const S_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
@@ -124,39 +124,90 @@
         const hierarki = { 'KETUA JABATAN': 1, 'KETUA SEKSYEN': 2, 'EKSEKUTIF KANAN': 3, 'EKSEKUTIF': 4, 'PENYELIA PENTADBIRAN': 5, 'PEMBANTU PENTADBIRAN': 6, 'JURUTEKNIK': 7, 'KERANI': 8 };
 
         try {
-            const resS = await fetch(S_URL + '/rest/v1/staff?select=*', { headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY } });
-            if (!resS.ok) throw new Error("Gagal ambil data staf");
+            // 1. Fetch Staff
+            const resS = await fetch(`${S_URL}/rest/v1/staff?select=*`, { 
+                headers: { 'apikey': S_KEY, 'Authorization': `Bearer ${S_KEY}` } 
+            });
+            if (!resS.ok) throw new Error("Database Staff Offline");
             const allStaff = await resS.json();
 
-            const resA = await fetch(S_URL + '/rest/v1/attendance?select=*', { headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY } });
-            if (!resA.ok) throw new Error("Gagal ambil data attendance");
+            // 2. Fetch Attendance
+            const resA = await fetch(`${S_URL}/rest/v1/attendance?select=*`, { 
+                headers: { 'apikey': S_KEY, 'Authorization': `Bearer ${S_KEY}` } 
+            });
+            if (!resA.ok) throw new Error("Database Attendance Offline");
             const allAtt = await resA.json();
 
-            const hariIni = new Date();
-            hariIni.setHours(0,0,0,0);
+            // 3. Process Date
+            const skrg = new Date();
+            const hariIni = new Date(skrg.getFullYear(), skrg.getMonth(), skrg.getDate()).getTime();
 
-            // Sort ikut hierarki
+            // 4. Sort Staff
             allStaff.sort((a, b) => {
-                const jA = (a.jawatan || "").toUpperCase().trim();
-                const jB = (b.jawatan || "").toUpperCase().trim();
-                return (hierarki[jA] || 99) - (hierarki[jB] || 99) || a.nama.localeCompare(b.nama);
+                const pA = hierarki[(a.jawatan || '').toUpperCase().trim()] || 99;
+                const pB = hierarki[(b.jawatan || '').toUpperCase().trim()] || 99;
+                return pA - pB || (a.nama || '').localeCompare(b.nama || '');
             });
 
+            // 5. Render
             list.innerHTML = "";
+            if (allStaff.length === 0) {
+                list.innerHTML = "<p style='width:100%; text-align:center;'>Tiada data staf dijumpai.</p>";
+            }
+
             allStaff.forEach(staf => {
-                const sNama = (staf.nama || "").toUpperCase().trim();
+                const sNama = (staf.nama || "TIADA NAMA").toUpperCase().trim();
+                
+                // Cari record dengan tarikh yang sah
                 const record = allAtt.find(a => {
-                    const tMula = new Date(a.tarikh_mula);
-                    const tAkhir = new Date(a.tarikh_akhir);
-                    tMula.setHours(0,0,0,0); tAkhir.setHours(0,0,0,0);
-                    return (a.nama || "").toUpperCase().trim() === sNama && hariIni >= tMula && hariIni <= tAkhir;
+                    if (!a.tarikh_mula || !a.tarikh_akhir) return false;
+                    const tM = new Date(a.tarikh_mula).getTime();
+                    const tA = new Date(a.tarikh_akhir).getTime();
+                    return (a.nama || "").toUpperCase().trim() === sNama && hariIni >= tM && hariIni <= tA;
                 });
 
                 let sText = "HADIR", sClass = "status-hadir";
                 if (record) {
-                    sText = (record.sebab || "ONSITE").toUpperCase();
+                    sText = (record.sebab || "OUTSTATION").toUpperCase();
                     sClass = (sText.includes("CUTI") || sText.includes("SAKIT") || sText.includes("HALFDAY")) ? "status-cuti" : "status-kerja";
                 }
 
                 list.innerHTML += `
-                    <div
+                    <div class="staf-card">
+                        <div class="staf-info">
+                            <div class="staf-nama">${sNama}</div>
+                            <div class="staf-jawatan">${(staf.jawatan || "STAF").toUpperCase()}</div>
+                        </div>
+                        <div class="badge ${sClass}">${sText}</div>
+                    </div>`;
+            });
+
+            indicator.innerHTML = '<i class="fa-solid fa-check-circle"></i> SISTEM AKTIF';
+            indicator.style.color = "var(--neon-green)";
+
+        } catch (err) {
+            console.error("Ralat Fetch:", err);
+            indicator.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> RALAT DATABASE';
+            indicator.style.color = "var(--neon-red)";
+            list.innerHTML = `<div style="width:100%; text-align:center; padding-top:50px; color:var(--neon-red);">
+                <h3>KONEKSI GAGAL</h3>
+                <p>${err.message}</p>
+                <button onclick="location.reload()" style="background:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-weight:bold;">CUBA SEMULA</button>
+            </div>`;
+        }
+    }
+
+    function updateClock() {
+        const now = new Date();
+        document.getElementById('liveClock').innerText = now.toLocaleTimeString('ms-MY', { hour12: false });
+    }
+
+    // Init
+    document.getElementById('todayDate').innerText = new Date().toLocaleDateString('ms-MY', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase();
+    updateClock();
+    setInterval(updateClock, 1000);
+    fetchAllStatus();
+    setInterval(fetchAllStatus, 30000); // Auto-refresh setiap 30 saat
+</script>
+</body>
+</html>
