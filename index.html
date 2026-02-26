@@ -5,16 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>M&E-Connect</title>
     
-    <meta name="color-scheme" content="light">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.png">
+    
+    <meta name="color-scheme" content="light only">
+    <meta name="supported-color-schemes" content="light">
+    <meta name="theme-color" content="#ffffff">
     
     <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;600&family=Plus+Jakarta+Sans:wght@400;600&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
     <style>
+        /* FORCE LIGHT MODE COLORS */
         :root {
-            /* Warna Mod Cerah (Default) */
+            color-scheme: light only;
             --bg-color: #a1c4fd !important;
-            --bg-gradient: linear-gradient(120deg, #a1c4fd 0%, #c2e9fb 33%, #fbc2eb 66%, #a1c4fd 100%) !important;
+            --bg-gradient: linear-gradient(120deg, rgba(161, 196, 253, 1) 0%, rgba(194, 233, 251, 1) 33%, rgba(251, 194, 235, 1) 66%, rgba(161, 196, 253, 1) 100%) !important;
             --glass-white: rgba(255, 255, 255, 0.45) !important;
             --glass-border: rgba(255, 255, 255, 0.6) !important;
             --text-primary: #1d1d1f !important;
@@ -23,29 +29,30 @@
             --input-bg: rgba(255, 255, 255, 0.4) !important;
         }
 
-        /* Warna Mod Gelap (Manual) */
+        /* MANUAL DARK MODE (Hanya bila body ada .dark-mode) */
         body.dark-mode {
+            color-scheme: dark !important;
             --bg-color: #0f172a !important;
             --bg-gradient: linear-gradient(120deg, #0f172a 0%, #1e293b 50%, #0f172a 100%) !important;
-            --glass-white: rgba(30, 41, 59, 0.7) !important;
+            --glass-white: rgba(30, 41, 59, 0.8) !important;
             --glass-border: rgba(255, 255, 255, 0.1) !important;
             --text-primary: #f8fafc !important;
             --text-secondary: rgba(255, 255, 255, 0.6) !important;
             --input-bg: rgba(15, 23, 42, 0.5) !important;
         }
 
-        /* Menyekat kesan auto-dark mode pelayar */
+        /* Sekat Samsung/Android daripada tukar warna secara automatik */
         @media (prefers-color-scheme: dark) {
             body:not(.dark-mode) {
-                background-color: var(--bg-color);
-                background-image: var(--bg-gradient);
+                background-color: var(--bg-color) !important;
+                background-image: var(--bg-gradient) !important;
             }
         }
 
         * { 
             box-sizing: border-box; 
             -webkit-tap-highlight-color: transparent; 
-            font-family: 'SF Pro Display', sans-serif;
+            font-family: 'SF Pro Display', 'Plus Jakarta Sans', sans-serif;
             transition: background 0.4s ease, color 0.4s ease, border 0.4s ease;
         }
 
@@ -65,7 +72,7 @@
             padding: 15px;
         }
 
-        /* --- BUTANG TOGGLE BERPUSING --- */
+        /* --- THEME TOGGLE (Matahari/Bulan Terbalik + Pusing) --- */
         .theme-switch {
             position: fixed;
             top: 25px;
@@ -87,14 +94,13 @@
 
         .theme-switch i {
             font-size: 20px;
-            color: #ffcc00; /* Warna Matahari */
-            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), color 0.5s ease;
+            color: #ffcc00; /* Matahari asal */
+            transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.4s ease;
         }
 
-        /* Ikon berpusing 360 darjah */
         body.dark-mode .theme-switch i {
-            transform: rotate(360deg);
-            color: #f8fafc; /* Warna Bulan */
+            transform: rotate(360deg); /* Animasi pusing */
+            color: #f8fafc; /* Bulan malam */
         }
 
         @keyframes liquidMove {
@@ -110,7 +116,7 @@
             flex-direction: column;
         }
 
-        /* HOMEPAGE */
+        /* HALAMAN UTAMA */
         #homePage {
             display: flex;
             flex-direction: column;
@@ -175,7 +181,7 @@
         .menu-content h3 { margin: 0; font-size: 16px; font-weight: 600; color: var(--text-primary); }
         .menu-content p { margin: 2px 0 0; font-size: 12px; color: var(--text-secondary); }
 
-        /* FORM PAGE */
+        /* HALAMAN BORANG */
         #formPage { display: none; animation: slideUp 0.6s ease-out; }
         .glass-card {
             background: var(--glass-white);
@@ -210,7 +216,7 @@
 </head>
 <body>
 
-<div class="theme-switch" onclick="runTransition()">
+<div class="theme-switch" onclick="toggleTheme()">
     <i id="themeIcon" class="fa-solid fa-sun"></i>
 </div>
 
@@ -257,6 +263,7 @@
                 <div class="back-btn" onclick="showHome()"><i class="fa-solid fa-chevron-left"></i></div>
                 <h1>Attendance</h1>
             </div>
+
             <form id="absenceForm">
                 <label>Jawatan</label>
                 <select id="jawatan" name="jawatan" onchange="updateNama()" required>
@@ -268,6 +275,13 @@
                     <option value="">Pilih Nama</option>
                 </select>
 
+                <label>Sebab</label>
+                <select name="sebab" required>
+                    <option value="Kerja Lapangan">Kerja Lapangan (Onsite)</option>
+                    <option value="Mesyuarat">Mesyuarat</option>
+                    <option value="Cuti">Cuti Rehat/Sakit</option>
+                </select>
+
                 <button type="submit" id="submitBtn">Hantar Rekod</button>
             </form>
         </div>
@@ -275,29 +289,29 @@
 </div>
 
 <script>
-    const scriptURL = 'YOUR_GOOGLE_SCRIPT_URL_HERE';
+    const scriptURL = 'SILA_MASUKKAN_URL_GOOGLE_SCRIPT_ANDA';
     let allStaffData = [];
 
-    // --- LOGIK TRANSISI TEMA (PUSING + TERBALIK) ---
-    function runTransition() {
+    // --- LOGIK TEMA (Matahari pusing jadi Bulan) ---
+    function toggleTheme() {
         const body = document.body;
         const icon = document.getElementById('themeIcon');
         
         body.classList.toggle('dark-mode');
         
         if (body.classList.contains('dark-mode')) {
-            // Tukar ke Bulan sewaktu berpusing
-            setTimeout(() => icon.classList.replace('fa-sun', 'fa-moon'), 200);
-            localStorage.setItem('chosen-theme', 'dark');
+            // Tukar ikon ke Bulan di pertengahan pusingan
+            setTimeout(() => icon.classList.replace('fa-sun', 'fa-moon'), 250);
+            localStorage.setItem('user-app-theme', 'dark');
         } else {
-            // Tukar ke Matahari sewaktu berpusing
-            setTimeout(() => icon.classList.replace('fa-moon', 'fa-sun'), 200);
-            localStorage.setItem('chosen-theme', 'light');
+            // Tukar ikon ke Matahari di pertengahan pusingan
+            setTimeout(() => icon.classList.replace('fa-moon', 'fa-sun'), 250);
+            localStorage.setItem('user-app-theme', 'light');
         }
     }
 
-    // Kekalkan pilihan tema bila refresh
-    if (localStorage.getItem('chosen-theme') === 'dark') {
+    // Kekalkan tema bila refresh (Anti-Samsung Override)
+    if (localStorage.getItem('user-app-theme') === 'dark') {
         document.body.classList.add('dark-mode');
         document.getElementById('themeIcon').classList.replace('fa-sun', 'fa-moon');
     }
@@ -313,7 +327,7 @@
         document.getElementById('formPage').style.display = 'none';
     }
 
-    // --- LOGIK DATA ---
+    // --- FETCH DATA STAFF ---
     window.onload = function() {
         fetch(scriptURL + "?action=getStaff")
             .then(res => res.json())
@@ -326,7 +340,8 @@
                     opt.value = opt.innerHTML = j;
                     jawatanSelect.appendChild(opt);
                 });
-            });
+            })
+            .catch(err => console.log("Ralat data:", err));
     };
 
     function updateNama() {
