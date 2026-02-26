@@ -19,7 +19,6 @@
             text-align: center; margin-bottom: 20px;
             backdrop-filter: blur(10px);
             box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-            border: 1px solid rgba(255,255,255,0.3);
         }
         .staf-card {
             background: white;
@@ -28,12 +27,26 @@
             display: flex; justify-content: space-between; align-items: center;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
+        .info-section { flex: 1; padding-right: 10px; }
+        .status-section { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+        
         .badge {
-            padding: 8px 10px; border-radius: 10px;
+            padding: 6px 12px; border-radius: 10px;
             font-size: 10px; font-weight: bold; color: white;
-            min-width: 100px; text-align: center;
-            line-height: 1.2;
+            min-width: 90px; text-align: center;
         }
+        .delete-btn {
+            background: rgba(255, 59, 48, 0.1);
+            color: #FF3B30;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .delete-btn:hover { background: #FF3B30; color: white; }
+
         .status-hadir { background: #34C759; } 
         .status-kerja { background: #007AFF; } 
         .status-cuti { background: #FF3B30; } 
@@ -51,7 +64,7 @@
 <div class="container">
     <div class="header">
         <div style="display:flex; justify-content:space-between; align-items: center;">
-            <button onclick="window.location.href='index.html'" style="border:none; background:none; color:#007AFF; cursor:pointer; font-weight: bold; font-size: 16px;">
+            <button onclick="window.location.href='index.html'" style="border:none; background:none; color:#007AFF; cursor:pointer; font-weight: bold;">
                 <i class="fa-solid fa-chevron-left"></i> UTAMA
             </button>
             <button class="refresh-btn" onclick="fetchAllStatus()">REFRESH</button>
@@ -88,17 +101,13 @@
             });
             const allAtt = await resA.json();
 
-            // FIX 1: Guna Tarikh Tempatan Malaysia (Elak isu 8 jam beza UTC)
             const sekarang = new Date();
             const hariIni = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate());
 
             allStaff.sort((a, b) => {
                 const jA = (a.jawatan || "").toUpperCase().trim();
                 const jB = (b.jawatan || "").toUpperCase().trim();
-                const p1 = hierarki[jA] || 99;
-                const p2 = hierarki[jB] || 99;
-                if (p1 !== p2) return p1 - p2;
-                return (a.nama || "").toUpperCase().trim().localeCompare((b.nama || "").toUpperCase().trim());
+                return (hierarki[jA] || 99) - (hierarki[jB] || 99) || a.nama.localeCompare(b.nama);
             });
 
             list.innerHTML = "";
@@ -106,46 +115,68 @@
             allStaff.forEach(staf => {
                 const sNama = (staf.nama || "").toUpperCase().trim();
                 
-                // FIX 2: Pencarian rekod yang lebih fleksibel
+                // Cari rekod ketiadaan aktif
                 const record = allAtt.find(a => {
                     const namaAtt = (a.nama || "").toUpperCase().trim();
-                    // Tukar string tarikh "YYYY-MM-DD" kepada objek Date yang bersih
                     const tMulaParts = a.tarikh_mula.split('-');
                     const tAkhirParts = a.tarikh_akhir.split('-');
-                    
                     const tMula = new Date(tMulaParts[0], tMulaParts[1] - 1, tMulaParts[2]);
                     const tAkhir = new Date(tAkhirParts[0], tAkhirParts[1] - 1, tAkhirParts[2]);
-
                     return namaAtt === sNama && hariIni >= tMula && hariIni <= tAkhir;
                 });
                 
                 let sText = "HADIR";
                 let sClass = "status-hadir";
                 let sSub = (staf.jawatan || "").toUpperCase();
+                let deleteButtonHtml = "";
 
                 if (record) {
                     sText = (record.sebab || "LUAR").toUpperCase();
-                    
-                    if (sText.includes("CUTI") || sText.includes("SAKIT") || sText.includes("HALFDAY")) {
-                        sClass = "status-cuti";
-                    } else {
-                        sClass = "status-kerja";
-                    }
+                    sClass = (sText.includes("CUTI") || sText.includes("SAKIT") || sText.includes("HALFDAY")) ? "status-cuti" : "status-kerja";
                     sSub = sSub + " • SEHINGGA: " + record.tarikh_akhir;
+                    
+                    // TAMBAH BUTANG PADAM JIKA ADA REKOD (Bukan Hadir)
+                    deleteButtonHtml = `<button class="delete-btn" onclick="padamRekod('${sNama}', '${record.tarikh_mula}')">
+                                            <i class="fa-solid fa-xmark"></i> HADIR TIBA-TIBA
+                                        </button>`;
                 }
 
                 list.innerHTML += `
                     <div class="staf-card">
-                        <div style="flex: 1; padding-right: 10px;">
+                        <div class="info-section">
                             <div style="font-weight:bold; font-size:14px;">${sNama}</div>
                             <div style="font-size:10px; color:gray; margin-top:3px;">${sSub}</div>
                         </div>
-                        <div class="badge ${sClass}">${sText}</div>
+                        <div class="status-section">
+                            <div class="badge ${sClass}">${sText}</div>
+                            ${deleteButtonHtml}
+                        </div>
                     </div>`;
             });
 
         } catch (err) {
             list.innerHTML = "<div style='color:red; text-align:center;'>RALAT: " + err.message.toUpperCase() + "</div>";
+        }
+    }
+
+    // FUNGSI UNTUK PADAM REKOD (Jika staf tiba-tiba hadir)
+    async function padamRekod(nama, tarikh) {
+        if (!confirm(`ADAKAH ANDA PASTI ${nama} TELAH HADIR? REKOD KETIADAAN HARI INI AKAN DIPADAM.`)) return;
+
+        try {
+            const res = await fetch(`${S_URL}/rest/v1/attendance?nama=eq.${nama}&tarikh_mula=eq.${tarikh}`, {
+                method: 'DELETE',
+                headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY }
+            });
+
+            if (res.ok) {
+                alert("REKOD DIPADAM. STATUS KEMBALI KEPADA HADIR.");
+                fetchAllStatus(); // Refresh senarai
+            } else {
+                throw new Error("Gagal padam rekod");
+            }
+        } catch (err) {
+            alert("RALAT: " + err.message);
         }
     }
 
