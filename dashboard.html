@@ -3,71 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>M&E-Connect | Status Kakitangan</title>
-    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;600&display=swap" rel="stylesheet">
+    <title>Status Kakitangan M&E</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    
     <style>
-        :root {
-            --bg: #f5f5f7;
-            --glass: rgba(255, 255, 255, 0.7);
-            --border: rgba(255, 255, 255, 0.4);
-            --ios-blue: #007AFF;
-            --ios-green: #34C759;
-            --ios-red: #FF3B30;
-            --text: #1d1d1f;
-        }
-
         body {
-            background: #a1c4fd linear-gradient(120deg, #a1c4fd 0%, #c2e9fb 100%) fixed;
-            font-family: 'SF Pro Display', sans-serif;
-            margin: 0; padding: 15px; display: flex; justify-content: center;
+            background: #a1c4fd;
+            font-family: sans-serif;
+            margin: 0; padding: 20px;
+            color: #1d1d1f;
         }
-
-        .container { width: 100%; max-width: 500px; }
-
-        .header-card {
-            background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-            border-radius: 20px; padding: 20px; margin-bottom: 20px;
-            border: 1px solid var(--border); text-align: center;
+        .container { max-width: 500px; margin: auto; }
+        .header {
+            background: rgba(255,255,255,0.8);
+            padding: 20px; border-radius: 20px;
+            text-align: center; margin-bottom: 20px;
+            backdrop-filter: blur(10px);
         }
-
-        .staf-row {
-            background: var(--glass); backdrop-filter: blur(15px);
-            border-radius: 18px; padding: 15px; margin-bottom: 10px;
+        .staf-card {
+            background: white;
+            padding: 15px; border-radius: 15px;
+            margin-bottom: 10px;
             display: flex; justify-content: space-between; align-items: center;
-            border: 1px solid var(--border); transition: 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
-
-        .staf-info h4 { margin: 0; font-size: 15px; color: var(--text); }
-        .staf-info p { margin: 2px 0 0; font-size: 11px; color: rgba(0,0,0,0.5); }
-
-        .status-badge {
-            padding: 6px 14px; border-radius: 12px; font-size: 11px; font-weight: 600; min-width: 70px; text-align: center;
+        .badge {
+            padding: 6px 12px; border-radius: 10px;
+            font-size: 11px; font-weight: bold; color: white;
+            min-width: 80px; text-align: center;
         }
-
-        /* Status Colors */
-        .status-hadir { background: var(--ios-green); color: white; }
-        .status-tidak-hadir { background: var(--ios-blue); color: white; }
-        .status-cuti { background: var(--ios-red); color: white; }
-
-        .refresh-btn {
-            background: var(--ios-blue); color: white; border: none;
-            padding: 10px 20px; border-radius: 12px; font-weight: 600; cursor: pointer;
+        .status-hadir { background: #34C759; }
+        .status-luar { background: #007AFF; }
+        .status-cuti { background: #FF3B30; }
+        .refresh-btn { 
+            background: #007AFF; color: white; border: none; 
+            padding: 8px 15px; border-radius: 10px; cursor: pointer;
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="header-card">
-        <div style="display:flex; justify-content: space-between; align-items:center;">
-            <button onclick="window.location.href='index.html'" style="background:none; border:none; color:var(--ios-blue); cursor:pointer;">
+    <div class="header">
+        <div style="display:flex; justify-content:space-between">
+            <button onclick="window.location.href='index.html'" style="border:none; background:none; color:#007AFF; cursor:pointer;">
                 <i class="fa-solid fa-chevron-left"></i> Utama
             </button>
             <button class="refresh-btn" onclick="fetchAllStatus()">Refresh</button>
         </div>
-        <h2 style="margin:15px 0 5px;">Status Kakitangan</h2>
+        <h2>Status Kakitangan</h2>
         <p id="todayDate" style="font-size:12px; opacity:0.6;"></p>
     </div>
 
@@ -75,62 +58,61 @@
 </div>
 
 <script>
-    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-    const SUPABASE_KEY = 'YOUR_SUPABASE_KEY';
-
-    document.getElementById('todayDate').innerText = new Date().toLocaleDateString('ms-MY', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    // PENTING: Masukkan URL & KEY anda di sini
+    const S_URL = 'https://XXXXXXXXXXXX.supabase.co'; 
+    const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; 
 
     async function fetchAllStatus() {
         const list = document.getElementById('mainList');
-        list.innerHTML = "<p style='text-align:center;'>Menyemak kehadiran...</p>";
+        list.innerHTML = "Menyemak database...";
 
         try {
-            // 1. Ambil semua staf
-            const resStaff = await fetch(SUPABASE_URL + '/rest/v1/staff?select=*&order=nama.asc', {
-                headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+            // 1. Ambil Semua Staf
+            const resS = await fetch(S_URL + '/rest/v1/staff?select=*&order=nama.asc', {
+                headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY }
             });
-            const allStaff = await resStaff.json();
+            const allStaff = await resS.json();
 
-            // 2. Ambil kehadiran hari ini
+            // 2. Ambil Kehadiran Hari Ini
             const today = new Date().toISOString().split('T')[0];
-            const resAttendance = await fetch(SUPABASE_URL + '/rest/v1/attendance?select=*&tarikh_mula=lte.' + today + '&tarikh_akhir=gte.' + today, {
-                headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+            const resA = await fetch(S_URL + '/rest/v1/attendance?select=*&tarikh_mula=lte.' + today + '&tarikh_akhir=gte.' + today, {
+                headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY }
             });
-            const activeAttendance = await resAttendance.json();
+            const activeAtt = await resA.json();
 
             list.innerHTML = "";
 
             allStaff.forEach(staf => {
-                // Cari jika staf ini ada dalam senarai attendance hari ini
-                const record = activeAttendance.find(a => a.nama === staf.nama);
+                const record = activeAtt.find(a => a.nama === staf.nama);
                 
-                let statusText = "HADIR";
-                let statusClass = "status-hadir";
-                let subText = staf.jawatan;
+                let sText = "HADIR";
+                let sClass = "status-hadir";
+                let sSub = staf.jawatan;
 
                 if (record) {
-                    statusText = record.sebab.toUpperCase();
-                    statusClass = record.sebab.toLowerCase().includes('cuti') ? 'status-cuti' : 'status-tidak-hadir';
-                    subText = "Hingga: " + record.tarikh_akhir;
+                    sText = record.sebab.toUpperCase();
+                    sClass = sText.includes('CUTI') ? 'status-cuti' : 'status-luar';
+                    sSub = "Sehingga: " + record.tarikh_akhir;
                 }
 
-                list.innerHTML += 
-                    '<div class="staf-row">' +
-                        '<div class="staf-info">' +
-                            '<h4>' + staf.nama + '</h4>' +
-                            '<p>' + subText + '</p>' +
-                        '</div>' +
-                        '<div class="status-badge ' + statusClass + '">' + statusText + '</div>' +
-                    '</div>';
+                // Guna String Biasa untuk elakkan Syntax Error
+                let itemHtml = '<div class="staf-card">';
+                itemHtml += '<div><div style="font-weight:bold">' + staf.nama + '</div>';
+                itemHtml += '<div style="font-size:11px; color:gray">' + sSub + '</div></div>';
+                itemHtml += '<div class="badge ' + sClass + '">' + sText + '</div>';
+                itemHtml += '</div>';
+                
+                list.innerHTML += itemHtml;
             });
 
-        } catch (e) {
-            list.innerHTML = "<p style='text-align:center; color:red;'>Ralat sambungan database.</p>";
-            console.error(e);
+        } catch (err) {
+            list.innerHTML = "Ralat: " + err.message;
         }
     }
 
+    document.getElementById('todayDate').innerText = new Date().toLocaleDateString('ms-MY');
     window.onload = fetchAllStatus;
 </script>
+
 </body>
 </html>
