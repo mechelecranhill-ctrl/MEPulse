@@ -14,7 +14,7 @@
             --glass: rgba(255, 255, 255, 0.45);
             --border: rgba(255, 255, 255, 0.6);
             --text: #1d1d1f;
-            --ios-blue: #007AFF; /* Ditambah untuk back-link */
+            --ios-blue: #007AFF;
         }
 
         body {
@@ -47,7 +47,6 @@
         .badge {
             padding: 5px 12px; border-radius: 10px; font-size: 11px; font-weight: 600;
             color: white; text-transform: uppercase;
-            text-align: center; min-width: 80px;
         }
 
         .onsite { background: #007AFF; }
@@ -92,11 +91,11 @@
         list.innerHTML = "<p style='text-align:center;'>Menarik data...</p>";
 
         try {
-            // Pembetulan backticks pada fetch URL
+            // PENGGUNAAN BACKTICK (`) DI SINI ADALAH WAJIB
             const res = await fetch(`${SUPABASE_URL}/rest/v1/attendance?select=*&order=created_at.desc`, {
                 headers: { 
                     'apikey': SUPABASE_KEY, 
-                    'Authorization': `Bearer ${SUPABASE_KEY}` // Pembetulan backticks di sini
+                    'Authorization': `Bearer ${SUPABASE_KEY}` 
                 }
             });
             const data = await res.json();
@@ -108,4 +107,29 @@
             }
 
             data.forEach(item => {
-                const sebabText =
+                const sebab = item.sebab ? item.sebab.toLowerCase() : '';
+                const statusClass = sebab.includes('onsite') ? 'onsite' : 
+                                    sebab.includes('cuti') ? 'cuti' : 
+                                    sebab.includes('fat') ? 'fat' : 'mesyuarat';
+
+                list.innerHTML += `
+                    <div class="record-card">
+                        <div class="info">
+                            <h4>${item.nama}</h4>
+                            <p>${item.jawatan} • <strong>${item.tarikh_mula}</strong> hingga <strong>${item.tarikh_akhir}</strong></p>
+                        </div>
+                        <div class="badge ${statusClass}">${item.sebab}</div>
+                    </div>
+                `;
+            });
+        } catch (e) {
+            console.error("Ralat Fetch:", e);
+            list.innerHTML = "<p style='color:red; text-align:center;'>Gagal memuatkan data. Sila semak sambungan internet.</p>";
+        }
+    }
+
+    // Jalankan automatik bila buka page
+    window.onload = fetchRecords;
+</script>
+</body>
+</html>
