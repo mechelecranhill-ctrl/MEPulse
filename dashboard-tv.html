@@ -30,7 +30,7 @@
             height: 100%;
         }
 
-        /* HEADER TV - LEBIH BESAR & JELAS */
+        /* HEADER TV */
         .header {
             display: flex;
             justify-content: space-between;
@@ -51,7 +51,7 @@
         #liveClock { font-size: 50px; font-weight: bold; font-variant-numeric: tabular-nums; }
         #todayDate { font-size: 18px; opacity: 0.7; text-transform: uppercase; }
 
-        /* GRID SYSTEM: 3 KOLUM UNTUK TV */
+        /* GRID SYSTEM: 3 KOLUM */
         #mainList {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -68,7 +68,6 @@
             justify-content: space-between;
             align-items: center;
             border: 1px solid var(--glass-border);
-            transition: transform 0.3s ease;
         }
 
         .staf-info { flex: 1; }
@@ -82,14 +81,37 @@
             font-weight: 800;
             text-align: center;
             min-width: 130px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.2);
         }
 
         .status-hadir { background: var(--neon-green); color: #052e16; }
         .status-kerja { background: var(--neon-blue); color: #eff6ff; }
         .status-cuti { background: var(--neon-red); color: #fef2f2; }
 
-        /* Scrollbar styling */
+        /* BUTANG MOBILE MODE (FLOATING) */
+        .back-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid var(--glass-border);
+            padding: 12px 24px;
+            border-radius: 50px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            font-weight: bold;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+
         #mainList::-webkit-scrollbar { width: 8px; }
         #mainList::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 10px; }
     </style>
@@ -110,9 +132,12 @@
         </div>
     </div>
 
-    <div id="mainList">
-        </div>
+    <div id="mainList"></div>
 </div>
+
+<button class="back-btn" onclick="window.location.href='dashboard.html'">
+    <i class="fa-solid fa-mobile-screen-button"></i> MOBILE MODE
+</button>
 
 <script>
     const S_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
@@ -144,7 +169,7 @@
                     const tAkhir = new Date(tAkhirParts[0], tAkhirParts[1] - 1, tAkhirParts[2]);
                     return a.nama.toUpperCase().trim() === sNama && hariIni >= tMula && hariIni <= tAkhir;
                 });
-                
+
                 let sText = "HADIR", sClass = "status-hadir", sSub = (staf.jawatan || "").toUpperCase();
                 if (record) {
                     sText = record.sebab.toUpperCase();
@@ -168,18 +193,14 @@
     function updateClock() {
         const now = new Date();
         document.getElementById('liveClock').innerText = now.toLocaleTimeString('ms-MY', { hour12: false });
-        
-        // Auto refresh data setiap 5 minit untuk elak beban server tapi tetap up-to-date
         if (now.getSeconds() === 0 && now.getMinutes() % 5 === 0) fetchAllStatus();
     }
 
     const opsi = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-    document.getElementById('todayDate').innerText = new Date().toLocaleDateString('ms-MY', opsi);
-    
-    // Jalankan segera
+    document.getElementById('todayDate').innerText = new Date().toLocaleDateString('ms-MY', opsi).toUpperCase();
+
     fetchAllStatus();
     setInterval(updateClock, 1000);
-    // Refresh data setiap 2 minit
     setInterval(fetchAllStatus, 120000);
 </script>
 </body>
