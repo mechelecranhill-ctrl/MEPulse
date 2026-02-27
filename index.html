@@ -8,11 +8,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="M&E-Connect">
 
-<link rel="manifest" href="manifest.json">
-
-<meta name="theme-color" content="#a1c4fd">
-<meta name="mobile-web-app-capable" content="yes">
-
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#a1c4fd">
+    <link rel="manifest" href="manifest.json">
 
     <link rel="apple-touch-icon" href="icon.png?v=1">
     <link rel="apple-touch-icon" sizes="152x152" href="icon.png?v=1">
@@ -40,11 +38,9 @@
             box-sizing: border-box; 
             -webkit-tap-highlight-color: transparent; 
             font-family: 'SF Pro Display', sans-serif; 
-            /* Menghalang 'long-press' menu pada elemen UI */
             -webkit-user-select: none;
         }
 
-        /* Benarkan user taip dalam input & select */
         input, select, textarea {
             -webkit-user-select: text;
         }
@@ -140,7 +136,7 @@
         select, input {
             width: 100%; padding: 12px; background: var(--input-bg);
             border: 1.2px solid var(--glass-border); border-radius: 14px;
-            outline: none; color: var(--text-primary); font-size: 16px; /* 16px elakkan iOS auto-zoom */
+            outline: none; color: var(--text-primary); font-size: 16px; 
             -webkit-appearance: none;
         }
 
@@ -149,12 +145,6 @@
             color: white; border: none; border-radius: 18px;
             font-size: 16px; font-weight: 600; cursor: pointer;
             margin-top: 15px; flex-shrink: 0;
-        }
-
-        .user-card {
-            background: rgba(255,255,255,0.2);
-            padding: 14px; border-radius: 18px;
-            margin-bottom: 10px; border: 1px solid var(--glass-border);
         }
     </style>
 </head>
@@ -209,10 +199,8 @@
             <form id="attendanceForm">
                 <label>Jawatan</label>
                 <select id="jawatan" required onchange="filterNames()"><option value="">Memuatkan...</option></select>
-
                 <label>Nama Staf</label>
                 <select id="nama" required disabled><option value="">Pilih Nama</option></select>
-
                 <label>Sebab</label>
                 <select id="sebab" required>
                     <option value="Kerja Lapangan (Onsite)">Kerja Lapangan (Onsite)</option>
@@ -221,7 +209,6 @@
                     <option value="Cuti Rehat/Sakit">Cuti Rehat/Sakit</option>
                     <option value="Cuti Separuh Hari/Halfday">Cuti Separuh Hari/Halfday</option>
                 </select>
-
                 <div style="display:flex; gap:10px;">
                     <div style="flex:1"><label>Mula</label><input type="date" id="t1" required></div>
                     <div style="flex:1"><label>Akhir</label><input type="date" id="t2" required></div>
@@ -306,12 +293,8 @@ document.getElementById('attendanceForm').onsubmit = async (e) => {
         const existing = await checkRes.json();
 
         if (existing.length > 0) {
-            const sahkan = confirm(`REKOD UNTUK ${nama.toUpperCase()} PADA ${t1} SUDAH ADA. ADAKAH ANDA MAHU GANTIKAN DENGAN DATA BARU INI?`);
-            if (!sahkan) {
-                btn.disabled = false;
-                btn.innerText = "Hantar Rekod";
-                return;
-            }
+            const sahkan = confirm(`REKOD UNTUK ${nama.toUpperCase()} PADA ${t1} SUDAH ADA. GANTI?`);
+            if (!sahkan) { btn.disabled = false; btn.innerText = "Hantar Rekod"; return; }
             await fetch(`${SUPABASE_URL}/rest/v1/attendance?nama=eq.${nama}&tarikh_mula=eq.${t1}`, {
                 method: 'DELETE',
                 headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
@@ -320,16 +303,12 @@ document.getElementById('attendanceForm').onsubmit = async (e) => {
 
         const res = await fetch(SUPABASE_URL + '/rest/v1/attendance', {
             method: 'POST',
-            headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': 'Bearer ' + SUPABASE_KEY,
-                'Content-Type': 'application/json'
-            },
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify({ nama, jawatan, sebab, tarikh_mula: t1, tarikh_akhir: t2 })
         });
 
         if (res.ok) {
-            alert("✅ REKOD TELAH DIKEMASKINI!");
+            alert("✅ REKOD DIKEMASKINI!");
             document.getElementById('attendanceForm').reset();
             document.getElementById('nama').disabled = true;
             showPage('homePage');
@@ -340,10 +319,13 @@ document.getElementById('attendanceForm').onsubmit = async (e) => {
 
 window.onload = loadStaff;
 
-<script>
+// REGISTRASI SERVICE WORKER (UNTUK NATIVE LOOK ANDROID/SAMSUNG)
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js')
-    .then(function() { console.log("Service Worker Registered"); });
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+        .then(reg => console.log("SW Terdaftar"))
+        .catch(err => console.log("SW Gagal", err));
+    });
 }
 </script>
 
