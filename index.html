@@ -3,6 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="M&E-Connect">
+    
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="icon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
+    <link rel="icon" type="image/png" href="icon.png">
+
     <title>M&E-Connect v1.0</title>
 
     <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;600&display=swap" rel="stylesheet">
@@ -24,6 +34,13 @@
             box-sizing: border-box; 
             -webkit-tap-highlight-color: transparent; 
             font-family: 'SF Pro Display', sans-serif; 
+            /* Menghalang 'long-press' menu pada elemen UI */
+            -webkit-user-select: none;
+        }
+
+        /* Benarkan user taip dalam input & select */
+        input, select, textarea {
+            -webkit-user-select: text;
         }
 
         html, body {
@@ -117,7 +134,7 @@
         select, input {
             width: 100%; padding: 12px; background: var(--input-bg);
             border: 1.2px solid var(--glass-border); border-radius: 14px;
-            outline: none; color: var(--text-primary); font-size: 14px;
+            outline: none; color: var(--text-primary); font-size: 16px; /* 16px elakkan iOS auto-zoom */
             -webkit-appearance: none;
         }
 
@@ -139,7 +156,7 @@
 
 <div class="container">
     <div id="homePage" class="page active">
-        <div class="logo-box"><img src="logo.png" style="width: 55%;" alt="Logo"></div>
+        <div class="logo-box"><img src="icon.png" style="width: 55%;" alt="Logo"></div>
         <div style="text-align:center; margin-bottom:20px;">
             <h1 style="margin:0; font-size:26px; letter-spacing: -1px;">M&E-Connect</h1>
             <p style="color:var(--text-secondary); font-size:13px;">Mechanical & Electrical Dpt Database v1.0</p>
@@ -213,22 +230,14 @@
 </div>
 
 <script>
-
 const SUPABASE_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48'; 
 
 let staffData = [];
 
-// DEFINISI HIERARKI JAWATAN
 const hierarki = {
-    'KETUA JABATAN': 1,
-    'KETUA SEKSYEN': 2,
-    'EKSEKUTIF KANAN': 3,
-    'EKSEKUTIF': 4,
-    'PENYELIA PENTADBIRAN': 5,
-    'PEMBANTU PENTADBIRAN': 6,
-    'JURUTEKNIK': 7,
-    'KERANI': 8
+    'KETUA JABATAN': 1, 'KETUA SEKSYEN': 2, 'EKSEKUTIF KANAN': 3, 'EKSEKUTIF': 4,
+    'PENYELIA PENTADBIRAN': 5, 'PEMBANTU PENTADBIRAN': 6, 'JURUTEKNIK': 7, 'KERANI': 8
 };
 
 function showPage(pageId) {
@@ -243,24 +252,13 @@ async function loadStaff() {
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
         });
         staffData = await res.json();
-        
         const jSel = document.getElementById('jawatan');
         jSel.innerHTML = '<option value="">Pilih Jawatan</option>';
-        
-        // AMBIL JAWATAN UNIK
         const uniqueJawatan = [...new Set(staffData.map(s => s.jawatan.toUpperCase().trim()))];
-        
-        // SUSUN JAWATAN MENGIKUT HIERARKI
-        uniqueJawatan.sort((a, b) => {
-            const p1 = hierarki[a] || 99;
-            const p2 = hierarki[b] || 99;
-            return p1 - p2;
-        });
-
+        uniqueJawatan.sort((a, b) => (hierarki[a] || 99) - (hierarki[b] || 99));
         uniqueJawatan.forEach(j => {
             const opt = document.createElement('option');
-            opt.value = j; 
-            opt.innerText = j;
+            opt.value = j; opt.innerText = j;
             jSel.appendChild(opt);
         });
     } catch (err) { console.error(err); }
@@ -272,25 +270,20 @@ function filterNames() {
     nSel.innerHTML = '<option value="">Pilih Nama</option>';
     if (selJ) {
         nSel.disabled = false;
-        // Tapis nama ikut jawatan dan susun ikut abjad
         staffData
             .filter(s => s.jawatan.toUpperCase().trim() === selJ)
             .sort((a, b) => a.nama.localeCompare(b.nama))
             .forEach(s => {
                 const opt = document.createElement('option');
-                opt.value = s.nama; 
-                opt.innerText = s.nama.toUpperCase();
+                opt.value = s.nama; opt.innerText = s.nama.toUpperCase();
                 nSel.appendChild(opt);
             });
-    } else {
-        nSel.disabled = true;
-    }
+    } else { nSel.disabled = true; }
 }
 
 document.getElementById('attendanceForm').onsubmit = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('subBtn');
-    
     const nama = document.getElementById('nama').value;
     const jawatan = document.getElementById('jawatan').value;
     const sebab = document.getElementById('sebab').value;
@@ -301,38 +294,27 @@ document.getElementById('attendanceForm').onsubmit = async (e) => {
     btn.innerText = "Mengemaskini...";
 
     try {
-        // 1. CARI REKOD LAMA
         const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/attendance?nama=eq.${nama}&tarikh_mula=eq.${t1}`, {
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
         });
         const existing = await checkRes.json();
 
-        // 2. JIKA WUJUD, TANYA PENGESAHAN
         if (existing.length > 0) {
             const sahkan = confirm(`REKOD UNTUK ${nama.toUpperCase()} PADA ${t1} SUDAH ADA. ADAKAH ANDA MAHU GANTIKAN DENGAN DATA BARU INI?`);
             if (!sahkan) return;
-
             await fetch(`${SUPABASE_URL}/rest/v1/attendance?nama=eq.${nama}&tarikh_mula=eq.${t1}`, {
                 method: 'DELETE',
                 headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
             });
         }
 
-        // 3. HANTAR REKOD BARU
         const res = await fetch(SUPABASE_URL + '/rest/v1/attendance', {
             method: 'POST',
             headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': 'Bearer ' + SUPABASE_KEY,
+                'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                nama: nama,
-                jawatan: jawatan,
-                sebab: sebab,
-                tarikh_mula: t1,
-                tarikh_akhir: t2
-            })
+            body: JSON.stringify({ nama, jawatan, sebab, tarikh_mula: t1, tarikh_akhir: t2 })
         });
 
         if (res.ok) {
@@ -340,20 +322,12 @@ document.getElementById('attendanceForm').onsubmit = async (e) => {
             document.getElementById('attendanceForm').reset();
             document.getElementById('nama').disabled = true;
             showPage('homePage');
-        } else {
-            throw new Error("Gagal simpan");
         }
-    } catch (err) {
-        alert("RALAT: " + err.message);
-    } finally {
-        btn.disabled = false;
-        btn.innerText = "Hantar Rekod";
-    }
+    } catch (err) { alert("RALAT: " + err.message); }
+    finally { btn.disabled = false; btn.innerText = "Hantar Rekod"; }
 };
 
 window.onload = loadStaff;
-</script>
-
 </script>
 </body>
 </html>
