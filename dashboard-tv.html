@@ -3,151 +3,178 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TV DISPLAY - M&E CONNECT</title>
+    <title>DASHBOARD M&E - LIVE</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
+
         :root {
-            --bg-dark: #0f172a;
-            --card-bg: rgba(255, 255, 255, 0.08);
-            --glass-border: rgba(255, 255, 255, 0.15);
-            --neon-green: #22c55e;
-            --neon-blue: #3b82f6;
-            --neon-red: #ef4444;
+            --bg-deep: #020617;
+            --accent-blue: #38bdf8;
+            --accent-green: #22c55e;
+            --accent-red: #f43f5e;
+            --glass: rgba(15, 23, 42, 0.6);
+            --border: rgba(255, 255, 255, 0.1);
         }
 
         * { box-sizing: border-box; }
 
         body {
-            background: #0f172a linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-            font-family: 'SF Pro Display', sans-serif, Arial;
-            margin: 0; 
-            padding: 15px;
-            color: white;
-            /* Paksa tinggi badan sama dengan tinggi skrin */
+            background: var(--bg-deep);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.15) 0, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(34, 197, 94, 0.1) 0, transparent 50%);
+            font-family: 'Rajdhani', sans-serif;
+            margin: 0; padding: 20px;
+            color: #f1f5f9;
             height: 100vh;
             display: flex;
             flex-direction: column;
-            overflow: hidden; /* Halang skrol */
+            overflow: hidden;
         }
 
-        .header {
-            display: flex;
-            justify-content: space-between;
+        /* HEADER & STATS */
+        .top-bar {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
             align-items: center;
-            background: var(--card-bg);
-            padding: 10px 25px;
-            border-radius: 12px;
-            backdrop-filter: blur(15px);
-            border: 1px solid var(--glass-border);
-            margin-bottom: 15px;
-            flex-shrink: 0;
         }
 
-        #liveClock { font-size: 32px; font-weight: bold; color: var(--neon-blue); }
+        .brand h1 {
+            font-family: 'Orbitron', sans-serif;
+            margin: 0; font-size: 24px; letter-spacing: 2px;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
 
-        /* GRID SYSTEM: Automatik muatkan staf dalam ruang yang ada */
+        .stats-container {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .stat-box {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            padding: 10px 20px;
+            border-radius: 12px;
+            text-align: center;
+            min-width: 100px;
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-val { font-size: 24px; font-weight: bold; display: block; }
+        .stat-label { font-size: 10px; text-transform: uppercase; opacity: 0.6; }
+
+        .time-box {
+            text-align: right;
+            font-family: 'Orbitron', sans-serif;
+        }
+        #liveClock { font-size: 32px; color: var(--accent-blue); text-shadow: 0 0 10px rgba(56,189,248,0.5); }
+
+        /* MAIN LIST GRID */
         #mainList {
             display: grid;
-            /* Membina 4 kolum secara default, adjust kalau staf terlalu ramai */
-            grid-template-columns: repeat(4, 1fr); 
-            grid-template-rows: repeat(auto-fill, minmax(0, 1fr));
-            gap: 10px;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            grid-auto-rows: min-content;
+            gap: 12px;
             flex-grow: 1;
             overflow: hidden;
-            padding-bottom: 10px;
         }
 
         .staf-card {
-            background: var(--card-bg);
-            padding: 10px 15px;
-            border-radius: 10px;
+            background: var(--glass);
+            border-left: 4px solid var(--accent-blue);
+            padding: 12px 15px;
+            border-radius: 8px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border: 1px solid var(--glass-border);
-            animation: fadeIn 0.5s ease forwards;
-            min-height: 0; /* Penting untuk grid fit */
-        }
-
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        .staf-info { 
-            overflow: hidden; 
-            white-space: nowrap; 
-            margin-right: 10px;
-            flex-grow: 1;
-        }
-
-        .staf-nama { 
-            font-size: clamp(12px, 1vw, 15px); 
-            font-weight: bold; 
-            text-transform: uppercase; 
-            text-overflow: ellipsis;
+            transition: 0.3s;
+            position: relative;
             overflow: hidden;
         }
 
-        .staf-jawatan { 
-            font-size: 9px; 
-            color: #94a3b8; 
-            text-overflow: ellipsis;
-            overflow: hidden;
+        .staf-card::after {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.03), transparent);
+            transform: translateX(-100%); transition: 0.5s;
         }
 
-        .badge {
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 10px;
-            font-weight: 800;
-            text-align: center;
-            min-width: 75px;
-            flex-shrink: 0;
+        .staf-card:hover::after { transform: translateX(100%); }
+
+        .staf-nama { font-size: 16px; font-weight: bold; color: #fff; letter-spacing: 0.5px; }
+        .staf-jawatan { font-size: 11px; color: #64748b; font-weight: 500; }
+
+        .status-tag {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 4px;
             text-transform: uppercase;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
         }
 
-        .status-hadir { background: var(--neon-green); color: #052e16; }
-        .status-kerja { background: var(--neon-blue); color: #eff6ff; }
-        .status-cuti { background: var(--neon-red); color: #fef2f2; }
+        /* DYNAMIC COLORS */
+        .bg-hadir { border-left-color: var(--accent-green); }
+        .bg-cuti { border-left-color: var(--accent-red); }
+        .bg-kerja { border-left-color: var(--accent-blue); }
+
+        .tag-hadir { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #22c55e; }
+        .tag-cuti { background: rgba(244, 63, 94, 0.2); color: #fb7185; border: 1px solid #f43f5e; }
+        .tag-kerja { background: rgba(56, 189, 248, 0.2); color: #7dd3fc; border: 1px solid #38bdf8; }
 
         .back-btn {
             position: fixed; bottom: 10px; right: 10px;
-            background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.2);
-            border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;
-            font-size: 10px;
+            background: transparent; color: #334155; border: 1px solid #334155;
+            padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 10px;
         }
-
-        /* Responsif: Jika skrin kecil, kurangkan kolum supaya tak sempit */
-        @media (max-width: 1200px) { #mainList { grid-template-columns: repeat(3, 1fr); } }
-        @media (max-width: 800px) { #mainList { grid-template-columns: repeat(2, 1fr); } }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <div>
-        <h1 style="margin:0; font-size: 22px; letter-spacing: 1px;">STATUS KAKITANGAN M&E</h1>
-        <p id="todayDate" style="margin:0; font-size:12px; opacity:0.7;"></p>
+<div class="top-bar">
+    <div class="brand">
+        <h1>M&E CONNECT</h1>
+        <div id="todayDate" style="font-size: 12px; color: var(--accent-blue)"></div>
     </div>
-    <div style="text-align:right">
-        <div id="liveClock">--:--:--</div>
-        <div id="statusIndicator" style="font-size:10px; color: #f59e0b;">
-            <i class="fa-solid fa-spinner fa-spin"></i> MEMUAT...
+    
+    <div class="stats-container">
+        <div class="stat-box">
+            <span class="stat-val" id="countHadir" style="color:var(--accent-green)">0</span>
+            <span class="stat-label">Hadir</span>
         </div>
+        <div class="stat-box">
+            <span class="stat-val" id="countKerja" style="color:var(--accent-blue)">0</span>
+            <span class="stat-label">On-Site</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-val" id="countCuti" style="color:var(--accent-red)">0</span>
+            <span class="stat-label">Cuti/Sakit</span>
+        </div>
+    </div>
+
+    <div class="time-box">
+        <div id="liveClock">00:00:00</div>
+        <div id="statusIndicator" style="font-size: 9px; opacity: 0.5;">MEMULAKAN SISTEM...</div>
     </div>
 </div>
 
 <div id="mainList">
     </div>
 
-<button class="back-btn" onclick="window.location.href='dashboard.html'">MOBILE MODE</button>
+<button class="back-btn" onclick="window.location.href='dashboard.html'">INTERNAL ACCESS</button>
 
 <script>
     const S_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
     const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48'; 
 
-    async function fetchAllStatus() {
+    async function updateDashboard() {
         const list = document.getElementById('mainList');
         const indicator = document.getElementById('statusIndicator');
-        const hierarki = { 'KETUA JABATAN': 1, 'KETUA SEKSYEN': 2, 'EKSEKUTIF KANAN': 3, 'EKSEKUTIF': 4, 'JURUTEKNIK': 5, 'PENYELIA PENTADBIRAN': 6, 'PEMBANTU PENTADBIRAN': 7, 'KERANI': 8 };
+        const hierarki = { 'KETUA JABATAN': 1, 'KETUA SEKSYEN': 2, 'EKSEKUTIF KANAN': 3, 'EKSEKUTIF': 4, 'PENYELIA PENTADBIRAN': 5, 'PEMBANTU PENTADBIRAN': 6, 'JURUTEKNIK': 7, 'KERANI': 8 };
 
         try {
             const [resS, resA] = await Promise.all([
@@ -157,67 +184,61 @@
 
             const allStaff = await resS.json();
             const allAtt = await resA.json();
-            const skrg = new Date();
-            const hariIni = new Date(skrg.getFullYear(), skrg.getMonth(), skrg.getDate()).getTime();
+            const hariIni = new Date().setHours(0,0,0,0);
 
-            allStaff.sort((a, b) => {
-                const pA = hierarki[(a.jawatan || '').toUpperCase().trim()] || 99;
-                const pB = hierarki[(b.jawatan || '').toUpperCase().trim()] || 99;
-                return pA - pB || (a.nama || '').localeCompare(b.nama || '');
-            });
+            // Sorting
+            allStaff.sort((a, b) => (hierarki[a.jawatan?.toUpperCase()] || 99) - (hierarki[b.jawatan?.toUpperCase()] || 99) || a.nama.localeCompare(b.nama));
 
             list.innerHTML = "";
+            let counts = { hadir: 0, kerja: 0, cuti: 0 };
+
             allStaff.forEach(staf => {
-                const sNama = (staf.nama || "TIADA NAMA").toUpperCase().trim();
+                const sNama = staf.nama.toUpperCase();
                 const record = allAtt.find(a => {
-                    if (!a.tarikh_mula || !a.tarikh_akhir) return false;
                     const tM = new Date(a.tarikh_mula).getTime();
                     const tA = new Date(a.tarikh_akhir).getTime();
-                    return (a.nama || "").toUpperCase().trim() === sNama && hariIni >= tM && hariIni <= tA;
+                    return a.nama.toUpperCase() === sNama && hariIni >= tM && hariIni <= tA;
                 });
 
-                let sText = "HADIR", sClass = "status-hadir";
+                let sText = "HADIR", sClass = "hadir";
                 if (record) {
-                    sText = (record.sebab || "OUTSTATION").toUpperCase();
-                    sClass = (sText.includes("CUTI") || sText.includes("SAKIT") || sText.includes("HALFDAY")) ? "status-cuti" : "status-kerja";
+                    sText = record.sebab.toUpperCase();
+                    sClass = (sText.includes("CUTI") || sText.includes("SAKIT") || sText.includes("HALFDAY")) ? "cuti" : "kerja";
                 }
+                counts[sClass]++;
 
-                const card = document.createElement('div');
-                card.className = 'staf-card';
-                card.innerHTML = `
-                    <div class="staf-info">
-                        <div class="staf-nama">${sNama}</div>
-                        <div class="staf-jawatan">${(staf.jawatan || "STAF").toUpperCase()}</div>
-                    </div>
-                    <div class="badge ${sClass}">${sText}</div>
-                `;
-                list.appendChild(card);
+                list.innerHTML += `
+                    <div class="staf-card bg-${sClass}">
+                        <div>
+                            <div class="staf-nama">${sNama}</div>
+                            <div class="staf-jawatan">${staf.jawatan}</div>
+                        </div>
+                        <div class="status-tag tag-${sClass}">${sText}</div>
+                    </div>`;
             });
 
-            // Adjust grid columns if staff > 40 to keep them small and fitting
-            if (allStaff.length > 40) {
-                list.style.gridTemplateColumns = "repeat(5, 1fr)";
-            }
-
-            indicator.innerHTML = '<i class="fa-solid fa-check-circle"></i> SISTEM AKTIF';
-            indicator.style.color = "var(--neon-green)";
-
+            // Update Stats UI
+            document.getElementById('countHadir').innerText = counts.hadir;
+            document.getElementById('countKerja').innerText = counts.kerja;
+            document.getElementById('countCuti').innerText = counts.cuti;
+            
+            indicator.innerHTML = '<i class="fa-solid fa-bolt"></i> DATA SEGERAK (LIVE)';
         } catch (err) {
-            indicator.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> RALAT';
-            indicator.style.color = "var(--neon-red)";
+            indicator.innerText = "RALAT HUBUNGAN DATABASE";
         }
     }
 
     function updateClock() {
         const now = new Date();
-        document.getElementById('liveClock').innerText = now.toLocaleTimeString('ms-MY', { hour12: false });
+        document.getElementById('liveClock').innerText = now.toLocaleTimeString('en-GB');
     }
 
-    document.getElementById('todayDate').innerText = new Date().toLocaleDateString('ms-MY', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase();
-    updateClock();
+    document.getElementById('todayDate').innerText = new Date().toLocaleDateString('ms-MY', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase();
     setInterval(updateClock, 1000);
-    fetchAllStatus();
-    setInterval(fetchAllStatus, 30000);
+    setInterval(updateDashboard, 60000); // Refresh setiap 1 minit
+    updateDashboard();
+    updateClock();
 </script>
+
 </body>
 </html>
