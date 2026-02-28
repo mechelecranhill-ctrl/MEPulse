@@ -8,339 +8,78 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
-            --bg-color: #a1c4fd;
-            --bg-gradient: linear-gradient(120deg, #a1c4fd 0%, #c2e9fb 33%, #fbc2eb 66%, #a1c4fd 100%);
-            --glass-white: rgba(255, 255, 255, 0.45);
-            --glass-border: rgba(255, 255, 255, 0.6);
-            --text-primary: #1d1d1f;
-            --text-secondary: rgba(0,0,0,0.5);
+            --bg-color: #f2f2f7;
+            --bg-gradient: linear-gradient(120deg, #a1c4fd 0%, #c2e9fb 100%);
+            --glass-white: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.8);
+            --text-primary: #1c1c1e;
+            --text-secondary: #8e8e93;
             --ios-blue: #007AFF;
             --ios-red: #FF3B30;
-            --input-bg: rgba(255, 255, 255, 0.4);
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: 'SF Pro Display', sans-serif; }
-        html, body { height: 100dvh; width: 100%; margin: 0; padding: 0; overflow: hidden; background: var(--bg-color) var(--bg-gradient) fixed; }
-        body { display: flex; justify-content: center; }
-        .container { width: 100%; max-width: 400px; height: 100dvh; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
-        .page { display: none; height: 100%; overflow-y: auto; padding: 20px 15px; -webkit-overflow-scrolling: touch; flex-direction: column; }
-        .page.active { display: flex; animation: slideUp 0.3s ease-out; }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-        
-        .glass-card, .menu-item { background: var(--glass-white); backdrop-filter: blur(20px) saturate(160%); border: 1.5px solid var(--glass-border); border-radius: 28px; padding: 20px; margin-bottom: 12px; }
-        .menu-item { display: flex; align-items: center; gap: 15px; cursor: pointer; transition: transform 0.2s; }
-        .menu-item:active { transform: scale(0.96); }
-        .menu-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; justify-content: center; align-items: center; color: white; flex-shrink: 0; }
-        
-        .section-header { background: #1c1c1e; color: white; padding: 12px 18px; border-radius: 15px; margin-top: 25px; font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 10px; }
-        .unit-label { margin: 15px 0 8px 10px; font-size: 13px; font-weight: 700; color: var(--ios-blue); display: flex; align-items: center; gap: 8px; }
-        .contract-card { margin-left: 10px; padding: 15px; margin-bottom: 12px; background: rgba(255,255,255,0.6); border-radius: 22px; border: 1.5px solid var(--glass-border); position: relative; }
-        .delete-btn { position: absolute; top: 15px; right: 15px; color: var(--ios-red); font-size: 16px; cursor: pointer; padding: 5px; }
-        
-        label { font-size: 10px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin: 10px 0 5px; display: block; }
-        select, input, textarea { width: 100%; padding: 12px; background: var(--input-bg); border: 1.2px solid var(--glass-border); border-radius: 14px; outline: none; font-size: 16px; margin-bottom: 10px; transition: 0.2s; }
-        input:focus { background: white; border-color: var(--ios-blue); }
-        button { width: 100%; padding: 16px; background: var(--ios-blue); color: white; border: none; border-radius: 18px; font-size: 16px; font-weight: 600; margin-top: 15px; cursor: pointer; }
-        button:disabled { opacity: 0.5; }
+        body { margin: 0; background: var(--bg-color) var(--bg-gradient) fixed; display: flex; justify-content: center; height: 100dvh; overflow: hidden; }
+        .container { width: 100%; max-width: 420px; height: 100dvh; display: flex; flex-direction: column; }
+        .page { display: none; height: 100%; overflow-y: auto; padding: 20px; flex-direction: column; -webkit-overflow-scrolling: touch; }
+        .page.active { display: flex; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Breakdown Styling */
-        .breakdown-box { background: rgba(0,0,0,0.03); padding: 8px 12px; border-radius: 12px; margin-top: 10px; font-size: 11px; line-height: 1.6; }
-        .sec-row { display: flex; gap: 8px; margin-bottom: 8px; }
+        /* UI Components */
+        .glass-card { background: var(--glass-white); backdrop-filter: blur(20px); border: 1px solid var(--glass-border); border-radius: 24px; padding: 20px; margin-bottom: 15px; box-shadow: 0 8px 32px rgba(0,0,0,0.05); }
+        .menu-item { background: white; border-radius: 20px; padding: 18px; display: flex; align-items: center; gap: 15px; margin-bottom: 12px; cursor: pointer; border: 1px solid rgba(0,0,0,0.05); }
+        .menu-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; justify-content: center; align-items: center; color: white; }
+        
+        /* Contract List UI */
+        .section-header { background: #1c1c1e; color: white; padding: 10px 15px; border-radius: 12px; margin-top: 20px; font-weight: 600; font-size: 13px; text-transform: uppercase; }
+        .unit-label { margin: 12px 0 8px 5px; font-size: 13px; font-weight: 700; color: var(--ios-blue); }
+        .contract-card { background: white; border-radius: 20px; padding: 15px; margin-bottom: 10px; border: 1px solid rgba(0,0,0,0.05); position: relative; }
+        .delete-btn { position: absolute; top: 15px; right: 15px; color: var(--ios-red); opacity: 0.5; }
+        
+        /* Form Styling */
+        label { font-size: 11px; font-weight: 600; color: var(--text-secondary); margin: 10px 0 5px; display: block; }
+        input, select, textarea { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #ddd; background: rgba(255,255,255,0.8); font-size: 15px; margin-bottom: 8px; outline: none; }
+        button { width: 100%; padding: 16px; background: var(--ios-blue); color: white; border: none; border-radius: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; }
+        
+        /* Breakdown Cost UI */
+        .breakdown-item { display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0; border-bottom: 1px dashed #eee; }
+        .breakdown-container { background: #f9f9f9; padding: 10px; border-radius: 12px; margin: 8px 0; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div id="homePage" class="page active">
-        <div style="text-align:center; margin-bottom:25px;">
-            <h1 style="margin:0; font-size:28px; letter-spacing: -1px; font-weight: 600;">M&E-Connect</h1>
-            <p style="color:var(--text-secondary); font-size:13px;">Sistem Pengurusan Kontrak v1.1</p>
+        <div style="text-align:center; margin: 20px 0 30px;">
+            <h1 style="margin:0; font-size:26px; letter-spacing:-1px;">M&E-Connect</h1>
+            <p style="color:var(--text-secondary); font-size:12px;">Tanpa Skema Public (Direct API)</p>
         </div>
         <div class="menu-item" onclick="showPage('kontrakPage')">
-            <div class="menu-icon" style="background: #34C759;"><i class="fa-solid fa-list-check"></i></div>
-            <div style="flex:1;">
-                <h3 style="margin:0; font-size:16px;">Direktori Kontrak</h3>
-                <p style="margin:0; font-size:11px; color:var(--text-secondary);">Pecahan mengikut seksyen & unit</p>
-            </div>
-            <i class="fa-solid fa-chevron-right" style="opacity:0.3; font-size:12px;"></i>
+            <div class="menu-icon" style="background:#34C759;"><i class="fa-solid fa-folder-tree"></i></div>
+            <div><h4 style="margin:0">Direktori Kontrak</h4><p style="margin:0; font-size:11px; color:var(--text-secondary)">Pecahan Seksyen & Unit</p></div>
         </div>
         <div class="menu-item" onclick="showPage('adminPage')">
-            <div class="menu-icon" style="background: #1c1c1e;"><i class="fa-solid fa-sliders"></i></div>
-            <div style="flex:1;">
-                <h3 style="margin:0; font-size:16px;">Admin Panel</h3>
-                <p style="margin:0; font-size:11px; color:var(--text-secondary);">Daftar unit & kontrak baru</p>
-            </div>
-            <i class="fa-solid fa-chevron-right" style="opacity:0.3; font-size:12px;"></i>
+            <div class="menu-icon" style="background:#007AFF;"><i class="fa-solid fa-plus"></i></div>
+            <div><h4 style="margin:0">Pendaftaran</h4><p style="margin:0; font-size:11px; color:var(--text-secondary)">Tambah Unit & Kontrak</p></div>
         </div>
     </div>
 
     <div id="kontrakPage" class="page">
         <div class="glass-card">
-            <div onclick="showPage('homePage')" style="color:var(--ios-blue); cursor:pointer; font-weight:600; margin-bottom:15px; font-size:14px;">
-                <i class="fa-solid fa-chevron-left"></i> KEMBALI
-            </div>
-            <h2 style="margin:0 0 15px 0; letter-spacing:-1px;">Struktur Jabatan</h2>
-            <input type="text" placeholder="Cari nama kontrak atau kontraktor..." onkeyup="searchContract(this.value)">
-            <div id="kontrakContainer"></div>
+            <div onclick="showPage('homePage')" style="color:var(--ios-blue); cursor:pointer; font-weight:600; margin-bottom:15px;"><i class="fa-solid fa-arrow-left"></i> KEMBALI</div>
+            <h2 style="margin:0 0 15px 0;">Senarai Kontrak</h2>
+            <input type="text" placeholder="Cari kontrak/vendor..." onkeyup="searchData(this.value)">
+            <div id="kontrakList"></div>
         </div>
     </div>
 
     <div id="adminPage" class="page">
         <div class="glass-card">
-            <div onclick="showPage('homePage')" style="color:var(--ios-blue); cursor:pointer; font-weight:600; margin-bottom:15px; font-size:14px;">
-                <i class="fa-solid fa-chevron-left"></i> MENU UTAMA
-            </div>
-            <h2 style="margin:0 0 20px 0; letter-spacing:-1px;">Pendaftaran Baru</h2>
-
-            <div style="padding:15px; background:rgba(255,255,255,0.3); border-radius:20px; margin-bottom:25px; border:1px solid var(--glass-border);">
-                <h3 style="font-size:14px; margin-top:0; color:var(--ios-blue);"><i class="fa-solid fa-plus-circle"></i> 1. Daftar Unit</h3>
+            <div onclick="showPage('homePage')" style="color:var(--ios-blue); cursor:pointer; font-weight:600; margin-bottom:15px;"><i class="fa-solid fa-arrow-left"></i> KEMBALI</div>
+            
+            <div style="background:rgba(0,0,0,0.03); padding:15px; border-radius:15px; margin-bottom:20px;">
+                <h4 style="margin-top:0">Daftar Unit</h4>
                 <label>Seksyen</label>
-                <select id="admin_sec_select">
+                <select id="reg_sec_id">
                     <option value="1">Seksyen Selenggara</option>
                     <option value="2">Seksyen Pematuhan Peraturan</option>
-                    <option value="3">Seksyen Pengurusan Aset & Kewangan</option>
-                    <option value="4">Seksyen Projek & Perkhidmatan Teknikal</option>
-                </select>
-                <label>Nama Unit</label>
-                <input type="text" id="admin_unit_name" placeholder="Cth: Unit Janakuasa">
-                <button onclick="registerUnit()" style="background:#5856D6; padding:12px; font-size:14px;">Simpan Unit</button>
-            </div>
-
-            <form id="contractForm">
-                <h3 style="font-size:14px; color:var(--ios-blue);"><i class="fa-solid fa-file-signature"></i> 2. Butiran Kontrak</h3>
-                <label>Unit Bertanggungjawab</label>
-                <select id="admin_unit_select" required><option value="">Pilih Unit</option></select>
-                
-                <label>Kod & Nama Kontrak</label>
-                <input type="text" id="c_code" required placeholder="Cth: ME/CONT/001">
-                <textarea id="c_name" rows="3" required placeholder="Tajuk penuh kontrak..."></textarea>
-                
-                <label>Kontraktor</label>
-                <input type="text" id="c_vendor" required placeholder="Nama syarikat">
-
-                <div style="display:flex; gap:10px;">
-                    <div style="flex:1;"><label>Tarikh Mula</label><input type="date" id="c_start" required></div>
-                    <div style="flex:1;"><label>Tarikh Tamat</label><input type="date" id="c_end" required></div>
-                </div>
-
-                <div style="background:rgba(255,255,255,0.25); padding:15px; border-radius:18px; margin-top:10px; border:1px solid var(--glass-border);">
-                    <label style="color:var(--text-primary);">Pecahan Kos (Seksyen A/B/dll)</label>
-                    <div id="sections_input_container">
-                        <div class="sec-row">
-                            <input type="text" placeholder="Seksyen A" class="sec_name" style="flex:2; margin-bottom:0;">
-                            <input type="number" placeholder="RM" class="sec_val" oninput="calculateTotalSum()" style="flex:1.5; margin-bottom:0;">
-                        </div>
-                    </div>
-                    <button type="button" onclick="addSectionInput()" style="background:none; color:var(--ios-blue); border:1.5px dashed var(--ios-blue); padding:8px; font-size:12px; margin-top:8px; width:auto; border-radius:10px;">
-                        <i class="fa-solid fa-plus"></i> Tambah Seksyen Kos
-                    </button>
-                    
-                    <label style="margin-top:15px;">Jumlah Keseluruhan (Auto)</label>
-                    <input type="number" id="c_sum" step="0.01" readonly style="background:rgba(255,255,255,0.6); font-weight:bold; font-size:18px;" placeholder="0.00">
-                </div>
-
-                <button type="submit" id="c_btn">Daftar Kontrak Sekarang</button>
-            </form>
-        </div>
-    </div>
-</div>
-
-<script>
-    // 1. CONFIGURATION
-    const SUPABASE_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48'; 
-
-    const getHeaders = () => ({
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json'
-    });
-
-    // 2. NAVIGATION
-    function showPage(pageId) {
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        const target = document.getElementById(pageId);
-        if (target) target.classList.add('active');
-
-        if (pageId === 'kontrakPage') loadKontrakData();
-        if (pageId === 'adminPage') loadAdminUnits();
-    }
-
-    // 3. AUTO-CALCULATE LOGIC
-    function addSectionInput() {
-        const container = document.getElementById('sections_input_container');
-        const div = document.createElement('div');
-        div.className = "sec-row";
-        div.innerHTML = `
-            <input type="text" placeholder="Nama Seksyen" class="sec_name" style="flex:2; margin-bottom:0;">
-            <input type="number" placeholder="RM" class="sec_val" oninput="calculateTotalSum()" style="flex:1.5; margin-bottom:0;">
-            <button type="button" onclick="this.parentElement.remove(); calculateTotalSum();" style="flex:0.3; background:none; color:red; padding:0; margin:0; width:auto; border:none;"><i class="fa-solid fa-minus-circle"></i></button>
-        `;
-        container.appendChild(div);
-    }
-
-    function calculateTotalSum() {
-        const vals = document.querySelectorAll('.sec_val');
-        let total = 0;
-        vals.forEach(v => total += parseFloat(v.value) || 0);
-        document.getElementById('c_sum').value = total.toFixed(2);
-    }
-
-    // 4. LOAD & DISPLAY DATA
-    async function loadKontrakData() {
-        const container = document.getElementById('kontrakContainer');
-        container.innerHTML = '<p style="text-align:center; padding:30px; opacity:0.6;">Memuatkan data...</p>';
-        try {
-            const res = await fetch(`${SUPABASE_URL}/rest/v1/contract?select=*,units(unit_name,me_sections(section_name))&order=created_at.desc`, {
-                headers: getHeaders()
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message);
-
-            if (data.length === 0) {
-                container.innerHTML = '<p style="text-align:center; padding:30px; opacity:0.5;">Tiada rekod kontrak ditemui.</p>';
-                return;
-            }
-
-            const grouped = {};
-            data.forEach(item => {
-                const sec = item.units?.me_sections?.section_name || "Lain-lain";
-                const uni = item.units?.unit_name || "Umum";
-                if (!grouped[sec]) grouped[sec] = {};
-                if (!grouped[sec][uni]) grouped[sec][uni] = [];
-                grouped[sec][uni].push(item);
-            });
-
-            let html = '';
-            for (const sec in grouped) {
-                html += `<div class="section-header"><i class="fa-solid fa-sitemap"></i> ${sec.toUpperCase()}</div>`;
-                for (const uni in grouped[sec]) {
-                    html += `<div class="unit-label"><i class="fa-solid fa-circle-dot" style="font-size:8px;"></i> ${uni}</div>`;
-                    grouped[sec][uni].forEach(c => {
-                        // Pecahan Kos UI
-                        let bHtml = '';
-                        if(c.contract_sections_breakdown && Object.keys(c.contract_sections_breakdown).length > 0) {
-                            bHtml = '<div class="breakdown-box">';
-                            for (const [name, val] of Object.entries(c.contract_sections_breakdown)) {
-                                bHtml += `<div style="display:flex; justify-content:space-between;"><span>${name}</span> <span>RM ${val.toLocaleString()}</span></div>`;
-                            }
-                            bHtml += '</div>';
-                        }
-
-                        html += `
-                            <div class="contract-card">
-                                <div class="delete-btn" onclick="deleteContract('${c.contract_code}')"><i class="fa-solid fa-trash-can"></i></div>
-                                <div style="font-size:10px; font-weight:bold; color:var(--ios-blue);">${c.contract_code}</div>
-                                <div style="font-size:15px; font-weight:600; margin:5px 0; padding-right:25px; line-height:1.3;">${c.contract_name}</div>
-                                <div style="font-size:11px; color:var(--text-secondary); margin-bottom:8px;">
-                                    <i class="fa-regular fa-calendar"></i> ${new Date(c.contract_start).toLocaleDateString('ms-MY')} - ${new Date(c.contract_end).toLocaleDateString('ms-MY')}
-                                </div>
-                                ${bHtml}
-                                <div style="display:flex; justify-content:space-between; font-size:12px; margin-top:10px; border-top:1px solid rgba(0,0,0,0.05); padding-top:10px;">
-                                    <span style="font-weight:500;">${c.contractor}</span>
-                                    <strong style="color:var(--text-primary);">RM ${parseFloat(c.contract_sum).toLocaleString()}</strong>
-                                </div>
-                            </div>`;
-                    });
-                }
-            }
-            container.innerHTML = html;
-        } catch (e) {
-            container.innerHTML = `<p style="color:red; text-align:center; padding:20px;">Ralat: ${e.message}</p>`;
-        }
-    }
-
-    async function loadAdminUnits() {
-        const sel = document.getElementById('admin_unit_select');
-        try {
-            const res = await fetch(`${SUPABASE_URL}/rest/v1/units?select=*&order=unit_name.asc`, { headers: getHeaders() });
-            const units = await res.json();
-            sel.innerHTML = '<option value="">Pilih Unit</option>';
-            if (Array.isArray(units)) {
-                units.forEach(u => sel.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`);
-            }
-        } catch (e) { console.error(e); }
-    }
-
-    // 5. ACTIONS (CRUD)
-    async function registerUnit() {
-        const secId = document.getElementById('admin_sec_select').value;
-        const uName = document.getElementById('admin_unit_name').value;
-        if(!uName) return alert("Sila masukkan nama unit!");
-        
-        try {
-            const res = await fetch(`${SUPABASE_URL}/rest/v1/units`, {
-                method: 'POST',
-                headers: getHeaders(),
-                body: JSON.stringify({ section_id: secId, unit_name: uName })
-            });
-            if(res.ok) { 
-                alert("✅ Unit berjaya disimpan!"); 
-                document.getElementById('admin_unit_name').value = ''; 
-                loadAdminUnits(); 
-            }
-        } catch (e) { alert("Ralat rangkaian."); }
-    }
-
-    document.getElementById('contractForm').onsubmit = async (e) => {
-        e.preventDefault();
-        const btn = document.getElementById('c_btn');
-        btn.disabled = true; btn.innerText = "Sila tunggu...";
-        
-        // Kumpul breakdown kos
-        const secNames = document.querySelectorAll('.sec_name');
-        const secVals = document.querySelectorAll('.sec_val');
-        let breakdown = {};
-        secNames.forEach((n, i) => { if(n.value) breakdown[n.value] = parseFloat(secVals[i].value) || 0; });
-
-        const payload = {
-            contract_code: document.getElementById('c_code').value,
-            unit_id: parseInt(document.getElementById('admin_unit_select').value),
-            contract_name: document.getElementById('c_name').value,
-            contractor: document.getElementById('c_vendor').value,
-            contract_sum: parseFloat(document.getElementById('c_sum').value),
-            contract_start: document.getElementById('c_start').value,
-            contract_end: document.getElementById('c_end').value,
-            contract_sections_breakdown: breakdown
-        };
-
-        try {
-            const res = await fetch(`${SUPABASE_URL}/rest/v1/contract`, {
-                method: 'POST',
-                headers: { ...getHeaders(), 'Prefer': 'return=minimal' },
-                body: JSON.stringify(payload)
-            });
-            if(res.ok) { 
-                alert("✅ Kontrak berjaya didaftarkan!"); 
-                document.getElementById('contractForm').reset(); 
-                document.getElementById('sections_input_container').innerHTML = '<div class="sec-row"><input type="text" placeholder="Seksyen A" class="sec_name" style="flex:2; margin-bottom:0;"><input type="number" placeholder="RM" class="sec_val" oninput="calculateTotalSum()" style="flex:1.5; margin-bottom:0;"></div>';
-                showPage('homePage'); 
-            } else {
-                const err = await res.json();
-                alert("Gagal: " + err.message);
-            }
-        } catch (e) { alert("Ralat sambungan."); }
-        finally { btn.disabled = false; btn.innerText = "Daftar Kontrak Sekarang"; }
-    };
-
-    async function deleteContract(code) {
-        if (!confirm(`Padam kontrak ${code}? Tindakan ini tidak boleh dibatalkan.`)) return;
-        try {
-            const res = await fetch(`${SUPABASE_URL}/rest/v1/contract?contract_code=eq.${code}`, { 
-                method: 'DELETE', 
-                headers: getHeaders() 
-            });
-            if (res.ok) loadKontrakData();
-        } catch (e) { alert("Gagal padam data."); }
-    }
-
-    function searchContract(q) {
-        const cards = document.querySelectorAll('.contract-card');
-        const query = q.toLowerCase();
-        cards.forEach(c => {
-            const text = c.innerText.toLowerCase();
-            c.style.display = text.includes(query) ? 'block' : 'none';
-        });
-    }
-</script>
-</body>
-</html>
+                    <option value="3">Seksyen Pengurusan Aset & Kew
