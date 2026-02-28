@@ -25,7 +25,7 @@
             overflow: hidden; 
         }
 
-        /* --- SIDEBAR TRANSITION & STYLE --- */
+        /* --- SIDEBAR --- */
         .sidebar { 
             width: 220px; 
             background: #fff; 
@@ -35,7 +35,6 @@
             box-shadow: 5px 0 25px rgba(0,0,0,0.05); 
             flex-shrink: 0;
             z-index: 10;
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .brand h1 { 
@@ -44,7 +43,6 @@
             margin: 0; 
             text-align: center; 
             color: var(--accent-blue);
-            text-shadow: 0 2px 4px rgba(0,168,255,0.1);
         }
 
         .clock-section { 
@@ -53,10 +51,7 @@
             padding: 15px;
             background: #f8fafc;
             border-radius: 15px;
-            transition: transform 0.3s ease;
         }
-        
-        .clock-section:hover { transform: scale(1.02); }
 
         #liveClock { 
             font-size: 42px; 
@@ -74,7 +69,7 @@
             margin-top: 8px; 
         }
 
-        /* --- MAIN PANEL & CARDS --- */
+        /* --- MAIN PANEL --- */
         .main-panel { flex-grow: 1; padding: 20px; display: flex; flex-direction: column; }
 
         #mainList { 
@@ -104,26 +99,20 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        .staf-card:hover { 
-            transform: translateY(-3px); 
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
-        }
-
         .staf-info { flex-grow: 1; min-width: 0; padding-right: 10px; }
         .staf-nama { font-weight: 900; font-size: 13px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #334155; }
         .staf-jawatan { font-size: 9px; color: #94a3b8; text-transform: uppercase; }
 
         .badge { 
-            font-size: 7.5px; 
+            font-size: 8px; 
             font-weight: 800; 
             padding: 5px 8px; 
             border-radius: 6px; 
             color: white; 
-            min-width: 68px; 
+            min-width: 75px; 
             text-align: center; 
             flex-shrink: 0; 
             text-transform: uppercase;
-            transition: all 0.3s ease;
         }
 
         .b-hadir { background: var(--accent-green); } 
@@ -134,28 +123,16 @@
         .c-kerja { border-left: 5px solid var(--accent-blue); } 
         .c-cuti { border-left: 5px solid var(--accent-red); }
 
-        /* --- STATS TRANSITION --- */
         .stats-list { margin-top: auto; display: grid; gap: 10px; }
-        
         .stat-card { 
-            padding: 12px 15px; 
-            border-radius: 12px; 
-            color: white; 
-            font-weight: bold; 
-            font-size: 13px; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
+            padding: 12px 15px; border-radius: 12px; color: white; 
+            font-weight: bold; font-size: 13px; display: flex; 
+            justify-content: space-between; align-items: center;
         }
 
-        .stat-card:hover { transform: translateX(5px); }
-
-        .s-hadir { background: var(--accent-green); box-shadow: 0 4px 12px rgba(0, 219, 139, 0.2); } 
-        .s-kerja { background: var(--accent-blue); box-shadow: 0 4px 12px rgba(0, 168, 255, 0.2); } 
-        .s-cuti { background: var(--accent-red); box-shadow: 0 4px 12px rgba(255, 94, 87, 0.2); }
+        .s-hadir { background: var(--accent-green); } 
+        .s-kerja { background: var(--accent-blue); } 
+        .s-cuti { background: var(--accent-red); }
 
     </style>
 </head>
@@ -183,6 +160,20 @@
     const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48'; 
 
     const HIERARKI = { 'KETUA JABATAN': 1, 'KETUA SEKSYEN': 2, 'EKSEKUTIF KANAN': 3, 'EKSEKUTIF': 4, 'JURUTEKNIK': 5, 'PENYELIA PENTADBIRAN': 6, 'PEMBANTU PENTADBIRAN': 7, 'KERANI': 8 };
+
+    // FUNGSI SHORTFORM UNTUK TV
+    function getShortForm(sebab) {
+        if (!sebab) return "HADIR";
+        const s = sebab.toUpperCase();
+        
+        if (s.includes("FIELD") || s.includes("LAPANGAN")) return "ONSITE";
+        if (s.includes("FACTORY") || s.includes("FAT")) return "FAT";
+        if (s.includes("MESYUARAT")) return "MEETING";
+        if (s.includes("CUTI REHAT") || s.includes("SAKIT")) return "OFF/MC";
+        if (s.includes("SEPARUH") || s.includes("HALFDAY")) return "1/2 DAY";
+        
+        return s.length > 9 ? s.substring(0, 9) : s;
+    }
 
     async function updateUI() {
         const list = document.getElementById('mainList');
@@ -212,14 +203,22 @@
                     return (a.nama || "").toUpperCase().trim() === sNama && hariIni >= dM && hariIni <= dA;
                 });
 
-                let txt = "HADIR", cls = "hadir";
+                let statusText = "HADIR";
+                let cls = "hadir";
+
                 if (record) {
-                    txt = record.sebab.toUpperCase().trim();
-                    cls = (txt.includes("CUTI") || txt.includes("SAKIT") || txt.includes("HALFDAY")) ? "cuti" : "kerja";
+                    const sebabRaw = record.sebab.toUpperCase();
+                    statusText = getShortForm(record.sebab);
+                    
+                    // Logic warna mengikut kategori
+                    if (sebabRaw.includes("CUTI") || sebabRaw.includes("HALFDAY")) {
+                        cls = "cuti";
+                    } else {
+                        cls = "kerja";
+                    }
                 }
                 counts[cls]++;
 
-                // Added staggered animation delay
                 const delay = index * 0.04;
                 htmlOutput += `
                     <div class="staf-card c-${cls}" style="animation-delay: ${delay}s">
@@ -227,13 +226,11 @@
                             <div class="staf-nama">${sNama}</div>
                             <div class="staf-jawatan">${(s.jawatan||"").toUpperCase()}</div>
                         </div>
-                        <div class="badge b-${cls}">${txt}</div>
+                        <div class="badge b-${cls}">${statusText}</div>
                     </div>`;
             });
 
             list.innerHTML = htmlOutput;
-
-            // Smooth number update
             document.getElementById('countHadir').innerText = counts.hadir;
             document.getElementById('countKerja').innerText = counts.kerja;
             document.getElementById('countCuti').innerText = counts.cuti;
