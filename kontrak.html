@@ -152,21 +152,19 @@ function showPage(pageId) {
 async function loadKontrakData() {
     const container = document.getElementById('kontrakContainer');
     try {
-        // Guna singular 'contract' mengikut database anda
         const res = await fetch(`${SUPABASE_URL}/rest/v1/contract?select=*,units(unit_name,me_sections(section_name))`, {
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
         });
         
-        const data = await res.json();
-        
-        if (!res.ok || !Array.isArray(data)) {
-            container.innerHTML = `<p style="text-align:center; padding:20px; color:red;">Ralat: ${data.message || 'Jadual tidak dijumpai'}</p>`;
-            return;
+        if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.message || "Gagal memuatkan data");
         }
 
-        if (!data.length) { 
-            container.innerHTML = '<p style="text-align:center; padding:20px; opacity:0.6;">Tiada data kontrak.</p>'; 
-            return; 
+        const data = await res.json();
+        if (!data || data.length === 0) {
+            container.innerHTML = '<p style="text-align:center; padding:20px; opacity:0.6;">Tiada data kontrak.</p>';
+            return;
         }
 
         const grouped = {};
@@ -200,9 +198,53 @@ async function loadKontrakData() {
             }
         }
         container.innerHTML = html;
-    } catch (e) { 
-        container.innerHTML = "<p style='text-align:center;'>Ralat sambungan rangkaian.</p>"; 
+    } catch (e) {
+        console.error(e);
+        container.innerHTML = `<p style="text-align:center; color:red; padding:20px;">Ralat: ${e.message}</p>`;
     }
+}
+
+async function loadAdminUnits() {
+    const sel = document.getElementById('admin_unit_select');
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/units?select=*&order=unit_name.asc`, {
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+        });
+        
+        if (!res.ok) throw new Error("Jadual 'units' tidak ditemui.");
+        
+        const units = await res.json();
+        sel.innerHTML = '<option value="">Pilih Unit</option>';
+        if (Array.isArray(units)) {
+            units.forEach(u => sel.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`);
+        }
+    } catch (e) { 
+        console.error(e);
+        sel.innerHTML = '<option value="">Gagal memuatkan unit</option>';
+    }
+}
+
+async function registerUnit() {
+    const secId = document.getElementById('admin_sec_select').value;
+    const uName = document.getElementById('admin_unit_name').value;
+    if(!uName) return alert("Isi nama unit!");
+    
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/units`, {
+            method: 'POST',
+            headers: { 
+                'apikey': SUPABASE_KEY, 
+                'Authorization': 'Bearer ' + SUPABASE_KEY, 
+                'Content-Type': 'application/json' 
+            },
+            body: JSON.stringify({ section_id: secId, unit_name: uName })
+        });
+        if(res.ok) { 
+            alert("✅ Unit Disimpan!"); 
+            document.getElementById('admin_unit_name').value = ''; 
+            loadAdminUnits(); 
+        }
+    } catch (e) { alert("Gagal menyimpan unit."); }
 }
 
 async function deleteContract(code) {
@@ -214,32 +256,6 @@ async function deleteContract(code) {
         });
         if (res.ok) { alert("✅ Berjaya!"); loadKontrakData(); }
     } catch (e) { alert("Gagal memadam."); }
-}
-
-async function loadAdminUnits() {
-    const sel = document.getElementById('admin_unit_select');
-    try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/units?select=*&order=unit_name.asc`, {
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
-        });
-        const units = await res.json();
-        if (Array.isArray(units)) {
-            sel.innerHTML = '<option value="">Pilih Unit</option>';
-            units.forEach(u => sel.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`);
-        }
-    } catch (e) { console.error(e); }
-}
-
-async function registerUnit() {
-    const secId = document.getElementById('admin_sec_select').value;
-    const uName = document.getElementById('admin_unit_name').value;
-    if(!uName) return alert("Isi nama unit!");
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/units`, {
-        method: 'POST',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ section_id: secId, unit_name: uName })
-    });
-    if(res.ok) { alert("✅ Unit Disimpan!"); document.getElementById('admin_unit_name').value = ''; loadAdminUnits(); }
 }
 
 document.getElementById('contractForm').onsubmit = async (e) => {
@@ -257,27 +273,32 @@ document.getElementById('contractForm').onsubmit = async (e) => {
         contract_end: document.getElementById('c_end').value
     };
 
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/contract`, {
-        method: 'POST',
-        headers: { 
-            'apikey': SUPABASE_KEY, 
-            'Authorization': 'Bearer ' + SUPABASE_KEY, 
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify(payload)
-    });
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/contract`, {
+            method: 'POST',
+            headers: { 
+                'apikey': SUPABASE_KEY, 
+                'Authorization': 'Bearer ' + SUPABASE_KEY, 
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify(payload)
+        });
 
-    if(res.ok) { 
-        alert("✅ Kontrak Berjaya Didaftarkan!"); 
-        document.getElementById('contractForm').reset(); 
-        showPage('homePage'); 
-    } else {
-        const err = await res.json();
-        alert("Ralat: " + (err.message || "Gagal simpan."));
+        if(res.ok) { 
+            alert("✅ Kontrak Berjaya Didaftarkan!"); 
+            document.getElementById('contractForm').reset(); 
+            showPage('homePage'); 
+        } else {
+            const err = await res.json();
+            alert("Ralat: " + (err.message || "Gagal simpan."));
+        }
+    } catch (e) {
+        alert("Ralat sambungan.");
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Daftar Kontrak";
     }
-    btn.disabled = false;
-    btn.innerText = "Daftar Kontrak";
 };
 </script>
 </body>
