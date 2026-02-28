@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>M&E CONNECT - ATTENDANCE LIVE</title>
+    <title>M&E CONNECT - SMART TRANSITION</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;700&family=Outfit:wght@700;900&display=swap');
@@ -14,6 +14,8 @@
             --accent-blue: #00a8ff;
             --accent-red: #ff5e57;
             --text-dark: #1e293b;
+            --sidebar-width: 240px;
+            --sidebar-collapsed: 70px;
         }
 
         * { box-sizing: border-box; }
@@ -29,9 +31,9 @@
             overflow: hidden;
         }
 
-        /* SIDEBAR - KECIL & MINIMALIS */
+        /* SIDEBAR WITH TRANSITION */
         .sidebar {
-            width: 240px; /* Mengecil dari 300px */
+            width: var(--sidebar-width);
             background: #ffffff;
             box-shadow: 5px 0 20px rgba(0,0,0,0.03);
             display: flex;
@@ -39,6 +41,20 @@
             padding: 25px 15px;
             flex-shrink: 0;
             z-index: 10;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); /* Transisi smooth */
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Hover effect untuk buka sidebar */
+        .sidebar:hover {
+            width: var(--sidebar-width);
+        }
+
+        /* Keadaan asal (kecil sedikit atau penuh, boleh laras di sini) */
+        .sidebar.collapsed {
+            width: var(--sidebar-collapsed);
+            padding: 25px 10px;
         }
 
         .brand h1 {
@@ -49,26 +65,40 @@
             animation: shine 4s linear infinite;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            text-align: center;
+            white-space: nowrap;
+            transition: opacity 0.3s;
         }
 
-        @keyframes shine { to { background-position: 200% center; } }
+        /* Sembunyikan teks bila sidebar kecil */
+        .collapsed .brand h1, 
+        .collapsed .brand p,
+        .collapsed #todayDate,
+        .collapsed .stat-label {
+            opacity: 0;
+            pointer-events: none;
+        }
 
-        .clock-section { margin: 25px 0; text-align: center; }
-        #liveClock { font-size: 42px; font-weight: 900; line-height: 1; color: var(--text-dark); }
-        #todayDate { font-size: 11px; margin-top: 5px; color: #94a3b8; font-weight: 700; text-transform: uppercase; }
+        .clock-section { 
+            margin: 25px 0; 
+            text-align: center;
+            transition: all 0.3s;
+        }
+        #liveClock { 
+            font-size: 42px; 
+            font-weight: 900; 
+            line-height: 1; 
+            transition: font-size 0.5s;
+        }
+        .collapsed #liveClock { font-size: 20px; }
 
         .stats-list { margin-top: auto; display: grid; gap: 8px; }
         .stat-card {
             padding: 10px 12px; border-radius: 10px;
             display: flex; justify-content: space-between; align-items: center;
             color: white; font-weight: bold; font-size: 12px;
+            min-height: 40px;
         }
         
-        .s-hadir { background: var(--accent-green); }
-        .s-kerja { background: var(--accent-blue); }
-        .s-cuti { background: var(--accent-red); }
-
         /* MAIN PANEL */
         .main-panel { 
             flex-grow: 1; 
@@ -77,6 +107,7 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
+            transition: padding 0.5s;
         }
 
         #mainList {
@@ -98,7 +129,19 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.02);
             border: 1px solid #f1f5f9;
             animation: popIn 0.4s ease-out backwards;
-            overflow: hidden;
+        }
+
+        .toggle-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--bg-light);
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            color: var(--accent-blue);
+            padding: 5px 8px;
+            z-index: 11;
         }
 
         @keyframes popIn {
@@ -106,40 +149,22 @@
             to { opacity: 1; transform: scale(1); }
         }
 
-        .staf-nama {
-            font-weight: 700;
-            font-size: 13px;
-            color: #334155;
-            text-transform: uppercase;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            flex-grow: 1;
-            padding-right: 8px;
-        }
-
-        .badge {
-            font-size: 8px; font-weight: 800; padding: 3px 8px;
-            border-radius: 5px; text-transform: uppercase;
-            min-width: 80px; text-align: center;
-            color: white;
-            flex-shrink: 0;
-        }
+        .staf-nama { font-weight: 700; font-size: 13px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1; }
+        .badge { font-size: 8px; font-weight: 800; padding: 3px 8px; border-radius: 5px; text-transform: uppercase; min-width: 80px; text-align: center; color: white; }
 
         .b-hadir { background: var(--accent-green); }
         .b-kerja { background: var(--accent-blue); }
         .b-cuti { background: var(--accent-red); }
-
         .c-hadir { border-left: 4px solid var(--accent-green); }
         .c-kerja { border-left: 4px solid var(--accent-blue); }
         .c-cuti { border-left: 4px solid var(--accent-red); }
-
-        .back-btn { position: fixed; bottom: 10px; left: 10px; opacity: 0.1; cursor: pointer; border: none; background: none; }
     </style>
 </head>
 <body>
 
-<div class="sidebar">
+<div class="sidebar" id="sidebar">
+    <button class="toggle-btn" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></button>
+    
     <div class="brand">
         <h1>M&E CONNECT</h1>
         <p style="font-size: 9px; color: #94a3b8; font-weight: 800; text-align: center;">LIVE MONITORING</p>
@@ -151,9 +176,9 @@
     </div>
 
     <div class="stats-list">
-        <div class="stat-card s-hadir"><span>OFFICE</span><span id="countHadir">0</span></div>
-        <div class="stat-card s-kerja"><span>FIELD</span><span id="countKerja">0</span></div>
-        <div class="stat-card s-cuti"><span>OFF</span><span id="countCuti">0</span></div>
+        <div class="stat-card s-hadir"><span class="stat-label">OFFICE</span><span id="countHadir">0</span></div>
+        <div class="stat-card s-kerja"><span class="stat-label">FIELD</span><span id="countKerja">0</span></div>
+        <div class="stat-card s-cuti"><span class="stat-label">OFF</span><span id="countCuti">0</span></div>
     </div>
 </div>
 
@@ -161,23 +186,18 @@
     <div id="mainList"></div>
 </div>
 
-<button class="back-btn" onclick="window.location.href='dashboard.html'"><i class="fa-solid fa-gear"></i></button>
-
 <script>
     const S_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
     const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48'; 
 
-    // SUSUNAN PANGKAT (Sama seperti dashboard)
     const HIERARKI = {
-        'KETUA JABATAN': 1,
-        'KETUA SEKSYEN': 2,
-        'EKSEKUTIF KANAN': 3,
-        'EKSEKUTIF': 4,
-        'PENYELIA PENTADBIRAN': 5,
-        'PEMBANTU PENTADBIRAN': 6,
-        'JURUTEKNIK': 7,
-        'KERANI': 8
+        'KETUA JABATAN': 1, 'KETUA SEKSYEN': 2, 'EKSEKUTIF KANAN': 3, 'EKSEKUTIF': 4,
+        'PENYELIA PENTADBIRAN': 5, 'PEMBANTU PENTADBIRAN': 6, 'JURUTEKNIK': 7, 'KERANI': 8
     };
+
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('collapsed');
+    }
 
     async function updateUI() {
         const list = document.getElementById('mainList');
@@ -191,12 +211,10 @@
             const att = await rA.json();
             const today = new Date().setHours(0,0,0,0);
 
-            // LOGIK SUSUNAN MENGIKUT PANGKAT
             staff.sort((a, b) => {
-                const rankA = HIERARKI[a.jawatan?.toUpperCase()] || 99;
-                const rankB = HIERARKI[b.jawatan?.toUpperCase()] || 99;
-                if (rankA !== rankB) return rankA - rankB;
-                return a.nama.localeCompare(b.nama); // Jika pangkat sama, ikut abjad
+                const rA = HIERARKI[a.jawatan?.toUpperCase()] || 99;
+                const rB = HIERARKI[b.jawatan?.toUpperCase()] || 99;
+                return rA - rB || a.nama.localeCompare(b.nama);
             });
 
             list.innerHTML = "";
@@ -204,35 +222,20 @@
 
             staff.forEach((s, index) => {
                 const sNama = (s.nama || "TIADA NAMA").toUpperCase().trim();
-                const record = att.find(a => {
-                    const tM = new Date(a.tarikh_mula).getTime();
-                    const tA = new Date(a.tarikh_akhir).getTime();
-                    return (a.nama || "").toUpperCase().trim() === sNama && today >= tM && today <= tA;
-                });
-
+                const record = att.find(a => (a.nama || "").toUpperCase().trim() === sNama && today >= new Date(a.tarikh_mula).getTime() && today <= new Date(a.tarikh_akhir).getTime());
                 let txt = "HADIR", cls = "hadir";
                 if (record) {
                     txt = record.sebab.toUpperCase();
                     cls = (txt.includes("CUTI") || txt.includes("SAKIT") || txt.includes("HALFDAY")) ? "cuti" : "kerja";
                 }
                 counts[cls]++;
-
-                const card = document.createElement('div');
-                card.className = `staf-card c-${cls}`;
-                card.style.animationDelay = `${index * 0.02}s`;
-                card.innerHTML = `
-                    <div class="staf-nama">${sNama}</div>
-                    <div class="badge b-${cls}">${txt}</div>
-                `;
-                list.appendChild(card);
+                list.innerHTML += `<div class="staf-card c-${cls}" style="animation-delay:${index*0.02}s"><div class="staf-nama">${sNama}</div><div class="badge b-${cls}">${txt}</div></div>`;
             });
 
-            if (staff.length > 40) list.style.gridTemplateColumns = "repeat(4, 1fr)";
             document.getElementById('countHadir').innerText = counts.hadir;
             document.getElementById('countKerja').innerText = counts.kerja;
             document.getElementById('countCuti').innerText = counts.cuti;
-
-        } catch (e) { console.error("Database Error"); }
+        } catch (e) { console.error(e); }
     }
 
     function clock() {
@@ -241,9 +244,7 @@
         document.getElementById('todayDate').innerText = n.toLocaleDateString('ms-MY', { weekday:'long', day:'numeric', month:'long' }).toUpperCase();
     }
 
-    setInterval(updateUI, 60000);
-    setInterval(clock, 1000);
-    updateUI(); clock();
+    setInterval(updateUI, 60000); setInterval(clock, 1000); updateUI(); clock();
 </script>
 </body>
 </html>
