@@ -1,11 +1,55 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M&E CONNECT - FIXED</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;700&family=Outfit:wght@500;700;900&display=swap');
+        :root { --bg-light: #f0f4f9; --accent-green: #00db8b; --accent-blue: #00a8ff; --accent-red: #ff5e57; --text-dark: #1e293b; }
+        body { background: var(--bg-light); font-family: 'Outfit', sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { width: 240px; background: #fff; padding: 25px 15px; display: flex; flex-direction: column; box-shadow: 5px 0 20px rgba(0,0,0,0.03); }
+        .clock-section { margin: 25px 0; text-align: center; }
+        #liveClock { font-size: 42px; font-weight: 900; }
+        #todayDate { font-size: 11px; color: #94a3b8; font-weight: 700; text-transform: uppercase; }
+        .main-panel { flex-grow: 1; padding: 15px; display: flex; flex-direction: column; }
+        #mainList { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: minmax(55px, 1fr); gap: 8px; height: 100%; }
+        .staf-card { background: #fff; border-radius: 10px; padding: 10px 15px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #f1f5f9; }
+        .staf-nama { font-weight: 900; font-size: 14px; text-transform: uppercase; }
+        .staf-jawatan { font-size: 10px; color: #94a3b8; text-transform: uppercase; }
+        .badge { font-size: 8px; font-weight: 800; padding: 4px 10px; border-radius: 6px; color: white; min-width: 85px; text-align: center; }
+        .b-hadir { background: var(--accent-green); } .b-kerja { background: var(--accent-blue); } .b-cuti { background: var(--accent-red); }
+        .c-hadir { border-left: 5px solid var(--accent-green); } .c-kerja { border-left: 5px solid var(--accent-blue); } .c-cuti { border-left: 5px solid var(--accent-red); }
+        .stats-list { margin-top: auto; display: grid; gap: 8px; }
+        .stat-card { padding: 10px 12px; border-radius: 10px; color: white; font-weight: bold; font-size: 12px; display: flex; justify-content: space-between; }
+        .s-hadir { background: var(--accent-green); } .s-kerja { background: var(--accent-blue); } .s-cuti { background: var(--accent-red); }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="brand"><h1>M&E CONNECT</h1></div>
+    <div class="clock-section">
+        <div id="liveClock">00:00</div>
+        <div id="todayDate">...</div>
+    </div>
+    <div class="stats-list">
+        <div class="stat-card s-hadir"><span>OFFICE</span><span id="countHadir">0</span></div>
+        <div class="stat-card s-kerja"><span>FIELD</span><span id="countKerja">0</span></div>
+        <div class="stat-card s-cuti"><span>OFF</span><span id="countCuti">0</span></div>
+    </div>
+</div>
+
+<div class="main-panel">
+    <div id="mainList">Memuatkan...</div>
+</div>
+
 <script>
     const S_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
     const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48'; 
 
-    const HIERARKI = {
-        'KETUA JABATAN': 1, 'KETUA SEKSYEN': 2, 'EKSEKUTIF KANAN': 3, 'EKSEKUTIF': 4,
-        'PENYELIA PENTADBIRAN': 5, 'PEMBANTU PENTADBIRAN': 6, 'JURUTEKNIK': 7, 'KERANI': 8
-    };
+    const HIERARKI = { 'KETUA JABATAN': 1, 'KETUA SEKSYEN': 2, 'EKSEKUTIF KANAN': 3, 'EKSEKUTIF': 4, 'PENYELIA PENTADBIRAN': 5, 'PEMBANTU PENTADBIRAN': 6, 'JURUTEKNIK': 7, 'KERANI': 8 };
 
     async function updateUI() {
         const list = document.getElementById('mainList');
@@ -14,71 +58,50 @@
                 fetch(`${S_URL}/rest/v1/staff?select=*`, { headers: { 'apikey': S_KEY, 'Authorization': `Bearer ${S_KEY}` } }),
                 fetch(`${S_URL}/rest/v1/attendance?select=*`, { headers: { 'apikey': S_KEY, 'Authorization': `Bearer ${S_KEY}` } })
             ]);
-
             const staff = await rS.json();
             const att = await rA.json();
-            
-            // LOGIK TARIKH YANG SAMA DENGAN DASHBOARD.HTML
             const sekarang = new Date();
             const hariIni = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate());
 
-            staff.sort((a, b) => {
-                const rA = HIERARKI[a.jawatan?.toUpperCase().trim()] || 99;
-                const rB = HIERARKI[b.jawatan?.toUpperCase().trim()] || 99;
-                return rA - rB || a.nama.localeCompare(b.nama);
-            });
-
+            staff.sort((a, b) => (HIERARKI[a.jawatan?.toUpperCase()] || 99) - (HIERARKI[b.jawatan?.toUpperCase()] || 99) || a.nama.localeCompare(b.nama));
+            
             list.innerHTML = "";
             let counts = { hadir: 0, kerja: 0, cuti: 0 };
 
-            staff.forEach((s, index) => {
-                const sNama = (s.nama || "TIADA NAMA").toUpperCase().trim();
-                const sJawatan = (s.jawatan || "STAF").toUpperCase().trim();
-                
-                // CARI REKOD DENGAN LOGIK SPLIT TARIKH (LEBIH TEPAT)
+            staff.forEach(s => {
+                const sNama = (s.nama || "").toUpperCase().trim();
                 const record = att.find(a => {
-                    const namaAtt = (a.nama || "").toUpperCase().trim();
-                    const tMulaParts = a.tarikh_mula.split('-');
-                    const tAkhirParts = a.tarikh_akhir.split('-');
-                    const tMula = new Date(tMulaParts[0], tMulaParts[1] - 1, tMulaParts[2]);
-                    const tAkhir = new Date(tAkhirParts[0], tAkhirParts[1] - 1, tAkhirParts[2]);
-                    return namaAtt === sNama && hariIni >= tMula && hariIni <= tAkhir;
+                    const tM = a.tarikh_mula.split('-');
+                    const tA = a.tarikh_akhir.split('-');
+                    const dM = new Date(tM[0], tM[1]-1, tM[2]);
+                    const dA = new Date(tA[0], tA[1]-1, tA[2]);
+                    return (a.nama || "").toUpperCase().trim() === sNama && hariIni >= dM && hariIni <= dA;
                 });
-                
+
                 let txt = "HADIR", cls = "hadir";
                 if (record) {
                     txt = record.sebab.toUpperCase().trim();
-                    // Warna merah untuk cuti/sakit, biru untuk mesyuarat/kerja luar
                     cls = (txt.includes("CUTI") || txt.includes("SAKIT") || txt.includes("HALFDAY")) ? "cuti" : "kerja";
                 }
                 counts[cls]++;
 
-                const card = document.createElement('div');
-                card.className = `staf-card c-${cls}`;
-                card.style.animationDelay = `${0.3 + (index * 0.03)}s`;
-                card.innerHTML = `
-                    <div class="staf-info">
-                        <div class="staf-nama" title="${sNama}">${sNama}</div>
-                        <div class="staf-jawatan">${sJawatan}</div>
-                    </div>
-                    <div class="badge b-${cls}">${txt}</div>
-                `;
-                list.appendChild(card);
+                list.innerHTML += `<div class="staf-card c-${cls}"><div class="staf-info"><div class="staf-nama">${sNama}</div><div class="staf-jawatan">${(s.jawatan||"").toUpperCase()}</div></div><div class="badge b-${cls}">${txt}</div></div>`;
             });
 
             document.getElementById('countHadir').innerText = counts.hadir;
             document.getElementById('countKerja').innerText = counts.kerja;
             document.getElementById('countCuti').innerText = counts.cuti;
-        } catch (e) { console.error("Sync Error:", e); }
+        } catch (e) { console.error("Ralat:", e); }
     }
 
     function clock() {
-        const n = new Date();
-        document.getElementById('liveClock').innerText = n.toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'});
-        document.getElementById('todayDate').innerText = n.toLocaleDateString('ms-MY', { weekday:'long', day:'numeric', month:'long' }).toUpperCase();
+        const c = document.getElementById('liveClock');
+        const d = document.getElementById('todayDate');
+        if(c) c.innerText = new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
+        if(d) d.innerText = new Date().toLocaleDateString('ms-MY', {weekday:'long', day:'numeric', month:'long'}).toUpperCase();
     }
 
-    setInterval(updateUI, 60000); 
-    setInterval(clock, 1000); 
-    updateUI(); clock();
+    setInterval(updateUI, 60000); setInterval(clock, 1000); updateUI(); clock();
 </script>
+</body>
+</html>
