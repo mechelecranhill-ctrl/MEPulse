@@ -8,22 +8,33 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;700&family=Outfit:wght@500;700;900&display=swap');
         :root { --bg-light: #f0f4f9; --accent-green: #00db8b; --accent-blue: #00a8ff; --accent-red: #ff5e57; --text-dark: #1e293b; }
+        
         body { background: var(--bg-light); font-family: 'Outfit', sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
-        .sidebar { width: 240px; background: #fff; padding: 25px 15px; display: flex; flex-direction: column; box-shadow: 5px 0 20px rgba(0,0,0,0.03); }
+        
+        .sidebar { width: 220px; background: #fff; padding: 25px 15px; display: flex; flex-direction: column; box-shadow: 5px 0 20px rgba(0,0,0,0.03); flex-shrink: 0; }
         .clock-section { margin: 25px 0; text-align: center; }
-        #liveClock { font-size: 42px; font-weight: 900; }
-        #todayDate { font-size: 11px; color: #94a3b8; font-weight: 700; text-transform: uppercase; }
+        #liveClock { font-size: 42px; font-weight: 900; line-height: 1; }
+        #todayDate { font-size: 11px; color: #94a3b8; font-weight: 700; text-transform: uppercase; margin-top: 5px; }
+        
         .main-panel { flex-grow: 1; padding: 15px; display: flex; flex-direction: column; }
         #mainList { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: minmax(55px, 1fr); gap: 8px; height: 100%; }
-        .staf-card { background: #fff; border-radius: 10px; padding: 10px 15px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #f1f5f9; }
-        .staf-nama { font-weight: 900; font-size: 14px; text-transform: uppercase; }
-        .staf-jawatan { font-size: 10px; color: #94a3b8; text-transform: uppercase; }
-        .badge { font-size: 8px; font-weight: 800; padding: 4px 10px; border-radius: 6px; color: white; min-width: 85px; text-align: center; }
+        
+        .staf-card { background: #fff; border-radius: 10px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #f1f5f9; overflow: hidden; }
+        
+        .staf-info { flex-grow: 1; min-width: 0; padding-right: 8px; }
+        .staf-nama { font-weight: 900; font-size: 13px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #334155; }
+        .staf-jawatan { font-size: 9px; color: #94a3b8; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        /* BADGE DIKECILKAN */
+        .badge { font-size: 7.5px; font-weight: 800; padding: 4px 5px; border-radius: 6px; color: white; min-width: 65px; text-align: center; flex-shrink: 0; text-transform: uppercase; }
+        
         .b-hadir { background: var(--accent-green); } .b-kerja { background: var(--accent-blue); } .b-cuti { background: var(--accent-red); }
         .c-hadir { border-left: 5px solid var(--accent-green); } .c-kerja { border-left: 5px solid var(--accent-blue); } .c-cuti { border-left: 5px solid var(--accent-red); }
+        
         .stats-list { margin-top: auto; display: grid; gap: 8px; }
         .stat-card { padding: 10px 12px; border-radius: 10px; color: white; font-weight: bold; font-size: 12px; display: flex; justify-content: space-between; }
         .s-hadir { background: var(--accent-green); } .s-kerja { background: var(--accent-blue); } .s-cuti { background: var(--accent-red); }
+        h1 { font-family: 'Fredoka', sans-serif; font-size: 20px; margin: 0; text-align: center; color: var(--accent-blue); }
     </style>
 </head>
 <body>
@@ -49,7 +60,7 @@
     const S_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
     const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48'; 
 
-    const HIERARKI = { 'KETUA JABATAN': 1, 'KETUA SEKSYEN': 2, 'EKSEKUTIF KANAN': 3, 'EKSEKUTIF': 4, 'JURUTEKNIK': 5, 'PENYELIA PENTADBIRAN': 6, 'PEMBANTU PENTADBIRAN': 7, 'KERANI': 8 };
+    const HIERARKI = { 'KETUA JABATAN': 1, 'KETUA SEKSYEN': 2, 'EKSEKUTIF KANAN': 3, 'EKSEKUTIF': 4, 'PENYELIA PENTADBIRAN': 5, 'PEMBANTU PENTADBIRAN': 6, 'JURUTEKNIK': 7, 'KERANI': 8 };
 
     async function updateUI() {
         const list = document.getElementById('mainList');
@@ -71,6 +82,7 @@
             staff.forEach(s => {
                 const sNama = (s.nama || "").toUpperCase().trim();
                 const record = att.find(a => {
+                    if(!a.tarikh_mula || !a.tarikh_akhir) return false;
                     const tM = a.tarikh_mula.split('-');
                     const tA = a.tarikh_akhir.split('-');
                     const dM = new Date(tM[0], tM[1]-1, tM[2]);
