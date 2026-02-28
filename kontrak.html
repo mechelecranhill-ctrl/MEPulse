@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>M&E-Connect | Kontrak</title>
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #a1c4fd;
+            --bg-gradient: linear-gradient(120deg, #a1c4fd 0%, #c2e9fb 33%, #fbc2eb 66%, #a1c4fd 100%);
+            --glass-white: rgba(255, 255, 255, 0.45);
+            --glass-border: rgba(255, 255, 255, 0.6);
+            --text-primary: #1d1d1f;
+            --text-secondary: rgba(0,0,0,0.5);
+            --ios-blue: #007AFF;
+            --input-bg: rgba(255, 255, 255, 0.4);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: 'SF Pro Display', sans-serif; }
+        body { background: var(--bg-color) var(--bg-gradient) fixed; background-size: cover; margin: 0; padding: env(safe-area-inset-top) 15px env(safe-area-inset-bottom); display: flex; justify-content: center; min-height: 100dvh; }
+        
+        .container { width: 100%; max-width: 400px; padding: 20px 0; }
+        .glass-card { background: var(--glass-white); backdrop-filter: blur(25px) saturate(180%); -webkit-backdrop-filter: blur(25px) saturate(180%); border: 1.5px solid var(--glass-border); border-radius: 28px; padding: 22px; width: 100%; }
+        
+        .header { display: flex; align-items: center; margin-bottom: 25px; }
+        .back-btn { color: var(--ios-blue); font-size: 18px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        
+        label { font-size: 10px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin: 12px 0 5px; display: block; }
+        input, textarea { width: 100%; padding: 12px; background: var(--input-bg); border: 1.2px solid var(--glass-border); border-radius: 14px; outline: none; font-size: 16px; color: var(--text-primary); -webkit-user-select: text; }
+        
+        .section-box { background: rgba(255,255,255,0.2); border-radius: 20px; padding: 15px; border: 1px solid var(--glass-border); margin-top: 15px; }
+        .section-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; } }
+
+        button { width: 100%; padding: 16px; background: var(--ios-blue); color: white; border: none; border-radius: 18px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 20px; }
+        .add-btn { width: auto; padding: 6px 14px; margin: 0; background: #34C759; font-size: 12px; border-radius: 12px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="glass-card">
+        <div class="header">
+            <div class="back-btn" onclick="window.location.href='index.html'"><i class="fa-solid fa-chevron-left"></i> KEMBALI</div>
+        </div>
+
+        <h2 style="margin: 0 0 20px; font-size: 24px; letter-spacing: -0.5px;">Daftar Kontrak</h2>
+
+        <form id="contractForm">
+            <label>Contract Code</label>
+            <input type="text" id="c_code" placeholder="M&E/2026/XYZ" required>
+
+            <label>Contractor</label>
+            <input type="text" id="c_vendor" required>
+
+            <label>Contract Name</label>
+            <textarea id="c_name" rows="2" required></textarea>
+
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1"><label>Mula</label><input type="date" id="c_start" required></div>
+                <div style="flex:1"><label>Tamat</label><input type="date" id="c_end" required></div>
+            </div>
+
+            <div class="section-box">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <span style="font-size:11px; font-weight:700; color:var(--text-secondary);">SECTIONAL SUM</span>
+                    <button type="button" class="add-btn" onclick="addSectionRow()">+ TAMBAH</button>
+                </div>
+                <div id="sectionContainer"></div>
+            </div>
+
+            <label>Performance Guarantee (RM)</label>
+            <input type="number" id="c_pg" step="0.01" required>
+
+            <button type="submit" id="subBtn">Simpan Rekod Kontrak</button>
+        </form>
+    </div>
+</div>
+
+<script>
+// KONFIGURASI PROJEK KONTRAK (ASING DARI ATTENDANCE)
+const C_URL = 'MASUKKAN_URL_PROJEK_MAINTENANCE_CONTRACT'; 
+const C_KEY = 'MASUKKAN_ANON_KEY_PROJEK_MAINTENANCE_CONTRACT'; 
+
+let sectionCount = 0;
+
+function addSectionRow() {
+    const container = document.getElementById('sectionContainer');
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const char = letters[sectionCount] || `S${sectionCount + 1}`;
+    
+    const div = document.createElement('div');
+    div.className = 'section-row';
+    div.innerHTML = `
+        <b style="width:20px; color:var(--ios-blue)">${char}</b>
+        <input type="text" placeholder="Nama Seksyen" class="s_name" required style="flex:2; font-size:14px;">
+        <input type="number" placeholder="RM" class="s_sum" required style="flex:1; font-size:14px;">
+        <i class="fa-solid fa-circle-xmark" onclick="this.parentElement.remove()" style="color:#ff3b30; cursor:pointer;"></i>
+    `;
+    container.appendChild(div);
+    sectionCount++;
+}
+
+document.getElementById('contractForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('subBtn');
+    btn.disabled = true; btn.innerText = "Menyimpan...";
+
+    const code = document.getElementById('c_code').value;
+    const names = document.querySelectorAll('.s_name');
+    const sums = document.querySelectorAll('.s_sum');
+    
+    let totalContractSum = 0;
+    let sectionsArray = [];
+
+    names.forEach((el, i) => {
+        const val = parseFloat(sums[i].value) || 0;
+        totalContractSum += val;
+        sectionsArray.push({
+            contract_code: code,
+            section_letter: String.fromCharCode(65 + i),
+            section_name: el.value,
+            section_sum: val
+        });
+    });
+
+    const mainData = {
+        contract_code: code,
+        contractor: document.getElementById('c_vendor').value,
+        contract_name: document.getElementById('c_name').value,
+        contract_start: document.getElementById('c_start').value,
+        contract_end: document.getElementById('c_end').value,
+        contract_sum: totalContractSum,
+        performance_guarantee_sum: parseFloat(document.getElementById('c_pg').value) || 0
+    };
+
+    try {
+        // Simpan Data Utama
+        const res1 = await fetch(`${C_URL}/rest/v1/contract`, {
+            method: 'POST',
+            headers: { 'apikey': C_KEY, 'Authorization': `Bearer ${C_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(mainData)
+        });
+
+        if (res1.ok) {
+            // Simpan Data Seksyen
+            await fetch(`${C_URL}/rest/v1/contract_sections`, {
+                method: 'POST',
+                headers: { 'apikey': C_KEY, 'Authorization': `Bearer ${C_KEY}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(sectionsArray)
+            });
+            alert("✅ REKOD KONTRAK BERJAYA DISIMPAN!");
+            window.location.href = 'index.html';
+        }
+    } catch (err) { alert("RALAT: " + err.message); }
+    finally { btn.disabled = false; btn.innerText = "Simpan Rekod Kontrak"; }
+};
+
+window.onload = addSectionRow;
+</script>
+</body>
+</html>
