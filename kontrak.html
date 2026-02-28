@@ -82,4 +82,191 @@
                 <select id="reg_sec_id">
                     <option value="1">Seksyen Selenggara</option>
                     <option value="2">Seksyen Pematuhan Peraturan</option>
-                    <option value="3">Seksyen Pengurusan Aset & Kew
+                    <option value="3">Seksyen Pengurusan Aset & Kewangan</option>
+                    <option value="4">Seksyen Projek & Perkhidmatan Teknikal</option>
+                </select>
+                <input type="text" id="reg_unit_name" placeholder="Nama Unit (Cth: Unit Lif)">
+                <button onclick="saveUnit()" style="padding:10px; font-size:13px; background:#5856D6;">Simpan Unit</button>
+            </div>
+
+            <form id="contractForm">
+                <h4>Daftar Kontrak Baru</h4>
+                <label>Unit</label>
+                <select id="reg_unit_id" required><option value="">Pilih Unit</option></select>
+                <label>Kod & Nama</label>
+                <input type="text" id="c_code" placeholder="Kod Kontrak" required>
+                <textarea id="c_name" placeholder="Tajuk Kontrak" required></textarea>
+                <input type="text" id="c_vendor" placeholder="Kontraktor" required>
+                
+                <div style="display:flex; gap:10px;">
+                    <div style="flex:1"><label>Mula</label><input type="date" id="c_start" required></div>
+                    <div style="flex:1"><label>Tamat</label><input type="date" id="c_end" required></div>
+                </div>
+
+                <label>Pecahan Kos (Seksyen A/B/C)</label>
+                <div id="breakdown_inputs">
+                    <div class="sec-input-row" style="display:flex; gap:5px; margin-bottom:5px;">
+                        <input type="text" placeholder="Nama Seksyen" class="b_name" style="flex:2">
+                        <input type="number" placeholder="RM" class="b_val" oninput="sumTotal()" style="flex:1">
+                    </div>
+                </div>
+                <button type="button" onclick="addBreakdownRow()" style="background:none; color:var(--ios-blue); border:1px dashed var(--ios-blue); font-size:12px; padding:8px; margin-top:0;">+ Tambah Pecahan</button>
+
+                <label>Jumlah Keseluruhan (Auto)</label>
+                <input type="number" id="c_sum" readonly style="background:#eee; font-weight:700;" placeholder="0.00">
+
+                <button type="submit" id="submitBtn">Daftar Kontrak</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SB_URL = 'https://fppemnabevbcephyepwx.supabase.co';
+    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48';
+
+    const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
+
+    function showPage(id) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        if(id === 'kontrakPage') loadContracts();
+        if(id === 'adminPage') loadUnitsDropdown();
+    }
+
+    // --- LOGIK PECAHAN KOS ---
+    function addBreakdownRow() {
+        const div = document.createElement('div');
+        div.className = "sec-input-row";
+        div.style = "display:flex; gap:5px; margin-bottom:5px;";
+        div.innerHTML = `<input type="text" placeholder="Nama Seksyen" class="b_name" style="flex:2"><input type="number" placeholder="RM" class="b_val" oninput="sumTotal()" style="flex:1">`;
+        document.getElementById('breakdown_inputs').appendChild(div);
+    }
+
+    function sumTotal() {
+        let total = 0;
+        document.querySelectorAll('.b_val').forEach(v => total += parseFloat(v.value) || 0);
+        document.getElementById('c_sum').value = total.toFixed(2);
+    }
+
+    // --- DATA ACTIONS ---
+    async function loadUnitsDropdown() {
+        const res = await fetch(`${SB_URL}/rest/v1/units?select=*&order=unit_name`, { headers });
+        const data = await res.json();
+        const sel = document.getElementById('reg_unit_id');
+        sel.innerHTML = '<option value="">Pilih Unit</option>';
+        data.forEach(u => sel.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`);
+    }
+
+    async function saveUnit() {
+        const name = document.getElementById('reg_unit_name').value;
+        const secId = document.getElementById('reg_sec_id').value;
+        if(!name) return alert("Isi nama unit!");
+        await fetch(`${SB_URL}/rest/v1/units`, {
+            method: 'POST', headers,
+            body: JSON.stringify({ section_id: secId, unit_name: name })
+        });
+        alert("Unit Disimpan!");
+        document.getElementById('reg_unit_name').value = '';
+        loadUnitsDropdown();
+    }
+
+    document.getElementById('contractForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+
+        let breakdown = {};
+        const names = document.querySelectorAll('.b_name');
+        const vals = document.querySelectorAll('.b_val');
+        names.forEach((n, i) => { if(n.value) breakdown[n.value] = parseFloat(vals[i].value) || 0; });
+
+        const payload = {
+            contract_code: document.getElementById('c_code').value,
+            unit_id: parseInt(document.getElementById('reg_unit_id').value),
+            contract_name: document.getElementById('c_name').value,
+            contractor: document.getElementById('c_vendor').value,
+            contract_sum: parseFloat(document.getElementById('c_sum').value),
+            contract_start: document.getElementById('c_start').value,
+            contract_end: document.getElementById('c_end').value,
+            contract_sections_breakdown: breakdown
+        };
+
+        const res = await fetch(`${SB_URL}/rest/v1/contract`, {
+            method: 'POST', headers, body: JSON.stringify(payload)
+        });
+
+        if(res.ok) {
+            alert("Kontrak Berjaya!");
+            document.getElementById('contractForm').reset();
+            showPage('homePage');
+        } else {
+            const err = await res.json();
+            alert("Ralat: " + err.message);
+        }
+        btn.disabled = false;
+    };
+
+    async function loadContracts() {
+        const container = document.getElementById('kontrakList');
+        container.innerHTML = "Memuatkan...";
+        const res = await fetch(`${SB_URL}/rest/v1/contract?select=*,units(unit_name,me_sections(section_name))`, { headers });
+        const data = await res.json();
+
+        const grouped = {};
+        data.forEach(c => {
+            const sName = c.units?.me_sections?.section_name || "Lain-lain";
+            const uName = c.units?.unit_name || "Umum";
+            if(!grouped[sName]) grouped[sName] = {};
+            if(!grouped[sName][uName]) grouped[sName][uName] = [];
+            grouped[sName][uName].push(c);
+        });
+
+        let html = '';
+        for (const sec in grouped) {
+            html += `<div class="section-header">${sec}</div>`;
+            for (const unit in grouped[sec]) {
+                html += `<div class="unit-label"><i class="fa-solid fa-caret-right"></i> ${unit}</div>`;
+                grouped[sec][unit].forEach(c => {
+                    let bHtml = '';
+                    if(c.contract_sections_breakdown) {
+                        bHtml = '<div class="breakdown-container">';
+                        for(const [k,v] of Object.entries(c.contract_sections_breakdown)) {
+                            bHtml += `<div class="breakdown-item"><span>${k}</span><b>RM ${v.toLocaleString()}</b></div>`;
+                        }
+                        bHtml += '</div>';
+                    }
+
+                    html += `
+                    <div class="contract-card">
+                        <div class="delete-btn" onclick="deleteContract('${c.contract_code}')"><i class="fa-solid fa-trash"></i></div>
+                        <div style="font-size:10px; color:var(--ios-blue); font-weight:700;">${c.contract_code}</div>
+                        <div style="font-weight:600; margin:5px 0;">${c.contract_name}</div>
+                        <div style="font-size:11px; color:var(--text-secondary);"><i class="fa-solid fa-calendar"></i> ${c.contract_start} hingga ${c.contract_end}</div>
+                        ${bHtml}
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid #eee;">
+                            <span style="font-size:12px;">${c.contractor}</span>
+                            <span style="font-weight:700;">RM ${parseFloat(c.contract_sum).toLocaleString()}</span>
+                        </div>
+                    </div>`;
+                });
+            }
+        }
+        container.innerHTML = html || "Tiada data.";
+    }
+
+    async function deleteContract(code) {
+        if(!confirm("Padam kontrak ini?")) return;
+        await fetch(`${SB_URL}/rest/v1/contract?contract_code=eq.${code}`, { method: 'DELETE', headers });
+        loadContracts();
+    }
+
+    function searchData(q) {
+        const query = q.toLowerCase();
+        document.querySelectorAll('.contract-card').forEach(card => {
+            card.style.display = card.innerText.toLowerCase().includes(query) ? 'block' : 'none';
+        });
+    }
+</script>
+</body>
+</html>
