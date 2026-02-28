@@ -141,13 +141,17 @@
 const SUPABASE_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48'; 
 
+// FUNGSI UTAMA UNTUK TUKAR PAGE
 function showPage(pageId) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.getElementById(pageId).classList.add('active');
+    const targetPage = document.getElementById(pageId);
+    if (targetPage) {
+        targetPage.classList.add('active');
+    }
     if(pageId === 'kontrakPage') loadKontrakData();
 }
 
-// Paparkan Hirarki & Fungsi Padam
+// PAPARKAN HIRARKI & FUNGSI PADAM
 async function loadKontrakData() {
     const container = document.getElementById('kontrakContainer');
     try {
@@ -155,7 +159,10 @@ async function loadKontrakData() {
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
         });
         const data = await res.json();
-        if (!data.length) { container.innerHTML = '<p style="text-align:center; padding:20px; opacity:0.6;">Tiada data kontrak.</p>'; return; }
+        if (!data || !data.length) { 
+            container.innerHTML = '<p style="text-align:center; padding:20px; opacity:0.6;">Tiada data kontrak.</p>'; 
+            return; 
+        }
 
         const grouped = {};
         data.forEach(item => {
@@ -172,6 +179,7 @@ async function loadKontrakData() {
             for (const uni in grouped[sec]) {
                 html += `<div class="unit-label"><i class="fa-solid fa-circle-dot" style="font-size:8px;"></i> ${uni}</div>`;
                 grouped[sec][uni].forEach(c => {
+                    // DI SINI RALAT SEBELUM INI: Jarak pada 'contract contractor' dibuang
                     html += `
                         <div class="contract-card">
                             <div class="delete-btn" onclick="deleteContract('${c.contract_code}')">
@@ -180,7 +188,7 @@ async function loadKontrakData() {
                             <div style="font-size:10px; font-weight:bold; color:var(--ios-blue);">${c.contract_code}</div>
                             <div style="font-size:15px; font-weight:600; margin:5px 0; padding-right:25px;">${c.contract_name}</div>
                             <div style="display:flex; justify-content:space-between; font-size:12px; opacity:0.8; margin-top:10px; border-top:1px solid rgba(0,0,0,0.05); padding-top:8px;">
-                                <span>${c.contract contractor}</span>
+                                <span>${c.contractor}</span>
                                 <strong>RM ${parseFloat(c.contract_sum).toLocaleString()}</strong>
                             </div>
                         </div>`;
@@ -188,13 +196,16 @@ async function loadKontrakData() {
             }
         }
         container.innerHTML = html;
-    } catch (e) { container.innerHTML = "<p style='text-align:center;'>Ralat memuatkan data.</p>"; }
+    } catch (e) { 
+        console.error(e);
+        container.innerHTML = "<p style='text-align:center;'>Ralat memuatkan data.</p>"; 
+    }
 }
 
-// Fungsi Padam Kontrak
+// FUNGSI PADAM KONTRAK
 async function deleteContract(code) {
     if (!confirm(`Padam rekod kontrak ${code}? Tindakan ini tidak boleh dibatalkan.`)) return;
-    
+
     try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/contract?contract_code=eq.${code}`, {
             method: 'DELETE',
@@ -207,7 +218,7 @@ async function deleteContract(code) {
     } catch (e) { alert("Gagal memadam rekod."); }
 }
 
-// Logik Admin
+// LOGIK ADMIN
 async function loadAdminUnits() {
     const sel = document.getElementById('admin_unit_select');
     try {
@@ -224,44 +235,62 @@ async function registerUnit() {
     const secId = document.getElementById('admin_sec_select').value;
     const uName = document.getElementById('admin_unit_name').value;
     if(!uName) return alert("Isi nama unit!");
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/units`, {
-        method: 'POST',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ section_id: secId, unit_name: uName })
-    });
-    if(res.ok) { alert("✅ Unit Disimpan!"); document.getElementById('admin_unit_name').value = ''; loadAdminUnits(); }
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/units`, {
+            method: 'POST',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ section_id: secId, unit_name: uName })
+        });
+        if(res.ok) { 
+            alert("✅ Unit Disimpan!"); 
+            document.getElementById('admin_unit_name').value = ''; 
+            loadAdminUnits(); 
+        }
+    } catch (e) { alert("Gagal menyimpan unit."); }
 }
 
+// HANDLE SUBMIT FORM KONTRAK
 document.getElementById('contractForm').onsubmit = async (e) => {
     e.preventDefault();
     const btn = document.getElementById('c_btn');
     btn.disabled = true;
     btn.innerText = "Menyimpan...";
-    
+
     const payload = {
         contract_code: document.getElementById('c_code').value,
-        unit_id: document.getElementById('admin_unit_select').value,
+        unit_id: parseInt(document.getElementById('admin_unit_select').value),
         contract_name: document.getElementById('c_name').value,
         contractor: document.getElementById('c_vendor').value,
-        contract_sum: document.getElementById('c_sum').value,
+        contract_sum: parseFloat(document.getElementById('c_sum').value),
         contract_end: document.getElementById('c_end').value
     };
-    
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/contract`, {
-        method: 'POST',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    });
-    
-    if(res.ok) { 
-        alert("✅ Kontrak Berjaya Didaftarkan!"); 
-        document.getElementById('contractForm').reset(); 
-        showPage('homePage'); 
-    } else {
-        alert("Ralat: Kod kontrak mungkin sudah wujud.");
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/contract`, {
+            method: 'POST',
+            headers: { 
+                'apikey': SUPABASE_KEY, 
+                'Authorization': 'Bearer ' + SUPABASE_KEY, 
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if(res.ok) { 
+            alert("✅ Kontrak Berjaya Didaftarkan!"); 
+            document.getElementById('contractForm').reset(); 
+            showPage('homePage'); 
+        } else {
+            const errData = await res.json();
+            alert("Ralat: " + (errData.message || "Kod kontrak mungkin sudah wujud."));
+        }
+    } catch (e) {
+        alert("Ralat rangkaian atau pelayan.");
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Daftar Kontrak";
     }
-    btn.disabled = false;
-    btn.innerText = "Daftar Kontrak";
 };
 </script>
 </body>
