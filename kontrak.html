@@ -151,12 +151,28 @@
 
     // --- DATA ACTIONS ---
     async function loadUnitsDropdown() {
+    const sel = document.getElementById('reg_unit_id');
+    sel.innerHTML = '<option value="">Memuatkan...</option>';
+    
+    try {
         const res = await fetch(`${SB_URL}/rest/v1/units?select=*&order=unit_name`, { headers });
         const data = await res.json();
-        const sel = document.getElementById('reg_unit_id');
+        
+        if (!res.ok) throw new Error(data.message || "Gagal tarik data");
+
         sel.innerHTML = '<option value="">Pilih Unit</option>';
-        data.forEach(u => sel.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`);
+        if (data.length === 0) {
+            sel.innerHTML = '<option value="">(Tiada Unit Ditemui)</option>';
+        } else {
+            data.forEach(u => {
+                sel.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
+            });
+        }
+    } catch (e) {
+        console.error("Ralat Unit:", e);
+        sel.innerHTML = '<option value="">Ralat API!</option>';
     }
+}
 
     async function saveUnit() {
         const name = document.getElementById('reg_unit_name').value;
