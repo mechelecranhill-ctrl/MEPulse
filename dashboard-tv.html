@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>M&E CONNECT - ENTRANCE ANIMATION</title>
+    <title>M&E CONNECT - POSITION VIEW</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;700&family=Outfit:wght@700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;700&family=Outfit:wght@500;700;900&display=swap');
 
         :root {
             --bg-light: #f0f4f9;
@@ -18,7 +18,6 @@
 
         * { box-sizing: border-box; }
 
-        /* KESAN ENTRANCE UNTUK BODY */
         body {
             background: var(--bg-light);
             font-family: 'Outfit', sans-serif;
@@ -31,12 +30,8 @@
             animation: fadeInPage 0.8s ease-out;
         }
 
-        @keyframes fadeInPage {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
+        @keyframes fadeInPage { from { opacity: 0; } to { opacity: 1; } }
 
-        /* SIDEBAR ENTRANCE (SLIDE DARI KIRI) */
         .sidebar {
             width: 240px;
             background: #ffffff;
@@ -49,10 +44,7 @@
             animation: slideInLeft 1s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        @keyframes slideInLeft {
-            from { transform: translateX(-100%); }
-            to { transform: translateX(0); }
-        }
+        @keyframes slideInLeft { from { transform: translateX(-100%); } to { transform: translateX(0); } }
 
         .brand h1 {
             font-family: 'Fredoka', sans-serif;
@@ -79,7 +71,8 @@
             animation: slideUp 0.8s ease-out backwards;
         }
 
-        /* MAIN PANEL ENTRANCE */
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
         .main-panel { 
             flex-grow: 1; 
             padding: 15px; 
@@ -92,17 +85,16 @@
         #mainList {
             display: grid;
             grid-template-columns: repeat(3, 1fr); 
-            grid-auto-rows: minmax(40px, 1fr); 
-            gap: 6px;
+            grid-auto-rows: minmax(55px, 1fr); /* Besarkan sikit row untuk jawatan */
+            gap: 8px;
             height: 100%;
             width: 100%;
         }
 
-        /* STAF CARD ENTRANCE (POP UP) */
         .staf-card {
             background: #ffffff;
-            border-radius: 8px;
-            padding: 0 12px;
+            border-radius: 10px;
+            padding: 10px 15px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -116,20 +108,54 @@
             to { opacity: 1; transform: translateY(0) scale(1); }
         }
 
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        /* Container Nama & Jawatan */
+        .staf-info {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            overflow: hidden;
+            padding-right: 10px;
         }
 
-        .staf-nama { font-weight: 700; font-size: 13px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1; padding-right: 8px; }
-        .badge { font-size: 8px; font-weight: 800; padding: 3px 8px; border-radius: 5px; text-transform: uppercase; min-width: 80px; text-align: center; color: white; }
+        .staf-nama { 
+            font-weight: 900; 
+            font-size: 14px; 
+            text-transform: uppercase; 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            color: #334155;
+        }
+
+        .staf-jawatan {
+            font-size: 10px;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 2px;
+        }
+
+        .badge { 
+            font-size: 8px; 
+            font-weight: 800; 
+            padding: 4px 10px; 
+            border-radius: 6px; 
+            text-transform: uppercase; 
+            min-width: 85px; 
+            text-align: center; 
+            color: white; 
+            flex-shrink: 0;
+        }
 
         .b-hadir { background: var(--accent-green); }
         .b-kerja { background: var(--accent-blue); }
         .b-cuti { background: var(--accent-red); }
-        .c-hadir { border-left: 4px solid var(--accent-green); }
-        .c-kerja { border-left: 4px solid var(--accent-blue); }
-        .c-cuti { border-left: 4px solid var(--accent-red); }
+        .c-hadir { border-left: 5px solid var(--accent-green); }
+        .c-kerja { border-left: 5px solid var(--accent-blue); }
+        .c-cuti { border-left: 5px solid var(--accent-red); }
 
         .back-btn { position: fixed; bottom: 10px; left: 10px; opacity: 0.1; cursor: pointer; border: none; background: none; }
     </style>
@@ -192,7 +218,9 @@
 
             staff.forEach((s, index) => {
                 const sNama = (s.nama || "TIADA NAMA").toUpperCase().trim();
+                const sJawatan = (s.jawatan || "STAF").toUpperCase().trim();
                 const record = att.find(a => (a.nama || "").toUpperCase().trim() === sNama && today >= new Date(a.tarikh_mula).getTime() && today <= new Date(a.tarikh_akhir).getTime());
+                
                 let txt = "HADIR", cls = "hadir";
                 if (record) {
                     txt = record.sebab.toUpperCase();
@@ -202,12 +230,18 @@
 
                 const card = document.createElement('div');
                 card.className = `staf-card c-${cls}`;
-                // KESAN STAGGER: Kad muncul satu persatu dengan delay sikit
                 card.style.animationDelay = `${0.3 + (index * 0.03)}s`;
-                card.innerHTML = `<div class="staf-nama">${sNama}</div><div class="badge b-${cls}">${txt}</div>`;
+                card.innerHTML = `
+                    <div class="staf-info">
+                        <div class="staf-nama" title="${sNama}">${sNama}</div>
+                        <div class="staf-jawatan">${sJawatan}</div>
+                    </div>
+                    <div class="badge b-${cls}">${txt}</div>
+                `;
                 list.appendChild(card);
             });
 
+            if (staff.length > 40) list.style.gridTemplateColumns = "repeat(4, 1fr)";
             document.getElementById('countHadir').innerText = counts.hadir;
             document.getElementById('countKerja').innerText = counts.kerja;
             document.getElementById('countCuti').innerText = counts.cuti;
