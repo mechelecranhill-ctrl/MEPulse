@@ -1,76 +1,162 @@
 <!DOCTYPE html>
 <html lang="ms">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>M&E-Connect v1.0</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
     <style>
-        /* Tambahan CSS untuk Label Hirarki */
-        .section-header {
-            background: #1c1c1e; color: white; padding: 12px 18px;
-            border-radius: 15px; margin-top: 25px; font-weight: 600;
-            font-size: 14px; display: flex; align-items: center; gap: 10px;
+        :root {
+            --bg-color: #a1c4fd;
+            --bg-gradient: linear-gradient(120deg, #a1c4fd 0%, #c2e9fb 33%, #fbc2eb 66%, #a1c4fd 100%);
+            --glass-white: rgba(255, 255, 255, 0.45);
+            --glass-border: rgba(255, 255, 255, 0.6);
+            --text-primary: #1d1d1f;
+            --text-secondary: rgba(0,0,0,0.5);
+            --ios-blue: #007AFF;
+            --input-bg: rgba(255, 255, 255, 0.4);
         }
-        .unit-label {
-            margin: 15px 0 8px 10px; font-size: 13px; font-weight: 700;
-            color: #007AFF; display: flex; align-items: center; gap: 8px;
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: 'SF Pro Display', sans-serif; }
+        html, body { height: 100dvh; width: 100%; margin: 0; padding: 0; overflow: hidden; background: var(--bg-color); }
+        body { background: var(--bg-color) var(--bg-gradient) fixed; background-size: cover; display: flex; justify-content: center; }
+
+        .container { 
+            width: 100%; max-width: 400px; height: 100dvh; display: flex; flex-direction: column;
+            padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
         }
-        .contract-card {
-            margin-left: 10px; padding: 15px; margin-bottom: 12px;
-            background: rgba(255,255,255,0.45); border-radius: 22px;
-            border: 1px solid var(--glass-border);
+
+        .page { display: none; height: 100%; overflow-y: auto; padding: 20px 15px; -webkit-overflow-scrolling: touch; }
+        .page.active { display: flex; flex-direction: column; animation: slideUp 0.4s ease-out; }
+        
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        .glass-card, .menu-item {
+            background: var(--glass-white); backdrop-filter: blur(25px) saturate(180%);
+            border: 1.5px solid var(--glass-border); border-radius: 28px; padding: 20px; margin-bottom: 12px;
         }
+
+        .menu-item { display: flex; align-items: center; gap: 15px; cursor: pointer; }
+        .menu-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; justify-content: center; align-items: center; color: white; flex-shrink: 0; }
+        
+        /* Hirarki UI Styling */
+        .section-header { background: #1c1c1e; color: white; padding: 12px 18px; border-radius: 15px; margin-top: 25px; font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 10px; }
+        .unit-label { margin: 15px 0 8px 10px; font-size: 13px; font-weight: 700; color: var(--ios-blue); display: flex; align-items: center; gap: 8px; }
+        .contract-card { margin-left: 10px; padding: 15px; margin-bottom: 12px; background: rgba(255,255,255,0.45); border-radius: 22px; border: 1.5px solid var(--glass-border); }
+
+        label { font-size: 10px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin: 10px 0 5px; display: block; }
+        select, input, textarea { width: 100%; padding: 12px; background: var(--input-bg); border: 1.2px solid var(--glass-border); border-radius: 14px; outline: none; font-size: 16px; }
+        button { width: 100%; padding: 16px; background: var(--ios-blue); color: white; border: none; border-radius: 18px; font-size: 16px; font-weight: 600; margin-top: 15px; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div id="homePage" class="page active">
+        <div style="text-align:center; margin-bottom:20px;">
+            <h1 style="margin:0; font-size:26px;">M&E-Connect</h1>
+            <p style="color:var(--text-secondary); font-size:13px;">Management System v1.0</p>
         </div>
+
+        <div class="menu-item" onclick="showPage('kontrakPage')">
+            <div class="menu-icon" style="background: #34C759;"><i class="fa-solid fa-file-contract"></i></div>
+            <div>
+                <h3 style="margin:0; font-size:16px;">Direktori Kontrak</h3>
+                <p style="margin:0; font-size:11px; color:var(--text-secondary);">Lihat hirarki seksyen & unit</p>
+            </div>
+        </div>
+
+        <div class="menu-item" onclick="showPage('adminPage'); loadAdminUnits();">
+            <div class="menu-icon" style="background: #1c1c1e;"><i class="fa-solid fa-user-gear"></i></div>
+            <div>
+                <h3 style="margin:0; font-size:16px;">Admin Panel</h3>
+                <p style="margin:0; font-size:11px; color:var(--text-secondary);">Daftar unit & kontrak baru</p>
+            </div>
+        </div>
+    </div>
 
     <div id="kontrakPage" class="page">
         <div class="glass-card">
-            <div class="header">
-                <div class="back-btn" onclick="showPage('homePage')"><i class="fa-solid fa-chevron-left"></i> KEMBALI</div>
+            <div class="header" style="margin-bottom:15px;">
+                <div onclick="showPage('homePage')" style="color:var(--ios-blue); cursor:pointer; font-weight:600;"><i class="fa-solid fa-chevron-left"></i> KEMBALI</div>
             </div>
-            <h2 style="margin:0;">Direktori Kontrak</h2>
-            <p style="font-size:12px; color:var(--text-secondary); margin-bottom:15px;">M&E Department Hierarchy</p>
-            
+            <h2 style="margin:0;">Struktur Jabatan</h2>
             <div id="kontrakContainer">
-                <p style="text-align:center; padding:20px;">Memuatkan struktur jabatan...</p>
+                <p style="text-align:center; padding:20px;">Memuatkan data...</p>
             </div>
         </div>
     </div>
 
+    <div id="adminPage" class="page">
+        <div class="glass-card">
+            <div class="header" style="margin-bottom:15px;">
+                <div onclick="showPage('homePage')" style="color:var(--ios-blue); cursor:pointer; font-weight:600;"><i class="fa-solid fa-chevron-left"></i> MENU UTAMA</div>
+            </div>
+            <h2 style="margin:0;">Pendaftaran</h2>
+
+            <div style="margin-top:20px; padding:15px; background:rgba(255,255,255,0.3); border-radius:20px;">
+                <h3 style="font-size:14px; margin-top:0;">1. Daftar Unit Baru</h3>
+                <label>Seksyen Utama</label>
+                <select id="admin_sec_select">
+                    <option value="1">Seksyen Selenggara</option>
+                    <option value="2">Seksyen Pematuhan Peraturan</option>
+                    <option value="3">Seksyen Pengurusan Aset & Kewangan</option>
+                    <option value="4">Seksyen Projek & Perkhidmatan Teknikal</option>
+                </select>
+                <label>Nama Unit</label>
+                <input type="text" id="admin_unit_name" placeholder="Contoh: Unit Instrumentasi">
+                <button onclick="registerUnit()" style="background:#5856D6; padding:12px;">Simpan Unit</button>
+            </div>
+
+            <form id="contractForm" style="margin-top:30px;">
+                <h3 style="font-size:14px;">2. Daftar Kontrak Baru</h3>
+                <label>Unit</label>
+                <select id="admin_unit_select" required><option value="">Pilih Unit</option></select>
+                <label>Kod Kontrak</label>
+                <input type="text" id="c_code" required>
+                <label>Nama Kontrak</label>
+                <textarea id="c_name" rows="3" required></textarea>
+                <label>Kontraktor</label>
+                <input type="text" id="c_vendor" required>
+                <div style="display:flex; gap:10px;">
+                    <div style="flex:1;"><label>Nilai (RM)</label><input type="number" id="c_sum" step="0.01" required></div>
+                    <div style="flex:1;"><label>Tamat</label><input type="date" id="c_end" required></div>
+                </div>
+                <button type="submit" id="c_btn">Daftar Kontrak</button>
+            </form>
+        </div>
     </div>
+</div>
 
 <script>
 const SUPABASE_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48'; 
 
 function showPage(pageId) {
-    const pages = document.querySelectorAll('.page');
-    pages.forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(pageId).classList.add('active');
     if(pageId === 'kontrakPage') loadKontrakData();
 }
 
+// Paparkan Hirarki
 async function loadKontrakData() {
     const container = document.getElementById('kontrakContainer');
     try {
-        // Query Join: Kontrak -> Unit -> Seksyen
         const res = await fetch(`${SUPABASE_URL}/rest/v1/contract?select=*,units(unit_name,me_sections(section_name))`, {
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
         });
         const data = await res.json();
+        if (!data.length) { container.innerHTML = '<p style="text-align:center; padding:20px;">Tiada data.</p>'; return; }
 
-        if (!data || data.length === 0) {
-            container.innerHTML = '<div style="text-align:center; padding:30px; opacity:0.6;">Tiada rekod kontrak aktif.</div>';
-            return;
-        }
-
-        // Grouping logic: Seksyen -> Unit
         const grouped = {};
         data.forEach(item => {
-            const sec = item.units?.me_sections?.section_name || "Seksyen Umum";
-            const uni = item.units?.unit_name || "Unit Umum";
+            const sec = item.units?.me_sections?.section_name || "Lain-lain";
+            const uni = item.units?.unit_name || "Umum";
             if (!grouped[sec]) grouped[sec] = {};
             if (!grouped[sec][uni]) grouped[sec][uni] = [];
             grouped[sec][uni].push(item);
@@ -84,9 +170,9 @@ async function loadKontrakData() {
                 grouped[sec][uni].forEach(c => {
                     html += `
                         <div class="contract-card">
-                            <div style="font-size:10px; font-weight:bold; color:var(--ios-blue); margin-bottom:4px;">${c.contract_code}</div>
-                            <div style="font-size:15px; font-weight:600; margin-bottom:8px; line-height:1.2;">${c.contract_name}</div>
-                            <div style="display:flex; justify-content:space-between; border-top:1px solid rgba(0,0,0,0.05); padding-top:8px; font-size:12px;">
+                            <div style="font-size:10px; font-weight:bold; color:var(--ios-blue);">${c.contract_code}</div>
+                            <div style="font-size:15px; font-weight:600; margin:5px 0;">${c.contract_name}</div>
+                            <div style="display:flex; justify-content:space-between; font-size:12px; opacity:0.8;">
                                 <span>${c.contractor}</span>
                                 <strong>RM ${parseFloat(c.contract_sum).toLocaleString()}</strong>
                             </div>
@@ -95,13 +181,54 @@ async function loadKontrakData() {
             }
         }
         container.innerHTML = html;
-    } catch (err) {
-        container.innerHTML = '<p style="color:red; text-align:center;">Ralat sambungan database.</p>';
-    }
+    } catch (e) { container.innerHTML = "Ralat data."; }
 }
 
-// [Kekalkan logik loadStaff & Attendance anda di sini]
-window.onload = loadStaff;
+// Logik Admin
+async function loadAdminUnits() {
+    const sel = document.getElementById('admin_unit_select');
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/units?select=*&order=unit_name.asc`, {
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+        });
+        const units = await res.json();
+        sel.innerHTML = '<option value="">Pilih Unit</option>';
+        units.forEach(u => sel.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`);
+    } catch (e) { console.error(e); }
+}
+
+async function registerUnit() {
+    const secId = document.getElementById('admin_sec_select').value;
+    const uName = document.getElementById('admin_unit_name').value;
+    if(!uName) return alert("Isi nama unit!");
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/units`, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ section_id: secId, unit_name: uName })
+    });
+    if(res.ok) { alert("Unit Disimpan!"); document.getElementById('admin_unit_name').value = ''; loadAdminUnits(); }
+}
+
+document.getElementById('contractForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('c_btn');
+    btn.disabled = true;
+    const payload = {
+        contract_code: document.getElementById('c_code').value,
+        unit_id: document.getElementById('admin_unit_select').value,
+        contract_name: document.getElementById('c_name').value,
+        contractor: document.getElementById('c_vendor').value,
+        contract_sum: document.getElementById('c_sum').value,
+        contract_end: document.getElementById('c_end').value
+    };
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/contract`, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    if(res.ok) { alert("Kontrak Berjaya!"); document.getElementById('contractForm').reset(); showPage('homePage'); }
+    btn.disabled = false;
+};
 </script>
 </body>
 </html>
