@@ -3,29 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>M&E-Connect v3.7 (Excel Mode)</title>
+    <title>M&E-Connect v3.8</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root { --ios-blue: #007AFF; --ios-green: #34C759; --glass-bg: rgba(255, 255, 255, 0.4); --glass-border: rgba(255, 255, 255, 0.6); }
         * { box-sizing: border-box; font-family: -apple-system, system-ui, sans-serif; }
         body { background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); background-attachment: fixed; margin: 0; padding: 15px; display: flex; justify-content: center; min-height: 100vh; }
         .app-container { width: 100%; max-width: 500px; }
-        .glass-card { background: var(--glass-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border-radius: 20px; padding: 15px; margin-bottom: 15px; border: 1px solid var(--glass-border); box-shadow: 0 8px 32px 0 rgba(31,38,135,0.1); }
+        .glass-card { background: var(--glass-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border-radius: 20px; padding: 20px; margin-bottom: 15px; border: 1px solid var(--glass-border); box-shadow: 0 8px 32px 0 rgba(31,38,135,0.1); }
         .page { display: none; } .page.active { display: block; animation: slideUp 0.3s ease; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        label { font-size: 10px; font-weight: 700; color: #4b4b4b; display: block; margin-top: 8px; text-transform: uppercase; }
-        input, select, textarea { width: 100%; padding: 10px; margin: 4px 0; border-radius: 8px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255, 255, 255, 0.4); font-size: 14px; outline: none; }
+        label { font-size: 10px; font-weight: 700; color: #4b4b4b; display: block; margin-top: 10px; text-transform: uppercase; }
+        input, select, textarea { width: 100%; padding: 12px; margin: 5px 0; border-radius: 10px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255, 255, 255, 0.4); font-size: 14px; outline: none; }
         button { width: 100%; padding: 14px; border-radius: 12px; border: none; background: var(--ios-blue); color: white; font-weight: 600; cursor: pointer; margin-top: 10px; }
         .nav-link { color: var(--ios-blue); font-weight: 600; cursor: pointer; margin-bottom: 15px; display: inline-block; }
-        
-        .work-row { background: rgba(255,255,255,0.3); padding: 12px; border-radius: 15px; border: 1px solid white; margin-bottom: 10px; position: relative; }
-        .btn-remove { position: absolute; top: 5px; right: 5px; color: #ff3b30; border: none; background: none; font-size: 18px; cursor: pointer; width: auto; padding: 0; }
-        .funding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 5px; border-top: 1px dashed #ccc; padding-top: 5px; }
-        
-        /* Excel Preview Table */
-        #xl_preview_table { width: 100%; font-size: 11px; border-collapse: collapse; margin-top: 10px; }
-        #xl_preview_table th, #xl_preview_table td { border: 1px solid rgba(0,0,0,0.1); padding: 6px; text-align: left; }
-        #xl_preview_table th { background: rgba(0,0,0,0.05); }
+        .work-row { background: rgba(255,255,255,0.3); padding: 15px; border-radius: 15px; border: 1px solid white; margin-bottom: 10px; position: relative; }
+        .funding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; border-top: 1px dashed #ccc; padding-top: 8px; }
+        .btn-remove { position: absolute; top: 5px; right: 5px; color: #ff3b30; background: none; border: none; font-size: 20px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -44,35 +38,46 @@
 
     <div id="adminPage" class="page">
         <span class="nav-link" onclick="showPage('homePage')">← Kembali</span>
+
+        <div class="glass-card">
+            <h3>1. Daftar Kontrak Utama</h3>
+            <form id="contractForm">
+                <input type="text" id="c_code" placeholder="Kod Kontrak (cth: ME/2024/01)" required>
+                <textarea id="c_name" placeholder="Tajuk Kontrak" rows="2" required></textarea>
+                
+                <label>Pecahan Dana & Nama Seksyen</label>
+                <div id="b_inputs">
+                    <div style="display:flex; gap:5px; margin-bottom:5px;">
+                        <input type="text" class="b_n" placeholder="Nama (cth: Labour Charges)" style="flex:2">
+                        <input type="number" class="b_v" placeholder="RM" style="flex:1">
+                    </div>
+                </div>
+                <button type="button" onclick="addB()" style="background:none; color:var(--ios-blue); border:1px dashed var(--ios-blue); font-size:11px;">+ Tambah Seksyen</button>
+                <button type="submit">Hantar Kontrak</button>
+            </form>
+        </div>
         
         <div class="glass-card" style="border: 2px solid var(--ios-green);">
-            <h3 style="color:var(--ios-green);"><i class="fa-solid fa-file-excel"></i> Import dari Excel</h3>
-            <label>1. Pilih Kontrak</label>
-            <select id="xl_contract_id" onchange="updateXLSecOptions()"><option value="">Pilih Kontrak</option></select>
+            <h3 style="color:var(--ios-green);">2. Import Excel (Auto-Assign)</h3>
+            <label>Pilih Kontrak</label>
+            <select id="xl_contract_id" onchange="updateXLSec()"><option value="">Pilih Kontrak</option></select>
             
-            <label>2. Pilih Seksyen Dana</label>
-            <select id="xl_target_sec"><option value="">Pilih Dana Utama</option></select>
+            <label>Pilih Dana (Target Seksyen)</label>
+            <select id="xl_target_sec"><option value="">Pilih...</option></select>
 
-            <label>3. Paste dari Excel</label>
-            <textarea id="xl_paste_area" rows="4" placeholder="Paste data di sini...&#10;Format: ID Kerja [TAB] Daerah [TAB] Keterangan [TAB] Amaun" oninput="processExcelPaste()"></textarea>
-            
-            <div id="xl_preview_container"></div>
-            <button id="btn_save_xl" onclick="saveExcelToDB()" style="background:var(--ios-green); display:none;">Sahkan & Simpan Excel</button>
+            <label>Paste dari Excel (ID | Daerah | Keterangan | Amaun)</label>
+            <textarea id="xl_paste" rows="3" oninput="doExcelPreview()"></textarea>
+            <div id="xl_preview" style="font-size:11px; margin-top:10px;"></div>
+            <button id="btn_xl" onclick="saveXL()" style="background:var(--ios-green); display:none;">Simpan Excel</button>
         </div>
 
         <div class="glass-card" style="border: 2px solid var(--ios-blue);">
-            <h3>Daftar Kerja (Bulk Grid Manual)</h3>
+            <h3>3. Daftar Kerja (Grid Manual)</h3>
             <label>Pilih Kontrak</label>
-            <select id="bulk_contract_id" onchange="refreshFundingOptions()"><option value="">Pilih Kontrak</option></select>
-            <div id="bulk_rows_container" style="margin-top: 15px;"></div>
-            <button type="button" onclick="addNewWorkRow()" style="background:#5856D6; font-size:12px; padding:8px;">+ Tambah ID Kerja</button>
-            <button onclick="saveBulkWork()" style="background:#FF9500; margin-top:20px;">Simpan Grid Manual</button>
-        </div>
-
-        <div class="glass-card">
-            <h3>Daftar Unit</h3>
-            <input type="text" id="u_name" placeholder="Nama Unit">
-            <button onclick="saveU()">Simpan Unit</button>
+            <select id="bulk_contract_id" onchange="refreshManualGrid()"><option value="">Pilih Kontrak</option></select>
+            <div id="manual_rows" style="margin-top: 15px;"></div>
+            <button onclick="addNewRow()" style="background:#5856D6; font-size:11px;">+ Tambah Baris Kerja</button>
+            <button onclick="saveManual()" style="background:#FF9500; margin-top:20px;">Simpan Grid Manual</button>
         </div>
     </div>
 </div>
@@ -82,155 +87,129 @@
     const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
     const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
 
-    let currentContractBreakdown = {};
-    let parsedExcelData = [];
+    let currentBreakdown = {};
+    let xlData = [];
 
     function showPage(id) {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.getElementById(id).classList.add('active');
-        if(id === 'adminPage') { loadContractsList(); }
+        if(id === 'adminPage') loadContracts();
         if(id === 'kontrakPage') loadData();
     }
 
-    async function loadContractsList() {
-        const res = await fetch(`${SB_URL}/rest/v1/contract?select=id,contract_code,contract_sections_breakdown`, { headers });
+    // --- PENDAFTARAN KONTRAK ---
+    function addB() {
+        const d = document.createElement('div'); d.style="display:flex; gap:5px; margin-bottom:5px;";
+        d.innerHTML = `<input type="text" class="b_n" placeholder="Nama Seksyen" style="flex:2"><input type="number" class="b_v" placeholder="RM" style="flex:1">`;
+        document.getElementById('b_inputs').appendChild(d);
+    }
+
+    document.getElementById('contractForm').onsubmit = async (e) => {
+        e.preventDefault();
+        let b = {}; 
+        const names = document.querySelectorAll('.b_n'), vals = document.querySelectorAll('.b_v');
+        let total = 0;
+        names.forEach((n, i) => { if(n.value) { b[n.value] = parseFloat(vals[i].value) || 0; total += b[n.value]; } });
+
+        const p = { contract_code: document.getElementById('c_code').value, contract_name: document.getElementById('c_name').value, contract_sum: total, contract_sections_breakdown: b, unit_id: 1, contract_start: '2024-01-01', contract_end: '2025-12-31' };
+        const res = await fetch(`${SB_URL}/rest/v1/contract`, { method: 'POST', headers, body: JSON.stringify(p) });
+        if(res.ok) { alert("Kontrak Disimpan!"); location.reload(); }
+    };
+
+    // --- LOAD DATA ---
+    async function loadContracts() {
+        const res = await fetch(`${SB_URL}/rest/v1/contract?select=*`, { headers });
         const data = await res.json();
-        
-        // Load ke dropdown Manual & dropdown Excel
-        const selManual = document.getElementById('bulk_contract_id');
-        const selXL = document.getElementById('xl_contract_id');
-        
-        [selManual, selXL].forEach(s => {
+        const sels = [document.getElementById('xl_contract_id'), document.getElementById('bulk_contract_id')];
+        sels.forEach(s => {
             s.innerHTML = '<option value="">Pilih Kontrak</option>';
             data.forEach(c => {
                 const opt = document.createElement('option');
-                opt.value = c.id;
-                opt.text = c.contract_code;
+                opt.value = c.id; opt.text = c.contract_code;
                 opt.dataset.b = JSON.stringify(c.contract_sections_breakdown);
                 s.appendChild(opt);
             });
         });
     }
 
-    // --- LOGIK EXCEL AUTO-ASSIGN ---
-    function updateXLSecOptions() {
-        const sel = document.getElementById('xl_contract_id');
-        const opt = sel.options[sel.selectedIndex];
+    // --- EXCEL LOGIC ---
+    function updateXLSec() {
+        const opt = document.getElementById('xl_contract_id').selectedOptions[0];
         const secSel = document.getElementById('xl_target_sec');
-        secSel.innerHTML = '<option value="">Pilih Dana Utama</option>';
+        secSel.innerHTML = '';
         if(opt.dataset.b) {
             const b = JSON.parse(opt.dataset.b);
             for(let k in b) secSel.innerHTML += `<option value="${k}">${k}</option>`;
         }
     }
 
-    function processExcelPaste() {
-        const raw = document.getElementById('xl_paste_area').value;
-        const lines = raw.trim().split('\n');
-        parsedExcelData = [];
-        
-        let html = '<table id="xl_preview_table"><tr><th>ID</th><th>Daerah</th><th>Keterangan</th><th>RM</th></tr>';
-        
-        lines.forEach(line => {
-            const cols = line.split('\t'); // Excel TAB separator
-            if(cols.length >= 2) {
-                const row = {
-                    id: cols[0]?.trim() || 'N/A',
-                    dist: cols[1]?.trim() || 'N/A',
-                    desc: cols[2]?.trim() || '',
-                    amt: parseFloat(cols[3]?.replace(/[^0-9.]/g, '')) || 0
-                };
-                parsedExcelData.push(row);
-                html += `<tr><td>${row.id}</td><td>${row.dist}</td><td>${row.desc}</td><td>${row.amt.toLocaleString()}</td></tr>`;
+    function doExcelPreview() {
+        const lines = document.getElementById('xl_paste').value.trim().split('\n');
+        xlData = [];
+        let h = '<table border="1" width="100%" style="border-collapse:collapse;"><tr><th>ID</th><th>RM</th></tr>';
+        lines.forEach(l => {
+            const c = l.split('\t');
+            if(c.length >= 2) {
+                const r = { id: c[0], dist: c[1], desc: c[2], amt: parseFloat(c[3]) || 0 };
+                xlData.push(r);
+                h += `<tr><td>${r.id}</td><td>${r.amt}</td></tr>`;
             }
         });
-        
-        html += '</table>';
-        document.getElementById('xl_preview_container').innerHTML = html;
-        document.getElementById('btn_save_xl').style.display = parsedExcelData.length > 0 ? 'block' : 'none';
+        document.getElementById('xl_preview').innerHTML = h + '</table>';
+        document.getElementById('btn_xl').style.display = xlData.length ? 'block' : 'none';
     }
 
-    async function saveExcelToDB() {
+    async function saveXL() {
         const cId = parseInt(document.getElementById('xl_contract_id').value);
         const sec = document.getElementById('xl_target_sec').value;
-        if(!cId || !sec) return alert("Pilih Kontrak & Seksyen!");
-
-        const payloads = parsedExcelData.map(d => ({
-            contract_id: cId,
-            work_id: d.id,
-            district: d.dist,
-            description: d.desc,
-            amount_spent: d.amt,
-            section_category: sec,
-            funding_details: { [sec]: d.amt }
+        const payloads = xlData.map(d => ({
+            contract_id: cId, work_id: d.id, district: d.dist, description: d.desc,
+            amount_spent: d.amt, section_category: sec, funding_details: { [sec]: d.amt }
         }));
-
-        const res = await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(payloads) });
-        if(res.ok) {
-            alert("Berjaya Import!");
-            document.getElementById('xl_paste_area').value = '';
-            document.getElementById('xl_preview_container').innerHTML = '';
-            document.getElementById('btn_save_xl').style.display = 'none';
-        }
+        await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(payloads) });
+        alert("Selesai!");
     }
 
-    // --- LOGIK MANUAL GRID ---
-    function refreshFundingOptions() {
-        const sel = document.getElementById('bulk_contract_id');
-        const opt = sel.options[sel.selectedIndex];
-        currentContractBreakdown = opt.dataset.b ? JSON.parse(opt.dataset.b) : {};
-        document.getElementById('bulk_rows_container').innerHTML = '';
-        addNewWorkRow();
+    // --- MANUAL GRID LOGIC ---
+    function refreshManualGrid() {
+        const opt = document.getElementById('bulk_contract_id').selectedOptions[0];
+        currentBreakdown = opt.dataset.b ? JSON.parse(opt.dataset.b) : {};
+        document.getElementById('manual_rows').innerHTML = '';
+        addNewRow();
     }
 
-    function addNewWorkRow() {
+    function addNewRow() {
         if(!document.getElementById('bulk_contract_id').value) return alert("Pilih kontrak!");
-        const container = document.getElementById('bulk_rows_container');
         const rId = Date.now();
-        let fundHTML = '';
-        for(let s in currentContractBreakdown) fundHTML += `<div style="font-size:11px;"><label>${s}</label><input type="number" class="row_amt" data-sec="${s}" placeholder="RM"></div>`;
-
-        const row = document.createElement('div');
-        row.className = 'work-row';
-        row.id = `row_${rId}`;
-        row.innerHTML = `<button class="btn-remove" onclick="document.getElementById('row_${rId}').remove()">×</button>
-            <div style="display:flex; gap:5px;"><input type="text" class="row_work_id" placeholder="ID"><input type="text" class="row_district" placeholder="Daerah"></div>
-            <textarea class="row_desc" placeholder="Keterangan" rows="1"></textarea>
-            <div class="funding-grid">${fundHTML}</div>`;
-        container.appendChild(row);
+        let fH = '';
+        for(let s in currentBreakdown) fH += `<div style="font-size:9px;"><label>${s}</label><input type="number" class="r_amt" data-sec="${s}" placeholder="RM"></div>`;
+        
+        const div = document.createElement('div');
+        div.className = 'work-row'; div.id = `r_${rId}`;
+        div.innerHTML = `<button class="btn-remove" onclick="document.getElementById('r_${rId}').remove()">×</button>
+            <div style="display:flex; gap:5px;"><input type="text" class="r_id" placeholder="ID"><input type="text" class="r_dist" placeholder="Daerah"></div>
+            <textarea class="r_desc" placeholder="Keterangan" rows="1" style="margin-top:5px;"></textarea>
+            <div class="funding-grid">${fH}</div>`;
+        document.getElementById('manual_rows').appendChild(div);
     }
 
-    async function saveBulkWork() {
+    async function saveManual() {
         const cId = parseInt(document.getElementById('bulk_contract_id').value);
-        const rows = document.querySelectorAll('.work-row');
         const payloads = [];
-        rows.forEach(r => {
-            const wId = r.querySelector('.row_work_id').value;
-            const dist = r.querySelector('.row_district').value;
-            const desc = r.querySelector('.row_desc').value;
-            let fund = {}, total = 0;
-            r.querySelectorAll('.row_amt').forEach(i => {
-                const v = parseFloat(i.value) || 0;
-                if(v > 0) { fund[i.dataset.sec] = v; total += v; }
-            });
-            if(wId && total > 0) payloads.push({ contract_id: cId, work_id: wId, district: dist, description: desc, amount_spent: total, section_category: "Multi-Fund", funding_details: fund });
+        document.querySelectorAll('.work-row').forEach(row => {
+            let f = {}, t = 0;
+            row.querySelectorAll('.r_amt').forEach(i => { const v = parseFloat(i.value) || 0; if(v>0){ f[i.dataset.sec] = v; t += v; } });
+            if(t > 0) payloads.push({ contract_id: cId, work_id: row.querySelector('.r_id').value, district: row.querySelector('.r_dist').value, description: row.querySelector('.r_desc').value, amount_spent: t, section_category: "Multi-Fund", funding_details: f });
         });
-        const res = await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(payloads) });
-        if(res.ok) alert("Simpan Berjaya!");
+        await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(payloads) });
+        alert("Data Disimpan!");
     }
 
     async function loadData() {
         const res = await fetch(`${SB_URL}/rest/v1/contract?select=*`, { headers });
         const data = await res.json();
-        let h = ''; data.forEach(c => h += `<div class="glass-card"><strong>${c.contract_code}</strong><br>${c.contract_name}</div>`);
+        let h = ''; data.forEach(c => h += `<div class="glass-card"><strong>${c.contract_code}</strong><br><small>${c.contract_name}</small></div>`);
         document.getElementById('listContainer').innerHTML = h || "Tiada data.";
-    }
-
-    async function saveU() {
-        const n = document.getElementById('u_name').value;
-        if(!n) return;
-        await fetch(`${SB_URL}/rest/v1/units`, { method: 'POST', headers, body: JSON.stringify({ unit_name: n, section_id: 1 }) });
-        alert("Selesai!");
     }
 </script>
 </body>
