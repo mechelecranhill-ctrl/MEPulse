@@ -3,126 +3,185 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOG RESPONSE KEHADIRAN</title>
+    <title>LOG DATA KEHADIRAN | DESKTOP MODE</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
+        * { box-sizing: border-box; }
         body {
-            background: #ffffff; /* Latar belakang putih bersih */
-            font-family: 'SF Pro Display', sans-serif, Arial;
-            margin: 0; padding: 20px;
+            background: #ffffff;
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+            margin: 0; padding: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden; /* Desktop mode: No scrolling */
             color: #1d1d1f;
         }
-        .container { max-width: 600px; margin: auto; }
-        
-        .header {
-            border-bottom: 2px solid #f2f2f7;
-            padding-bottom: 15px;
-            margin-bottom: 20px;
+
+        .desktop-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 30px;
+        }
+
+        .header-section {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 25px;
+            flex-shrink: 0;
         }
 
-        .back-btn {
-            background: #f2f2f7; color: #007AFF; border: none;
-            padding: 8px 15px; border-radius: 10px; cursor: pointer;
-            font-weight: bold; font-size: 13px;
-        }
+        .title-group h2 { margin: 0; font-size: 28px; letter-spacing: -0.5px; }
+        .title-group p { margin: 5px 0 0 0; color: #86868b; font-size: 14px; font-weight: 600; }
 
-        .res-card {
+        .btn-back {
+            background: #007AFF; color: white; border: none;
+            padding: 12px 24px; border-radius: 10px; cursor: pointer;
+            font-weight: bold; font-size: 14px; transition: 0.2s;
+        }
+        .btn-back:hover { background: #0056b3; }
+
+        /* Container Jadual */
+        .table-container {
+            flex-grow: 1;
             background: #fff;
-            padding: 15px;
-            border-radius: 12px;
-            margin-bottom: 12px;
             border: 1px solid #e5e5ea;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+            border-radius: 16px;
+            overflow-y: auto; /* Jika data terlampau banyak, hanya kawasan ini skrol */
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
         }
 
-        .staf-name { font-weight: 800; font-size: 16px; color: #000; display: block; }
-        .staf-jawatan { font-size: 11px; color: #86868b; text-transform: uppercase; font-weight: 600; }
-        
-        .details {
-            margin-top: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
         }
 
-        .status-pill {
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 11px;
+        thead {
+            position: sticky;
+            top: 0;
+            background: #fbfbfd;
+            z-index: 10;
+        }
+
+        th {
+            padding: 18px 20px;
+            font-size: 13px;
+            text-transform: uppercase;
+            color: #86868b;
+            border-bottom: 2px solid #f2f2f7;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 16px 20px;
+            font-size: 15px;
+            border-bottom: 1px solid #f2f2f7;
+            font-weight: 500;
+        }
+
+        tr:hover { background-color: #f9f9fb; }
+
+        /* Badge Styles */
+        .badge {
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 12px;
             font-weight: 800;
+            display: inline-block;
             color: white;
+            min-width: 100px;
+            text-align: center;
         }
+        .bg-blue { background: #007AFF; }
+        .bg-red { background: #FF3B30; }
 
-        .tarikh-info { font-size: 12px; color: #3a3a3c; font-weight: 500; }
-        
-        #loading { text-align: center; padding: 40px; color: #86868b; font-weight: bold; }
+        .timestamp { font-size: 12px; color: #86868b; }
+
+        #loadingOverlay {
+            text-align: center; padding: 100px; font-weight: bold; color: #007AFF;
+        }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="header">
-        <button class="back-btn" onclick="window.history.back()">
-            <i class="fa-solid fa-chevron-left"></i> KEMBALI
+<div class="desktop-wrapper">
+    <div class="header-section">
+        <div class="title-group">
+            <h2><i class="fa-solid fa-database" style="color: #007AFF;"></i> LOG RESPONSE KEHADIRAN</h2>
+            <p id="statsInfo">Memuatkan data dari database...</p>
+        </div>
+        <button class="btn-back" onclick="window.location.href='index.html'">
+            <i class="fa-solid fa-house"></i> KEMBALI KE MENU
         </button>
-        <h3 style="margin:0;">LOG KEHADIRAN</h3>
     </div>
 
-    <div id="loading"><i class="fas fa-spinner fa-spin"></i> MEMUATKAN DATA...</div>
-    <div id="responseList"></div>
+    <div class="table-container">
+        <table id="responseTable">
+            <thead>
+                <tr>
+                    <th>Nama Kakitangan</th>
+                    <th>Jawatan</th>
+                    <th>Sebab / Aktiviti</th>
+                    <th>Tarikh Mula</th>
+                    <th>Tarikh Akhir</th>
+                    <th>Waktu Input (Log)</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                </tbody>
+        </table>
+        <div id="loadingOverlay"><i class="fas fa-spinner fa-spin"></i> MENYEMAK DATABASE...</div>
+    </div>
 </div>
 
 <script>
     const S_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
     const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48'; 
 
-    async function fetchResponses() {
-        const list = document.getElementById('responseList');
-        const loader = document.getElementById('loading');
+    async function loadDesktopData() {
+        const tbody = document.getElementById('tableBody');
+        const overlay = document.getElementById('loadingOverlay');
+        const stats = document.getElementById('statsInfo');
 
         try {
-            // Ambil data attendance disusun mengikut tarikh input terbaru (desc)
+            // Susun ikut yang paling baru dihantar
             const res = await fetch(S_URL + '/rest/v1/attendance?select=*&order=created_at.desc', {
                 headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY }
             });
             const data = await res.json();
             
-            loader.style.display = 'none';
-
-            if (data.length === 0) {
-                list.innerHTML = "<p style='text-align:center; color:gray;'>Tiada rekod dijumpai.</p>";
-                return;
-            }
+            overlay.style.display = 'none';
+            tbody.innerHTML = "";
+            stats.innerText = `JUMLAH REKOD: ${data.length} ENTRI DIJUMPAI`;
 
             data.forEach(item => {
                 const isCuti = (item.sebab.toUpperCase().match(/CUTI|SAKIT|HALFDAY/));
-                const bgColor = isCuti ? "#FF3B30" : "#007AFF";
+                const badgeClass = isCuti ? "bg-red" : "bg-blue";
+                
+                // Format waktu created_at
+                const logDate = new Date(item.created_at).toLocaleString('ms-MY');
 
-                list.innerHTML += `
-                    <div class="res-card">
-                        <span class="staf-name">${item.nama.toUpperCase()}</span>
-                        <span class="staf-jawatan">${item.jawatan}</span>
-                        
-                        <div class="details">
-                            <span class="tarikh-info">
-                                <i class="fa-regular fa-calendar"></i> ${item.tarikh_mula} → ${item.tarikh_akhir}
-                            </span>
-                            <span class="status-pill" style="background:${bgColor}">
-                                ${item.sebab.toUpperCase()}
-                            </span>
-                        </div>
-                    </div>`;
+                const row = `
+                    <tr>
+                        <td style="font-weight:bold; color:#000;">${item.nama.toUpperCase()}</td>
+                        <td>${item.jawatan}</td>
+                        <td><span class="badge ${badgeClass}">${item.sebab.toUpperCase()}</span></td>
+                        <td>${item.tarikh_mula}</td>
+                        <td>${item.tarikh_akhir}</td>
+                        <td class="timestamp">${logDate}</td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
             });
 
         } catch (err) {
-            loader.innerText = "RALAT: GAGAL MENGAMBIL DATA.";
+            overlay.innerHTML = "<span style='color:red;'>RALAT DATABASE: GAGAL MENGAMBIL DATA.</span>";
         }
     }
 
-    window.onload = fetchResponses;
+    window.onload = loadDesktopData;
 </script>
 
 </body>
