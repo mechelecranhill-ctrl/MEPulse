@@ -61,7 +61,12 @@
             <form id="workOrderForm">
                 <label>Pilih Kontrak</label>
                 <select id="w_contract_id" onchange="onContractSelect()" required><option value="">Pilih Kontrak</option></select>
-                <input type="text" id="w_id" placeholder="ID Kerja (Cth: C 123456)" required>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div><label>ID Kerja</label><input type="text" id="w_id" placeholder="C 123456" required></div>
+                    <div><label>Tarikh Terima</label><input type="date" id="w_date_received" required></div>
+                </div>
+
                 <input type="text" id="w_location" placeholder="Lokasi (Cth: JEMENTAH / LABIS)">
                 <label>Proceed Blueform</label>
                 <input type="date" id="w_qpb_date">
@@ -88,8 +93,11 @@
             
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 <div><label>No. Interim</label><input type="number" id="i_no" placeholder="Cth: 1"></div>
-                <div><label>Salvage Value (RM)</label><input type="number" id="i_salvage" placeholder="0.00" step="0.01"></div>
+                <div><label>Tarikh Terima Interim</label><input type="date" id="i_date_received"></div>
             </div>
+            
+            <label>Salvage Value (RM)</label>
+            <input type="number" id="i_salvage" placeholder="0.00" step="0.01">
 
             <div id="i_sec_inputs"></div>
             <label>Pilih ID Kerja (Assign ke Interim)</label>
@@ -105,7 +113,12 @@
             <form id="contractForm">
                 <label>Pilih Unit</label>
                 <select id="c_unit_id" required><option value="">Memuatkan Unit...</option></select>
-                <input type="text" id="c_code" placeholder="Kod Kontrak" required>
+                
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
+                    <div><label>Kod Kontrak</label><input type="text" id="c_code" placeholder="Kod Kontrak" required></div>
+                    <div><label>Kod Kawasan</label><input type="text" id="c_area" placeholder="SGT" required></div>
+                </div>
+
                 <textarea id="c_name" placeholder="Tajuk Kontrak" rows="2" required></textarea>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div><label>Tarikh Mula</label><input type="date" id="c_start" required></div>
@@ -187,12 +200,52 @@
         }
     };
 
+    // --- LOGIK DAFTAR KONTRAK (ADMIN) ---
+    document.getElementById('contractForm').onsubmit = async (e) => {
+        e.preventDefault();
+        let breakdown = {};
+        document.querySelectorAll('.sec-input-wrapper').forEach(w => {
+            const name = w.querySelector('.b_n').value;
+            const val = parseFloat(w.querySelector('.b_v').value) || 0;
+            if(name) breakdown[name] = val;
+        });
+
+        const data = {
+            unit_id: parseInt(document.getElementById('c_unit_id').value),
+            contract_code: document.getElementById('c_code').value,
+            area_code: document.getElementById('c_area').value.toUpperCase(),
+            contract_name: document.getElementById('c_name').value,
+            contract_start: document.getElementById('c_start').value,
+            contract_end: document.getElementById('c_end').value,
+            contract_vendor: document.getElementById('c_vendor').value,
+            district: document.getElementById('c_dist').value,
+            contract_sections_breakdown: breakdown
+        };
+
+        const res = await fetch(`${SB_URL}/rest/v1/contract`, { method: 'POST', headers, body: JSON.stringify(data) });
+        if(res.ok) { alert("Kontrak Didaftarkan!"); location.reload(); }
+    };
+
     // --- LOGIK DAFTAR KERJA ---
     document.getElementById('workOrderForm').onsubmit = async (e) => {
         e.preventDefault();
         const cId = document.getElementById('w_contract_id').value;
+        const opt = document.getElementById('w_contract_id').selectedOptions[0];
+        const areaCode = opt.dataset.area;
         const workId = document.getElementById('w_id').value;
         const locationStr = document.getElementById('w_location').value;
+        const dateReceived = document.getElementById('w_date_received').value;
+
+        // Auto Sequence Number
+        const resCount = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&select=sequence_no&order=sequence_no.desc&limit=1`, { headers });
+        const lastWork = await resCount.json();
+        let nextNum = 1;
+        if(lastWork.length > 0 && lastWork[0].sequence_no) {
+            const lastNum = parseInt(lastWork[0].sequence_no.replace(areaCode, ''));
+            nextNum = lastNum + 1;
+        }
+        const seqNo = areaCode + nextNum.toString().padStart(3, '0');
+
         let fundingDetails = {};
         let totalSpent = 0;
         document.querySelectorAll('.w_sec_amt').forEach(input => {
@@ -203,7 +256,9 @@
         const workData = {
             contract_id: parseInt(cId),
             work_id: workId,
+            sequence_no: seqNo,
             location: locationStr,
+            date_received: dateReceived,
             qpb_date: document.getElementById('w_qpb_date').value || null,
             district: document.getElementById('w_dist').value,
             description: document.getElementById('w_desc').value,
@@ -214,7 +269,7 @@
         const resWork = await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(workData) });
         if(resWork.ok) {
             await updateContractBalance(cId, fundingDetails, 'deduct');
-            alert("Kerja Berjaya Didaftarkan!");
+            alert(`Kerja Didaftarkan! No Urutan: ${seqNo}`);
             location.reload();
         }
     };
@@ -250,20 +305,24 @@
             });
         }
 
-        const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&status=is.null`, { headers });
+        // Susun mengikut tarikh terima dan urutan kawasan
+        const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&status=is.null&order=date_received.asc,sequence_no.asc`, { headers });
         const works = await resW.json();
         workList.innerHTML = works.map(w => `
-            <div style="margin-bottom:5px;">
-                <input type="checkbox" class="w_checkbox" value="${w.id}"> ${w.work_id} (RM ${w.amount_spent.toLocaleString()})
+            <div style="margin-bottom:5px; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:5px;">
+                <input type="checkbox" class="w_checkbox" value="${w.id}"> 
+                <strong>${w.sequence_no}</strong> | ${w.work_id} <br>
+                <small>${formatDate(w.date_received)} (RM ${w.amount_spent.toLocaleString()})</small>
             </div>`).join('') || "Tiada kerja tersedia.";
     }
 
     async function submitInterim() {
         const cId = document.getElementById('i_contract_id').value;
         const iNo = document.getElementById('i_no').value;
+        const dateRec = document.getElementById('i_date_received').value;
         const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
         
-        if(!cId || !iNo) return alert("Sila pilih kontrak dan No. Interim");
+        if(!cId || !iNo || !dateRec) return alert("Sila isi No. Interim dan Tarikh Terima");
 
         let interimFunding = {};
         let totalGross = 0;
@@ -274,13 +333,13 @@
 
         const netAmount = totalGross - salvage;
 
-        // Simpan ke table interims
         const resInterim = await fetch(`${SB_URL}/rest/v1/interims`, {
             method: 'POST',
             headers,
             body: JSON.stringify({
                 contract_id: parseInt(cId),
                 interim_no: parseInt(iNo),
+                date_received: dateRec,
                 gross_amount: totalGross,
                 salvage_value: salvage,
                 net_amount: netAmount,
@@ -303,10 +362,8 @@
                 }
             }
             await updateContractBalance(cId, interimFunding, 'deduct');
-            alert("Rekod Interim & Salvage berjaya disimpan!");
+            alert("Rekod Interim berjaya disimpan!");
             location.reload();
-        } else {
-            alert("Ralat simpan interim. Pastikan table 'interims' wujud.");
         }
     }
 
@@ -317,7 +374,7 @@
         document.getElementById('listContainer').innerHTML = data.map(c => `
             <div class="glass-card" onclick="openDetails(${c.id}, '${c.contract_code}', '${c.contract_name.replace(/'/g, "\\'")}')">
                 <span class="unit-tag">${c.units ? c.units.unit_name : 'No Unit'}</span><br>
-                <strong>${c.contract_code}</strong><br>
+                <strong>${c.contract_code} (${c.area_code || ''})</strong><br>
                 <div style="font-size:11px; color:#444; margin: 4px 0;"><i class="fa-solid fa-location-dot"></i> ${c.district}</div>
                 <div style="font-size:11px; color:#444; margin: 4px 0;"><i class="fa-regular fa-calendar"></i> ${formatDate(c.contract_start)} - ${formatDate(c.contract_end)}</div>
             </div>`).join('');
@@ -329,9 +386,10 @@
         const c = (await resC.json())[0];
         document.getElementById('detailsHeader').innerHTML = `
             <span class="unit-tag" style="background:white; color:var(--ios-blue)">${c.units ? c.units.unit_name : ''}</span>
-            <h3>${cCode}</h3>
+            <h3>${cCode} (${c.area_code || ''})</h3>
             <div style="font-size:12px; margin-bottom:5px;"><i class="fa-solid fa-location-dot"></i> ${c.district}</div>
             <small>${cName}</small>`;
+        
         let bakiHTML = '<div style="margin-top:10px; border-top:1px solid rgba(255,255,255,0.3); padding-top:10px;">';
         for(let s in c.contract_sections_breakdown) {
             const val = c.contract_sections_breakdown[s];
@@ -339,10 +397,15 @@
             bakiHTML += `<div style="display:flex; justify-content:space-between; font-size:11px;"><span>${s}</span><strong>RM ${amt.toLocaleString()}</strong></div>`;
         }
         document.getElementById('detailsHeader').innerHTML += bakiHTML + '</div>';
-        const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&order=created_at.desc`, { headers });
+        
+        const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&order=date_received.desc,sequence_no.desc`, { headers });
         const works = await resW.json();
         document.getElementById('workListContainer').innerHTML = works.map(w => `
             <div class="work-card">
+                <div style="display:flex; justify-content:space-between;">
+                    <strong>${w.sequence_no || '-'}</strong>
+                    <span style="font-size:10px; color:var(--ios-blue);">${formatDate(w.date_received)}</span>
+                </div>
                 <strong>ID: ${w.work_id}</strong> <span style="font-size:10px; color:var(--ios-orange);">(${w.location || '-'})</span><br>
                 <small>RM ${w.amount_spent.toLocaleString()} (${w.district})</small>
             </div>`).join('') || "Tiada rekod.";
@@ -359,6 +422,7 @@
                 const opt = document.createElement('option');
                 opt.value = c.id; opt.text = c.contract_code;
                 opt.dataset.b = JSON.stringify(c.contract_sections_breakdown);
+                opt.dataset.area = c.area_code;
                 opt.dataset.dist = c.district;
                 s.appendChild(opt);
             });
