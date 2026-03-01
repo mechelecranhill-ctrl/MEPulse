@@ -41,9 +41,8 @@
     <div id="registerWorkPage" class="page">
         <span class="nav-link" onclick="showPage('homePage')">← Kembali</span>
         <div class="glass-card">
-            <h3 id="workFormTitle">Borang ID Kerja</h3>
+            <h3>Borang ID Kerja</h3>
             <form id="workOrderForm">
-                <input type="hidden" id="edit_internal_id">
                 <label>Pilih Kontrak</label>
                 <select id="w_contract_id" onchange="onContractSelect()" required><option value="">Pilih Kontrak</option></select>
                 <input type="text" id="w_id" placeholder="ID Kerja (Cth: C 123456)" required>
@@ -58,7 +57,7 @@
                     <span style="font-weight:bold; font-size:12px;">Jumlah Keseluruhan:</span>
                     <span id="total_display" style="font-weight:bold; color:var(--ios-blue);">RM 0.00</span>
                 </div>
-                <button type="submit" id="btnSubmitWork" style="background:var(--ios-green); margin-top:20px;">Daftar & Tolak Baki</button>
+                <button type="submit" style="background:var(--ios-green); margin-top:20px;">Daftar & Tolak Baki</button>
             </form>
         </div>
     </div>
@@ -73,7 +72,7 @@
             <input type="number" id="i_no" placeholder="Cth: 1">
             <div id="i_sec_inputs"></div>
             <label>Pilih ID Kerja (Assign ke Interim)</label>
-            <div id="i_work_list" style="max-height: 200px; overflow-y: auto; background: rgba(255,255,255,0.2); border-radius: 10px; padding: 10px; font-size: 11px; margin-top:5px;"></div>
+            <div id="i_work_list" style="max-height: 200px; overflow-y: auto; background: rgba(255,255,255,0.2); border-radius: 10px; padding: 10px; font-size: 11px; margin-top:5px; border:1px solid rgba(0,0,0,0.1);"></div>
             <button onclick="submitInterim()" style="background:var(--ios-orange); margin-top:15px;">Hantar & Selaras Baki</button>
         </div>
     </div>
@@ -125,9 +124,12 @@
     const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
     const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
 
+    // --- FUNGSI NAVIGASI ---
     function showPage(id) {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.getElementById(id).classList.add('active');
+        const target = document.getElementById(id);
+        if(target) target.classList.add('active');
+        
         if(id === 'registerWorkPage' || id === 'interimPage') loadContractsToDropdowns();
         if(id === 'adminPage') fetchUnits();
         if(id === 'kontrakPage') loadData();
@@ -147,7 +149,51 @@
         return `${d}/${m}/${y}`;
     }
 
-    // --- INTERIM LOGIC ---
+    // --- LOGIK DAFTAR KERJA (ID) & TOLAK BAKI ---
+    document.getElementById('workOrderForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const cId = document.getElementById('w_contract_id').value;
+        const workId = document.getElementById('w_id').value;
+        const qpbDate = document.getElementById('w_qpb_date').value;
+        const dist = document.getElementById('w_dist').value;
+        const desc = document.getElementById('w_desc').value;
+
+        let fundingDetails = {};
+        let totalSpent = 0;
+        document.querySelectorAll('.w_sec_amt').forEach(input => {
+            const val = parseFloat(input.value) || 0;
+            if(val > 0) {
+                fundingDetails[input.dataset.sec] = val;
+                totalSpent += val;
+            }
+        });
+
+        if(totalSpent <= 0) return alert("Sila masukkan amaun kos!");
+
+        // 1. Simpan Work Order
+        const workData = {
+            contract_id: parseInt(cId),
+            work_id: workId,
+            qpb_date: qpbDate || null,
+            district: dist,
+            description: desc,
+            amount_spent: totalSpent,
+            funding_details: fundingDetails
+        };
+
+        const resWork = await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(workData) });
+
+        if(resWork.ok) {
+            // 2. Tolak Baki Kontrak
+            await updateContractBalance(cId, fundingDetails, 'deduct');
+            alert("Kerja Berjaya Didaftarkan!");
+            location.reload();
+        } else {
+            alert("Gagal mendaftar kerja.");
+        }
+    };
+
+    // --- LOGIK INTERIM ---
     async function loadInterimData() {
         const cId = document.getElementById('i_contract_id').value;
         if(!cId) return;
@@ -168,7 +214,7 @@
         const iNo = document.getElementById('i_no').value;
         const selectedIds = Array.from(document.querySelectorAll('.i_chk:checked')).map(el => el.dataset.id);
         if(!cId || !iNo || selectedIds.length === 0) return alert("Pilih Kontrak, No Interim & ID Kerja!");
-        
+
         let interimFunding = {}; let totalClaim = 0;
         document.querySelectorAll('.i_amt').forEach(i => { 
             const v = parseFloat(i.value) || 0; 
@@ -179,7 +225,7 @@
         const works = await resW.json();
         for(let w of works) await updateContractBalance(cId, w.funding_details, 'revert');
         await updateContractBalance(cId, interimFunding, 'deduct');
-        
+
         await fetch(`${SB_URL}/rest/v1/interims`, { method: 'POST', headers, body: JSON.stringify({ contract_id: parseInt(cId), interim_no: parseInt(iNo), claim_amount: totalClaim, claim_breakdown: interimFunding }) });
         for(let id of selectedIds) { await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}`, { method: 'PATCH', headers, body: JSON.stringify({ interim_no: iNo }) }); }
         alert("Interim Berjaya!"); location.reload();
@@ -199,7 +245,7 @@
         await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { method: 'PATCH', headers, body: JSON.stringify({ contract_sections_breakdown: b }) });
     }
 
-    // --- ASAL LOGIK ---
+    // --- DIREKTORI & DETAILS ---
     async function loadData() {
         const res = await fetch(`${SB_URL}/rest/v1/contract?select=*,units(unit_name)`, { headers });
         const data = await res.json();
@@ -233,6 +279,7 @@
         document.getElementById('workListContainer').innerHTML = works.map(w => `<div class="work-card"><strong>ID: ${w.work_id}</strong><br><small>RM ${w.amount_spent.toLocaleString()}</small></div>`).join('') || "Tiada rekod.";
     }
 
+    // --- FORM HELPERS ---
     function addB() {
         const d = document.createElement('div'); d.className = "sec-input-wrapper";
         d.innerHTML = `<div class="btn-remove-sec" onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></div><input type="text" class="b_n" placeholder="SECTION"><input type="text" class="b_d" placeholder="Description"><input type="number" class="b_v" placeholder="RM">`;
@@ -242,8 +289,7 @@
     async function loadContractsToDropdowns() {
         const res = await fetch(`${SB_URL}/rest/v1/contract?select=*`, { headers });
         const data = await res.json();
-        const ids = ['w_contract_id', 'i_contract_id'];
-        ids.forEach(id => {
+        ['w_contract_id', 'i_contract_id'].forEach(id => {
             const s = document.getElementById(id);
             if(!s) return;
             s.innerHTML = '<option value="">Pilih Kontrak</option>';
