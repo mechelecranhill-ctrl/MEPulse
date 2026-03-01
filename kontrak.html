@@ -3,38 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>M&E-Connect v1.0</title>
+    <title>M&E-Connect v4.9</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        :root { --ios-blue: #007AFF; --ios-green: #34C759; --ios-orange: #FF9500; --glass-bg: rgba(255, 255, 255, 0.4); --glass-border: rgba(255, 255, 255, 0.6); }
+        :root { --ios-blue: #007AFF; --ios-green: #34C759; --ios-orange: #FF9500; --ios-red: #FF3B30; --glass-bg: rgba(255, 255, 255, 0.4); --glass-border: rgba(255, 255, 255, 0.6); }
         * { box-sizing: border-box; font-family: -apple-system, system-ui, sans-serif; }
-        body { background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); background-attachment: fixed; margin: 0; padding: 15px; display: flex; justify-content: center; min-height: 100vh; }
-        .app-container { width: 100%; max-width: 500px; }
+        body { background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); background-attachment: fixed; margin: 0; padding: 15px; min-height: 100vh; }
+        .app-container { width: 100%; max-width: 500px; margin: auto; }
         .glass-card { background: var(--glass-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border-radius: 20px; padding: 20px; margin-bottom: 15px; border: 1px solid var(--glass-border); box-shadow: 0 8px 32px 0 rgba(31,38,135,0.1); }
         .page { display: none; } .page.active { display: block; animation: slideUp 0.3s ease; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         label { font-size: 10px; font-weight: 700; color: #4b4b4b; display: block; margin-top: 10px; text-transform: uppercase; }
         input, select, textarea { width: 100%; padding: 12px; margin: 5px 0; border-radius: 10px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255, 255, 255, 0.4); font-size: 14px; outline: none; }
-        button { width: 100%; padding: 14px; border-radius: 12px; border: none; background: var(--ios-blue); color: white; font-weight: 600; cursor: pointer; margin-top: 10px; }
+        button { width: 100%; padding: 12px; border-radius: 10px; border: none; background: var(--ios-blue); color: white; font-weight: 600; cursor: pointer; margin-top: 10px; }
         .nav-link { color: var(--ios-blue); font-weight: 600; cursor: pointer; margin-bottom: 15px; display: inline-block; }
-        
-        /* Pembaikan Input Seksyen & Butang Pangkah */
-        .sec-input-card { position: relative; padding: 35px 15px 15px 15px; background: rgba(255,255,255,0.2); border-radius: 15px; border: 1px solid white; margin-bottom: 15px; }
-        .btn-remove-sec { position: absolute; top: 10px; right: 10px; width: 25px; height: 25px; background: #ff3b30; color: white; border-radius: 50%; border: none; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; }
-        
-        .sec-item { border-bottom: 1px solid rgba(0,0,0,0.05); padding: 8px 0; }
-        .sec-item:last-child { border-bottom: none; }
-        .preview-area { background: white; border: 2px dashed var(--ios-blue); border-radius: 15px; padding: 15px; margin-top: 15px; display: none; }
+        .work-card { background: white; border-radius: 15px; padding: 15px; margin-bottom: 12px; border: 1px solid rgba(0,0,0,0.05); }
+        .action-row { display: flex; gap: 8px; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px; }
+        .btn-small { padding: 6px 12px; font-size: 11px; border-radius: 8px; flex: 1; }
     </style>
 </head>
 <body>
 
 <div class="app-container">
     <div id="homePage" class="page active">
-        <h1 style="text-align:center; padding: 30px 0;">M&E-Connect | v4.6</h1>
-        <div class="glass-card" onclick="showPage('kontrakPage')"><strong>📂 Direktori Kontrak</strong></div>
-        <div class="glass-card" onclick="showPage('adminPage')"><strong>➕ Pendaftaran Baru</strong></div>
-        <div class="glass-card" style="border: 2px solid var(--ios-orange);" onclick="showPage('interimPage')"><strong>📑 Kemaskini Interim Claim</strong></div>
+        <h1 style="text-align:center; padding: 20px 0;">M&E-Connect | v4.9</h1>
+        <div class="glass-card" onclick="showPage('kontrakPage')"><strong>📂 Direktori & Urus Kerja</strong></div>
+        <div class="glass-card" onclick="showPage('registerWorkPage')"><strong>📝 Pendaftaran Kerja (ID)</strong></div>
+        <div class="glass-card" onclick="showPage('adminPage')"><strong>➕ Daftar Kontrak Baru</strong></div>
+    </div>
+
+    <div id="registerWorkPage" class="page">
+        <span class="nav-link" onclick="showPage('homePage')">← Kembali</span>
+        <div class="glass-card">
+            <h3 id="formTitle">Borang ID Kerja</h3>
+            <form id="workOrderForm">
+                <input type="hidden" id="edit_work_id_internal">
+                <label>Pilih Kontrak</label>
+                <select id="w_contract_id" onchange="updateSectionList()" required><option value="">Pilih Kontrak</option></select>
+                <label>Pilih Section</label>
+                <select id="w_section" required><option value="">Sila pilih kontrak dulu...</option></select>
+                <label>ID Kerja</label>
+                <input type="text" id="w_id" required>
+                <label>Daerah</label>
+                <input type="text" id="w_dist" required>
+                <label>Keterangan</label>
+                <textarea id="w_desc" rows="2"></textarea>
+                <label>Amaun (RM)</label>
+                <input type="number" id="w_amt" step="0.01" required>
+                <button type="submit" id="btnSubmitWork" style="background:var(--ios-green);">Daftar & Tolak Baki</button>
+                <button type="button" id="btnCancelEdit" style="background:#8e8e93; display:none;" onclick="cancelEdit()">Batal Edit</button>
+            </form>
+        </div>
     </div>
 
     <div id="kontrakPage" class="page">
@@ -42,57 +61,10 @@
         <div id="listContainer"></div>
     </div>
 
-    <div id="adminPage" class="page">
-        <span class="nav-link" onclick="showPage('homePage')">← Kembali</span>
-        <div class="glass-card">
-            <h3>Pendaftaran Kontrak Utama</h3>
-            <form id="contractForm">
-                <input type="text" id="c_code" placeholder="Kod Kontrak (JKR/ME/...)" required>
-                <textarea id="c_name" placeholder="Tajuk Kontrak" rows="2" required></textarea>
-                <input type="text" id="c_vendor" placeholder="Nama Kontraktor" required>
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-                    <input type="date" id="c_start" required title="Tarikh Mula">
-                    <input type="date" id="c_end" required title="Tarikh Tamat">
-                </div>
-                
-                <label>Pecahan Seksyen & Deskripsi</label>
-                <div id="b_inputs">
-                    <div class="sec-input-card">
-                        <label style="margin-top:0;">Nama Seksyen</label>
-                        <input type="text" class="b_n" placeholder="Contoh: Section A" style="font-weight:bold;">
-                        <label>Deskripsi</label>
-                        <input type="text" class="b_d" placeholder="Contoh: General & Preliminaries">
-                        <label>Amaun (RM)</label>
-                        <input type="number" class="b_v" placeholder="0.00">
-                    </div>
-                </div>
-                
-                <button type="button" onclick="addB()" style="background:none; color:var(--ios-blue); border:1px dashed var(--ios-blue); font-size:11px;">+ Tambah Seksyen</button>
-                <button type="button" onclick="previewContract()" style="background:#8E8E93; margin-top:10px;">Semak Susunan (Preview)</button>
-                
-                <div id="p_area" class="preview-area">
-                    <h4 style="margin-top:0; color:var(--ios-blue);">Pratinjau Paparan:</h4>
-                    <div id="p_content"></div>
-                </div>
-
-                <button type="submit" style="background:var(--ios-green); margin-top:20px;">Sahkan & Daftar Kontrak</button>
-            </form>
-        </div>
-    </div>
-
-    <div id="interimPage" class="page">
-        <span class="nav-link" onclick="showPage('homePage')">← Kembali</span>
-        <div class="glass-card">
-            <h3>Proses Interim Claim</h3>
-            <label>Pilih Kontrak</label>
-            <select id="i_contract_id" onchange="loadInterimData()"><option value="">Pilih Kontrak</option></select>
-            <label>No. Interim</label>
-            <input type="number" id="i_no" placeholder="Contoh: 1">
-            <div id="i_sec_inputs"></div>
-            <label>Assign ID Kerja</label>
-            <div id="i_work_list" style="max-height: 200px; overflow-y: auto; background: rgba(255,255,255,0.2); border-radius: 8px; padding: 10px; font-size: 11px; border: 1px solid rgba(0,0,0,0.1);"></div>
-            <button onclick="submitInterim()" style="background:var(--ios-orange); margin-top:15px;">Hantar & Selaras Baki</button>
-        </div>
+    <div id="detailsPage" class="page">
+        <span class="nav-link" onclick="showPage('kontrakPage')">← Kembali</span>
+        <div id="detailsHeader" class="glass-card" style="background: var(--ios-blue); color: white;"></div>
+        <div id="workListContainer"></div>
     </div>
 </div>
 
@@ -104,96 +76,122 @@
     function showPage(id) {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.getElementById(id).classList.add('active');
-        if(id === 'adminPage' || id === 'interimPage') loadContracts();
+        if(id === 'registerWorkPage') loadContractsToDropdowns();
         if(id === 'kontrakPage') loadData();
     }
 
-    function addB() {
-        const d = document.createElement('div');
-        d.className = "sec-input-card";
-        d.innerHTML = `
-            <button type="button" class="btn-remove-sec" onclick="this.parentElement.remove()">×</button>
-            <label style="margin-top:0;">Nama Seksyen</label>
-            <input type="text" class="b_n" placeholder="Contoh: Section B" style="font-weight:bold;">
-            <label>Deskripsi</label>
-            <input type="text" class="b_d" placeholder="Contoh: Preventive Maintenance">
-            <label>Amaun (RM)</label>
-            <input type="number" class="b_v" placeholder="0.00">
-        `;
-        document.getElementById('b_inputs').appendChild(d);
+    async function loadContractsToDropdowns() {
+        const res = await fetch(`${SB_URL}/rest/v1/contract?select=*`, { headers });
+        const contracts = await res.json();
+        const s = document.getElementById('w_contract_id');
+        s.innerHTML = '<option value="">Pilih Kontrak</option>';
+        contracts.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id; opt.text = c.contract_code;
+            opt.dataset.breakdown = JSON.stringify(c.contract_sections_breakdown);
+            s.appendChild(opt);
+        });
     }
 
-    function previewContract() {
-        const names = document.querySelectorAll('.b_n'), descs = document.querySelectorAll('.b_d'), vals = document.querySelectorAll('.b_v');
-        let h = '';
-        let list = [];
-        names.forEach((n, i) => {
-            if(n.value) list.push({ n: n.value, d: descs[i].value, v: parseFloat(vals[i].value) || 0 });
-        });
-        list.sort((a,b) => a.n.localeCompare(b.n));
-        list.forEach(item => {
-            h += `<div class="sec-item"><div style="display:flex; justify-content:space-between;"><span style="font-size:11px; font-weight:700;">${item.n}</span><span style="font-size:11px; font-weight:700; color:var(--ios-blue);">RM ${item.v.toLocaleString(undefined,{minimumFractionDigits:2})}</span></div><div style="font-size:10px; color:#666; font-style:italic;">${item.d}</div></div>`;
-        });
-        document.getElementById('p_content').innerHTML = h || "Tiada seksyen ditambah.";
-        document.getElementById('p_area').style.display = 'block';
+    function updateSectionList() {
+        const sel = document.getElementById('w_contract_id');
+        const secSel = document.getElementById('w_section');
+        const opt = sel.selectedOptions[0];
+        if(opt && opt.dataset.breakdown) {
+            const b = JSON.parse(opt.dataset.breakdown);
+            secSel.innerHTML = '<option value="">Pilih Section...</option>';
+            Object.keys(b).sort().forEach(k => secSel.innerHTML += `<option value="${k}">${k}</option>`);
+        }
     }
 
-    document.getElementById('contractForm').onsubmit = async (e) => {
+    // --- DAFTAR / KEMASKINI KERJA ---
+    document.getElementById('workOrderForm').onsubmit = async (e) => {
         e.preventDefault();
-        let b = {}; 
-        const names = document.querySelectorAll('.b_n'), descs = document.querySelectorAll('.b_d'), vals = document.querySelectorAll('.b_v');
-        let total = 0;
-        names.forEach((n, i) => { 
-            if(n.value) { 
-                const val = parseFloat(vals[i].value) || 0;
-                b[n.value] = { desc: descs[i].value || "", amt: val }; 
-                total += val; 
-            } 
-        });
-        const p = { contract_code: document.getElementById('c_code').value, contract_name: document.getElementById('c_name').value, contractor: document.getElementById('c_vendor').value, contract_start: document.getElementById('c_start').value, contract_end: document.getElementById('c_end').value, contract_sum: total, contract_sections_breakdown: b, unit_id: 1 };
-        const res = await fetch(`${SB_URL}/rest/v1/contract`, { method: 'POST', headers, body: JSON.stringify(p) });
-        if(res.ok) { alert("Kontrak Berjaya!"); location.reload(); }
+        const internalId = document.getElementById('edit_work_id_internal').value;
+        const cId = document.getElementById('w_contract_id').value;
+        const sec = document.getElementById('w_section').value;
+        const amt = parseFloat(document.getElementById('w_amt').value);
+        
+        const payload = {
+            contract_id: parseInt(cId), work_id: document.getElementById('w_id').value,
+            district: document.getElementById('w_dist').value, description: document.getElementById('w_desc').value,
+            amount_spent: amt, section_category: sec, funding_details: { [sec]: amt }
+        };
+
+        if (internalId) { // MODE EDIT
+            const oldWorkRes = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${internalId}`, { headers });
+            const oldWork = (await oldWorkRes.json())[0];
+            await updateContractBalance(oldWork.contract_id, oldWork.funding_details, 'revert'); // Refund bajet lama
+            await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${internalId}`, { method: 'PATCH', headers, body: JSON.stringify(payload) });
+            await updateContractBalance(cId, payload.funding_details, 'deduct'); // Tolak bajet baru
+            alert("Kerja dikemaskini!");
+        } else { // MODE BARU
+            await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(payload) });
+            await updateContractBalance(cId, payload.funding_details, 'deduct');
+            alert("Kerja didaftarkan!");
+        }
+        location.reload();
     };
 
     async function loadData() {
         const res = await fetch(`${SB_URL}/rest/v1/contract?select=*`, { headers });
         const data = await res.json();
-        let h = ''; 
-        data.forEach(c => {
-            let bHTML = '';
-            const sorted = Object.keys(c.contract_sections_breakdown).sort();
-            sorted.forEach(sec => {
-                const item = c.contract_sections_breakdown[sec];
-                const d = (item && typeof item === 'object') ? item.desc : "";
-                const a = (item && typeof item === 'object') ? item.amt : item;
-                bHTML += `<div class="sec-item"><div style="display:flex; justify-content:space-between;"><span style="font-size:11px; font-weight:700;">${sec}</span><span style="font-size:11px; font-weight:700; color:var(--ios-blue);">RM ${a.toLocaleString(undefined,{minimumFractionDigits:2})}</span></div><div style="font-size:10px; color:#666; font-style:italic;">${d}</div></div>`;
-            });
-            h += `<div class="glass-card"><div style="font-size:10px; color:var(--ios-blue); font-weight:bold;">${c.contract_code}</div><div style="font-weight:bold; margin:5px 0;">${c.contract_name}</div><div style="margin:10px 0; padding:12px; background:rgba(255,255,255,0.25); border-radius:12px; border:1px solid rgba(0,0,0,0.05);">${bHTML}</div><div style="font-size:11px; color:#444;"><strong>Vendor:</strong> ${c.contractor}</div></div>`;
-        });
-        document.getElementById('listContainer').innerHTML = h || "Tiada data.";
+        document.getElementById('listContainer').innerHTML = data.map(c => `
+            <div class="glass-card" onclick="openDetails(${c.id}, '${c.contract_code}', '${c.contract_name.replace(/'/g, "\\'")}')">
+                <strong>${c.contract_code}</strong><br><small>${c.contract_name}</small>
+            </div>`).join('');
     }
 
-    async function loadContracts() {
-        const res = await fetch(`${SB_URL}/rest/v1/contract?select=*`, { headers });
-        const data = await res.json();
-        const s = document.getElementById('i_contract_id');
-        s.innerHTML = '<option value="">Pilih Kontrak</option>';
-        data.forEach(c => { s.innerHTML += `<option value="${c.id}">${c.contract_code}</option>`; });
+    async function openDetails(cId, cCode, cName) {
+        showPage('detailsPage');
+        document.getElementById('detailsHeader').innerHTML = `<h3>${cCode}</h3><small>${cName}</small>`;
+        const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}`, { headers });
+        const works = await res.json();
+        document.getElementById('workListContainer').innerHTML = works.map(w => `
+            <div class="work-card">
+                <strong>ID: ${w.work_id}</strong><br>
+                <small>${w.section_category} | RM ${w.amount_spent.toLocaleString()}</small>
+                <div class="action-row">
+                    <button class="btn-small" style="background:var(--ios-orange)" onclick='prepEdit(${JSON.stringify(w)})'>Edit</button>
+                    <button class="btn-small" style="background:var(--ios-red)" onclick="deleteWork(${w.id}, ${w.contract_id}, ${JSON.stringify(w.funding_details)})">Hapus</button>
+                </div>
+            </div>`).join('') || "Tiada rekod.";
     }
 
-    // Fungsi updateContractBalance dan lain-lain kekal sama mengikut lojik v4.5
-    async function updateContractBalance(cId, fundingDetails, mode = 'deduct') {
+    function prepEdit(w) {
+        showPage('registerWorkPage');
+        document.getElementById('formTitle').innerText = "Edit ID Kerja";
+        document.getElementById('edit_work_id_internal').value = w.id;
+        document.getElementById('w_contract_id').value = w.contract_id;
+        updateSectionList();
+        document.getElementById('w_section').value = w.section_category;
+        document.getElementById('w_id').value = w.work_id;
+        document.getElementById('w_dist').value = w.district;
+        document.getElementById('w_desc').value = w.description;
+        document.getElementById('w_amt').value = w.amount_spent;
+        document.getElementById('btnSubmitWork').innerText = "Simpan Perubahan";
+        document.getElementById('btnCancelEdit').style.display = "block";
+    }
+
+    async function deleteWork(id, cId, funding) {
+        if (!confirm("Hapus kerja ini? Baki akan dipulangkan ke kontrak.")) return;
+        await updateContractBalance(cId, funding, 'revert');
+        await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}`, { method: 'DELETE', headers });
+        alert("Kerja dihapuskan!");
+        location.reload();
+    }
+
+    async function updateContractBalance(cId, fundingDetails, mode) {
         const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}&select=contract_sections_breakdown`, { headers });
         const data = await res.json();
         let breakdown = data[0].contract_sections_breakdown;
         for (let sec in fundingDetails) {
-            if (breakdown[sec] !== undefined) {
-                if(typeof breakdown[sec] === 'object' && breakdown[sec] !== null) {
-                    if (mode === 'deduct') breakdown[sec].amt -= fundingDetails[sec];
-                    else breakdown[sec].amt += fundingDetails[sec];
+            if (breakdown[sec]) {
+                const amtToAdjust = fundingDetails[sec];
+                if(typeof breakdown[sec] === 'object') {
+                    breakdown[sec].amt = (mode === 'deduct') ? (breakdown[sec].amt - amtToAdjust) : (breakdown[sec].amt + amtToAdjust);
                 } else {
-                    if (mode === 'deduct') breakdown[sec] -= fundingDetails[sec];
-                    else breakdown[sec] += fundingDetails[sec];
+                    breakdown[sec] = (mode === 'deduct') ? (breakdown[sec] - amtToAdjust) : (breakdown[sec] + amtToAdjust);
                 }
             }
         }
