@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>M&E-Connect v1.0</title>
+    <title>M&E-Connect v3.9</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root { --ios-blue: #007AFF; --ios-green: #34C759; --glass-bg: rgba(255, 255, 255, 0.4); --glass-border: rgba(255, 255, 255, 0.6); }
@@ -20,6 +20,7 @@
         .work-row { background: rgba(255,255,255,0.3); padding: 15px; border-radius: 15px; border: 1px solid white; margin-bottom: 10px; position: relative; }
         .funding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; border-top: 1px dashed #ccc; padding-top: 8px; }
         .btn-remove { position: absolute; top: 5px; right: 5px; color: #ff3b30; background: none; border: none; font-size: 20px; cursor: pointer; }
+        .date-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     </style>
 </head>
 <body>
@@ -42,10 +43,25 @@
         <div class="glass-card">
             <h3>1. Daftar Kontrak Utama</h3>
             <form id="contractForm">
+                <label>Info Kontrak</label>
                 <input type="text" id="c_code" placeholder="Kod Kontrak (cth: RanhillSAJ/KP/T/78/2025)" required>
                 <textarea id="c_name" placeholder="Tajuk Kontrak" rows="2" required></textarea>
                 
-                <label>Section & Sum</label>
+                <label>Butiran Kontraktor</label>
+                <input type="text" id="c_vendor" placeholder="Nama Kontraktor / Syarikat" required>
+                
+                <div class="date-grid">
+                    <div>
+                        <label>Tarikh Mula</label>
+                        <input type="date" id="c_start" required>
+                    </div>
+                    <div>
+                        <label>Tarikh Tamat</label>
+                        <input type="date" id="c_end" required>
+                    </div>
+                </div>
+
+                <label>Section & Sum (Breakdown)</label>
                 <div id="b_inputs">
                     <div style="display:flex; gap:5px; margin-bottom:5px;">
                         <input type="text" class="b_n" placeholder="Nama (cth: Labour Charges)" style="flex:2">
@@ -56,15 +72,13 @@
                 <button type="submit">Daftar Kontrak</button>
             </form>
         </div>
-        
+
         <div class="glass-card" style="border: 2px solid var(--ios-green);">
             <h3 style="color:var(--ios-green);">2. Import Excel (Auto-Assign)</h3>
             <label>Pilih Kontrak</label>
             <select id="xl_contract_id" onchange="updateXLSec()"><option value="">Pilih Kontrak</option></select>
-            
             <label>Pilih Section</label>
             <select id="xl_target_sec"><option value="">Pilih...</option></select>
-
             <label>Paste dari Excel (ID | Daerah | Keterangan | Amaun)</label>
             <textarea id="xl_paste" rows="3" oninput="doExcelPreview()"></textarea>
             <div id="xl_preview" style="font-size:11px; margin-top:10px;"></div>
@@ -97,10 +111,9 @@
         if(id === 'kontrakPage') loadData();
     }
 
-    // --- PENDAFTARAN KONTRAK ---
     function addB() {
         const d = document.createElement('div'); d.style="display:flex; gap:5px; margin-bottom:5px;";
-        d.innerHTML = `<input type="text" class="b_n" placeholder="Nama Seksyen" style="flex:2"><input type="number" class="b_v" placeholder="RM" style="flex:1">`;
+        d.innerHTML = `<input type="text" class="b_n" placeholder="Nama Section" style="flex:2"><input type="number" class="b_v" placeholder="RM" style="flex:1">`;
         document.getElementById('b_inputs').appendChild(d);
     }
 
@@ -111,12 +124,21 @@
         let total = 0;
         names.forEach((n, i) => { if(n.value) { b[n.value] = parseFloat(vals[i].value) || 0; total += b[n.value]; } });
 
-        const p = { contract_code: document.getElementById('c_code').value, contract_name: document.getElementById('c_name').value, contract_sum: total, contract_sections_breakdown: b, unit_id: 1, contract_start: '2024-01-01', contract_end: '2025-12-31' };
+        const p = { 
+            contract_code: document.getElementById('c_code').value, 
+            contract_name: document.getElementById('c_name').value, 
+            contractor: document.getElementById('c_vendor').value, // Kolum baru
+            contract_start: document.getElementById('c_start').value,    // Kolum baru
+            contract_end: document.getElementById('c_end').value,        // Kolum baru
+            contract_sum: total, 
+            contract_sections_breakdown: b, 
+            unit_id: 1 
+        };
+
         const res = await fetch(`${SB_URL}/rest/v1/contract`, { method: 'POST', headers, body: JSON.stringify(p) });
-        if(res.ok) { alert("Kontrak Disimpan!"); location.reload(); }
+        if(res.ok) { alert("Kontrak Berjaya Didaftarkan!"); location.reload(); }
     };
 
-    // --- LOAD DATA ---
     async function loadContracts() {
         const res = await fetch(`${SB_URL}/rest/v1/contract?select=*`, { headers });
         const data = await res.json();
@@ -132,11 +154,10 @@
         });
     }
 
-    // --- EXCEL LOGIC ---
     function updateXLSec() {
         const opt = document.getElementById('xl_contract_id').selectedOptions[0];
         const secSel = document.getElementById('xl_target_sec');
-        secSel.innerHTML = '';
+        secSel.innerHTML = '<option value="">Pilih...</option>';
         if(opt.dataset.b) {
             const b = JSON.parse(opt.dataset.b);
             for(let k in b) secSel.innerHTML += `<option value="${k}">${k}</option>`;
@@ -146,13 +167,13 @@
     function doExcelPreview() {
         const lines = document.getElementById('xl_paste').value.trim().split('\n');
         xlData = [];
-        let h = '<table border="1" width="100%" style="border-collapse:collapse;"><tr><th>ID</th><th>RM</th></tr>';
+        let h = '<table border="1" width="100%" style="border-collapse:collapse; font-size:10px;"><tr><th>ID</th><th>Daerah</th><th>RM</th></tr>';
         lines.forEach(l => {
             const c = l.split('\t');
             if(c.length >= 2) {
-                const r = { id: c[0], dist: c[1], desc: c[2], amt: parseFloat(c[3]) || 0 };
+                const r = { id: c[0]?.trim(), dist: c[1]?.trim(), desc: c[2]?.trim(), amt: parseFloat(c[3]) || 0 };
                 xlData.push(r);
-                h += `<tr><td>${r.id}</td><td>${r.amt}</td></tr>`;
+                h += `<tr><td>${r.id}</td><td>${r.dist}</td><td>${r.amt.toLocaleString()}</td></tr>`;
             }
         });
         document.getElementById('xl_preview').innerHTML = h + '</table>';
@@ -166,11 +187,10 @@
             contract_id: cId, work_id: d.id, district: d.dist, description: d.desc,
             amount_spent: d.amt, section_category: sec, funding_details: { [sec]: d.amt }
         }));
-        await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(payloads) });
-        alert("Selesai!");
+        const res = await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(payloads) });
+        if(res.ok) { alert("Data Excel Berjaya Disimpan!"); document.getElementById('xl_paste').value = ''; }
     }
 
-    // --- MANUAL GRID LOGIC ---
     function refreshManualGrid() {
         const opt = document.getElementById('bulk_contract_id').selectedOptions[0];
         currentBreakdown = opt.dataset.b ? JSON.parse(opt.dataset.b) : {};
@@ -183,12 +203,12 @@
         const rId = Date.now();
         let fH = '';
         for(let s in currentBreakdown) fH += `<div style="font-size:9px;"><label>${s}</label><input type="number" class="r_amt" data-sec="${s}" placeholder="RM"></div>`;
-        
+
         const div = document.createElement('div');
         div.className = 'work-row'; div.id = `r_${rId}`;
         div.innerHTML = `<button class="btn-remove" onclick="document.getElementById('r_${rId}').remove()">×</button>
-            <div style="display:flex; gap:5px;"><input type="text" class="r_id" placeholder="ID"><input type="text" class="r_dist" placeholder="Daerah"></div>
-            <textarea class="r_desc" placeholder="Keterangan" rows="1" style="margin-top:5px;"></textarea>
+            <div style="display:flex; gap:5px;"><input type="text" class="r_id" placeholder="ID Kerja"><input type="text" class="r_dist" placeholder="Daerah"></div>
+            <textarea class="r_desc" placeholder="Keterangan Kerja" rows="1" style="margin-top:5px;"></textarea>
             <div class="funding-grid">${fH}</div>`;
         document.getElementById('manual_rows').appendChild(div);
     }
@@ -201,15 +221,23 @@
             row.querySelectorAll('.r_amt').forEach(i => { const v = parseFloat(i.value) || 0; if(v>0){ f[i.dataset.sec] = v; t += v; } });
             if(t > 0) payloads.push({ contract_id: cId, work_id: row.querySelector('.r_id').value, district: row.querySelector('.r_dist').value, description: row.querySelector('.r_desc').value, amount_spent: t, section_category: "Multi-Fund", funding_details: f });
         });
-        await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(payloads) });
-        alert("Data Disimpan!");
+        const res = await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(payloads) });
+        if(res.ok) alert("Rekod Manual Berjaya Disimpan!");
     }
 
     async function loadData() {
         const res = await fetch(`${SB_URL}/rest/v1/contract?select=*`, { headers });
         const data = await res.json();
-        let h = ''; data.forEach(c => h += `<div class="glass-card"><strong>${c.contract_code}</strong><br><small>${c.contract_name}</small></div>`);
-        document.getElementById('listContainer').innerHTML = h || "Tiada data.";
+        let h = ''; 
+        data.forEach(c => {
+            h += `<div class="glass-card">
+                <div style="font-size:10px; color:var(--ios-blue); font-weight:bold;">${c.contract_code}</div>
+                <div style="font-weight:bold; margin:5px 0;">${c.contract_name}</div>
+                <div style="font-size:12px; color:#555;">Kontraktor: ${c.contractor_name || '-'}</div>
+                <div style="font-size:11px; margin-top:5px;">Tempoh: ${c.contract_start} hingga ${c.contract_end}</div>
+            </div>`;
+        });
+        document.getElementById('listContainer').innerHTML = h || "Tiada data kontrak.";
     }
 </script>
 </body>
