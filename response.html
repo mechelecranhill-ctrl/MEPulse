@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RESPONSE KEHADIRAN</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: #a1c4fd;
+            font-family: 'SF Pro Display', sans-serif, Arial;
+            margin: 0; padding: 20px;
+            color: #1d1d1f;
+        }
+        .container { max-width: 500px; margin: auto; }
+        .header {
+            background: rgba(255,255,255,0.8);
+            padding: 20px; border-radius: 20px;
+            text-align: center; margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        .res-card {
+            background: white;
+            padding: 15px; border-radius: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .back-btn {
+            background: #007AFF; color: white; border: none;
+            padding: 10px 20px; border-radius: 12px; cursor: pointer;
+            font-weight: bold; font-size: 14px; margin-bottom: 15px;
+        }
+        .label { font-size: 11px; color: gray; font-weight: bold; text-transform: uppercase; }
+        .value { font-size: 15px; font-weight: 600; margin-bottom: 8px; color: #333; }
+        .status-pill {
+            display: inline-block; padding: 4px 10px; border-radius: 8px;
+            font-size: 11px; font-weight: bold; color: white; margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <button class="back-btn" onclick="window.location.href='index.html'">
+            <i class="fa-solid fa-chevron-left"></i> UTAMA
+        </button>
+        <h2>LOG RESPONSE TERKINI</h2>
+        <p style="font-size:12px; opacity:0.6; font-weight: bold;">Senarai Rekod Kehadiran dalam Database</p>
+    </div>
+
+    <div id="responseList">MEMUATKAN DATA...</div>
+</div>
+
+<script>
+    const S_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
+    const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48'; 
+
+    async function loadResponses() {
+        const list = document.getElementById('responseList');
+        try {
+            const res = await fetch(S_URL + '/rest/v1/attendance?select=*&order=created_at.desc', {
+                headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY }
+            });
+            const data = await res.json();
+            
+            if(data.length === 0) {
+                list.innerHTML = "<div style='text-align:center;'>TIADA REKOD DIJUMPA.</div>";
+                return;
+            }
+
+            list.innerHTML = "";
+            data.forEach(item => {
+                const color = (item.sebab.includes("CUTI") || item.sebab.includes("SAKIT")) ? "#FF3B30" : "#007AFF";
+                list.innerHTML += `
+                    <div class="res-card">
+                        <div class="label">Nama Kakitangan</div>
+                        <div class="value">${item.nama.toUpperCase()}</div>
+                        <div class="label">Jawatan</div>
+                        <div class="value">${item.jawatan}</div>
+                        <div class="label">Sebab / Aktiviti</div>
+                        <div class="status-pill" style="background:${color}">${item.sebab.toUpperCase()}</div>
+                        <div style="margin-top:10px; font-size:12px; font-weight:bold;">
+                            <i class="fa-solid fa-calendar-days"></i> ${item.tarikh_mula} SEHINGGA ${item.tarikh_akhir}
+                        </div>
+                    </div>`;
+            });
+        } catch (err) {
+            list.innerHTML = "<div style='color:red;'>RALAT: " + err.message + "</div>";
+        }
+    }
+    window.onload = loadResponses;
+</script>
+</body>
+</html>
