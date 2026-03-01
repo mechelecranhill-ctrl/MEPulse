@@ -113,19 +113,21 @@
                 <label>Pilih Unit</label>
                 <select id="c_unit_id" required><option value="">Memuatkan Unit...</option></select>
                 
-                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
-                    <div><label>Kod Kontrak</label><input type="text" id="c_code" placeholder="Kod Kontrak" required></div>
-                    <div><label>Kod Kawasan</label><input type="text" id="c_area" placeholder="SGT" required></div>
-                </div>
-
+                <div><label>Kod Kontrak</label><input type="text" id="c_code" placeholder="Kod Kontrak" required></div>
+                
                 <textarea id="c_name" placeholder="Tajuk Kontrak" rows="2" required></textarea>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div><label>Tarikh Mula</label><input type="date" id="c_start" required></div>
                     <div><label>Tarikh Tamat</label><input type="date" id="c_end" required></div>
                 </div>
                 <input type="text" id="c_vendor" placeholder="Nama Kontraktor" required>
+                
                 <label>Senarai Daerah (Koma)</label>
                 <input type="text" id="c_dist" placeholder="Cth: Segamat, Muar" required>
+                
+                <label>Kod Kawasan Ikut Daerah (Format: Daerah:Kod)</label>
+                <input type="text" id="c_area" placeholder="Cth: Segamat:SGT, Muar:MR" required>
+
                 <label>Senarai Section</label>
                 <div id="b_inputs">
                     <div class="sec-input-wrapper">
@@ -161,13 +163,11 @@
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         const target = document.getElementById(id);
         if(target) target.classList.add('active');
-        
         if(id === 'registerWorkPage' || id === 'interimPage' || id === 'adminPage' || id === 'settingsPage') fetchUnits();
         if(id === 'registerWorkPage' || id === 'interimPage') loadContractsToDropdowns();
         if(id === 'kontrakPage') loadData();
     }
 
-    // --- LOGIK UNIT ---
     async function fetchUnits() {
         const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
         const units = await res.json();
@@ -189,7 +189,6 @@
         if(res.ok) { alert("Unit berjaya didaftarkan!"); document.getElementById('new_unit_name').value = ''; fetchUnits(); }
     };
 
-    // --- LOGIK DAFTAR KONTRAK (ADMIN) ---
     document.getElementById('contractForm').onsubmit = async (e) => {
         e.preventDefault();
         let breakdown = {};
@@ -201,7 +200,7 @@
         const data = {
             unit_id: parseInt(document.getElementById('c_unit_id').value),
             contract_code: document.getElementById('c_code').value,
-            area_code: document.getElementById('c_area').value.toUpperCase(),
+            area_code: document.getElementById('c_area').value, // Simpan format Daerah:Kod
             contract_name: document.getElementById('c_name').value,
             contract_start: document.getElementById('c_start').value,
             contract_end: document.getElementById('c_end').value,
@@ -213,22 +212,32 @@
         if(res.ok) { alert("Kontrak Didaftarkan!"); location.reload(); }
     };
 
-    // --- LOGIK DAFTAR KERJA ---
     document.getElementById('workOrderForm').onsubmit = async (e) => {
         e.preventDefault();
         const cId = document.getElementById('w_contract_id').value;
         const opt = document.getElementById('w_contract_id').selectedOptions[0];
-        const areaCode = opt.dataset.area;
+        const selectedDist = document.getElementById('w_dist').value;
+        
+        // Logik Pecah Area Code
+        let areaCode = "W"; // Default
+        const mappingStr = opt.dataset.area || "";
+        const mappingArr = mappingStr.split(',');
+        mappingArr.forEach(m => {
+            const [d, k] = m.split(':');
+            if(d && k && d.trim() === selectedDist) areaCode = k.trim();
+        });
+
         const workId = document.getElementById('w_id').value;
         const locationStr = document.getElementById('w_location').value;
         const qpbDate = document.getElementById('w_qpb_date').value;
 
-        const resCount = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&select=sequence_no&order=sequence_no.desc&limit=1`, { headers });
+        // Cari sequence terakhir bagi kod kawasan spesifik ini
+        const resCount = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&sequence_no=ilike.${areaCode}%&select=sequence_no&order=sequence_no.desc&limit=1`, { headers });
         const lastWork = await resCount.json();
         let nextNum = 1;
         if(lastWork.length > 0 && lastWork[0].sequence_no) {
-            const lastNum = parseInt(lastWork[0].sequence_no.replace(areaCode, ''));
-            nextNum = lastNum + 1;
+            const lastNumStr = lastWork[0].sequence_no.replace(areaCode, '');
+            nextNum = (parseInt(lastNumStr) || 0) + 1;
         }
         const seqNo = areaCode + nextNum.toString().padStart(3, '0');
 
@@ -245,7 +254,7 @@
             sequence_no: seqNo,
             location: locationStr,
             qpb_date: qpbDate,
-            district: document.getElementById('w_dist').value,
+            district: selectedDist,
             description: document.getElementById('w_desc').value,
             amount_spent: totalSpent,
             funding_details: fundingDetails
@@ -278,24 +287,16 @@
         const opt = document.getElementById('i_contract_id').selectedOptions[0];
         const secContainer = document.getElementById('i_sec_inputs');
         const workList = document.getElementById('i_work_list');
-        secContainer.innerHTML = '';
-        workList.innerHTML = 'Memuatkan...';
-
+        secContainer.innerHTML = ''; workList.innerHTML = 'Memuatkan...';
         if(opt && opt.dataset.b) {
             const b = JSON.parse(opt.dataset.b);
             Object.keys(b).sort().forEach(sec => {
                 secContainer.innerHTML += `<label>Interim ${sec}</label><input type="number" class="i_sec_amt" data-sec="${sec}" placeholder="RM">`;
             });
         }
-
         const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&status=is.null&order=qpb_date.asc,sequence_no.asc`, { headers });
         const works = await resW.json();
-        workList.innerHTML = works.map(w => `
-            <div style="margin-bottom:5px; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:5px;">
-                <input type="checkbox" class="w_checkbox" value="${w.id}"> 
-                <strong>${w.sequence_no}</strong> | QPB: ${formatDate(w.qpb_date)} <br>
-                <small>${w.work_id} (RM ${w.amount_spent.toLocaleString()})</small>
-            </div>`).join('') || "Tiada kerja tersedia.";
+        workList.innerHTML = works.map(w => `<div style="margin-bottom:5px; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:5px;"><input type="checkbox" class="w_checkbox" value="${w.id}"> <strong>${w.sequence_no}</strong> | QPB: ${formatDate(w.qpb_date)} <br><small>${w.work_id} (RM ${w.amount_spent.toLocaleString()})</small></div>`).join('') || "Tiada kerja tersedia.";
     }
 
     async function submitInterim() {
@@ -311,11 +312,7 @@
             if(val > 0) { interimFunding[input.dataset.sec] = val; totalGross += val; }
         });
         const netAmount = totalGross - salvage;
-        const resInterim = await fetch(`${SB_URL}/rest/v1/interims`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ contract_id: parseInt(cId), interim_no: parseInt(iNo), date_received: dateRec, gross_amount: totalGross, salvage_value: salvage, net_amount: netAmount, funding_details: interimFunding })
-        });
+        const resInterim = await fetch(`${SB_URL}/rest/v1/interims`, { method: 'POST', headers, body: JSON.stringify({ contract_id: parseInt(cId), interim_no: parseInt(iNo), date_received: dateRec, gross_amount: totalGross, salvage_value: salvage, net_amount: netAmount, funding_details: interimFunding }) });
         if (resInterim.ok) {
             const selectedIds = Array.from(document.querySelectorAll('.w_checkbox:checked')).map(cb => cb.value);
             if(selectedIds.length > 0) {
@@ -327,28 +324,21 @@
                 }
             }
             await updateContractBalance(cId, interimFunding, 'deduct');
-            alert("Rekod Interim berjaya disimpan!");
-            location.reload();
+            alert("Rekod Interim berjaya disimpan!"); location.reload();
         }
     }
 
     async function loadData() {
         const res = await fetch(`${SB_URL}/rest/v1/contract?select=*,units(unit_name)`, { headers });
         const data = await res.json();
-        document.getElementById('listContainer').innerHTML = data.map(c => `
-            <div class="glass-card" onclick="openDetails(${c.id}, '${c.contract_code}', '${c.contract_name.replace(/'/g, "\\'")}')">
-                <span class="unit-tag">${c.units ? c.units.unit_name : 'No Unit'}</span><br>
-                <strong>${c.contract_code} (${c.area_code || ''})</strong><br>
-                <div style="font-size:11px; color:#444; margin: 4px 0;"><i class="fa-solid fa-location-dot"></i> ${c.district}</div>
-                <div style="font-size:11px; color:#444; margin: 4px 0;"><i class="fa-regular fa-calendar"></i> ${formatDate(c.contract_start)} - ${formatDate(c.contract_end)}</div>
-            </div>`).join('');
+        document.getElementById('listContainer').innerHTML = data.map(c => `<div class="glass-card" onclick="openDetails(${c.id}, '${c.contract_code}', '${c.contract_name.replace(/'/g, "\\'")}')"><span class="unit-tag">${c.units ? c.units.unit_name : 'No Unit'}</span><br><strong>${c.contract_code}</strong><br><div style="font-size:11px; color:#444; margin: 4px 0;"><i class="fa-solid fa-location-dot"></i> ${c.district}</div><div style="font-size:11px; color:#444; margin: 4px 0;"><i class="fa-regular fa-calendar"></i> ${formatDate(c.contract_start)} - ${formatDate(c.contract_end)}</div></div>`).join('');
     }
 
     async function openDetails(cId, cCode, cName) {
         showPage('detailsPage');
         const resC = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}&select=*,units(unit_name)`, { headers });
         const c = (await resC.json())[0];
-        document.getElementById('detailsHeader').innerHTML = `<span class="unit-tag" style="background:white; color:var(--ios-blue)">${c.units ? c.units.unit_name : ''}</span><h3>${cCode} (${c.area_code || ''})</h3><div style="font-size:12px; margin-bottom:5px;"><i class="fa-solid fa-location-dot"></i> ${c.district}</div><small>${cName}</small>`;
+        document.getElementById('detailsHeader').innerHTML = `<span class="unit-tag" style="background:white; color:var(--ios-blue)">${c.units ? c.units.unit_name : ''}</span><h3>${cCode}</h3><div style="font-size:12px; margin-bottom:5px;"><i class="fa-solid fa-location-dot"></i> ${c.district}</div><small>${cName}</small>`;
         let bakiHTML = '<div style="margin-top:10px; border-top:1px solid rgba(255,255,255,0.3); padding-top:10px;">';
         for(let s in c.contract_sections_breakdown) {
             const val = c.contract_sections_breakdown[s];
@@ -369,7 +359,9 @@
             s.innerHTML = '<option value="">Pilih Kontrak</option>';
             data.forEach(c => {
                 const opt = document.createElement('option'); opt.value = c.id; opt.text = c.contract_code;
-                opt.dataset.b = JSON.stringify(c.contract_sections_breakdown); opt.dataset.area = c.area_code; opt.dataset.dist = c.district;
+                opt.dataset.b = JSON.stringify(c.contract_sections_breakdown); 
+                opt.dataset.area = c.area_code; // Format: Segamat:SGT, Muar:MR
+                opt.dataset.dist = c.district;
                 s.appendChild(opt);
             });
         });
