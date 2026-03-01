@@ -3,94 +3,176 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RESPONSE KEHADIRAN</title>
+    <title>TV MODE - STATUS KAKITANGAN</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         body {
-            background: #a1c4fd;
+            background: #1d1d1f; /* Warna gelap untuk skrin TV */
             font-family: 'SF Pro Display', sans-serif, Arial;
-            margin: 0; padding: 20px;
-            color: #1d1d1f;
+            margin: 0; padding: 0;
+            color: white;
+            overflow: hidden; /* Sorok skrol bar utama */
         }
-        .container { max-width: 500px; margin: auto; }
-        .header {
-            background: rgba(255,255,255,0.8);
-            padding: 20px; border-radius: 20px;
-            text-align: center; margin-bottom: 20px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        .tv-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
         }
-        .res-card {
-            background: white;
-            padding: 15px; border-radius: 15px;
-            margin-bottom: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        .tv-header {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
         }
-        .back-btn {
-            background: #007AFF; color: white; border: none;
-            padding: 10px 20px; border-radius: 12px; cursor: pointer;
-            font-weight: bold; font-size: 14px; margin-bottom: 15px;
+        .tv-title { font-size: 32px; font-weight: bold; letter-spacing: 2px; }
+        .tv-date { font-size: 24px; color: #007AFF; font-weight: bold; }
+
+        /* Kawasan Senarai yang akan diskrol */
+        #scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 40px;
+            scrollbar-width: none; /* Sorok skrol bar Firefox */
         }
-        .label { font-size: 11px; color: gray; font-weight: bold; text-transform: uppercase; }
-        .value { font-size: 15px; font-weight: 600; margin-bottom: 8px; color: #333; }
-        .status-pill {
-            display: inline-block; padding: 4px 10px; border-radius: 8px;
-            font-size: 11px; font-weight: bold; color: white; margin-top: 5px;
+        #scroll-area::-webkit-scrollbar { display: none; } /* Sorok skrol bar Chrome/Safari */
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr); /* 2 Kolum untuk TV */
+            gap: 20px;
         }
+
+        .staf-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 25px;
+            border-radius: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .info-section { flex: 1; }
+        .nama { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
+        .jawatan { font-size: 16px; color: #aaa; text-transform: uppercase; }
+
+        .badge {
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            min-width: 140px;
+            text-align: center;
+        }
+
+        .status-hadir { background: #34C759; color: white; } 
+        .status-kerja { background: #007AFF; color: white; } 
+        .status-cuti { background: #FF3B30; color: white; }
+
+        /* Butang Kembali Kecil */
+        .back-floating {
+            position: fixed; bottom: 20px; right: 20px;
+            background: rgba(255,255,255,0.1); color: white;
+            border: none; padding: 10px 15px; border-radius: 10px;
+            cursor: pointer; opacity: 0.3; transition: 0.3s;
+        }
+        .back-floating:hover { opacity: 1; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="header">
-        <button class="back-btn" onclick="window.location.href='index.html'">
-            <i class="fa-solid fa-chevron-left"></i> UTAMA
-        </button>
-        <h2>LOG RESPONSE TERKINI</h2>
-        <p style="font-size:12px; opacity:0.6; font-weight: bold;">Senarai Rekod Kehadiran dalam Database</p>
+<div class="tv-container">
+    <div class="tv-header">
+        <div class="tv-title"><i class="fa-solid fa-users-viewfinder"></i> STATUS KAKITANGAN M&E</div>
+        <div id="todayDate" class="tv-date"></div>
     </div>
 
-    <div id="responseList">MEMUATKAN DATA...</div>
+    <div id="scroll-area">
+        <div id="mainGrid" class="grid-container">
+            </div>
+    </div>
 </div>
+
+<button class="back-floating" onclick="window.location.href='status.html'">
+    <i class="fa-solid fa-chevron-left"></i> KEMBALI
+</button>
 
 <script>
     const S_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
     const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48'; 
 
-    async function loadResponses() {
-        const list = document.getElementById('responseList');
-        try {
-            const res = await fetch(S_URL + '/rest/v1/attendance?select=*&order=created_at.desc', {
-                headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY }
-            });
-            const data = await res.json();
-            
-            if(data.length === 0) {
-                list.innerHTML = "<div style='text-align:center;'>TIADA REKOD DIJUMPA.</div>";
-                return;
-            }
+    async function fetchTVData() {
+        const grid = document.getElementById('mainGrid');
+        
+        const hierarki = {
+            'KETUA JABATAN': 1, 'KETUA SEKSYEN': 2, 'EKSEKUTIF KANAN': 3,
+            'EKSEKUTIF': 4, 'JURUTEKNIK': 5, 'PENYELIA PENTADBIRAN': 6,
+            'PEMBANTU PENTADBIRAN': 7, 'KERANI': 8
+        };
 
-            list.innerHTML = "";
-            data.forEach(item => {
-                const color = (item.sebab.includes("CUTI") || item.sebab.includes("SAKIT")) ? "#FF3B30" : "#007AFF";
-                list.innerHTML += `
-                    <div class="res-card">
-                        <div class="label">Nama Kakitangan</div>
-                        <div class="value">${item.nama.toUpperCase()}</div>
-                        <div class="label">Jawatan</div>
-                        <div class="value">${item.jawatan}</div>
-                        <div class="label">Sebab / Aktiviti</div>
-                        <div class="status-pill" style="background:${color}">${item.sebab.toUpperCase()}</div>
-                        <div style="margin-top:10px; font-size:12px; font-weight:bold;">
-                            <i class="fa-solid fa-calendar-days"></i> ${item.tarikh_mula} SEHINGGA ${item.tarikh_akhir}
+        try {
+            const [resS, resA] = await Promise.all([
+                fetch(S_URL + '/rest/v1/staff?select=*', { headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY } }),
+                fetch(S_URL + '/rest/v1/attendance?select=*', { headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY } })
+            ]);
+
+            let allStaff = await resS.json();
+            const allAtt = await resA.json();
+            const hariIni = new Date().setHours(0,0,0,0);
+
+            allStaff.sort((a, b) => (hierarki[a.jawatan.toUpperCase()] || 99) - (hierarki[b.jawatan.toUpperCase()] || 99));
+
+            grid.innerHTML = "";
+            allStaff.forEach(staf => {
+                const sNama = staf.nama.toUpperCase().trim();
+                const record = allAtt.find(a => {
+                    const tMula = new Date(a.tarikh_mula).setHours(0,0,0,0);
+                    const tAkhir = new Date(a.tarikh_akhir).setHours(0,0,0,0);
+                    return a.nama.toUpperCase().trim() === sNama && hariIni >= tMula && hariIni <= tAkhir;
+                });
+
+                let sText = "HADIR", sClass = "status-hadir";
+                if (record) {
+                    sText = record.sebab.toUpperCase();
+                    sClass = (sText.match(/CUTI|SAKIT|HALFDAY/)) ? "status-cuti" : "status-kerja";
+                }
+
+                grid.innerHTML += `
+                    <div class="staf-card">
+                        <div class="info-section">
+                            <div class="nama">${sNama}</div>
+                            <div class="jawatan">${staf.jawatan}</div>
                         </div>
+                        <div class="badge ${sClass}">${sText}</div>
                     </div>`;
             });
-        } catch (err) {
-            list.innerHTML = "<div style='color:red;'>RALAT: " + err.message + "</div>";
-        }
+        } catch (err) { console.error(err); }
     }
-    window.onload = loadResponses;
+
+    // Fungsi Auto-Scroll
+    function startAutoScroll() {
+        const container = document.getElementById('scroll-area');
+        let scrollSpeed = 1; 
+        setInterval(() => {
+            container.scrollTop += scrollSpeed;
+            if (container.scrollTop + container.clientHeight >= container.scrollHeight) {
+                setTimeout(() => { container.scrollTop = 0; }, 2000); // Tunggu 2 saat di bawah sebelum naik balik
+            }
+        }, 50);
+    }
+
+    // Refresh data setiap 5 minit
+    setInterval(fetchTVData, 300000);
+
+    const opsi = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+    document.getElementById('todayDate').innerText = new Date().toLocaleDateString('ms-MY', opsi).toUpperCase();
+
+    window.onload = () => {
+        fetchTVData();
+        setTimeout(startAutoScroll, 3000); // Mula skrol selepas 3 saat
+    };
 </script>
 </body>
 </html>
