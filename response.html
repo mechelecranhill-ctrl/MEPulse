@@ -3,172 +3,127 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TV MODE - STATUS KAKITANGAN (WHITE THEME)</title>
+    <title>LOG RESPONSE KEHADIRAN</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        * { box-sizing: border-box; }
-        
         body {
-            background: #F2F2F7; /* Kelabu sangat cerah (Apple style) */
+            background: #ffffff; /* Latar belakang putih bersih */
             font-family: 'SF Pro Display', sans-serif, Arial;
-            margin: 0; padding: 0;
+            margin: 0; padding: 20px;
             color: #1d1d1f;
-            height: 100vh;
-            width: 100vw;
-            overflow: hidden; 
         }
-
-        .tv-layout {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            padding: 25px;
-        }
-
-        .tv-header {
+        .container { max-width: 600px; margin: auto; }
+        
+        .header {
+            border-bottom: 2px solid #f2f2f7;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 20px 30px;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            margin-bottom: 20px;
-            flex-shrink: 0;
         }
 
-        .tv-title { font-size: 2.2vw; font-weight: 800; color: #1d1d1f; text-transform: uppercase; }
-        .tv-date { font-size: 1.6vw; color: #007AFF; font-weight: 700; }
-
-        #mainGrid {
-            display: grid;
-            /* Automatik susun: Jika staf ramai, grid akan mengecil sendiri */
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            grid-auto-rows: 1fr;
-            gap: 12px;
-            flex-grow: 1;
-            width: 100%;
+        .back-btn {
+            background: #f2f2f7; color: #007AFF; border: none;
+            padding: 8px 15px; border-radius: 10px; cursor: pointer;
+            font-weight: bold; font-size: 13px;
         }
 
-        .staf-card {
-            background: white;
-            padding: 15px 20px;
-            border-radius: 15px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-            border-left: 10px solid #34C759; /* Default */
-            position: relative;
+        .res-card {
+            background: #fff;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border: 1px solid #e5e5ea;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
         }
 
-        /* Warna border mengikut status */
-        .border-hadir { border-left-color: #34C759; }
-        .border-kerja { border-left-color: #007AFF; }
-        .border-cuti { border-left-color: #FF3B30; }
-
-        .nama { 
-            font-size: 1.2vw; 
-            font-weight: 700; 
-            color: #1d1d1f;
-            white-space: nowrap; 
-            overflow: hidden; 
-            text-overflow: ellipsis; 
-        }
+        .staf-name { font-weight: 800; font-size: 16px; color: #000; display: block; }
+        .staf-jawatan { font-size: 11px; color: #86868b; text-transform: uppercase; font-weight: 600; }
         
-        .jawatan { font-size: 0.8vw; color: #86868b; margin-top: 2px; font-weight: 600; text-transform: uppercase; }
+        .details {
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
-        .status-text {
-            margin-top: 6px;
-            font-size: 1vw;
+        .status-pill {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
             font-weight: 800;
-            text-transform: uppercase;
+            color: white;
         }
 
-        .color-hadir { color: #34C759; }
-        .color-kerja { color: #007AFF; }
-        .color-cuti { color: #FF3B30; }
-
-        .back-floating {
-            position: fixed; bottom: 10px; right: 10px;
-            background: #fff; color: #888; border: 1px solid #ddd;
-            padding: 5px 10px; border-radius: 5px; cursor: pointer; opacity: 0.2;
-        }
-        .back-floating:hover { opacity: 1; }
+        .tarikh-info { font-size: 12px; color: #3a3a3c; font-weight: 500; }
+        
+        #loading { text-align: center; padding: 40px; color: #86868b; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div class="tv-layout">
-    <div class="tv-header">
-        <div class="tv-title"><i class="fa-solid fa- chalkboard-user" style="color:#007AFF"></i> STATUS KAKITANGAN M&E</div>
-        <div id="todayDate" class="tv-date"></div>
+<div class="container">
+    <div class="header">
+        <button class="back-btn" onclick="window.history.back()">
+            <i class="fa-solid fa-chevron-left"></i> KEMBALI
+        </button>
+        <h3 style="margin:0;">LOG KEHADIRAN</h3>
     </div>
 
-    <div id="mainGrid">
-        </div>
+    <div id="loading"><i class="fas fa-spinner fa-spin"></i> MEMUATKAN DATA...</div>
+    <div id="responseList"></div>
 </div>
-
-<button class="back-floating" onclick="window.location.href='status.html'">Kembali</button>
 
 <script>
     const S_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
     const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48'; 
 
-    async function updateDashboard() {
-        const grid = document.getElementById('mainGrid');
-        const hierarki = { 'KETUA JABATAN': 1, 'KETUA SEKSYEN': 2, 'EKSEKUTIF KANAN': 3, 'EKSEKUTIF': 4, 'JURUTEKNIK': 5, 'PENYELIA PENTADBIRAN': 6, 'PEMBANTU PENTADBIRAN': 7, 'KERANI': 8 };
+    async function fetchResponses() {
+        const list = document.getElementById('responseList');
+        const loader = document.getElementById('loading');
 
         try {
-            const [resS, resA] = await Promise.all([
-                fetch(S_URL + '/rest/v1/staff?select=*', { headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY } }),
-                fetch(S_URL + '/rest/v1/attendance?select=*', { headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY } })
-            ]);
+            // Ambil data attendance disusun mengikut tarikh input terbaru (desc)
+            const res = await fetch(S_URL + '/rest/v1/attendance?select=*&order=created_at.desc', {
+                headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY }
+            });
+            const data = await res.json();
+            
+            loader.style.display = 'none';
 
-            let allStaff = await resS.json();
-            const allAtt = await resA.json();
-            const hariIni = new Date().setHours(0,0,0,0);
+            if (data.length === 0) {
+                list.innerHTML = "<p style='text-align:center; color:gray;'>Tiada rekod dijumpai.</p>";
+                return;
+            }
 
-            allStaff.sort((a, b) => (hierarki[a.jawatan.toUpperCase()] || 99) - (hierarki[b.jawatan.toUpperCase()] || 99));
+            data.forEach(item => {
+                const isCuti = (item.sebab.toUpperCase().match(/CUTI|SAKIT|HALFDAY/));
+                const bgColor = isCuti ? "#FF3B30" : "#007AFF";
 
-            grid.innerHTML = "";
-            allStaff.forEach(staf => {
-                const sNama = staf.nama.toUpperCase().trim();
-                const record = allAtt.find(a => {
-                    const tMula = new Date(a.tarikh_mula).setHours(0,0,0,0);
-                    const tAkhir = new Date(a.tarikh_akhir).setHours(0,0,0,0);
-                    return a.nama.toUpperCase().trim() === sNama && hariIni >= tMula && hariIni <= tAkhir;
-                });
-
-                let sText = "HADIR", sClass = "hadir";
-                if (record) {
-                    sText = record.sebab.toUpperCase();
-                    sClass = (sText.match(/CUTI|SAKIT|HALFDAY/)) ? "cuti" : "kerja";
-                }
-
-                grid.innerHTML += `
-                    <div class="staf-card border-${sClass}">
-                        <div class="nama">${sNama}</div>
-                        <div class="jawatan">${staf.jawatan}</div>
-                        <div class="status-text color-${sClass}">${sText}</div>
+                list.innerHTML += `
+                    <div class="res-card">
+                        <span class="staf-name">${item.nama.toUpperCase()}</span>
+                        <span class="staf-jawatan">${item.jawatan}</span>
+                        
+                        <div class="details">
+                            <span class="tarikh-info">
+                                <i class="fa-regular fa-calendar"></i> ${item.tarikh_mula} → ${item.tarikh_akhir}
+                            </span>
+                            <span class="status-pill" style="background:${bgColor}">
+                                ${item.sebab.toUpperCase()}
+                            </span>
+                        </div>
                     </div>`;
             });
-        } catch (err) { console.error("Error:", err); }
+
+        } catch (err) {
+            loader.innerText = "RALAT: GAGAL MENGAMBIL DATA.";
+        }
     }
 
-    function updateClock() {
-        const opsi = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-        const masa = new Date().toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        document.getElementById('todayDate').innerText = new Date().toLocaleDateString('ms-MY', opsi).toUpperCase() + " | " + masa;
-    }
-
-    setInterval(updateDashboard, 60000); // Refresh data setiap 1 minit
-    setInterval(updateClock, 1000); // Update jam setiap saat
-
-    window.onload = () => {
-        updateDashboard();
-        updateClock();
-    };
+    window.onload = fetchResponses;
 </script>
+
 </body>
 </html>
