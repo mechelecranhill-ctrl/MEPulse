@@ -18,34 +18,9 @@
         button { width: 100%; padding: 14px; border-radius: 12px; border: none; background: var(--ios-blue); color: white; font-weight: 600; cursor: pointer; margin-top: 10px; }
         .nav-link { color: var(--ios-blue); font-weight: 600; cursor: pointer; margin-bottom: 15px; display: inline-block; }
         
-        /* STYLING KOTAK SEKSYEN CANTIK */
-        .sec-input-wrapper { 
-            background: rgba(255,255,255,0.3); 
-            padding: 15px; 
-            border-radius: 15px; 
-            margin-bottom: 12px; 
-            border: 1px solid var(--glass-border);
-            position: relative;
-            animation: slideUp 0.3s ease;
-        }
-        .btn-remove-sec { 
-            position: absolute; 
-            top: 8px; 
-            right: 8px; 
-            color: var(--ios-red); 
-            font-size: 18px; 
-            cursor: pointer; 
-            background: white;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
+        .sec-input-wrapper { background: rgba(255,255,255,0.3); padding: 15px; border-radius: 15px; margin-bottom: 12px; border: 1px solid var(--glass-border); position: relative; animation: slideUp 0.3s ease; }
+        .btn-remove-sec { position: absolute; top: 8px; right: 8px; color: var(--ios-red); font-size: 18px; cursor: pointer; background: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
 
-        /* FUNDING GRID */
         .funding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(255,255,255,0.2); padding: 10px; border-radius: 12px; margin-top: 5px; border: 1px solid rgba(255,255,255,0.5); }
         .funding-item { display: flex; flex-direction: column; }
         .funding-item label { margin-top: 0; font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #555; }
@@ -74,14 +49,16 @@
             <form id="workOrderForm">
                 <input type="hidden" id="edit_internal_id">
                 <label>Pilih Kontrak</label>
-                <select id="w_contract_id" onchange="renderWorkSections()" required><option value="">Pilih Kontrak</option></select>
+                <select id="w_contract_id" onchange="onContractSelect()" required><option value="">Pilih Kontrak</option></select>
                 
                 <input type="text" id="w_id" placeholder="ID Kerja (Cth: C 123456)" required>
                 
                 <label>Proceed Blueform</label>
                 <input type="date" id="w_qpb_date">
                 
-                <input type="text" id="w_dist" placeholder="Daerah" required>
+                <label>Pilih Daerah Terlibat</label>
+                <select id="w_dist" required><option value="">Pilih Kontrak Dahulu</option></select>
+
                 <textarea id="w_desc" rows="2" placeholder="Keterangan Kerja"></textarea>
                 
                 <label>Pecahan Kos Mengikut Section</label>
@@ -124,6 +101,9 @@
                 <textarea id="c_name" placeholder="Tajuk Kontrak" rows="2" required></textarea>
                 <input type="text" id="c_vendor" placeholder="Nama Kontraktor" required>
                 
+                <label>Senarai Daerah (Asingkan dengan koma)</label>
+                <input type="text" id="c_dist" placeholder="Cth: Segamat, Muar, Labis" required>
+
                 <label>Senarai Seksyen</label>
                 <div id="b_inputs">
                     <div class="sec-input-wrapper">
@@ -162,7 +142,21 @@
         if(id === 'kontrakPage') loadData();
     }
 
-    // --- LOGIK MULTI-SECTION ---
+    // --- LOGIK MULTI-SECTION & DAERAH DROPDOWN ---
+    function onContractSelect() {
+        const opt = document.getElementById('w_contract_id').selectedOptions[0];
+        const distSelect = document.getElementById('w_dist');
+        distSelect.innerHTML = '<option value="">Pilih Daerah</option>';
+        
+        if(opt && opt.dataset.dist) {
+            const distArray = opt.dataset.dist.split(',').map(d => d.trim());
+            distArray.forEach(d => {
+                if(d) distSelect.innerHTML += `<option value="${d}">${d}</option>`;
+            });
+        }
+        renderWorkSections();
+    }
+
     function renderWorkSections() {
         const opt = document.getElementById('w_contract_id').selectedOptions[0];
         const container = document.getElementById('w_sections_container');
@@ -272,6 +266,7 @@
                 const opt = document.createElement('option');
                 opt.value = c.id; opt.text = c.contract_code;
                 opt.dataset.b = JSON.stringify(c.contract_sections_breakdown);
+                opt.dataset.dist = c.district;
                 s.appendChild(opt);
             });
             if(currentVal) s.value = currentVal;
@@ -295,7 +290,6 @@
         await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { method: 'PATCH', headers, body: JSON.stringify({ contract_sections_breakdown: breakdown }) });
     }
 
-    // --- FUNGSI ADMIN DENGAN KOTAK CANTIK ---
     function addB() {
         const d = document.createElement('div'); 
         d.className = "sec-input-wrapper";
@@ -313,18 +307,10 @@
     document.getElementById('contractForm').onsubmit = async (e) => {
         e.preventDefault();
         let b = {}; 
-        const names = document.querySelectorAll('.b_n'), 
-              descs = document.querySelectorAll('.b_d'), 
-              vals = document.querySelectorAll('.b_v');
+        const names = document.querySelectorAll('.b_n'), descs = document.querySelectorAll('.b_d'), vals = document.querySelectorAll('.b_v');
         let total = 0;
-        names.forEach((n, i) => { 
-            if(n.value) { 
-                const val = parseFloat(vals[i].value) || 0; 
-                b[n.value] = { desc: descs[i].value || "", amt: val }; 
-                total += val; 
-            } 
-        });
-        const p = { contract_code: document.getElementById('c_code').value, contract_name: document.getElementById('c_name').value, contractor: document.getElementById('c_vendor').value, contract_sum: total, contract_sections_breakdown: b, unit_id: 1 };
+        names.forEach((n, i) => { if(n.value) { const val = parseFloat(vals[i].value) || 0; b[n.value] = { desc: descs[i].value || "", amt: val }; total += val; } });
+        const p = { contract_code: document.getElementById('c_code').value, contract_name: document.getElementById('c_name').value, contractor: document.getElementById('c_vendor').value, district: document.getElementById('c_dist').value, contract_sum: total, contract_sections_breakdown: b, unit_id: 1 };
         const res = await fetch(`${SB_URL}/rest/v1/contract`, { method: 'POST', headers, body: JSON.stringify(p) });
         if(res.ok) { alert("Berjaya!"); location.reload(); }
     };
@@ -332,14 +318,14 @@
     async function loadData() {
         const res = await fetch(`${SB_URL}/rest/v1/contract?select=*`, { headers });
         const data = await res.json();
-        document.getElementById('listContainer').innerHTML = data.map(c => `<div class="glass-card" onclick="openDetails(${c.id}, '${c.contract_code}', '${c.contract_name.replace(/'/g, "\\'")}')"><strong>${c.contract_code}</strong><br><small>${c.contract_name}</small></div>`).join('');
+        document.getElementById('listContainer').innerHTML = data.map(c => `<div class="glass-card" onclick="openDetails(${c.id}, '${c.contract_code}', '${c.contract_name.replace(/'/g, "\\'")}')"><strong>${c.contract_code}</strong><br><small>${c.district}</small><br><small>${c.contract_name}</small></div>`).join('');
     }
 
     async function openDetails(cId, cCode, cName) {
         showPage('detailsPage');
-        document.getElementById('detailsHeader').innerHTML = `<h3>${cCode}</h3><small>${cName}</small>`;
         const resC = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { headers });
         const contract = (await resC.json())[0];
+        document.getElementById('detailsHeader').innerHTML = `<h3>${cCode}</h3><small>${contract.district}</small><br><small>${cName}</small>`;
         let bakiHTML = '<div style="margin-top:10px; border-top:1px solid rgba(255,255,255,0.3); padding-top:10px;">';
         for(let s in contract.contract_sections_breakdown) {
             const val = contract.contract_sections_breakdown[s];
@@ -353,8 +339,9 @@
         document.getElementById('workListContainer').innerHTML = works.map(w => `
             <div class="work-card">
                 <strong>ID: ${w.work_id}</strong><br>
+                <small>${w.district}</small><br>
                 ${w.qpb_date ? `<small style="color:var(--ios-blue); font-weight:bold;">QPB: ${w.qpb_date}</small><br>` : ''}
-                <small>Multi-Section | RM ${w.amount_spent.toLocaleString()}</small>
+                <small>RM ${w.amount_spent.toLocaleString()}</small>
                 <div class="action-row">
                     <button class="btn-small" style="background:var(--ios-orange)" onclick='prepEdit(${JSON.stringify(w)})'>Edit</button>
                     <button class="btn-small" style="background:var(--ios-red)" onclick="deleteWork(${w.id}, ${w.contract_id}, ${JSON.stringify(w.funding_details)})">Hapus</button>
@@ -366,14 +353,14 @@
         showPage('registerWorkPage');
         document.getElementById('edit_internal_id').value = w.id;
         document.getElementById('w_contract_id').value = w.contract_id;
-        renderWorkSections();
+        onContractSelect(); // Trigger reload dropdown daerah
+        setTimeout(() => { document.getElementById('w_dist').value = w.district; }, 100);
         for(let sec in w.funding_details) {
             const input = document.querySelector(`.w_sec_amt[data-sec="${sec}"]`);
             if(input) input.value = w.funding_details[sec];
         }
         document.getElementById('w_id').value = w.work_id;
         document.getElementById('w_qpb_date').value = w.qpb_date || '';
-        document.getElementById('w_dist').value = w.district;
         document.getElementById('w_desc').value = w.description;
         calcTotalWork();
         document.getElementById('btnSubmitWork').innerText = "Simpan Perubahan";
