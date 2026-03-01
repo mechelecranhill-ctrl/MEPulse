@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>M&E-Connect v1.0</title>
+    <title>M&E-Connect v4.9.1</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root { --ios-blue: #007AFF; --ios-green: #34C759; --ios-orange: #FF9500; --ios-red: #FF3B30; --glass-bg: rgba(255, 255, 255, 0.4); --glass-border: rgba(255, 255, 255, 0.6); }
@@ -17,6 +17,11 @@
         input, select, textarea { width: 100%; padding: 12px; margin: 5px 0; border-radius: 10px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255, 255, 255, 0.4); font-size: 14px; outline: none; }
         button { width: 100%; padding: 12px; border-radius: 10px; border: none; background: var(--ios-blue); color: white; font-weight: 600; cursor: pointer; margin-top: 10px; }
         .nav-link { color: var(--ios-blue); font-weight: 600; cursor: pointer; margin-bottom: 15px; display: inline-block; }
+        
+        /* Style untuk input seksyen kontrak */
+        .sec-input-card { position: relative; padding: 35px 15px 15px 15px; background: rgba(255,255,255,0.2); border-radius: 15px; border: 1px solid white; margin-bottom: 15px; }
+        .btn-remove-sec { position: absolute; top: 10px; right: 10px; width: 25px; height: 25px; background: var(--ios-red); color: white; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; z-index: 5; }
+        
         .work-card { background: white; border-radius: 15px; padding: 15px; margin-bottom: 12px; border: 1px solid rgba(0,0,0,0.05); }
         .action-row { display: flex; gap: 8px; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px; }
         .btn-small { padding: 6px 12px; font-size: 11px; border-radius: 8px; flex: 1; }
@@ -26,10 +31,33 @@
 
 <div class="app-container">
     <div id="homePage" class="page active">
-        <h1 style="text-align:center; padding: 20px 0;">M&E-Connect | v4.9</h1>
+        <h1 style="text-align:center; padding: 20px 0;">M&E-Connect | v4.9.1</h1>
         <div class="glass-card" onclick="showPage('kontrakPage')"><strong>📂 Direktori & Urus Kerja</strong></div>
         <div class="glass-card" onclick="showPage('registerWorkPage')"><strong>📝 Pendaftaran Kerja (ID)</strong></div>
         <div class="glass-card" onclick="showPage('adminPage')"><strong>➕ Daftar Kontrak Baru</strong></div>
+    </div>
+
+    <div id="adminPage" class="page">
+        <span class="nav-link" onclick="showPage('homePage')">← Kembali</span>
+        <div class="glass-card">
+            <h3>Daftar Kontrak Utama</h3>
+            <form id="contractForm">
+                <input type="text" id="c_code" placeholder="Kod Kontrak (JKR/ME/...)" required>
+                <textarea id="c_name" placeholder="Tajuk Kontrak" rows="2" required></textarea>
+                <input type="text" id="c_vendor" placeholder="Nama Kontraktor" required>
+                
+                <label>Pecahan Seksyen</label>
+                <div id="b_inputs">
+                    <div class="sec-input-card">
+                        <input type="text" class="b_n" placeholder="Contoh: Section A" style="font-weight:bold;">
+                        <input type="text" class="b_d" placeholder="Deskripsi Seksyen">
+                        <input type="number" class="b_v" placeholder="Amaun (RM)">
+                    </div>
+                </div>
+                <button type="button" onclick="addB()" style="background:none; color:var(--ios-blue); border:1px dashed var(--ios-blue);">+ Tambah Section</button>
+                <button type="submit" style="background:var(--ios-green); margin-top:20px;">Sahkan & Daftar Kontrak</button>
+            </form>
+        </div>
     </div>
 
     <div id="registerWorkPage" class="page">
@@ -42,16 +70,12 @@
                 <select id="w_contract_id" onchange="updateSectionList()" required><option value="">Pilih Kontrak</option></select>
                 <label>Pilih Section</label>
                 <select id="w_section" required><option value="">Sila pilih kontrak dulu...</option></select>
-                <label>ID Kerja</label>
-                <input type="text" id="w_id" required>
-                <label>Daerah</label>
-                <input type="text" id="w_dist" required>
-                <label>Keterangan</label>
-                <textarea id="w_desc" rows="2"></textarea>
-                <label>Amaun (RM)</label>
-                <input type="number" id="w_amt" step="0.01" required>
+                <input type="text" id="w_id" placeholder="ID Kerja" required>
+                <input type="text" id="w_dist" placeholder="Daerah" required>
+                <textarea id="w_desc" rows="2" placeholder="Keterangan"></textarea>
+                <input type="number" id="w_amt" step="0.01" placeholder="Amaun (RM)" required>
                 <button type="submit" id="btnSubmitWork" style="background:var(--ios-green);">Daftar & Tolak Baki</button>
-                <button type="button" id="btnCancelEdit" style="background:#8e8e93; display:none;" onclick="cancelEdit()">Batal Edit</button>
+                <button type="button" id="btnCancelEdit" style="background:#8e8e93; display:none;" onclick="location.reload()">Batal Edit</button>
             </form>
         </div>
     </div>
@@ -80,6 +104,38 @@
         if(id === 'kontrakPage') loadData();
     }
 
+    // Fungsi tambah input section di page Daftar Kontrak
+    function addB() {
+        const d = document.createElement('div');
+        d.className = "sec-input-card";
+        d.innerHTML = `
+            <button type="button" class="btn-remove-sec" onclick="this.parentElement.remove()">×</button>
+            <input type="text" class="b_n" placeholder="Nama Section" style="font-weight:bold;">
+            <input type="text" class="b_d" placeholder="Deskripsi">
+            <input type="number" class="b_v" placeholder="Amaun (RM)">
+        `;
+        document.getElementById('b_inputs').appendChild(d);
+    }
+
+    // --- LOGIK KONTRAK ---
+    document.getElementById('contractForm').onsubmit = async (e) => {
+        e.preventDefault();
+        let b = {}; 
+        const names = document.querySelectorAll('.b_n'), descs = document.querySelectorAll('.b_d'), vals = document.querySelectorAll('.b_v');
+        let total = 0;
+        names.forEach((n, i) => { 
+            if(n.value) { 
+                const val = parseFloat(vals[i].value) || 0;
+                b[n.value] = { desc: descs[i].value || "", amt: val }; 
+                total += val; 
+            } 
+        });
+        const p = { contract_code: document.getElementById('c_code').value, contract_name: document.getElementById('c_name').value, contractor: document.getElementById('c_vendor').value, contract_sum: total, contract_sections_breakdown: b, unit_id: 1 };
+        const res = await fetch(`${SB_URL}/rest/v1/contract`, { method: 'POST', headers, body: JSON.stringify(p) });
+        if(res.ok) { alert("Kontrak Berjaya Didaftar!"); location.reload(); }
+    };
+
+    // --- LOGIK KERJA (ID) ---
     async function loadContractsToDropdowns() {
         const res = await fetch(`${SB_URL}/rest/v1/contract?select=*`, { headers });
         const contracts = await res.json();
@@ -104,7 +160,6 @@
         }
     }
 
-    // --- DAFTAR / KEMASKINI KERJA ---
     document.getElementById('workOrderForm').onsubmit = async (e) => {
         e.preventDefault();
         const internalId = document.getElementById('edit_work_id_internal').value;
@@ -118,14 +173,14 @@
             amount_spent: amt, section_category: sec, funding_details: { [sec]: amt }
         };
 
-        if (internalId) { // MODE EDIT
-            const oldWorkRes = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${internalId}`, { headers });
-            const oldWork = (await oldWorkRes.json())[0];
-            await updateContractBalance(oldWork.contract_id, oldWork.funding_details, 'revert'); // Refund bajet lama
+        if (internalId) {
+            const oldRes = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${internalId}`, { headers });
+            const old = (await oldRes.json())[0];
+            await updateContractBalance(old.contract_id, old.funding_details, 'revert');
             await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${internalId}`, { method: 'PATCH', headers, body: JSON.stringify(payload) });
-            await updateContractBalance(cId, payload.funding_details, 'deduct'); // Tolak bajet baru
+            await updateContractBalance(cId, payload.funding_details, 'deduct');
             alert("Kerja dikemaskini!");
-        } else { // MODE BARU
+        } else {
             await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(payload) });
             await updateContractBalance(cId, payload.funding_details, 'deduct');
             alert("Kerja didaftarkan!");
@@ -174,7 +229,7 @@
     }
 
     async function deleteWork(id, cId, funding) {
-        if (!confirm("Hapus kerja ini? Baki akan dipulangkan ke kontrak.")) return;
+        if (!confirm("Hapus kerja ini? Baki akan dipulangkan.")) return;
         await updateContractBalance(cId, funding, 'revert');
         await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}`, { method: 'DELETE', headers });
         alert("Kerja dihapuskan!");
@@ -187,11 +242,11 @@
         let breakdown = data[0].contract_sections_breakdown;
         for (let sec in fundingDetails) {
             if (breakdown[sec]) {
-                const amtToAdjust = fundingDetails[sec];
+                const amt = fundingDetails[sec];
                 if(typeof breakdown[sec] === 'object') {
-                    breakdown[sec].amt = (mode === 'deduct') ? (breakdown[sec].amt - amtToAdjust) : (breakdown[sec].amt + amtToAdjust);
+                    breakdown[sec].amt = (mode === 'deduct') ? (breakdown[sec].amt - amt) : (breakdown[sec].amt + amt);
                 } else {
-                    breakdown[sec] = (mode === 'deduct') ? (breakdown[sec] - amtToAdjust) : (breakdown[sec] + amtToAdjust);
+                    breakdown[sec] = (mode === 'deduct') ? (breakdown[sec] - amt) : (breakdown[sec] + amt);
                 }
             }
         }
