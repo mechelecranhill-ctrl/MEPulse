@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>M&E-Connect v4.9.6</title>
+    <title>M&E-Connect v4.9.7</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root { --ios-blue: #007AFF; --ios-green: #34C759; --ios-orange: #FF9500; --ios-red: #FF3B30; --glass-bg: rgba(255, 255, 255, 0.4); --glass-border: rgba(255, 255, 255, 0.6); }
@@ -18,26 +18,55 @@
         button { width: 100%; padding: 14px; border-radius: 12px; border: none; background: var(--ios-blue); color: white; font-weight: 600; cursor: pointer; margin-top: 10px; }
         .nav-link { color: var(--ios-blue); font-weight: 600; cursor: pointer; margin-bottom: 15px; display: inline-block; }
         
-        /* STYLING PANGKAH SECTION */
-        .sec-input-wrapper { position: relative; background: rgba(255,255,255,0.2); padding: 15px; border-radius: 15px; margin-bottom: 10px; border: 1px solid white; }
-        .btn-remove-sec { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; background: var(--ios-red); color: white; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; cursor: pointer; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        /* MULTI-SECTION STYLING */
+        .funding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(255,255,255,0.2); padding: 10px; border-radius: 12px; margin-top: 5px; border: 1px solid rgba(255,255,255,0.5); }
+        .funding-item { display: flex; flex-direction: column; }
+        .funding-item label { margin-top: 0; font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #555; }
+        .funding-item input { padding: 8px; font-size: 12px; margin: 2px 0; }
 
-        /* DETAILS WORK CARD */
         .work-card { background: white; border-radius: 15px; padding: 15px; margin-bottom: 12px; border: 1px solid rgba(0,0,0,0.05); }
         .action-row { display: flex; gap: 8px; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px; }
         .btn-small { padding: 8px; font-size: 11px; border-radius: 8px; flex: 1; text-align: center; font-weight: bold; color: white; cursor: pointer; border:none; }
-        .sec-item { border-bottom: 1px solid rgba(0,0,0,0.05); padding: 8px 0; }
     </style>
 </head>
 <body>
 
 <div class="app-container">
     <div id="homePage" class="page active">
-        <h1 style="text-align:center; padding: 30px 0;">M&E-Connect | v4.9.6</h1>
+        <h1 style="text-align:center; padding: 30px 0;">M&E-Connect | v4.9.7</h1>
         <div class="glass-card" onclick="showPage('kontrakPage')"><strong>📂 Direktori Kontrak</strong></div>
         <div class="glass-card" onclick="showPage('registerWorkPage')"><strong>📝 Pendaftaran Kerja (ID)</strong></div>
         <div class="glass-card" onclick="showPage('adminPage')"><strong>➕ Pengurusan Kontrak</strong></div>
         <div class="glass-card" style="border: 2px solid var(--ios-orange);" onclick="showPage('interimPage')"><strong>📑 Kemaskini Interim Claim</strong></div>
+    </div>
+
+    <div id="registerWorkPage" class="page">
+        <span class="nav-link" onclick="showPage('homePage')">← Kembali</span>
+        <div class="glass-card">
+            <h3 id="workFormTitle">Borang ID Kerja</h3>
+            <form id="workOrderForm">
+                <input type="hidden" id="edit_internal_id">
+                <label>Pilih Kontrak</label>
+                <select id="w_contract_id" onchange="renderWorkSections()" required><option value="">Pilih Kontrak</option></select>
+                
+                <input type="text" id="w_id" placeholder="ID Kerja (Cth: ME/2024/01)" required>
+                <input type="text" id="w_dist" placeholder="Daerah" required>
+                <textarea id="w_desc" rows="2" placeholder="Keterangan Kerja"></textarea>
+                
+                <label>Pecahan Kos Mengikut Section</label>
+                <div id="w_sections_container" class="funding-grid">
+                    <div style="grid-column: span 2; font-size: 11px; color: #666; text-align: center; padding: 10px;">Sila pilih kontrak dahulu</div>
+                </div>
+
+                <div style="margin-top:15px; padding:10px; background:rgba(0,122,255,0.1); border-radius:10px; display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-weight:bold; font-size:12px;">Jumlah Keseluruhan:</span>
+                    <span id="total_display" style="font-weight:bold; color:var(--ios-blue);">RM 0.00</span>
+                </div>
+
+                <button type="submit" id="btnSubmitWork" style="background:var(--ios-green); margin-top:20px;">Daftar & Tolak Baki</button>
+                <button type="button" id="btnCancelEdit" style="background:#8e8e93; display:none;" onclick="location.reload()">Batal Edit</button>
+            </form>
+        </div>
     </div>
 
     <div id="interimPage" class="page">
@@ -52,26 +81,6 @@
             <label>Pilih ID Kerja (Assign ke Interim)</label>
             <div id="i_work_list" style="max-height: 200px; overflow-y: auto; background: rgba(255,255,255,0.2); border-radius: 8px; padding: 10px; font-size: 11px; border: 1px solid rgba(0,0,0,0.1); margin-top:5px;"></div>
             <button onclick="submitInterim()" style="background:var(--ios-orange); margin-top:15px;">Hantar & Selaras Baki</button>
-        </div>
-    </div>
-
-    <div id="registerWorkPage" class="page">
-        <span class="nav-link" onclick="showPage('homePage')">← Kembali</span>
-        <div class="glass-card">
-            <h3 id="workFormTitle">Borang ID Kerja</h3>
-            <form id="workOrderForm">
-                <input type="hidden" id="edit_internal_id">
-                <label>Pilih Kontrak</label>
-                <select id="w_contract_id" onchange="updateSectionList()" required><option value="">Pilih Kontrak</option></select>
-                <label>Pilih Section</label>
-                <select id="w_section" required><option value="">Pilih kontrak dahulu...</option></select>
-                <input type="text" id="w_id" placeholder="ID Kerja" required>
-                <input type="text" id="w_dist" placeholder="Daerah" required>
-                <textarea id="w_desc" rows="2" placeholder="Keterangan Kerja"></textarea>
-                <input type="number" id="w_amt" step="0.01" placeholder="Amaun (RM)" required>
-                <button type="submit" id="btnSubmitWork" style="background:var(--ios-green);">Daftar & Tolak Baki</button>
-                <button type="button" id="btnCancelEdit" style="background:#8e8e93; display:none;" onclick="location.reload()">Batal Edit</button>
-            </form>
         </div>
     </div>
 
@@ -120,14 +129,78 @@
         if(id === 'kontrakPage') loadData();
     }
 
-    // --- LOGIK INTERIM (YANG DIPULIHKAN) ---
+    // --- LOGIK MULTI-SECTION (BORANG ID KERJA) ---
+    function renderWorkSections() {
+        const opt = document.getElementById('w_contract_id').selectedOptions[0];
+        const container = document.getElementById('w_sections_container');
+        container.innerHTML = '';
+        
+        if(opt && opt.dataset.b) {
+            const b = JSON.parse(opt.dataset.b);
+            Object.keys(b).sort().forEach(sec => {
+                container.innerHTML += `
+                    <div class="funding-item">
+                        <label>${sec}</label>
+                        <input type="number" class="w_sec_amt" data-sec="${sec}" placeholder="RM" oninput="calcTotalWork()">
+                    </div>`;
+            });
+        } else {
+            container.innerHTML = '<div style="grid-column: span 2; font-size: 11px; color: #666; text-align: center; padding: 10px;">Sila pilih kontrak dahulu</div>';
+        }
+        calcTotalWork();
+    }
+
+    function calcTotalWork() {
+        let total = 0;
+        document.querySelectorAll('.w_sec_amt').forEach(input => {
+            total += parseFloat(input.value) || 0;
+        });
+        document.getElementById('total_display').innerText = `RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+        return total;
+    }
+
+    document.getElementById('workOrderForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const internalId = document.getElementById('edit_internal_id').value;
+        const cId = document.getElementById('w_contract_id').value;
+        const totalAmt = calcTotalWork();
+        
+        if (totalAmt <= 0) return alert("Sila masukkan amaun pada sekurang-kurangnya satu section!");
+
+        let funding = {};
+        document.querySelectorAll('.w_sec_amt').forEach(i => {
+            const v = parseFloat(i.value) || 0;
+            if(v > 0) funding[i.dataset.sec] = v;
+        });
+
+        const payload = { 
+            contract_id: parseInt(cId), work_id: document.getElementById('w_id').value, 
+            district: document.getElementById('w_dist').value, description: document.getElementById('w_desc').value, 
+            amount_spent: totalAmt, section_category: "Multi-Section", funding_details: funding 
+        };
+
+        if (internalId) {
+            const oldRes = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${internalId}`, { headers });
+            const old = (await oldRes.json())[0];
+            await updateContractBalance(old.contract_id, old.funding_details, 'revert');
+            await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${internalId}`, { method: 'PATCH', headers, body: JSON.stringify(payload) });
+            await updateContractBalance(cId, payload.funding_details, 'deduct');
+        } else {
+            await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(payload) });
+            await updateContractBalance(cId, payload.funding_details, 'deduct');
+        }
+        alert("Pendaftaran Berjaya!");
+        location.reload();
+    };
+
+    // --- LOGIK INTERIM (DIKEKALKAN) ---
     async function loadInterimData() {
         const cId = document.getElementById('i_contract_id').value;
         if(!cId) return;
         const resC = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { headers });
         const contract = (await resC.json())[0];
         const secDiv = document.getElementById('i_sec_inputs');
-        secDiv.innerHTML = '<label> Interim Claim Amount</label>';
+        secDiv.innerHTML = '<label>Amaun Interim Sebenar</label>';
         Object.keys(contract.contract_sections_breakdown).sort().forEach(k => {
             secDiv.innerHTML += `<div style="display:flex; align-items:center; gap:10px; margin-bottom:5px;"><span style="font-size:11px; flex:1">${k}</span><input type="number" class="i_amt" data-sec="${k}" placeholder="RM" style="width:120px"></div>`;
         });
@@ -141,33 +214,26 @@
         const iNo = document.getElementById('i_no').value;
         const selectedIds = Array.from(document.querySelectorAll('.i_chk:checked')).map(el => el.dataset.id);
         if(!cId || !iNo) return alert("Pilih Kontrak & No Interim!");
-
-        // 1. Revert baki ID kerja lama
         const resW = await fetch(`${SB_URL}/rest/v1/work_orders?id=in.(${selectedIds.join(',')})`, { headers });
         const works = await resW.json();
         for(let w of works) await updateContractBalance(cId, w.funding_details, 'revert');
-
-        // 2. Potong baki mengikut amaun Interim baru
         let interimFunding = {}; let totalClaim = 0;
         document.querySelectorAll('.i_amt').forEach(i => { const v = parseFloat(i.value) || 0; if(v > 0) { interimFunding[i.dataset.sec] = v; totalClaim += v; } });
         await updateContractBalance(cId, interimFunding, 'deduct');
-
-        // 3. Simpan rekod Interim & Update Work Orders
         const interimRecord = { contract_id: parseInt(cId), interim_no: parseInt(iNo), claim_date: new Date().toISOString(), claim_amount: totalClaim, claim_breakdown: interimFunding };
         await fetch(`${SB_URL}/rest/v1/interims`, { method: 'POST', headers, body: JSON.stringify(interimRecord) });
         for(let id of selectedIds) { await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}`, { method: 'PATCH', headers, body: JSON.stringify({ interim_no: iNo }) }); }
-        
-        alert("Interim Berjaya Disimpan!");
-        location.reload();
+        alert("Interim Berjaya!"); location.reload();
     }
 
-    // --- LOGIK LAIN ---
+    // --- LOGIK ASAS (DROPDOWN & BALANCES) ---
     async function loadContractsToDropdowns() {
         const res = await fetch(`${SB_URL}/rest/v1/contract?select=*`, { headers });
         const data = await res.json();
         const sels = [document.getElementById('w_contract_id'), document.getElementById('i_contract_id')];
         sels.forEach(s => {
             if(!s) return;
+            const currentVal = s.value;
             s.innerHTML = '<option value="">Pilih Kontrak</option>';
             data.forEach(c => {
                 const opt = document.createElement('option');
@@ -175,10 +241,28 @@
                 opt.dataset.b = JSON.stringify(c.contract_sections_breakdown);
                 s.appendChild(opt);
             });
+            if(currentVal) s.value = currentVal;
         });
     }
 
-    // [FUNGSI-FUNGSI LAIN DIKEKALKAN SEPERTI v4.9.5...]
+    async function updateContractBalance(cId, fundingDetails, mode) {
+        const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}&select=contract_sections_breakdown`, { headers });
+        const data = await res.json();
+        let breakdown = data[0].contract_sections_breakdown;
+        for (let sec in fundingDetails) {
+            if (breakdown[sec]) {
+                const val = fundingDetails[sec];
+                if(typeof breakdown[sec] === 'object') {
+                    breakdown[sec].amt = (mode === 'deduct') ? (breakdown[sec].amt - val) : (breakdown[sec].amt + val);
+                } else {
+                    breakdown[sec] = (mode === 'deduct') ? (breakdown[sec] - val) : (breakdown[sec] + val);
+                }
+            }
+        }
+        await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { method: 'PATCH', headers, body: JSON.stringify({ contract_sections_breakdown: breakdown }) });
+    }
+
+    // --- FUNGSI ADMIN & DIREKTORI (COPY DARI ASAL) ---
     function addB() {
         const d = document.createElement('div'); d.className = "sec-input-wrapper";
         d.innerHTML = `<div class="btn-remove-sec" onclick="this.parentElement.remove()">×</div><input type="text" class="b_n" placeholder="Nama Seksyen" style="font-weight:bold;"><input type="text" class="b_d" placeholder="Deskripsi"><input type="number" class="b_v" placeholder="Amaun Asal (RM)">`;
@@ -193,36 +277,6 @@
         const p = { contract_code: document.getElementById('c_code').value, contract_name: document.getElementById('c_name').value, contractor: document.getElementById('c_vendor').value, contract_sum: total, contract_sections_breakdown: b, unit_id: 1 };
         const res = await fetch(`${SB_URL}/rest/v1/contract`, { method: 'POST', headers, body: JSON.stringify(p) });
         if(res.ok) { alert("Berjaya!"); location.reload(); }
-    };
-
-    function updateSectionList() {
-        const opt = document.getElementById('w_contract_id').selectedOptions[0];
-        const secSel = document.getElementById('w_section');
-        secSel.innerHTML = '<option value="">Pilih Section...</option>';
-        if(opt && opt.dataset.b) {
-            const b = JSON.parse(opt.dataset.b);
-            Object.keys(b).sort().forEach(k => secSel.innerHTML += `<option value="${k}">${k}</option>`);
-        }
-    }
-
-    document.getElementById('workOrderForm').onsubmit = async (e) => {
-        e.preventDefault();
-        const internalId = document.getElementById('edit_internal_id').value;
-        const cId = document.getElementById('w_contract_id').value;
-        const sec = document.getElementById('w_section').value;
-        const amt = parseFloat(document.getElementById('w_amt').value);
-        const payload = { contract_id: parseInt(cId), work_id: document.getElementById('w_id').value, district: document.getElementById('w_dist').value, description: document.getElementById('w_desc').value, amount_spent: amt, section_category: sec, funding_details: { [sec]: amt } };
-        if (internalId) {
-            const oldRes = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${internalId}`, { headers });
-            const old = (await oldRes.json())[0];
-            await updateContractBalance(old.contract_id, old.funding_details, 'revert');
-            await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${internalId}`, { method: 'PATCH', headers, body: JSON.stringify(payload) });
-            await updateContractBalance(cId, payload.funding_details, 'deduct');
-        } else {
-            await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(payload) });
-            await updateContractBalance(cId, payload.funding_details, 'deduct');
-        }
-        location.reload();
     };
 
     async function loadData() {
@@ -245,45 +299,32 @@
         document.getElementById('detailsHeader').innerHTML += bakiHTML + '</div>';
         const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&order=created_at.desc`, { headers });
         const works = await resW.json();
-        document.getElementById('workListContainer').innerHTML = works.map(w => `<div class="work-card"><strong>ID: ${w.work_id}</strong><br><small>${w.section_category} | RM ${w.amount_spent.toLocaleString()}</small><div class="action-row"><button class="btn-small" style="background:var(--ios-orange)" onclick='prepEdit(${JSON.stringify(w)})'>Edit</button><button class="btn-small" style="background:var(--ios-red)" onclick="deleteWork(${w.id}, ${w.contract_id}, ${JSON.stringify(w.funding_details)})">Hapus</button></div></div>`).join('') || "Tiada rekod kerja.";
+        document.getElementById('workListContainer').innerHTML = works.map(w => `<div class="work-card"><strong>ID: ${w.work_id}</strong><br><small>Multi-Section | RM ${w.amount_spent.toLocaleString()}</small><div class="action-row"><button class="btn-small" style="background:var(--ios-orange)" onclick='prepEdit(${JSON.stringify(w)})'>Edit</button><button class="btn-small" style="background:var(--ios-red)" onclick="deleteWork(${w.id}, ${w.contract_id}, ${JSON.stringify(w.funding_details)})">Hapus</button></div></div>`).join('') || "Tiada rekod.";
     }
 
     function prepEdit(w) {
         showPage('registerWorkPage');
         document.getElementById('edit_internal_id').value = w.id;
         document.getElementById('w_contract_id').value = w.contract_id;
-        updateSectionList();
-        document.getElementById('w_section').value = w.section_category;
+        renderWorkSections();
+        // Fill back the specific section amounts
+        for(let sec in w.funding_details) {
+            const input = document.querySelector(`.w_sec_amt[data-sec="${sec}"]`);
+            if(input) input.value = w.funding_details[sec];
+        }
         document.getElementById('w_id').value = w.work_id;
         document.getElementById('w_dist').value = w.district;
         document.getElementById('w_desc').value = w.description;
-        document.getElementById('w_amt').value = w.amount_spent;
+        calcTotalWork();
         document.getElementById('btnSubmitWork').innerText = "Simpan Perubahan";
         document.getElementById('btnCancelEdit').style.display = "block";
     }
 
     async function deleteWork(id, cId, funding) {
-        if(!confirm("Hapus ID kerja? Baki akan dipulangkan.")) return;
+        if(!confirm("Hapus? Baki akan dipulangkan.")) return;
         await updateContractBalance(cId, funding, 'revert');
         await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}`, { method: 'DELETE', headers });
         location.reload();
-    }
-
-    async function updateContractBalance(cId, fundingDetails, mode) {
-        const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}&select=contract_sections_breakdown`, { headers });
-        const data = await res.json();
-        let breakdown = data[0].contract_sections_breakdown;
-        for (let sec in fundingDetails) {
-            if (breakdown[sec]) {
-                const val = fundingDetails[sec];
-                if(typeof breakdown[sec] === 'object') {
-                    breakdown[sec].amt = (mode === 'deduct') ? (breakdown[sec].amt - val) : (breakdown[sec].amt + val);
-                } else {
-                    breakdown[sec] = (mode === 'deduct') ? (breakdown[sec] - val) : (breakdown[sec] + val);
-                }
-            }
-        }
-        await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { method: 'PATCH', headers, body: JSON.stringify({ contract_sections_breakdown: breakdown }) });
     }
 </script>
 </body>
