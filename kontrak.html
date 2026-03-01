@@ -62,6 +62,7 @@
                 <label>Pilih Kontrak</label>
                 <select id="w_contract_id" onchange="onContractSelect()" required><option value="">Pilih Kontrak</option></select>
                 <input type="text" id="w_id" placeholder="ID Kerja (Cth: C 123456)" required>
+                <input type="text" id="w_location" placeholder="Lokasi (Cth: JEMENTAH / LABIS)">
                 <label>Proceed Blueform</label>
                 <input type="date" id="w_qpb_date">
                 <label>Pilih Daerah Terlibat</label>
@@ -191,6 +192,7 @@
         e.preventDefault();
         const cId = document.getElementById('w_contract_id').value;
         const workId = document.getElementById('w_id').value;
+        const locationStr = document.getElementById('w_location').value;
         let fundingDetails = {};
         let totalSpent = 0;
         document.querySelectorAll('.w_sec_amt').forEach(input => {
@@ -201,6 +203,7 @@
         const workData = {
             contract_id: parseInt(cId),
             work_id: workId,
+            location: locationStr,
             qpb_date: document.getElementById('w_qpb_date').value || null,
             district: document.getElementById('w_dist').value,
             description: document.getElementById('w_desc').value,
@@ -338,7 +341,11 @@
         document.getElementById('detailsHeader').innerHTML += bakiHTML + '</div>';
         const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&order=created_at.desc`, { headers });
         const works = await resW.json();
-        document.getElementById('workListContainer').innerHTML = works.map(w => `<div class="work-card"><strong>ID: ${w.work_id}</strong><br><small>RM ${w.amount_spent.toLocaleString()} (${w.district})</small></div>`).join('') || "Tiada rekod.";
+        document.getElementById('workListContainer').innerHTML = works.map(w => `
+            <div class="work-card">
+                <strong>ID: ${w.work_id}</strong> <span style="font-size:10px; color:var(--ios-orange);">(${w.location || '-'})</span><br>
+                <small>RM ${w.amount_spent.toLocaleString()} (${w.district})</small>
+            </div>`).join('') || "Tiada rekod.";
     }
 
     async function loadContractsToDropdowns() {
