@@ -236,7 +236,7 @@
         const locationStr = document.getElementById('w_location').value;
         const dateReceived = document.getElementById('w_date_received').value;
 
-        // Auto Sequence Number
+        // Auto Sequence Number berdasarkan Kod Kawasan (Cth: SGT001)
         const resCount = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&select=sequence_no&order=sequence_no.desc&limit=1`, { headers });
         const lastWork = await resCount.json();
         let nextNum = 1;
@@ -305,14 +305,14 @@
             });
         }
 
-        // Susun mengikut tarikh terima dan urutan kawasan
-        const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&status=is.null&order=date_received.asc,sequence_no.asc`, { headers });
+        // Susun mengikut qpb_date untuk urutan bayaran yang betul
+        const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&status=is.null&order=qpb_date.asc,sequence_no.asc`, { headers });
         const works = await resW.json();
         workList.innerHTML = works.map(w => `
             <div style="margin-bottom:5px; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:5px;">
                 <input type="checkbox" class="w_checkbox" value="${w.id}"> 
-                <strong>${w.sequence_no}</strong> | ${w.work_id} <br>
-                <small>${formatDate(w.date_received)} (RM ${w.amount_spent.toLocaleString()})</small>
+                <strong>${w.sequence_no}</strong> | QPB: ${formatDate(w.qpb_date)} <br>
+                <small>${w.work_id} (RM ${w.amount_spent.toLocaleString()})</small>
             </div>`).join('') || "Tiada kerja tersedia.";
     }
 
@@ -398,13 +398,13 @@
         }
         document.getElementById('detailsHeader').innerHTML += bakiHTML + '</div>';
         
-        const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&order=date_received.desc,sequence_no.desc`, { headers });
+        const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&order=qpb_date.desc,sequence_no.desc`, { headers });
         const works = await resW.json();
         document.getElementById('workListContainer').innerHTML = works.map(w => `
             <div class="work-card">
                 <div style="display:flex; justify-content:space-between;">
                     <strong>${w.sequence_no || '-'}</strong>
-                    <span style="font-size:10px; color:var(--ios-blue);">${formatDate(w.date_received)}</span>
+                    <span style="font-size:10px; color:var(--ios-blue);">QPB: ${formatDate(w.qpb_date)}</span>
                 </div>
                 <strong>ID: ${w.work_id}</strong> <span style="font-size:10px; color:var(--ios-orange);">(${w.location || '-'})</span><br>
                 <small>RM ${w.amount_spent.toLocaleString()} (${w.district})</small>
