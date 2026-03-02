@@ -32,6 +32,7 @@
         .dash-val { font-size: 11px; font-weight: 800; display: block; }
         .dash-label { font-size: 8px; color: #888; text-transform: uppercase; }
         .c-code { font-weight: bold; font-size: 14px; color: var(--ios-blue); }
+        .interim-list { margin-top: 10px; padding: 10px; background: #f9f9f9; border-radius: 10px; font-size: 10px; border-left: 3px solid var(--ios-green); }
     </style>
 </head>
 <body>
@@ -157,13 +158,13 @@
 
     window.onload = updateDashboard;
 
-    // FUNGSI DASHBOARD BARU (BAL VS ID VS INTERIM)
+    // FUNGSI DASHBOARD (BAL VS ID VS INTERIM) + SENARAI ID INTERIM 1
     async function updateDashboard() {
         const container = document.getElementById('dashContainer');
         try {
             const [resC, resW, resI] = await Promise.all([
                 fetch(`${SB_URL}/rest/v1/contract?select=id,contract_code,contract_sections_breakdown`, { headers }),
-                fetch(`${SB_URL}/rest/v1/work_orders?select=contract_id,amount_spent,status`, { headers }),
+                fetch(`${SB_URL}/rest/v1/work_orders?select=contract_id,work_id,amount_spent,status,interim_no`, { headers }),
                 fetch(`${SB_URL}/rest/v1/interims?select=contract_id,claim_amount`, { headers })
             ]);
             const contracts = await resC.json();
@@ -173,8 +174,23 @@
             container.innerHTML = contracts.map(c => {
                 let currentBal = 0;
                 if(c.contract_sections_breakdown) Object.values(c.contract_sections_breakdown).forEach(v => currentBal += v.amt);
-                const totalID = works.filter(w => w.contract_id === c.id).reduce((s, w) => s + w.amount_spent, 0);
+                const contractWorks = works.filter(w => w.contract_id === c.id);
+                const totalID = contractWorks.reduce((s, w) => s + w.amount_spent, 0);
                 const totalInt = interims.filter(i => i.contract_id === c.id).reduce((s, i) => s + i.claim_amount, 0);
+
+                // Cari ID yang diclaim dalam Interim 1
+                const idsInterim1 = contractWorks
+                    .filter(w => w.interim_no === "1")
+                    .map(w => w.work_id);
+
+                let interim1Html = '';
+                if(idsInterim1.length > 0) {
+                    interim1Html = `
+                    <div class="interim-list">
+                        <strong>ID dalam Interim 1:</strong><br>
+                        ${idsInterim1.join(', ')}
+                    </div>`;
+                }
 
                 return `
                 <div class="dash-card">
@@ -184,6 +200,7 @@
                         <div><span class="dash-val" style="color:var(--ios-orange)">RM ${totalID.toLocaleString()}</span><span class="dash-label">Potongan ID</span></div>
                         <div><span class="dash-val" style="color:var(--ios-blue)">RM ${totalInt.toLocaleString()}</span><span class="dash-label">Potongan Int.</span></div>
                     </div>
+                    ${interim1Html}
                 </div>`;
             }).join('');
         } catch(e) { console.error("Dash Error", e); }
@@ -344,7 +361,7 @@
         const sn = ac + next.toString().padStart(3, '0');
         let sc = {}; let ts = 0;
         document.querySelectorAll('.w_sec_amt').forEach(i => { const v = parseFloat(i.value) || 0; if(v > 0) { sc[i.dataset.sec] = { "amt": v }; ts += v; } });
-        const wd = { contract_id: parseInt(cId), work_id: document.getElementById('w_id').value, sequence_no: sn, location: document.getElementById('w_location').value, qpb_date: document.getElementById('w_qpb_date').value, district: dist, description: document.getElementById('w_desc').value, amount_spent: ts, status: 'Pending', section_category: sc };
+        const wd = { contract_id: parseInt(cId), work_id: document.getElementById('w_id').value, sequence_no: sn, location: document.getElementById('w_location').value, qpb_date: document.getElementById('w_qpb_date').value, district: dist, description: document.getElementById('w_desc').value, amount_spent: ts, status: 'Pending', section_category: sc, interim_no: "" };
         const resW = await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(wd) });
         if(resW.ok) { await updateContractBalance(cId, sc, 'deduct'); alert("Berjaya!"); location.reload(); }
     };
