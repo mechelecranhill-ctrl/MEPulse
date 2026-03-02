@@ -286,7 +286,7 @@
         renderExcelTable();
     }
 
-    // FUNGSI SUBMIT INTERIM (STABIL)
+    // FUNGSI SUBMIT INTERIM (UPDATED WITH CORRECT COLUMN NAMES)
     async function submitInterim() {
         const cId = document.getElementById('i_contract_id').value;
         const iNo = document.getElementById('i_no').value;
@@ -310,7 +310,7 @@
         if(totalGross === 0) return alert("Sila masukkan amaun claim untuk sekurang-kurangnya satu section.");
 
         try {
-            // 1. Simpan Rekod Interim
+            // 1. Simpan Rekod Interim mengikut nama kolum pangkalan data
             const res = await fetch(`${SB_URL}/rest/v1/interims`, { 
                 method: 'POST', 
                 headers, 
@@ -318,14 +318,17 @@
                     contract_id: parseInt(cId), 
                     interim_no: parseInt(iNo), 
                     date_received: dateRec, 
-                    gross_amount: totalGross, 
+                    claim_amount: totalGross, 
                     salvage_value: salvage, 
                     net_amount: totalGross - salvage, 
-                    funding_details: interimFunding 
+                    claim_breakdown: interimFunding 
                 }) 
             });
 
-            if (!res.ok) throw new Error("Gagal simpan rekod Interim.");
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.message || "Gagal simpan rekod Interim.");
+            }
 
             // 2. Kemaskini ID Kerja Terlibat
             for(let w of selectedWorksForInterim) {
@@ -352,7 +355,7 @@
         }
     }
 
-    // FUNGSI UPDATE BAKI (STABIL)
+    // FUNGSI UPDATE BAKI
     async function updateContractBalance(cId, funding, mode) {
         const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { headers });
         const contracts = await res.json();
