@@ -268,11 +268,16 @@
         const opt = document.getElementById('i_contract_id').selectedOptions[0];
         const secContainer = document.getElementById('i_sec_inputs');
         const workList = document.getElementById('i_work_list');
+        
         secContainer.innerHTML = ''; 
         workList.innerHTML = 'Memuatkan...';
 
-        if(!cId) return;
+        if(!cId) {
+            workList.innerHTML = 'Sila pilih kontrak.';
+            return;
+        }
 
+        // 1. Render input sections based on JSONB
         if(opt && opt.dataset.b) {
             const b = JSON.parse(opt.dataset.b);
             Object.keys(b).sort().forEach(sec => {
@@ -280,18 +285,26 @@
             });
         }
         
-        // Memastikan fetch hanya mengambil yang statusnya belum di-claim (is.null)
-        const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&status=is.null&order=qpb_date.asc,sequence_no.asc`, { headers });
-        const works = await resW.json();
-        
-        workList.innerHTML = works.map(w => `
-            <div style="margin-bottom:8px; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:8px; display:flex; align-items:flex-start; gap:10px;">
-                <input type="checkbox" class="w_checkbox" value="${w.id}" data-funding='${JSON.stringify(w.section_category)}' style="width:18px; height:18px;">
-                <div style="flex:1;">
-                    <strong>${w.sequence_no}</strong> | <small>${formatDate(w.qpb_date)}</small><br>
-                    <small>${w.work_id} (RM ${w.amount_spent.toLocaleString()})</small>
-                </div>
-            </div>`).join('') || "Tiada kerja tersedia untuk kontrak ini.";
+        // 2. Fetch work orders where status is null (meaning not claimed yet)
+        try {
+            const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&status=is.null&order=qpb_date.asc,sequence_no.asc`, { headers });
+            const works = await resW.json();
+            
+            if(works.length === 0) {
+                workList.innerHTML = "Tiada kerja tersedia untuk di-claim.";
+            } else {
+                workList.innerHTML = works.map(w => `
+                    <div style="margin-bottom:10px; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:8px; display:flex; align-items:center; gap:10px;">
+                        <input type="checkbox" class="w_checkbox" value="${w.id}" data-funding='${JSON.stringify(w.section_category)}' style="width:20px; height:20px;">
+                        <div style="flex:1;">
+                            <strong>${w.sequence_no}</strong> | <small>${formatDate(w.qpb_date)}</small><br>
+                            <small>${w.work_id} - RM ${w.amount_spent.toLocaleString()}</small>
+                        </div>
+                    </div>`).join('');
+            }
+        } catch (e) {
+            workList.innerHTML = "Ralat memuatkan senarai kerja.";
+        }
     }
 
     async function submitInterim() {
