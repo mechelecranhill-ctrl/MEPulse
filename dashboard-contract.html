@@ -99,12 +99,7 @@
                     <h1 id="panel-title" style="margin:0; font-size: 28px; color: var(--ios-blue);">Analisis Kontrak</h1>
                     <p id="panel-vendor" style="margin:5px 0 0 0; color: #888; font-size: 14px;"></p>
                 </div>
-                <div style="display: flex; gap: 10px;">
-                    <button onclick="printSelectedContract()" style="background:var(--ios-blue); color:white; border:none; padding:12px 20px; border-radius:15px; font-weight: 600; cursor:pointer;">
-                        <i class="fa fa-file-pdf"></i> Borang Biru
-                    </button>
-                    <button onclick="document.getElementById('analysis-panel').style.display='none'" style="background:#e5e5ea; border:none; padding:12px 25px; border-radius:15px; font-weight: 600; cursor:pointer;">Tutup</button>
-                </div>
+                <button onclick="document.getElementById('analysis-panel').style.display='none'" style="background:#f2f2f7; border:none; padding:12px 25px; border-radius:15px; font-weight: 600; cursor:pointer;">Tutup</button>
             </div>
 
             <div class="health-grid">
@@ -148,6 +143,7 @@
             const nav = document.getElementById('unitNav');
             nav.innerHTML = units.map(u => `<button class="unit-pill" onclick="fetchContracts(${u.id}, this)">${u.unit_name}</button>`).join('');
             
+            // Auto click first unit
             if(units.length > 0) document.querySelector('.unit-pill').click();
         } catch (e) { console.error("Error units:", e); }
     }
@@ -181,9 +177,11 @@
         document.getElementById('panel-title').innerText = contract.contract_code;
         document.getElementById('panel-vendor').innerText = `Kontraktor: ${contract.contractor}`;
 
+        // FETCH REAL DATA FROM WORK ORDERS
         const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contract.id}&select=amount_spent,section_category`, { headers });
         const workOrders = await resW.json();
 
+        // Calculate Period
         const start = new Date(contract.start_date || new Date());
         const end = new Date(contract.end_date || new Date());
         const months = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
@@ -198,6 +196,7 @@
             const totalBudget = sections[s].amt || 0;
             const desc = sections[s].desc || "KONTRAK ASAL";
             
+            // AGGREGATE SPENT FROM WORK ORDERS
             let usedAmount = 0;
             workOrders.forEach(wo => {
                 if(wo.section_category && wo.section_category[s]) {
@@ -207,6 +206,8 @@
 
             const monthlyPlanned = totalBudget / months;
             const usedPercent = Math.min(100, (usedAmount / totalBudget) * 100);
+            
+            // Health Color Logic
             const hColor = usedPercent > 85 ? 'var(--ios-red)' : (usedPercent > 60 ? 'var(--ios-orange)' : 'var(--ios-blue)');
 
             labels.push(s);
@@ -221,6 +222,7 @@
                             <span style="color:var(--ios-green); font-size:11px; font-weight:800;">PLANNED: RM ${monthlyPlanned.toLocaleString(undefined,{maximumFractionDigits:0})}/bln</span>
                         </div>
                         <span class="desc-text">${desc}</span>
+                        
                         <div class="prog-bar-bg">
                             <div class="prog-bar-fill" style="width:${usedPercent}%; background:${hColor}"></div>
                         </div>
@@ -263,28 +265,18 @@
         });
     }
 
-    // Toggle Sub-Module (Rujukan ke kontrak.html)
+    // Toggle Sub-Module (Iframe)
     function toggleSubModule(show) {
         const overlay = document.getElementById('subModuleOverlay');
         overlay.style.display = show ? 'block' : 'none';
         if(show) {
-            document.getElementById('formFrame').src = kontrak.html'; 
+            // Gantian ini dengan URL fail kod asal anda jika ia fail berasingan
+            // Atau letakkan kod asal dalam format data URI
+            document.getElementById('formFrame').src = 'kontrak.html'; 
         } else {
             document.getElementById('formFrame').src = 'about:blank';
-            fetchUnits(); 
+            fetchUnits(); // Refresh dashboard data when form closes
         }
-    }
-
-    // Fungsi untuk membuka borang bagi kontrak yang dipilih secara spesifik
-    function printSelectedContract() {
-        if(!selectedContract) {
-            alert("Sila pilih kontrak terlebih dahulu.");
-            return;
-        }
-        const overlay = document.getElementById('subModuleOverlay');
-        overlay.style.display = 'block';
-        // Menghantar ID kontrak melalui Query Parameter
-        document.getElementById('formFrame').src = `kontrak.html?id=${selectedContract.id}`;
     }
 </script>
 </body>
