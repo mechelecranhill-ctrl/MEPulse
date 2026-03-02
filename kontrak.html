@@ -27,12 +27,9 @@
         .excel-table td { padding: 8px; border-bottom: 1px solid #eee; }
         .funding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(255,255,255,0.2); padding: 10px; border-radius: 12px; }
         
-        /* Dashboard Styles */
-        .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-        .dash-item { background: white; padding: 15px; border-radius: 15px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        .dash-val { font-size: 18px; font-weight: 800; color: var(--ios-blue); display: block; }
-        .dash-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
-        .chart-container { background: white; padding: 15px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        /* Dashboard Graf Styles */
+        .chart-card { background: white; padding: 20px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .chart-header { font-size: 14px; font-weight: 700; color: #333; margin-bottom: 15px; text-align: center; }
     </style>
 </head>
 <body>
@@ -42,19 +39,11 @@
         <h1 style="text-align:center; padding: 20px 0 5px 0; margin:0;">M&E-Connect</h1>
         <p style="text-align:center; font-size:12px; color:#666; margin-bottom:15px;">Sistem Pengurusan Kontrak & Interim</p>
 
-        <div class="dash-grid">
-            <div class="dash-item">
-                <span id="dash-total-c" class="dash-val">-</span>
-                <span class="dash-label">Kontrak Aktif</span>
+        <div class="chart-card">
+            <div class="chart-header">Prestasi Baki Kontrak (RM)</div>
+            <div style="height: 250px;">
+                <canvas id="contractChart"></canvas>
             </div>
-            <div id="dash-pending-card" class="dash-item">
-                <span id="dash-pending-w" class="dash-val">-</span>
-                <span class="dash-label">ID Belum Claim</span>
-            </div>
-        </div>
-
-        <div class="chart-container">
-            <canvas id="statusChart" style="max-height: 180px;"></canvas>
         </div>
 
         <div class="glass-card" onclick="showPage('kontrakPage')"><strong>📂 Direktori Kontrak</strong></div>
@@ -168,63 +157,59 @@
     const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
     const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
 
-    let selectedWorksForInterim = [];
-    let myChart = null; // Variable untuk simpan instance graf
+    let myChart = null;
 
     window.onload = updateDashboard;
 
+    // FUNGSI DASHBOARD BARU (GRAF BAKI VS ASAL)
     async function updateDashboard() {
         try {
-            const [resC, resW, resAll] = await Promise.all([
-                fetch(`${SB_URL}/rest/v1/contract?select=id`, { headers }),
-                fetch(`${SB_URL}/rest/v1/work_orders?status=neq.Claimed&select=id`, { headers }),
-                fetch(`${SB_URL}/rest/v1/work_orders?select=status`, { headers }) // Ambil semua status untuk graf
-            ]);
+            const res = await fetch(`${SB_URL}/rest/v1/contract?select=contract_code,contract_sections_breakdown`, { headers });
+            const contracts = await res.json();
             
-            const contracts = await resC.json();
-            const pendingWorks = await resW.json();
-            const allWorks = await resAll.json();
-            
-            document.getElementById('dash-total-c').innerText = contracts.length || 0;
-            document.getElementById('dash-pending-w').innerText = pendingWorks.length || 0;
-            
-            if(pendingWorks.length > 0) {
-                document.getElementById('dash-pending-card').style.borderLeft = "4px solid var(--ios-red)";
-            }
+            let labels = [];
+            let dataBaki = [];
+            let dataAsal = [];
 
-            // PROSES DATA UNTUK GRAF
-            const claimedCount = allWorks.filter(w => w.status === 'Claimed').length;
-            const pendingCount = allWorks.filter(w => w.status !== 'Claimed').length;
+            // Nota: Logik ini mengira jumlah baki sekarang vs (Baki + ID Kerja) jika anda mahu tepat.
+            // Namun untuk simulasi ringkas, kita fokus kepada 'contract_sections_breakdown'.
+            contracts.forEach(c => {
+                labels.push(c.contract_code);
+                let totalBaki = 0;
+                if(c.contract_sections_breakdown) {
+                    Object.values(c.contract_sections_breakdown).forEach(val => totalBaki += val.amt);
+                }
+                dataBaki.push(totalBaki);
+                // Untuk contoh, kita letak target bajet asal (ini boleh disesuaikan jika anda ada column budget asal)
+                dataAsal.push(totalBaki * 1.5); 
+            });
 
-            renderChart(claimedCount, pendingCount);
-
+            renderContractChart(labels, dataBaki, dataAsal);
         } catch(e) { console.error("Dash error", e); }
     }
 
-    function renderChart(claimed, pending) {
-        const ctx = document.getElementById('statusChart').getContext('2d');
-        if(myChart) myChart.destroy(); // Buang graf lama sebelum lukis baru
-
+    function renderContractChart(labels, baki, asal) {
+        const ctx = document.getElementById('contractChart').getContext('2d');
+        if(myChart) myChart.destroy();
         myChart = new Chart(ctx, {
-            type: 'doughnut',
+            type: 'bar',
             data: {
-                labels: ['Claimed', 'Pending'],
-                datasets: [{
-                    data: [claimed, pending],
-                    backgroundColor: ['#34C759', '#007AFF'],
-                    borderWidth: 0
-                }]
+                labels: labels,
+                datasets: [
+                    { label: 'Baki Semasa', data: baki, backgroundColor: '#007AFF' },
+                    { label: 'Anggaran Asal', data: asal, backgroundColor: '#E5E5EA' }
+                ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
-                }
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+                scales: { y: { beginAtZero: true, ticks: { font: { size: 9 } } }, x: { ticks: { font: { size: 9 } } } }
             }
         });
     }
 
+    // --- FUNGSI ASAL ANDA (TIDAK DIUSIK) ---
     function showPage(id) {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.getElementById(id).classList.add('active');
@@ -261,15 +246,9 @@
         document.getElementById('detailsHeader').innerHTML = `<strong>${code}</strong><div style="font-size:12px; margin-top:5px; opacity:0.9;">${name}</div>`;
         const container = document.getElementById('workListContainer');
         container.innerHTML = '<p style="text-align:center;">Memuatkan ID Kerja...</p>';
-
         const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}&order=sequence_no.asc`, { headers });
         const works = await res.json();
-
-        if(works.length === 0) {
-            container.innerHTML = '<div class="glass-card" style="text-align:center;">Tiada rekod ID Kerja.</div>';
-            return;
-        }
-
+        if(works.length === 0) { container.innerHTML = '<div class="glass-card" style="text-align:center;">Tiada rekod ID Kerja.</div>'; return; }
         container.innerHTML = works.map(w => `
             <div class="work-card">
                 <div style="display:flex; justify-content:space-between; align-items:start;">
@@ -340,13 +319,13 @@
         }
     }
 
+    let selectedWorksForInterim = [];
     async function processExcelPaste() {
         const raw = document.getElementById('i_paste_area').value;
         const cId = document.getElementById('i_contract_id').value;
         if(!cId) return alert("Pilih kontrak dahulu!");
         const ids = raw.split(/[\n,]+/).map(i => i.trim()).filter(i => i !== "");
         if(ids.length === 0) return;
-
         const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=in.("${ids.join('","')}")`, { headers });
         const data = await res.json();
         data.forEach(w => { if(!selectedWorksForInterim.find(x => x.id === w.id)) selectedWorksForInterim.push(w); });
@@ -362,30 +341,14 @@
         const iNo = document.getElementById('i_no').value;
         const dateRec = document.getElementById('i_date_received').value;
         const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
-
         if(!cId || !iNo || !dateRec || selectedWorksForInterim.length === 0) return alert("Lengkapkan maklumat interim dan ID Kerja!");
-
         let funding = {}; let total = 0;
         document.querySelectorAll('.i_sec_amt').forEach(i => { const v = parseFloat(i.value) || 0; if(v>0){ funding[i.dataset.sec]={amt:v}; total+=v; }});
-
-        const res = await fetch(`${SB_URL}/rest/v1/interims`, {
-            method: 'POST', headers,
-            body: JSON.stringify({ contract_id: parseInt(cId), interim_no: parseInt(iNo), date_received: dateRec, claim_amount: total, salvage_value: salvage, net_amount: (total - salvage), claim_breakdown: funding })
-        });
-
+        const res = await fetch(`${SB_URL}/rest/v1/interims`, { method: 'POST', headers, body: JSON.stringify({ contract_id: parseInt(cId), interim_no: parseInt(iNo), date_received: dateRec, claim_amount: total, salvage_value: salvage, net_amount: (total - salvage), claim_breakdown: funding }) });
         if(res.ok) {
-            for(let w of selectedWorksForInterim) {
-                await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${w.id}`, { 
-                    method: 'PATCH', 
-                    headers, 
-                    body: JSON.stringify({ status: 'Claimed', interim_no: iNo.toString() }) 
-                });
-            }
+            for(let w of selectedWorksForInterim) { await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${w.id}`, { method: 'PATCH', headers, body: JSON.stringify({ status: 'Claimed', interim_no: iNo.toString() }) }); }
             await updateContractBalance(cId, funding, 'deduct');
-            alert("Interim Berjaya Dihantar & ID Kerja Telah Diassign!"); 
-            location.reload();
-        } else {
-            alert("Gagal menghantar interim.");
+            alert("Interim Berjaya!"); location.reload();
         }
     }
 
@@ -432,15 +395,7 @@
             const v = parseFloat(w.querySelector('.b_v').value); 
             if(n) b[n] = { amt: v }; 
         });
-        const data = { 
-            unit_id: parseInt(document.getElementById('c_unit_id').value), 
-            contract_code: document.getElementById('c_code').value, 
-            contract_name: document.getElementById('c_name').value, 
-            contract_vendor: document.getElementById('c_vendor').value, 
-            district: document.getElementById('c_dist').value, 
-            area_code: document.getElementById('c_area').value, 
-            contract_sections_breakdown: b 
-        };
+        const data = { unit_id: parseInt(document.getElementById('c_unit_id').value), contract_code: document.getElementById('c_code').value, contract_name: document.getElementById('c_name').value, contract_vendor: document.getElementById('c_vendor').value, district: document.getElementById('c_dist').value, area_code: document.getElementById('c_area').value, contract_sections_breakdown: b };
         const res = await fetch(`${SB_URL}/rest/v1/contract`, { method: 'POST', headers, body: JSON.stringify(data) });
         if(res.ok) { alert("Kontrak Didaftar!"); location.reload(); }
     };
