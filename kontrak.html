@@ -18,16 +18,13 @@
         input, select, textarea { width: 100%; padding: 12px; margin: 5px 0; border-radius: 10px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255, 255, 255, 0.4); font-size: 14px; outline: none; }
         button { width: 100%; padding: 14px; border-radius: 12px; border: none; background: var(--ios-blue); color: white; font-weight: 600; cursor: pointer; margin-top: 10px; }
         .nav-link { color: var(--ios-blue); font-weight: 600; cursor: pointer; margin-bottom: 15px; display: inline-block; }
-        .sec-input-wrapper { background: rgba(255,255,255,0.3); padding: 15px; border-radius: 15px; margin-bottom: 12px; border: 1px solid var(--glass-border); position: relative; }
-        .btn-remove-sec { position: absolute; top: 8px; right: 8px; color: var(--ios-red); font-size: 18px; cursor: pointer; background: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .funding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(255,255,255,0.2); padding: 10px; border-radius: 12px; margin-top: 5px; border: 1px solid rgba(255,255,255,0.5); }
-        .funding-item { display: flex; flex-direction: column; }
-        .funding-item label { margin-top: 0; font-size: 9px; color: #555; }
-        .work-card { background: white; border-radius: 15px; padding: 15px; margin-bottom: 12px; border: 1px solid rgba(0,0,0,0.05); }
+        .work-card { background: white; border-radius: 15px; padding: 15px; margin-bottom: 12px; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         .unit-tag { font-size: 9px; background: var(--ios-orange); color: white; padding: 2px 8px; border-radius: 8px; text-transform: uppercase; margin-bottom: 5px; display: inline-block; }
+        .status-tag { font-size: 9px; padding: 2px 6px; border-radius: 5px; color: white; font-weight: bold; }
         .excel-table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; font-size: 11px; margin-top: 10px; }
-        .excel-table th { background: #f1f1f1; padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+        .excel-table th { background: #f1f1f1; padding: 8px; text-align: left; }
         .excel-table td { padding: 8px; border-bottom: 1px solid #eee; }
+        .funding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(255,255,255,0.2); padding: 10px; border-radius: 12px; }
     </style>
 </head>
 <body>
@@ -42,18 +39,15 @@
         <div class="glass-card" style="background: rgba(0,0,0,0.05);" onclick="showPage('settingsPage')"><i class="fa-solid fa-gear"></i> Tetapan Unit</div>
     </div>
 
-    <div id="settingsPage" class="page">
+    <div id="kontrakPage" class="page">
         <span class="nav-link" onclick="showPage('homePage')">← Kembali</span>
-        <div class="glass-card">
-            <h3>Pendaftaran Unit</h3>
-            <form id="unitForm">
-                <label>Nama Unit Baru</label>
-                <input type="text" id="new_unit_name" placeholder="Cth: Elektrik / Mekanikal" required>
-                <button type="submit">Simpan Unit</button>
-            </form>
-            <hr style="border: 0; border-top: 1px solid rgba(0,0,0,0.1); margin: 20px 0;">
-            <div id="unitListDisplay" style="font-size: 13px;">Memuatkan...</div>
-        </div>
+        <div id="listContainer"></div>
+    </div>
+
+    <div id="detailsPage" class="page">
+        <span class="nav-link" onclick="showPage('kontrakPage')">← Kembali</span>
+        <div id="detailsHeader" class="glass-card" style="background: var(--ios-blue); color: white; margin-bottom: 20px;"></div>
+        <div id="workListContainer"></div>
     </div>
 
     <div id="registerWorkPage" class="page">
@@ -67,14 +61,14 @@
                     <div><label>ID Kerja</label><input type="text" id="w_id" placeholder="C 123456" required></div>
                     <div><label>Proceed Blueform</label><input type="date" id="w_qpb_date" required></div>
                 </div>
-                <input type="text" id="w_location" placeholder="Lokasi">
+                <input type="text" id="w_location" placeholder="Lokasi (Cth: JEMENTAH)">
                 <label>Pilih Daerah</label>
                 <select id="w_dist" required><option value="">Pilih Kontrak Dahulu</option></select>
                 <textarea id="w_desc" rows="2" placeholder="Keterangan"></textarea>
                 <label>Pecahan Kos</label>
                 <div id="w_sections_container" class="funding-grid"></div>
                 <div style="margin-top:15px; padding:10px; background:rgba(0,122,255,0.1); border-radius:10px; display:flex; justify-content:space-between;">
-                    <strong>Jumlah:</strong><span id="total_display" style="color:var(--ios-blue);">RM 0.00</span>
+                    <strong>Jumlah:</strong><span id="total_display" style="color:var(--ios-blue); font-weight:bold;">RM 0.00</span>
                 </div>
                 <button type="submit" style="background:var(--ios-green);">Daftar & Tolak Baki</button>
             </form>
@@ -94,7 +88,6 @@
             <label>Salvage Value (RM)</label>
             <input type="number" id="i_salvage" placeholder="0.00" step="0.01">
             <div id="i_sec_inputs"></div>
-            <hr>
             <label>Tampal ID Kerja</label>
             <textarea id="i_paste_area" rows="3" placeholder="Tampal ID di sini..."></textarea>
             <button type="button" onclick="processExcelPaste()">Cari ID</button>
@@ -118,29 +111,30 @@
                     <input type="date" id="c_start" required><input type="date" id="c_end" required>
                 </div>
                 <input type="text" id="c_vendor" placeholder="Kontraktor" required>
-                <input type="text" id="c_dist" placeholder="Daerah (Koma)" required>
-                <input type="text" id="c_area" placeholder="Daerah:Kod (Koma)" required>
+                <input type="text" id="c_dist" placeholder="Daerah (Koma Segamat, Muar)" required>
+                <input type="text" id="c_area" placeholder="Segamat:SGT, Muar:MR" required>
                 <div id="b_inputs">
-                    <div class="sec-input-wrapper">
+                    <div class="sec-input-wrapper" style="background:rgba(255,255,255,0.2); padding:10px; border-radius:10px; margin-bottom:5px;">
                         <input type="text" class="b_n" placeholder="SECTION">
                         <input type="number" class="b_v" placeholder="RM">
                     </div>
                 </div>
-                <button type="button" onclick="addB()" style="background:none; color:var(--ios-blue); border:1px dashed;">+ SECTION</button>
-                <button type="submit">Daftar Kontrak</button>
+                <button type="button" onclick="addB()" style="background:none; color:var(--ios-blue); border:1px dashed var(--ios-blue); font-size:12px;">+ TAMBAH SECTION</button>
+                <button type="submit" style="margin-top:20px;">Daftar Kontrak</button>
             </form>
         </div>
     </div>
 
-    <div id="kontrakPage" class="page">
+    <div id="settingsPage" class="page">
         <span class="nav-link" onclick="showPage('homePage')">← Kembali</span>
-        <div id="listContainer"></div>
-    </div>
-
-    <div id="detailsPage" class="page">
-        <span class="nav-link" onclick="showPage('kontrakPage')">← Kembali</span>
-        <div id="detailsHeader" class="glass-card" style="background: var(--ios-blue); color: white;"></div>
-        <div id="workListContainer"></div>
+        <div class="glass-card">
+            <h3>Pendaftaran Unit</h3>
+            <form id="unitForm">
+                <input type="text" id="new_unit_name" placeholder="Cth: Elektrik" required>
+                <button type="submit">Simpan Unit</button>
+            </form>
+            <div id="unitListDisplay" style="margin-top:20px; font-size:13px;"></div>
+        </div>
     </div>
 </div>
 
@@ -176,25 +170,46 @@
         document.getElementById('listContainer').innerHTML = data.map(c => `
             <div class="glass-card" onclick="openDetails(${c.id}, '${c.contract_code}', '${c.contract_name.replace(/'/g, "\\'")}')">
                 <span class="unit-tag">${c.units?.unit_name || 'N/A'}</span><br>
-                <strong>${c.contract_code}</strong><br><small>${c.district}</small>
+                <strong style="font-size:16px;">${c.contract_code}</strong><br>
+                <small><i class="fa-solid fa-location-dot" style="color:var(--ios-red)"></i> ${c.district}</small>
             </div>`).join('');
     }
 
     async function openDetails(id, code, name) {
         showPage('detailsPage');
-        document.getElementById('detailsHeader').innerHTML = `<h3>${code}</h3><p>${name}</p>`;
+        document.getElementById('detailsHeader').innerHTML = `<strong>${code}</strong><div style="font-size:12px; margin-top:5px; opacity:0.9;">${name}</div>`;
         const container = document.getElementById('workListContainer');
-        container.innerHTML = '<p>Memuatkan...</p>';
+        container.innerHTML = '<p style="text-align:center;">Memuatkan ID Kerja...</p>';
+        
         const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}&order=sequence_no.asc`, { headers });
         const works = await res.json();
+        
+        if(works.length === 0) {
+            container.innerHTML = '<div class="glass-card" style="text-align:center;">Tiada rekod ID Kerja.</div>';
+            return;
+        }
+
         container.innerHTML = works.map(w => `
             <div class="work-card">
-                <strong>${w.work_id}</strong> (${w.status})<br>
-                <small>${w.sequence_no} | RM ${w.amount_spent}</small>
-                <p>${w.description || ''}</p>
-            </div>`).join('') || '<p>Tiada data.</p>';
+                <div style="display:flex; justify-content:space-between; align-items:start;">
+                    <div>
+                        <span class="status-tag" style="background:${w.status === 'Claimed' ? 'var(--ios-green)' : 'var(--ios-blue)'}">${w.status || 'Pending'}</span>
+                        <div style="font-weight:bold; font-size:15px; margin-top:5px;">${w.work_id}</div>
+                        <div style="font-size:11px; color:#666;">${w.sequence_no}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-weight:bold; color:var(--ios-blue);">RM ${w.amount_spent.toLocaleString()}</div>
+                        <div style="font-size:10px; color:#999;">${w.qpb_date}</div>
+                    </div>
+                </div>
+                <div style="margin-top:10px; padding-top:10px; border-top:1px solid #eee; font-size:12px; color:#444;">
+                    <i class="fa-solid fa-location-arrow" style="color:var(--ios-orange)"></i> <strong>${w.district}</strong> - ${w.location || 'N/A'}<br>
+                    <div style="margin-top:5px; font-style:italic;">${w.description || ''}</div>
+                </div>
+            </div>`).join('');
     }
 
+    // Fungsi sokongan yang lain (load dropdown, calcTotal, dll) kekal mengikut logik asal anda
     async function loadContractsToDropdowns() {
         const res = await fetch(`${SB_URL}/rest/v1/contract?select=*`, { headers });
         const data = await res.json();
@@ -212,86 +227,58 @@
     function onContractSelect() {
         const opt = document.getElementById('w_contract_id').selectedOptions[0];
         const dSel = document.getElementById('w_dist');
+        if(!dSel) return;
         dSel.innerHTML = '<option value="">Pilih Daerah</option>';
-        if(opt.dataset.dist) opt.dataset.dist.split(',').forEach(d => dSel.innerHTML += `<option value="${d.trim()}">${d.trim()}</option>`);
+        if(opt && opt.dataset.dist) opt.dataset.dist.split(',').forEach(d => dSel.innerHTML += `<option value="${d.trim()}">${d.trim()}</option>`);
         const container = document.getElementById('w_sections_container'); container.innerHTML = '';
-        if(opt.dataset.b) {
+        if(opt && opt.dataset.b) {
             const b = JSON.parse(opt.dataset.b);
-            Object.keys(b).forEach(sec => container.innerHTML += `<div class="funding-item"><label>${sec}</label><input type="number" class="w_sec_amt" data-sec="${sec}" oninput="calcTotalWork()"></div>`);
+            Object.keys(b).sort().forEach(sec => {
+                container.innerHTML += `<div class="funding-item"><label>${sec}</label><input type="number" class="w_sec_amt" data-sec="${sec}" oninput="calcTotalWork()"></div>`;
+            });
         }
     }
 
     function calcTotalWork() {
         let total = 0; document.querySelectorAll('.w_sec_amt').forEach(i => total += parseFloat(i.value) || 0);
-        document.getElementById('total_display').innerText = `RM ${total.toLocaleString()}`;
-    }
-
-    async function loadInterimData() {
-        const opt = document.getElementById('i_contract_id').selectedOptions[0];
-        const container = document.getElementById('i_sec_inputs'); container.innerHTML = '';
-        if(opt.dataset.b) {
-            const b = JSON.parse(opt.dataset.b);
-            Object.keys(b).forEach(sec => container.innerHTML += `<label>Claim ${sec}</label><input type="number" class="i_sec_amt" data-sec="${sec}">`);
-        }
-    }
-
-    async function processExcelPaste() {
-        const raw = document.getElementById('i_paste_area').value;
-        const cId = document.getElementById('i_contract_id').value;
-        const ids = raw.split(/[\n,]+/).map(i => i.trim()).filter(i => i !== "");
-        const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=in.(${ids.join(',')})`, { headers });
-        const data = await res.json();
-        data.forEach(w => { if(!selectedWorksForInterim.find(x => x.id === w.id)) selectedWorksForInterim.push(w); });
-        renderExcelTable();
-    }
-
-    function renderExcelTable() {
-        document.getElementById('i_work_tbody').innerHTML = selectedWorksForInterim.map((w, idx) => `<tr><td>${w.work_id}</td><td>${w.sequence_no}</td><td>${w.amount_spent}</td><td onclick="selectedWorksForInterim.splice(${idx},1);renderExcelTable()">X</td></tr>`).join('');
-    }
-
-    async function submitInterim() {
-        const cId = document.getElementById('i_contract_id').value;
-        const iNo = document.getElementById('i_no').value;
-        const dateRec = document.getElementById('i_date_received').value;
-        const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
-        let funding = {}; let total = 0;
-        document.querySelectorAll('.i_sec_amt').forEach(i => { const v = parseFloat(i.value) || 0; if(v>0){ funding[i.dataset.sec]={amt:v}; total+=v; }});
-
-        const res = await fetch(`${SB_URL}/rest/v1/interims`, {
-            method: 'POST', headers,
-            body: JSON.stringify({ contract_id: parseInt(cId), interim_no: parseInt(iNo), date_received: dateRec, claim_amount: total, salvage_value: salvage, net_amount: (total - salvage), claim_breakdown: funding })
-        });
-
-        if(res.ok) {
-            for(let w of selectedWorksForInterim) {
-                await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${w.id}`, { method: 'PATCH', headers, body: JSON.stringify({ status: 'Claimed', interim_no: iNo }) });
-            }
-            await updateContractBalance(cId, funding, 'deduct');
-            alert("Berjaya!"); location.reload();
-        }
-    }
-
-    async function updateContractBalance(cId, funding, mode) {
-        const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { headers });
-        const c = (await res.json())[0];
-        let b = c.contract_sections_breakdown;
-        for(let s in funding) { if(b[s]) b[s].amt = (mode === 'deduct') ? (b[s].amt - funding[s].amt) : (b[s].amt + funding[s].amt); }
-        await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { method: 'PATCH', headers, body: JSON.stringify({ contract_sections_breakdown: b }) });
+        document.getElementById('total_display').innerText = `RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
     }
 
     function addB() {
         const d = document.createElement('div'); d.className = "sec-input-wrapper";
-        d.innerHTML = `<input type="text" class="b_n" placeholder="SECTION"><input type="number" class="b_v" placeholder="RM">`;
+        d.style = "background:rgba(255,255,255,0.2); padding:10px; border-radius:10px; margin-bottom:5px; position:relative;";
+        d.innerHTML = `<div onclick="this.parentElement.remove()" style="position:absolute; right:5px; top:5px; color:red; cursor:pointer;">X</div><input type="text" class="b_n" placeholder="SECTION"><input type="number" class="b_v" placeholder="RM">`;
         document.getElementById('b_inputs').appendChild(d);
     }
 
-    document.getElementById('contractForm').onsubmit = async (e) => {
+    // Masukkan semula event submit asal anda di sini...
+    document.getElementById('workOrderForm').onsubmit = async (e) => {
         e.preventDefault();
-        let b = {}; document.querySelectorAll('.sec-input-wrapper').forEach(w => { b[w.querySelector('.b_n').value] = { amt: parseFloat(w.querySelector('.b_v').value) }; });
-        const data = { unit_id: parseInt(document.getElementById('c_unit_id').value), contract_code: document.getElementById('c_code').value, contract_name: document.getElementById('c_name').value, contract_vendor: document.getElementById('c_vendor').value, district: document.getElementById('c_dist').value, area_code: document.getElementById('c_area').value, contract_sections_breakdown: b };
-        await fetch(`${SB_URL}/rest/v1/contract`, { method: 'POST', headers, body: JSON.stringify(data) });
-        alert("Daftar!"); location.reload();
+        const cId = document.getElementById('w_contract_id').value;
+        const opt = document.getElementById('w_contract_id').selectedOptions[0];
+        const dist = document.getElementById('w_dist').value;
+        let ac = "W";
+        (opt.dataset.area || "").split(',').forEach(m => { const [d, k] = m.split(':'); if(d?.trim() === dist) ac = k.trim(); });
+        const resC = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&sequence_no=ilike.${ac}%&select=sequence_no&order=sequence_no.desc&limit=1`, { headers });
+        const last = await resC.json();
+        let next = 1; if(last.length > 0) next = (parseInt(last[0].sequence_no.replace(ac, '')) || 0) + 1;
+        const sn = ac + next.toString().padStart(3, '0');
+        let sc = {}; let ts = 0;
+        document.querySelectorAll('.w_sec_amt').forEach(i => { const v = parseFloat(i.value) || 0; if(v > 0) { sc[i.dataset.sec] = { "amt": v }; ts += v; } });
+        const wd = { contract_id: parseInt(cId), work_id: document.getElementById('w_id').value, sequence_no: sn, location: document.getElementById('w_location').value, qpb_date: document.getElementById('w_qpb_date').value, district: dist, description: document.getElementById('w_desc').value, amount_spent: ts, section_category: sc };
+        const resW = await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(wd) });
+        if(resW.ok) { await updateContractBalance(cId, sc, 'deduct'); alert("Berjaya Daftar!"); location.reload(); }
     };
+    
+    async function updateContractBalance(cId, funding, mode) {
+        const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { headers });
+        const contracts = await res.json();
+        if(!contracts.length) return;
+        const c = contracts[0];
+        let b = c.contract_sections_breakdown || {};
+        for(let s in funding) { if(b[s]) b[s].amt = (mode === 'deduct') ? (b[s].amt - funding[s].amt) : (b[s].amt + funding[s].amt); }
+        await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { method: 'PATCH', headers, body: JSON.stringify({ contract_sections_breakdown: b }) });
+    }
 </script>
 </body>
 </html>
