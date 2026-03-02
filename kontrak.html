@@ -188,6 +188,49 @@
         if(listSettings) {
             listSettings.innerHTML = units.map(u => `<div style="padding:8px; border-bottom:1px solid rgba(0,0,0,0.05);"><i class="fa-solid fa-tag"></i> ${u.unit_name}</div>`).join('') || "Tiada unit didaftarkan.";
         }
+
+        async function openDetails(id, code, name) {
+    showPage('detailsPage');
+    const header = document.getElementById('detailsHeader');
+    header.innerHTML = <h3>${code}</h3><p>${name}</p>;
+    
+    const container = document.getElementById('workListContainer');
+    container.innerHTML = '<p style="padding:20px;">Memuatkan senarai kerja...</p>';
+
+    try {
+        const res = await fetch(${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}&order=sequence_no.asc, { headers });
+        const works = await res.json();
+
+        if (works.length === 0) {
+            container.innerHTML = '<div class="glass-card">Tiada ID Kerja didaftarkan untuk kontrak ini.</div>';
+            return;
+        }
+
+        container.innerHTML = works.map(w => `
+            <div class="work-card">
+                <div style="display:flex; justify-content:space-between; align-items:start;">
+                    <div>
+                        <span class="unit-tag" style="background:${w.status === 'Claimed' ? 'var(--ios-green)' : 'var(--ios-blue)'}">
+                            ${w.status || 'Pending'}
+                        </span>
+                        <div style="font-weight:bold; font-size:16px; margin-top:5px;">${w.work_id}</div>
+                        <div style="font-size:12px; color:#666;">Seq: ${w.sequence_no} | ${w.district}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-weight:bold; color:var(--ios-blue);">RM ${(w.amount_spent || 0).toLocaleString()}</div>
+                        <div style="font-size:10px; color:#999;">${w.qpb_date}</div>
+                    </div>
+                </div>
+                <div style="font-size:13px; margin-top:10px; color:#444; border-top:1px solid #eee; padding-top:8px;">
+                    ${w.description || 'Tiada keterangan'}
+                </div>
+                ${w.interim_no ? <div style="font-size:11px; margin-top:5px; color:var(--ios-orange);">Paid in Interim #${w.interim_no}</div> : ''}
+            </div>
+        `).join('');
+    } catch (err) {
+        container.innerHTML = <p style="color:red; padding:20px;">Ralat: ${err.message}</p>;
+    }
+}
     }
 
     async function loadData() {
