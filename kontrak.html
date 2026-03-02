@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>M&E-Connect v1.0</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --ios-blue: #007AFF; --ios-green: #34C759; --ios-orange: #FF9500; --ios-red: #FF3B30; --glass-bg: rgba(255, 255, 255, 0.4); --glass-border: rgba(255, 255, 255, 0.6); }
         * { box-sizing: border-box; font-family: -apple-system, system-ui, sans-serif; }
@@ -27,18 +28,19 @@
         .funding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(255,255,255,0.2); padding: 10px; border-radius: 12px; }
         
         /* Dashboard Styles */
-        .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
         .dash-item { background: white; padding: 15px; border-radius: 15px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
         .dash-val { font-size: 18px; font-weight: 800; color: var(--ios-blue); display: block; }
         .dash-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+        .chart-container { background: white; padding: 15px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
     </style>
 </head>
 <body>
 
 <div class="app-container">
     <div id="homePage" class="page active">
-        <h1 style="text-align:center; padding: 20px 0 10px 0; margin:0;">M&E-Connect</h1>
-        <p style="text-align:center; font-size:12px; color:#666; margin-bottom:20px;">Sistem Pengurusan Kontrak & Interim</p>
+        <h1 style="text-align:center; padding: 20px 0 5px 0; margin:0;">M&E-Connect</h1>
+        <p style="text-align:center; font-size:12px; color:#666; margin-bottom:15px;">Sistem Pengurusan Kontrak & Interim</p>
 
         <div class="dash-grid">
             <div class="dash-item">
@@ -49,6 +51,10 @@
                 <span id="dash-pending-w" class="dash-val">-</span>
                 <span class="dash-label">ID Belum Claim</span>
             </div>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="statusChart" style="max-height: 180px;"></canvas>
         </div>
 
         <div class="glass-card" onclick="showPage('kontrakPage')"><strong>📂 Direktori Kontrak</strong></div>
@@ -163,27 +169,60 @@
     const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
 
     let selectedWorksForInterim = [];
+    let myChart = null; // Variable untuk simpan instance graf
 
-    // Auto-run Dashboard bila buka app
     window.onload = updateDashboard;
 
     async function updateDashboard() {
         try {
-            const [resC, resW] = await Promise.all([
+            const [resC, resW, resAll] = await Promise.all([
                 fetch(`${SB_URL}/rest/v1/contract?select=id`, { headers }),
-                fetch(`${SB_URL}/rest/v1/work_orders?status=neq.Claimed&select=id`, { headers })
+                fetch(`${SB_URL}/rest/v1/work_orders?status=neq.Claimed&select=id`, { headers }),
+                fetch(`${SB_URL}/rest/v1/work_orders?select=status`, { headers }) // Ambil semua status untuk graf
             ]);
+            
             const contracts = await resC.json();
             const pendingWorks = await resW.json();
+            const allWorks = await resAll.json();
             
             document.getElementById('dash-total-c').innerText = contracts.length || 0;
             document.getElementById('dash-pending-w').innerText = pendingWorks.length || 0;
             
-            // Tukar warna card ID Belum Claim jika ada banyak
             if(pendingWorks.length > 0) {
                 document.getElementById('dash-pending-card').style.borderLeft = "4px solid var(--ios-red)";
             }
+
+            // PROSES DATA UNTUK GRAF
+            const claimedCount = allWorks.filter(w => w.status === 'Claimed').length;
+            const pendingCount = allWorks.filter(w => w.status !== 'Claimed').length;
+
+            renderChart(claimedCount, pendingCount);
+
         } catch(e) { console.error("Dash error", e); }
+    }
+
+    function renderChart(claimed, pending) {
+        const ctx = document.getElementById('statusChart').getContext('2d');
+        if(myChart) myChart.destroy(); // Buang graf lama sebelum lukis baru
+
+        myChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Claimed', 'Pending'],
+                datasets: [{
+                    data: [claimed, pending],
+                    backgroundColor: ['#34C759', '#007AFF'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
+                }
+            }
+        });
     }
 
     function showPage(id) {
