@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M&E Connect | Pendaftaran & Laporan</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        :root { --blue: #007AFF; --dark: #1c1c1e; }
+        body { font-family: sans-serif; background: #f2f2f7; margin: 0; padding: 20px; }
+        
+        /* Layout */
+        .main-grid { display: grid; grid-template-columns: 400px 1fr; gap: 20px; max-width: 1400px; margin: auto; }
+        
+        /* Form Styling */
+        .form-card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #666; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        
+        button { width: 100%; padding: 12px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        .btn-save { background: var(--blue); color: white; }
+        .btn-download { background: #34C759; color: white; }
+
+        /* Template Styling (The "Paper" Look) */
+        #report-template { 
+            background: white; width: 210mm; min-height: 297mm; 
+            padding: 15mm; margin: auto; border: 2px double #000;
+            color: black; position: relative; font-size: 12px; line-height: 1.5;
+        }
+        .header-logo { text-align: right; }
+        .header-logo img { width: 80px; }
+        .title { text-align: center; font-weight: bold; text-decoration: underline; margin: 20px 0; font-size: 14px; }
+        
+        .row { display: flex; margin-bottom: 8px; border-bottom: 0.1px solid #eee; padding-bottom: 2px; }
+        .label-col { width: 180px; font-weight: normal; }
+        .colon { width: 20px; }
+        .val-col { flex: 1; font-weight: bold; }
+        .val-red { color: red; }
+
+        /* Signature Table */
+        .sign-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 50px; margin-top: 60px; }
+        .sign-box { border-top: 1px dotted #000; padding-top: 10px; text-align: left; font-weight: bold; font-size: 11px; }
+
+        @media print { .no-print { display: none; } body { padding: 0; } }
+    </style>
+</head>
+<body>
+
+<div class="main-grid">
+    <div class="form-card no-print">
+        <h2 style="margin-top:0">Daftar Work Order</h2>
+        <div class="form-group">
+            <label>NO. WORK ORDER</label>
+            <input type="text" id="in_wo" placeholder="Contoh: C 358196" oninput="sync()">
+        </div>
+        <div class="form-group">
+            <label>TAJUK KERJA</label>
+            <input type="text" id="in_tajuk" placeholder="Contoh: PEMBAIKAN..." oninput="sync()">
+        </div>
+        <div class="form-group">
+            <label>ANGGARAN KERJA (RM)</label>
+            <input type="number" id="in_amt" placeholder="3665.00" oninput="sync()">
+        </div>
+        <div class="form-group">
+            <label>NO. RUJUKAN</label>
+            <input type="text" id="in_rujukan" value="SAJ/M&E/IP/11-57/24 - MR048" oninput="sync()">
+        </div>
+
+        <button class="btn-save" onclick="alert('Data disimpan ke Database!')">SIMPAN DATA</button>
+        <button class="btn-download" onclick="downloadPDF()">MUAT TURUN PDF</button>
+    </div>
+
+    <div id="report-template">
+        <div class="header-logo">
+            <img src="https://upload.wikimedia.org/wikipedia/en/thumb/5/5f/Ranhill_SAJ_Logo.svg/1200px-Ranhill_SAJ_Logo.svg.png" alt="Logo">
+        </div>
+
+        <div class="title">PERMOHONAN KERJA-KERJA S.O.R / TAMBAHAN DALAM KONTRAK PENYELENGGARAAN</div>
+
+        <div class="row"><div class="label-col">1 NO. RUJUKAN</div><div class="colon">:</div><div class="val-col" id="out_rujukan">SAJ/M&E/IP/11-57/24 - <span class="val-red">MR048</span></div></div>
+        <div class="row"><div class="label-col">2 NO. WORK ORDER</div><div class="colon">:</div><div class="val-col val-red" id="out_wo">C 358196</div></div>
+        <div class="row"><div class="label-col">3 NO. KONTRAK</div><div class="colon">:</div><div class="val-col">SAJ/KP/T/57/2024</div></div>
+        <div class="row"><div class="label-col">4 NAMA KONTAKTOR</div><div class="colon">:</div><div class="val-col">WIJATI SDN BHD</div></div>
+        <div class="row"><div class="label-col">5 TEMPOH KONTRAK</div><div class="colon">:</div><div class="val-col">01 DECEMBER 2024 ~ 31 NOVEMBER 2027</div></div>
+
+        <hr>
+        <div class="row"><div class="label-col">6 LABOUR CHARGES SUM</div><div class="colon">:</div><div class="val-col">RM 96,000.00</div></div>
+        <div class="row"><div class="label-col">7 ANGGARAN KERJA (L.C)</div><div class="colon">:</div><div class="val-col">RM -</div></div>
+        
+        <hr>
+        <div class="row"><div class="label-col">8 SUPPLY SPARE PART SUM</div><div class="colon">:</div><div class="val-col">RM 340,434.00</div></div>
+        <div class="row"><div class="label-col">9 ANGGARAN KERJA (S.S.P)</div><div class="colon">:</div><div class="val-col">RM -</div></div>
+
+        <hr>
+        <div class="row"><div class="label-col">10 PROVISIONAL SUM</div><div class="colon">:</div><div class="val-col">RM 2,200,000.00</div></div>
+        <div class="row"><div class="label-col">11 ANGGARAN KERJA (S.O.R)</div><div class="colon">:</div><div class="val-col">RM <span class="val-red" id="out_amt">3,665.00</span></div></div>
+        <div class="row"><div class="label-col">12 ANGGARAN KERJA (Tambahan)</div><div class="colon">:</div><div class="val-col">RM -</div></div>
+
+        <hr>
+        <div class="row"><div class="label-col">13 JUMLAH HARGA KONTRAK</div><div class="colon">:</div><div class="val-col">RM 4,608,384.00</div></div>
+        
+        <div class="row">
+            <div class="label-col">14 BAKI : G&P<br>PM<br>PROACTIVE<br>WORKMANSHIP<br>SUPPLY SPARE PART</div>
+            <div class="colon">:</div>
+            <div class="val-col">
+                RM 24,500.00<br>RM 125,500.00<br>RM 1,003,650.00<br>RM <span class="val-red">9,900.00</span><br>RM <span class="val-red">160,787.00</span>
+            </div>
+        </div>
+        
+        <div class="row"><div class="label-col">15 BAKI HARGA KONTRAK</div><div class="colon">:</div><div class="val-col">RM 2,114,182.67</div></div>
+        
+        <div class="row">
+            <div class="label-col">16 TAJUK KERJA</div><div class="colon">:</div>
+            <div class="val-col val-red" id="out_tajuk">PEMBAIKAN PENIMBANG KLORIN ROSAK DI LRA BUKIT SERAMPANG</div>
+        </div>
+
+        <div class="sign-grid">
+            <div class="sign-box">Dimohon oleh:<br><br><br><br>Eksekutif Instrumentasi</div>
+            <div class="sign-box">Disemak oleh:<br><br><br><br>Ketua Seksyen Selenggara</div>
+            <div class="sign-box">Disahkan oleh:<br><br><br><br>Ketua Mekanikal & Elektrikal</div>
+            <div class="sign-box">Disokong oleh:<br><br><br><br>Ketua Bahagian Operasi & Penyelenggaraan</div>
+        </div>
+        
+        <p style="font-size: 10px; font-style: italic; margin-top: 40px;">*Sebut harga dan Work Order telah disemak sepenuhnya oleh Pihak Daerah</p>
+    </div>
+</div>
+
+<script>
+    // Fungsi untuk Live Update dari Borang ke Templat
+    function sync() {
+        document.getElementById('out_wo').innerText = document.getElementById('in_wo').value;
+        document.getElementById('out_rujukan').innerText = document.getElementById('in_rujukan').value;
+        document.getElementById('out_tajuk').innerText = document.getElementById('in_tajuk').value + " (RM " + document.getElementById('in_amt').value + ")";
+        document.getElementById('out_amt').innerText = parseFloat(document.getElementById('in_amt').value).toLocaleString();
+    }
+
+    // Fungsi Muat Turun PDF
+    function downloadPDF() {
+        const element = document.getElementById('report-template');
+        const opt = {
+            margin:       0,
+            filename:     'WorkOrder_' + document.getElementById('in_wo').value + '.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(element).save();
+    }
+</script>
+
+</body>
+</html>
