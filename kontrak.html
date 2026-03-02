@@ -209,7 +209,6 @@
             </div>`).join('');
     }
 
-    // Fungsi sokongan yang lain (load dropdown, calcTotal, dll) kekal mengikut logik asal anda
     async function loadContractsToDropdowns() {
         const res = await fetch(`${SB_URL}/rest/v1/contract?select=*`, { headers });
         const data = await res.json();
@@ -251,7 +250,67 @@
         document.getElementById('b_inputs').appendChild(d);
     }
 
-    // Masukkan semula event submit asal anda di sini...
+    // --- LOGIK INTERIM (BAIKI ASSIGN ID) ---
+    async function loadInterimData() {
+        const opt = document.getElementById('i_contract_id').selectedOptions[0];
+        const container = document.getElementById('i_sec_inputs'); container.innerHTML = '';
+        if(opt && opt.dataset.b) {
+            const b = JSON.parse(opt.dataset.b);
+            Object.keys(b).sort().forEach(sec => container.innerHTML += `<label>Claim ${sec}</label><input type="number" class="i_sec_amt" data-sec="${sec}">`);
+        }
+    }
+
+    async function processExcelPaste() {
+        const raw = document.getElementById('i_paste_area').value;
+        const cId = document.getElementById('i_contract_id').value;
+        if(!cId) return alert("Pilih kontrak dahulu!");
+        const ids = raw.split(/[\n,]+/).map(i => i.trim()).filter(i => i !== "");
+        if(ids.length === 0) return;
+
+        const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=in.("${ids.join('","')}")`, { headers });
+        const data = await res.json();
+        data.forEach(w => { if(!selectedWorksForInterim.find(x => x.id === w.id)) selectedWorksForInterim.push(w); });
+        renderExcelTable();
+    }
+
+    function renderExcelTable() {
+        document.getElementById('i_work_tbody').innerHTML = selectedWorksForInterim.map((w, idx) => `<tr><td>${w.work_id}</td><td>${w.sequence_no}</td><td>${w.amount_spent}</td><td onclick="selectedWorksForInterim.splice(${idx},1);renderExcelTable()" style="color:red; cursor:pointer;">X</td></tr>`).join('');
+    }
+
+    async function submitInterim() {
+        const cId = document.getElementById('i_contract_id').value;
+        const iNo = document.getElementById('i_no').value;
+        const dateRec = document.getElementById('i_date_received').value;
+        const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
+
+        if(!cId || !iNo || !dateRec || selectedWorksForInterim.length === 0) return alert("Lengkapkan maklumat interim dan ID Kerja!");
+
+        let funding = {}; let total = 0;
+        document.querySelectorAll('.i_sec_amt').forEach(i => { const v = parseFloat(i.value) || 0; if(v>0){ funding[i.dataset.sec]={amt:v}; total+=v; }});
+
+        const res = await fetch(`${SB_URL}/rest/v1/interims`, {
+            method: 'POST', headers,
+            body: JSON.stringify({ contract_id: parseInt(cId), interim_no: parseInt(iNo), date_received: dateRec, claim_amount: total, salvage_value: salvage, net_amount: (total - salvage), claim_breakdown: funding })
+        });
+
+        if(res.ok) {
+            // LOOP UNTUK ASSIGN KEPADA SETIAP ID KERJA
+            for(let w of selectedWorksForInterim) {
+                await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${w.id}`, { 
+                    method: 'PATCH', 
+                    headers, 
+                    body: JSON.stringify({ status: 'Claimed', interim_no: iNo.toString() }) 
+                });
+            }
+            await updateContractBalance(cId, funding, 'deduct');
+            alert("Interim Berjaya Dihantar & ID Kerja Telah Diassign!"); 
+            location.reload();
+        } else {
+            alert("Gagal menghantar interim.");
+        }
+    }
+
+    // --- LOGIK PENDAFTARAN KERJA ---
     document.getElementById('workOrderForm').onsubmit = async (e) => {
         e.preventDefault();
         const cId = document.getElementById('w_contract_id').value;
@@ -279,6 +338,34 @@
         for(let s in funding) { if(b[s]) b[s].amt = (mode === 'deduct') ? (b[s].amt - funding[s].amt) : (b[s].amt + funding[s].amt); }
         await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { method: 'PATCH', headers, body: JSON.stringify({ contract_sections_breakdown: b }) });
     }
+
+    document.getElementById('unitForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('new_unit_name').value;
+        await fetch(`${SB_URL}/rest/v1/units`, { method: 'POST', headers, body: JSON.stringify({ unit_name: name }) });
+        alert("Unit Ditambah!"); fetchUnits();
+    };
+
+    document.getElementById('contractForm').onsubmit = async (e) => {
+        e.preventDefault();
+        let b = {}; 
+        document.querySelectorAll('.sec-input-wrapper').forEach(w => { 
+            const n = w.querySelector('.b_n').value; 
+            const v = parseFloat(w.querySelector('.b_v').value); 
+            if(n) b[n] = { amt: v }; 
+        });
+        const data = { 
+            unit_id: parseInt(document.getElementById('c_unit_id').value), 
+            contract_code: document.getElementById('c_code').value, 
+            contract_name: document.getElementById('c_name').value, 
+            contract_vendor: document.getElementById('c_vendor').value, 
+            district: document.getElementById('c_dist').value, 
+            area_code: document.getElementById('c_area').value, 
+            contract_sections_breakdown: b 
+        };
+        const res = await fetch(`${SB_URL}/rest/v1/contract`, { method: 'POST', headers, body: JSON.stringify(data) });
+        if(res.ok) { alert("Kontrak Didaftar!"); location.reload(); }
+    };
 </script>
 </body>
 </html>
