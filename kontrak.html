@@ -39,9 +39,7 @@
 <div class="app-container">
     <div id="homePage" class="page active">
         <h1 style="text-align:center; padding: 20px 0 10px 0; margin:0;">M&E-Connect</h1>
-        
         <div id="dashContainer"></div>
-
         <div class="glass-card" onclick="showPage('kontrakPage')"><strong>📂 Direktori Kontrak</strong></div>
         <div class="glass-card" onclick="showPage('registerWorkPage')"><strong>📝 Pendaftaran Kerja (ID)</strong></div>
         <div class="glass-card" onclick="showPage('adminPage')"><strong>➕ Pengurusan Kontrak</strong></div>
@@ -157,13 +155,13 @@
 
     window.onload = updateDashboard;
 
-    // FUNGSI DASHBOARD BARU (BAL VS ID VS INTERIM)
+    // FUNGSI DASHBOARD (LOGIK RELATION: ID PENDING VS CLAIMED)
     async function updateDashboard() {
         const container = document.getElementById('dashContainer');
         try {
             const [resC, resW, resI] = await Promise.all([
                 fetch(`${SB_URL}/rest/v1/contract?select=id,contract_code,contract_sections_breakdown`, { headers }),
-                fetch(`${SB_URL}/rest/v1/work_orders?select=contract_id,amount_spent,status`, { headers }),
+                fetch(`${SB_URL}/rest/v1/work_orders?select=contract_id,amount_spent,status,interim_no`, { headers }),
                 fetch(`${SB_URL}/rest/v1/interims?select=contract_id,claim_amount`, { headers })
             ]);
             const contracts = await resC.json();
@@ -173,7 +171,11 @@
             container.innerHTML = contracts.map(c => {
                 let currentBal = 0;
                 if(c.contract_sections_breakdown) Object.values(c.contract_sections_breakdown).forEach(v => currentBal += v.amt);
-                const totalID = works.filter(w => w.contract_id === c.id).reduce((s, w) => s + w.amount_spent, 0);
+                
+                // Potongan ID: Hanya kira ID yang statusnya 'Pending' (Belum ada relation ke Interim)
+                const totalID = works.filter(w => w.contract_id === c.id && w.status !== 'Claimed').reduce((s, w) => s + w.amount_spent, 0);
+                
+                // Potongan Interim: Kira jumlah dari table interims (Relation sah)
                 const totalInt = interims.filter(i => i.contract_id === c.id).reduce((s, i) => s + i.claim_amount, 0);
 
                 return `
@@ -189,7 +191,6 @@
         } catch(e) { console.error("Dash Error", e); }
     }
 
-    // FUNGSI NAVIGASI ASAL (SHOWPAGE)
     function showPage(id) {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.getElementById(id).classList.add('active');
@@ -234,6 +235,7 @@
                 <div style="display:flex; justify-content:space-between; align-items:start;">
                     <div>
                         <span class="status-tag" style="background:${w.status === 'Claimed' ? 'var(--ios-green)' : 'var(--ios-blue)'}">${w.status || 'Pending'}</span>
+                        ${w.interim_no ? `<small style="margin-left:5px; color:#888;">#Int-${w.interim_no}</small>` : ''}
                         <div style="font-weight:bold; font-size:15px; margin-top:5px;">${w.work_id}</div>
                         <div style="font-size:11px; color:#666;">${w.sequence_no}</div>
                     </div>
@@ -315,19 +317,53 @@
         document.getElementById('i_work_tbody').innerHTML = selectedWorksForInterim.map((w, idx) => `<tr><td>${w.work_id}</td><td>${w.sequence_no}</td><td>${w.amount_spent}</td><td onclick="selectedWorksForInterim.splice(${idx},1);renderExcelTable()" style="color:red; cursor:pointer;">X</td></tr>`).join('');
     }
 
+    // FUNGSI SUBMIT INTERIM (IMPLEMENTASI RELATION)
     async function submitInterim() {
         const cId = document.getElementById('i_contract_id').value;
         const iNo = document.getElementById('i_no').value;
         const dateRec = document.getElementById('i_date_received').value;
         const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
+        
         if(!cId || !iNo || !dateRec || selectedWorksForInterim.length === 0) return alert("Lengkapkan maklumat!");
+        
         let funding = {}; let total = 0;
-        document.querySelectorAll('.i_sec_amt').forEach(i => { const v = parseFloat(i.value) || 0; if(v>0){ funding[i.dataset.sec]={amt:v}; total+=v; }});
-        const res = await fetch(`${SB_URL}/rest/v1/interims`, { method: 'POST', headers, body: JSON.stringify({ contract_id: parseInt(cId), interim_no: parseInt(iNo), date_received: dateRec, claim_amount: total, salvage_value: salvage, net_amount: (total - salvage), claim_breakdown: funding }) });
+        document.querySelectorAll('.i_sec_amt').forEach(i => { 
+            const v = parseFloat(i.value) || 0; 
+            if(v>0){ funding[i.dataset.sec]={amt:v}; total+=v; }
+        });
+
+        // 1. Simpan ke table interims (Induk)
+        const res = await fetch(`${SB_URL}/rest/v1/interims`, { 
+            method: 'POST', 
+            headers, 
+            body: JSON.stringify({ 
+                contract_id: parseInt(cId), 
+                interim_no: parseInt(iNo), 
+                date_received: dateRec, 
+                claim_amount: total, 
+                salvage_value: salvage, 
+                net_amount: (total - salvage), 
+                claim_breakdown: funding 
+            }) 
+        });
+
         if(res.ok) {
-            for(let w of selectedWorksForInterim) { await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${w.id}`, { method: 'PATCH', headers, body: JSON.stringify({ status: 'Claimed', interim_no: iNo.toString() }) }); }
+            // 2. Hubungkan (Relation) setiap ID Kerja ke interim_no ini
+            for(let w of selectedWorksForInterim) { 
+                await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${w.id}`, { 
+                    method: 'PATCH', 
+                    headers, 
+                    body: JSON.stringify({ 
+                        status: 'Claimed', 
+                        interim_no: iNo.toString() // Ini adalah Foreign Key
+                    }) 
+                }); 
+            }
+            // 3. Selaraskan baki kontrak (Tambah baki asal, tolak baki interim baru)
             await updateContractBalance(cId, funding, 'deduct');
-            alert("Interim Berjaya!"); location.reload();
+            alert("Interim Berjaya Didaftarkan!"); location.reload();
+        } else {
+            alert("Gagal menyimpan Interim.");
         }
     }
 
@@ -346,7 +382,7 @@
         document.querySelectorAll('.w_sec_amt').forEach(i => { const v = parseFloat(i.value) || 0; if(v > 0) { sc[i.dataset.sec] = { "amt": v }; ts += v; } });
         const wd = { contract_id: parseInt(cId), work_id: document.getElementById('w_id').value, sequence_no: sn, location: document.getElementById('w_location').value, qpb_date: document.getElementById('w_qpb_date').value, district: dist, description: document.getElementById('w_desc').value, amount_spent: ts, status: 'Pending', section_category: sc };
         const resW = await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(wd) });
-        if(resW.ok) { await updateContractBalance(cId, sc, 'deduct'); alert("Berjaya!"); location.reload(); }
+        if(resW.ok) { await updateContractBalance(cId, sc, 'deduct'); alert("ID Kerja Berjaya!"); location.reload(); }
     };
 
     async function updateContractBalance(cId, funding, mode) {
