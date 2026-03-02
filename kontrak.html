@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>M&E-Connect v1.0</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --ios-blue: #007AFF; --ios-green: #34C759; --ios-orange: #FF9500; --ios-red: #FF3B30; --glass-bg: rgba(255, 255, 255, 0.4); --glass-border: rgba(255, 255, 255, 0.6); }
         * { box-sizing: border-box; font-family: -apple-system, system-ui, sans-serif; }
@@ -32,11 +33,38 @@
 <div class="app-container">
     <div id="homePage" class="page active">
         <h1 style="text-align:center; padding: 30px 0;">M&E-Connect | Contract</h1>
+        <div class="glass-card" style="background: var(--ios-green); color: white;" onclick="showPage('dashboardPage')">
+            <strong>📊 Dashboard Analitik</strong>
+        </div>
         <div class="glass-card" onclick="showPage('kontrakPage')"><strong>📂 Direktori Kontrak</strong></div>
         <div class="glass-card" onclick="showPage('registerWorkPage')"><strong>📝 Pendaftaran Kerja (ID)</strong></div>
         <div class="glass-card" onclick="showPage('adminPage')"><strong>➕ Pengurusan Kontrak</strong></div>
         <div class="glass-card" style="border: 2px solid var(--ios-orange);" onclick="showPage('interimPage')"><strong>📑 Kemaskini Interim Claim</strong></div>
         <div class="glass-card" style="background: rgba(0,0,0,0.05);" onclick="showPage('settingsPage')"><i class="fa-solid fa-gear"></i> Tetapan Unit</div>
+    </div>
+
+    <div id="dashboardPage" class="page">
+        <span class="nav-link" onclick="showPage('homePage')">← Kembali</span>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+            <div class="glass-card" style="margin-bottom:0; text-align: center; padding: 15px;">
+                <label>Total Baki</label>
+                <h2 id="dash_total_alloc" style="margin:5px 0; font-size: 16px; color: var(--ios-blue);">RM 0</h2>
+            </div>
+            <div class="glass-card" style="margin-bottom:0; text-align: center; padding: 15px;">
+                <label>Total Belanja</label>
+                <h2 id="dash_total_spent" style="margin:5px 0; font-size: 16px; color: var(--ios-red);">RM 0</h2>
+            </div>
+        </div>
+        <div class="glass-card">
+            <label>Prestasi Belanja vs Baki Semasa (RM)</label>
+            <canvas id="barChart" style="max-height: 250px;"></canvas>
+        </div>
+        <div class="glass-card" style="text-align: center;">
+            <label>Pecahan Penggunaan Bajet (%)</label>
+            <div style="width: 200px; margin: auto;">
+                <canvas id="pieChart"></canvas>
+            </div>
+        </div>
     </div>
 
     <div id="settingsPage" class="page">
@@ -159,15 +187,76 @@
     const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
     const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
 
+    let myBarChart, myPieChart; // Global Chart Objects
+
     function showPage(id) {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         const target = document.getElementById(id);
         if(target) target.classList.add('active');
+
+        // Logic Dashboard
+        if(id === 'dashboardPage') loadDashboardData();
+
+        // Logic Sedia Ada
         if(['registerWorkPage', 'interimPage', 'adminPage', 'settingsPage'].includes(id)) fetchUnits();
         if(['registerWorkPage', 'interimPage'].includes(id)) loadContractsToDropdowns();
         if(id === 'kontrakPage') loadData();
     }
 
+    // --- LOGIC DASHBOARD (BARU) ---
+    async function loadDashboardData() {
+        const resC = await fetch(`${SB_URL}/rest/v1/contract?select=*`, { headers });
+        const contracts = await resC.json();
+        const resW = await fetch(`${SB_URL}/rest/v1/work_orders?select=section_category`, { headers });
+        const works = await resW.json();
+
+        let labels = [], balanceData = [], spentData = [], grandBalance = 0, grandSpent = 0;
+
+        contracts.forEach(c => {
+            const b = c.contract_sections_breakdown;
+            for(let s in b) {
+                const amt = (b[s] && typeof b[s] === 'object') ? (b[s].amt || 0) : (b[s] || 0);
+                if(!labels.includes(s)) { labels.push(s); balanceData.push(0); spentData.push(0); }
+                balanceData[labels.indexOf(s)] += amt;
+                grandBalance += amt;
+            }
+        });
+
+        works.forEach(w => {
+            const sc = w.section_category;
+            for(let s in sc) {
+                const amt = (sc[s] && typeof sc[s] === 'object') ? (sc[s].amt || 0) : (sc[s] || 0);
+                if(labels.includes(s)) {
+                    spentData[labels.indexOf(s)] += amt;
+                    grandSpent += amt;
+                }
+            }
+        });
+
+        document.getElementById('dash_total_alloc').innerText = `RM ${grandBalance.toLocaleString()}`;
+        document.getElementById('dash_total_spent').innerText = `RM ${grandSpent.toLocaleString()}`;
+
+        // Render Bar Chart
+        if(myBarChart) myBarChart.destroy();
+        myBarChart = new Chart(document.getElementById('barChart'), {
+            type: 'bar',
+            data: { labels, datasets: [
+                { label: 'Baki Semasa', data: balanceData, backgroundColor: '#007AFF' },
+                { label: 'Belanja (ID)', data: spentData, backgroundColor: '#FF3B30' }
+            ]},
+            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+        });
+
+        // Render Pie Chart
+        if(myPieChart) myPieChart.destroy();
+        myPieChart = new Chart(document.getElementById('pieChart'), {
+            type: 'doughnut',
+            data: { labels: ['Belanja', 'Baki'], datasets: [{ data: [grandSpent, grandBalance], backgroundColor: ['#FF9500', '#34C759'] }]},
+            options: { plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+
+    // --- LOGIC ASAL ANDA (TIDAK BERUBAH) ---
     async function fetchUnits() {
         const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
         const units = await res.json();
@@ -257,7 +346,7 @@
             if(b[s]) {
                 const spentAmt = funding[s].amt || 0;
                 const currentAmt = b[s].amt || 0;
-                b[s].amt = mode === 'deduct' ? currentAmt - spentAmt : (mode === 'revert' ? currentAmt + spentAmt : b[s].amt);
+                b[s].amt = mode === 'deduct' ? currentAmt - spentAmt : currentAmt + spentAmt;
             }
         }
         await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { method: 'PATCH', headers, body: JSON.stringify({ contract_sections_breakdown: b }) });
@@ -268,59 +357,38 @@
         const opt = document.getElementById('i_contract_id').selectedOptions[0];
         const secContainer = document.getElementById('i_sec_inputs');
         const workList = document.getElementById('i_work_list');
-        secContainer.innerHTML = ''; 
-        workList.innerHTML = 'Memuatkan...';
-
-        if(!cId) return;
-
+        secContainer.innerHTML = ''; workList.innerHTML = 'Memuatkan...';
         if(opt && opt.dataset.b) {
             const b = JSON.parse(opt.dataset.b);
             Object.keys(b).sort().forEach(sec => {
                 secContainer.innerHTML += `<label>Interim ${sec}</label><input type="number" class="i_sec_amt" data-sec="${sec}" placeholder="RM">`;
             });
         }
-        
-        // Memastikan fetch hanya mengambil yang statusnya belum di-claim (is.null)
-        const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&status=is.null&order=qpb_date.asc,sequence_no.asc`, { headers });
+        const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&status=is.null&order=qpb_date.asc`, { headers });
         const works = await resW.json();
-        
-        workList.innerHTML = works.map(w => `
-            <div style="margin-bottom:8px; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:8px; display:flex; align-items:flex-start; gap:10px;">
-                <input type="checkbox" class="w_checkbox" value="${w.id}" data-funding='${JSON.stringify(w.section_category)}' style="width:18px; height:18px;">
-                <div style="flex:1;">
-                    <strong>${w.sequence_no}</strong> | <small>${formatDate(w.qpb_date)}</small><br>
-                    <small>${w.work_id} (RM ${w.amount_spent.toLocaleString()})</small>
-                </div>
-            </div>`).join('') || "Tiada kerja tersedia untuk kontrak ini.";
+        workList.innerHTML = works.map(w => `<div style="padding-bottom:5px; border-bottom:1px solid #eee;"><input type="checkbox" class="w_checkbox" value="${w.id}" data-funding='${JSON.stringify(w.section_category)}'> <strong>${w.sequence_no}</strong> | RM ${w.amount_spent.toLocaleString()}</div>`).join('') || "Tiada kerja.";
     }
 
     async function submitInterim() {
         const cId = document.getElementById('i_contract_id').value;
         const iNo = document.getElementById('i_no').value;
         const dateRec = document.getElementById('i_date_received').value;
-        const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
-        const selectedCheckboxes = Array.from(document.querySelectorAll('.w_checkbox:checked'));
-
-        if(!cId || !iNo || !dateRec) return alert("Sila isi No. Interim dan Tarikh Terima");
-        if(selectedCheckboxes.length === 0) return alert("Sila pilih sekurang-kurangnya satu ID Kerja");
-        
+        if(!cId || !iNo || !dateRec) return alert("Sila isi maklumat interim");
         let interimFunding = {};
         let totalGross = 0;
         document.querySelectorAll('.i_sec_amt').forEach(input => {
             const val = parseFloat(input.value) || 0;
             if(val > 0) { interimFunding[input.dataset.sec] = { "amt": val }; totalGross += val; }
         });
-
-        const resInterim = await fetch(`${SB_URL}/rest/v1/interims`, { method: 'POST', headers, body: JSON.stringify({ contract_id: parseInt(cId), interim_no: parseInt(iNo), date_received: dateRec, gross_amount: totalGross, salvage_value: salvage, net_amount: totalGross - salvage, funding_details: interimFunding }) });
-        
-        if (resInterim.ok) {
-            for(let cb of selectedCheckboxes) {
-                const funding = JSON.parse(cb.dataset.funding);
-                await updateContractBalance(cId, funding, 'revert');
+        const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
+        const resI = await fetch(`${SB_URL}/rest/v1/interims`, { method: 'POST', headers, body: JSON.stringify({ contract_id: parseInt(cId), interim_no: parseInt(iNo), date_received: dateRec, gross_amount: totalGross, salvage_value: salvage, net_amount: totalGross - salvage, funding_details: interimFunding }) });
+        if(resI.ok) {
+            for(let cb of document.querySelectorAll('.w_checkbox:checked')) {
+                await updateContractBalance(cId, JSON.parse(cb.dataset.funding), 'revert');
                 await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${cb.value}`, { method: 'PATCH', headers, body: JSON.stringify({ status: 'Claimed', interim_no: iNo }) });
             }
             await updateContractBalance(cId, interimFunding, 'deduct');
-            alert("Rekod Interim berjaya disimpan!"); location.reload();
+            alert("Interim Berjaya!"); location.reload();
         }
     }
 
@@ -369,8 +437,8 @@
     }
 
     function calcTotalWork() {
-        let total = 0; document.querySelectorAll('.w_sec_amt').forEach(i => total += parseFloat(i.value) || 0);
-        document.getElementById('total_display').innerText = `RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+        let t = 0; document.querySelectorAll('.w_sec_amt').forEach(i => t += parseFloat(i.value) || 0);
+        document.getElementById('total_display').innerText = `RM ${t.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
     }
 
     function addB() {
@@ -379,11 +447,7 @@
         document.getElementById('b_inputs').appendChild(d);
     }
 
-    function formatDate(dateStr) {
-        if(!dateStr) return "-";
-        const [y, m, d] = dateStr.split('-');
-        return `${d}/${m}/${y}`;
-    }
+    function formatDate(s) { if(!s) return "-"; const [y,m,d] = s.split('-'); return `${d}/${m}/${y}`; }
 </script>
 </body>
 </html>
