@@ -25,13 +25,32 @@
         .excel-table th { background: #f1f1f1; padding: 8px; text-align: left; }
         .excel-table td { padding: 8px; border-bottom: 1px solid #eee; }
         .funding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(255,255,255,0.2); padding: 10px; border-radius: 12px; }
+        
+        /* Dashboard Styles */
+        .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .dash-item { background: white; padding: 15px; border-radius: 15px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .dash-val { font-size: 18px; font-weight: 800; color: var(--ios-blue); display: block; }
+        .dash-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
     </style>
 </head>
 <body>
 
 <div class="app-container">
     <div id="homePage" class="page active">
-        <h1 style="text-align:center; padding: 30px 0;">M&E-Connect | Contract</h1>
+        <h1 style="text-align:center; padding: 20px 0 10px 0; margin:0;">M&E-Connect</h1>
+        <p style="text-align:center; font-size:12px; color:#666; margin-bottom:20px;">Sistem Pengurusan Kontrak & Interim</p>
+
+        <div class="dash-grid">
+            <div class="dash-item">
+                <span id="dash-total-c" class="dash-val">-</span>
+                <span class="dash-label">Kontrak Aktif</span>
+            </div>
+            <div id="dash-pending-card" class="dash-item">
+                <span id="dash-pending-w" class="dash-val">-</span>
+                <span class="dash-label">ID Belum Claim</span>
+            </div>
+        </div>
+
         <div class="glass-card" onclick="showPage('kontrakPage')"><strong>📂 Direktori Kontrak</strong></div>
         <div class="glass-card" onclick="showPage('registerWorkPage')"><strong>📝 Pendaftaran Kerja (ID)</strong></div>
         <div class="glass-card" onclick="showPage('adminPage')"><strong>➕ Pengurusan Kontrak</strong></div>
@@ -145,12 +164,35 @@
 
     let selectedWorksForInterim = [];
 
+    // Auto-run Dashboard bila buka app
+    window.onload = updateDashboard;
+
+    async function updateDashboard() {
+        try {
+            const [resC, resW] = await Promise.all([
+                fetch(`${SB_URL}/rest/v1/contract?select=id`, { headers }),
+                fetch(`${SB_URL}/rest/v1/work_orders?status=neq.Claimed&select=id`, { headers })
+            ]);
+            const contracts = await resC.json();
+            const pendingWorks = await resW.json();
+            
+            document.getElementById('dash-total-c').innerText = contracts.length || 0;
+            document.getElementById('dash-pending-w').innerText = pendingWorks.length || 0;
+            
+            // Tukar warna card ID Belum Claim jika ada banyak
+            if(pendingWorks.length > 0) {
+                document.getElementById('dash-pending-card').style.borderLeft = "4px solid var(--ios-red)";
+            }
+        } catch(e) { console.error("Dash error", e); }
+    }
+
     function showPage(id) {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.getElementById(id).classList.add('active');
         if(['registerWorkPage', 'interimPage', 'adminPage', 'settingsPage'].includes(id)) fetchUnits();
         if(['registerWorkPage', 'interimPage'].includes(id)) loadContractsToDropdowns();
         if(id === 'kontrakPage') loadData();
+        if(id === 'homePage') updateDashboard();
     }
 
     async function fetchUnits() {
@@ -180,10 +222,10 @@
         document.getElementById('detailsHeader').innerHTML = `<strong>${code}</strong><div style="font-size:12px; margin-top:5px; opacity:0.9;">${name}</div>`;
         const container = document.getElementById('workListContainer');
         container.innerHTML = '<p style="text-align:center;">Memuatkan ID Kerja...</p>';
-        
+
         const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}&order=sequence_no.asc`, { headers });
         const works = await res.json();
-        
+
         if(works.length === 0) {
             container.innerHTML = '<div class="glass-card" style="text-align:center;">Tiada rekod ID Kerja.</div>';
             return;
@@ -250,7 +292,6 @@
         document.getElementById('b_inputs').appendChild(d);
     }
 
-    // --- LOGIK INTERIM (BAIKI ASSIGN ID) ---
     async function loadInterimData() {
         const opt = document.getElementById('i_contract_id').selectedOptions[0];
         const container = document.getElementById('i_sec_inputs'); container.innerHTML = '';
@@ -294,7 +335,6 @@
         });
 
         if(res.ok) {
-            // LOOP UNTUK ASSIGN KEPADA SETIAP ID KERJA
             for(let w of selectedWorksForInterim) {
                 await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${w.id}`, { 
                     method: 'PATCH', 
@@ -310,7 +350,6 @@
         }
     }
 
-    // --- LOGIK PENDAFTARAN KERJA ---
     document.getElementById('workOrderForm').onsubmit = async (e) => {
         e.preventDefault();
         const cId = document.getElementById('w_contract_id').value;
@@ -324,11 +363,11 @@
         const sn = ac + next.toString().padStart(3, '0');
         let sc = {}; let ts = 0;
         document.querySelectorAll('.w_sec_amt').forEach(i => { const v = parseFloat(i.value) || 0; if(v > 0) { sc[i.dataset.sec] = { "amt": v }; ts += v; } });
-        const wd = { contract_id: parseInt(cId), work_id: document.getElementById('w_id').value, sequence_no: sn, location: document.getElementById('w_location').value, qpb_date: document.getElementById('w_qpb_date').value, district: dist, description: document.getElementById('w_desc').value, amount_spent: ts, section_category: sc };
+        const wd = { contract_id: parseInt(cId), work_id: document.getElementById('w_id').value, sequence_no: sn, location: document.getElementById('w_location').value, qpb_date: document.getElementById('w_qpb_date').value, district: dist, description: document.getElementById('w_desc').value, amount_spent: ts, status: 'Pending', section_category: sc };
         const resW = await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(wd) });
         if(resW.ok) { await updateContractBalance(cId, sc, 'deduct'); alert("Berjaya Daftar!"); location.reload(); }
     };
-    
+
     async function updateContractBalance(cId, funding, mode) {
         const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { headers });
         const contracts = await res.json();
