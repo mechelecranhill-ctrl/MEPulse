@@ -257,26 +257,56 @@
     }
 
     async function processExcelPaste() {
-        const raw = document.getElementById('i_paste_area').value;
-        const cId = document.getElementById('i_contract_id').value;
-        if(!cId) return alert("Pilih Kontrak dahulu!");
-        
-        const ids = raw.split(/[\n,]+/).map(i => i.trim()).filter(i => i !== "");
-        if(ids.length === 0) return;
+    const raw = document.getElementById('i_paste_area').value;
+    const cId = document.getElementById('i_contract_id').value;
+    
+    if(!cId) return alert("Pilih Kontrak dahulu!");
+    
+    // Membersihkan data: Buang ruang kosong, buang baris kosong
+    const ids = raw.split(/[\n,]+/)
+                   .map(i => i.trim())
+                   .filter(i => i !== "");
 
-        const idString = ids.join(',');
-        const url = `${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=in.(${idString})`;
-        
+    if(ids.length === 0) return;
+
+    // Supabase perlukan format: in.(ID1,ID2,ID3) tanpa ruang kosong selepas koma
+    const idString = ids.join(',');
+    
+    // Gunakan URLSearchParams atau pastikan URL bersih
+    const query = contract_id=eq.${cId}&work_id=in.(${idString});
+    const url = ${SB_URL}/rest/v1/work_orders?${query};
+    
+    try {
         const res = await fetch(url, { headers });
+        
+        if (!res.ok) {
+            // Jika ralat 400, kita akan nampak puncanya di sini
+            const errorDetail = await res.json();
+            console.error("Ralat Supabase (400):", errorDetail);
+            alert("Ralat 400: " + (errorDetail.message || "Permintaan tidak sah. Semak Console."));
+            return;
+        }
+
         const data = await res.json();
 
+        if (data.length === 0) {
+            alert("Tiada data dijumpai untuk ID tersebut dalam kontrak ini.");
+        }
+
         data.forEach(w => {
-            if(!selectedWorksForInterim.find(x => x.id === w.id)) selectedWorksForInterim.push(w);
+            if(!selectedWorksForInterim.find(x => x.id === w.id)) {
+                selectedWorksForInterim.push(w);
+            }
         });
+        
         renderExcelTable();
         document.getElementById('i_paste_area').value = '';
-    }
 
+    } catch (e) {
+        console.error("Network Error:", e);
+        alert("Gagal menyambung ke pelayan.");
+    }
+}
     function renderExcelTable() {
         const tbody = document.getElementById('i_work_tbody');
         if(selectedWorksForInterim.length === 0) {
