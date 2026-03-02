@@ -157,11 +157,6 @@
         <div id="listContainer"></div>
     </div>
 
-    <div id="detailsPage" class="page">
-        <span class="nav-link" onclick="showPage('kontrakPage')">← Kembali</span>
-        <div id="detailsHeader" class="glass-card" style="background: var(--ios-blue); color: white;"></div>
-        <div id="workListContainer"></div>
-    </div>
 </div>
 
 <script>
@@ -171,6 +166,7 @@
 
     let selectedWorksForInterim = [];
 
+    // Fungsi Navigasi & Load Data Asas kekal sama
     function showPage(id) {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         const target = document.getElementById(id);
@@ -248,19 +244,12 @@
         const raw = document.getElementById('i_paste_area').value;
         const cId = document.getElementById('i_contract_id').value;
         if(!cId) return alert("Pilih Kontrak dahulu!");
-
         const ids = raw.split(/[\n,]+/).map(i => i.trim()).filter(i => i !== "");
         if(ids.length === 0) return;
-
         const idString = ids.join(',');
-        const url = `${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=in.(${idString})`;
-
-        const res = await fetch(url, { headers });
+        const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=in.(${idString})`, { headers });
         const data = await res.json();
-
-        data.forEach(w => {
-            if(!selectedWorksForInterim.find(x => x.id === w.id)) selectedWorksForInterim.push(w);
-        });
+        data.forEach(w => { if(!selectedWorksForInterim.find(x => x.id === w.id)) selectedWorksForInterim.push(w); });
         renderExcelTable();
         document.getElementById('i_paste_area').value = '';
     }
@@ -268,25 +257,16 @@
     function renderExcelTable() {
         const tbody = document.getElementById('i_work_tbody');
         if(selectedWorksForInterim.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#999;">Tiada data.</td></tr>';
-            return;
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#999;">Tiada data.</td></tr>'; return;
         }
-        tbody.innerHTML = selectedWorksForInterim.map((w, idx) => `
-            <tr>
-                <td>${w.work_id}</td>
-                <td>${w.sequence_no}</td>
-                <td style="text-align:right;">${(w.amount_spent || 0).toLocaleString()}</td>
-                <td style="text-align:center;"><i class="fa-solid fa-trash" style="color:var(--ios-red); cursor:pointer;" onclick="removeWork(${idx})"></i></td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = selectedWorksForInterim.map((w, idx) => `<tr><td>${w.work_id}</td><td>${w.sequence_no}</td><td style="text-align:right;">${(w.amount_spent || 0).toLocaleString()}</td><td style="text-align:center;"><i class="fa-solid fa-trash" style="color:var(--ios-red); cursor:pointer;" onclick="removeWork(${idx})"></i></td></tr>`).join('');
     }
 
-    function removeWork(idx) {
-        selectedWorksForInterim.splice(idx, 1);
-        renderExcelTable();
-    }
+    function removeWork(idx) { selectedWorksForInterim.splice(idx, 1); renderExcelTable(); }
 
-    // FUNGSI SUBMIT INTERIM (UPDATED WITH CORRECT COLUMN NAMES)
+    // ==========================================
+    // FUNGSI SUBMIT INTERIM (VERSI KEMASKINI KOLUM)
+    // ==========================================
     async function submitInterim() {
         const cId = document.getElementById('i_contract_id').value;
         const iNo = document.getElementById('i_no').value;
@@ -310,7 +290,7 @@
         if(totalGross === 0) return alert("Sila masukkan amaun claim untuk sekurang-kurangnya satu section.");
 
         try {
-            // 1. Simpan Rekod Interim mengikut nama kolum pangkalan data
+            // 1. Simpan Rekod Interim mengikut kolum claim_amount, salvage_value, net_amount, dan claim_breakdown
             const res = await fetch(`${SB_URL}/rest/v1/interims`, { 
                 method: 'POST', 
                 headers, 
@@ -320,7 +300,7 @@
                     date_received: dateRec, 
                     claim_amount: totalGross, 
                     salvage_value: salvage, 
-                    net_amount: totalGross - salvage, 
+                    net_amount: (totalGross - salvage), 
                     claim_breakdown: interimFunding 
                 }) 
             });
@@ -332,11 +312,9 @@
 
             // 2. Kemaskini ID Kerja Terlibat
             for(let w of selectedWorksForInterim) {
-                // Revert baki lama yang ditolak masa pendaftaran ID kerja
                 if (w.section_category) {
                     await updateContractBalance(cId, w.section_category, 'revert');
                 }
-                // Kemaskini status ID kerja
                 await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${w.id}`, { 
                     method: 'PATCH', 
                     headers, 
@@ -346,7 +324,7 @@
 
             // 3. Tolak baki kontrak ikut amaun interim sebenar
             await updateContractBalance(cId, interimFunding, 'deduct');
-            
+
             alert("Interim Berjaya & Baki Telah Diselaraskan!"); 
             location.reload();
         } catch (err) {
@@ -355,15 +333,12 @@
         }
     }
 
-    // FUNGSI UPDATE BAKI
     async function updateContractBalance(cId, funding, mode) {
         const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { headers });
         const contracts = await res.json();
         if(!contracts.length) return;
-        
         const c = contracts[0];
         let b = c.contract_sections_breakdown || {};
-        
         for(let s in funding) {
             if(b[s]) {
                 const amt = parseFloat(funding[s].amt) || 0;
@@ -371,12 +346,7 @@
                 b[s].amt = (mode === 'deduct') ? (current - amt) : (current + amt);
             }
         }
-        
-        await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { 
-            method: 'PATCH', 
-            headers, 
-            body: JSON.stringify({ contract_sections_breakdown: b }) 
-        });
+        await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { method: 'PATCH', headers, body: JSON.stringify({ contract_sections_breakdown: b }) });
     }
 
     function calcTotalWork() {
@@ -390,7 +360,7 @@
         document.getElementById('b_inputs').appendChild(d);
     }
 
-    // Form Submissions
+    // Form Submissions kekal sama
     document.getElementById('unitForm').onsubmit = async (e) => {
         e.preventDefault();
         const name = document.getElementById('new_unit_name').value;
@@ -429,15 +399,12 @@
         const dist = document.getElementById('w_dist').value;
         let ac = "W";
         (opt.dataset.area || "").split(',').forEach(m => { const [d, k] = m.split(':'); if(d?.trim() === dist) ac = k.trim(); });
-
         const resC = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&sequence_no=ilike.${ac}%&select=sequence_no&order=sequence_no.desc&limit=1`, { headers });
         const last = await resC.json();
         let next = 1; if(last.length > 0) next = (parseInt(last[0].sequence_no.replace(ac, '')) || 0) + 1;
         const sn = ac + next.toString().padStart(3, '0');
-
         let sc = {}; let ts = 0;
         document.querySelectorAll('.w_sec_amt').forEach(i => { const v = parseFloat(i.value) || 0; if(v > 0) { sc[i.dataset.sec] = { "amt": v }; ts += v; } });
-
         const wd = { contract_id: parseInt(cId), work_id: document.getElementById('w_id').value, sequence_no: sn, location: document.getElementById('w_location').value, qpb_date: document.getElementById('w_qpb_date').value, district: dist, description: document.getElementById('w_desc').value, amount_spent: ts, section_category: sc };
         const resW = await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(wd) });
         if(resW.ok) { await updateContractBalance(cId, sc, 'deduct'); alert("Daftar!"); location.reload(); }
