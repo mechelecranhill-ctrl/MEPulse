@@ -47,8 +47,7 @@
 
     <header class="main-header">
         <h2>M&E-Connect <span style="font-weight: 300; font-size: 0.6em;">Dashboard Induk</span></h2>
-        <div class="unit-selector" id="unitNav">
-            </div>
+        <div class="unit-selector" id="unitNav"></div>
     </header>
 
     <div class="container">
@@ -119,7 +118,7 @@
                 <h3>${c.contract_code}</h3>
                 <p style="font-size: 13px; color: #555;">${c.contract_name}</p>
                 <div style="font-size: 11px; color: #888; margin-top:10px;">
-                    <i class="fa fa-calendar"></i> ${c.start_date || 'N/A'} - ${c.end_date || 'N/A'}
+                    <i class="fa fa-calendar"></i> ${c.contract_start || 'N/A'} - ${c.contract_end || 'N/A'}
                 </div>
             </div>
         `).join('');
@@ -131,15 +130,15 @@
         document.getElementById('analysis-panel').style.display = 'block';
         document.getElementById('selected-contract-name').innerText = activeContract.contract_code;
         
-        // Kira tempoh kontrak dalam bulan
-        const start = new Date(activeContract.start_date);
-        const end = new Date(activeContract.end_date);
+        // Kira tempoh menggunakan contract_start dan contract_end
+        const start = new Date(activeContract.contract_start);
+        const end = new Date(activeContract.contract_end);
+        
         const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
         const period = months <= 0 ? 1 : months;
         
         document.getElementById('contract-period').innerText = `Tempoh Kontrak: ${period} Bulan`;
         
-        // Bina filter checkbox untuk section
         const sections = activeContract.contract_sections_breakdown || {};
         const filterWrap = document.getElementById('sectionFilters');
         filterWrap.innerHTML = Object.keys(sections).sort().map(s => `
@@ -175,18 +174,16 @@
         });
     }
 
-function openSubModule() {
-    document.getElementById('subModuleModal').style.display = 'block';
-    // Hanya panggil nama fail sahaja
-    document.getElementById('subModuleFrame').src = 'kontrak.html';
-}
+    function openSubModule() {
+        document.getElementById('subModuleModal').style.display = 'block';
+        document.getElementById('subModuleFrame').src = 'kontrak.html';
+    }
 
-function closeSubModule() {
-    document.getElementById('subModuleModal').style.display = 'none';
-    document.getElementById('subModuleFrame').src = 'about:blank';
-    // Refresh unit selepas tutup untuk update data terbaru
-    fetchUnits(); 
-}
+    function closeSubModule() {
+        document.getElementById('subModuleModal').style.display = 'none';
+        document.getElementById('subModuleFrame').src = 'about:blank';
+        fetchUnits(); 
+    }
 </script>
 </body>
 </html>
