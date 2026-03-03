@@ -95,7 +95,7 @@
         }
 
         .prog-bar-bg { width: 100%; height: 8px; background: #eee; border-radius: 4px; margin-top: 5px; overflow: hidden; }
-        .prog-bar-fill { height: 100%; border-radius: 4px; transition: 1s cubic-bezier(0.4, 0, 0.2, 1); width: 0; }
+        .prog-bar-fill { height: 100%; border-radius: 4px; transition: 1s cubic-bezier(0.4, 0, 0.2, 1); width: 0 !important; }
 
         .avg-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 5px; }
         .avg-item { font-size: 9px; font-weight: 600; color: #666; }
@@ -214,11 +214,15 @@
     }
 
     async function openAnalysis(contract) {
-        if (myChart) { myChart.destroy(); myChart = null; }
-        
+        // Paparkan panel dahulu supaya elemen HTML sedia ada untuk dimanipulasi
         document.getElementById('analysis-panel').style.display = 'flex';
         document.getElementById('panel-title').innerText = contract.contract_code;
         document.getElementById('sectionSelector').style.display = 'none';
+        
+        // Kosongkan container untuk reset animasi bar
+        document.getElementById('selectedSectionContainer').innerHTML = '<p style="font-size:12px; padding:20px; color:#888;">Memuatkan data...</p>';
+
+        if (myChart) { myChart.destroy(); myChart = null; }
 
         try {
             const resC = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${contract.id}&select=*`, { headers });
@@ -282,7 +286,7 @@
                         <div class="avg-item">ACTUAL: RM ${(used/monthsPassed).toLocaleString()}/bln</div>
                     </div>
                     <div class="prog-bar-bg">
-                        <div class="prog-bar-fill" data-width="${percent}%" style="width: 0%; background:${color}"></div>
+                        <div class="prog-bar-fill" data-width="${percent}%" style="background:${color}"></div>
                     </div>
                     <div style="font-size:10px; margin-top:5px; font-weight:700;">BAKI: RM ${(budget-used).toLocaleString()}</div>
                 </div>
@@ -290,16 +294,17 @@
         });
 
         updateChart();
-        triggerAnimations();
+        // Beri sedikit delay untuk memastikan DOM sudah render barulah trigger animasi
+        setTimeout(triggerAnimations, 50);
     }
 
     function triggerAnimations() {
-        setTimeout(() => {
-            const bars = document.querySelectorAll('.prog-bar-fill');
-            bars.forEach(bar => {
-                bar.style.width = bar.getAttribute('data-width');
-            });
-        }, 100); 
+        const bars = document.querySelectorAll('.prog-bar-fill');
+        bars.forEach(bar => {
+            const targetWidth = bar.getAttribute('data-width');
+            // Gunakan style.setProperty untuk override style default
+            bar.style.setProperty('width', targetWidth, 'important');
+        });
     }
 
     async function toggleSection(s) {
