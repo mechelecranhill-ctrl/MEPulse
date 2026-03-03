@@ -192,6 +192,7 @@
             if(diff > 10) statusColor = 'var(--ios-red)'; 
             else if(diff > 0) statusColor = 'var(--ios-orange)';
 
+            // PAPAR NAMA PENUH KAT SINI
             mainContainer.innerHTML += `
                 <div class="section-row">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -231,9 +232,12 @@
         const totalMonths = Math.max(1, (end.getFullYear()-start.getFullYear())*12 + (end.getMonth()-start.getMonth()));
         const monthsElapsed = Math.max(1, (today.getFullYear()-start.getFullYear())*12 + (today.getMonth()-start.getMonth()));
 
-        let labels = [], targetD = [], actualD = [];
+        let labels = [], shortLabels = [], targetD = [], actualD = [];
         selectedSections.sort().forEach(s => {
             labels.push(s);
+            // AMBIL "SECTION A" SAHAJA DARIPADA "SECTION A - LABOUR"
+            shortLabels.push(s.split(' - ')[0]); 
+            
             const b = sections[s].amt || 0;
             targetD.push((b/totalMonths).toFixed(0));
             let u = 0;
@@ -243,16 +247,16 @@
 
         const ctx = document.getElementById('healthChart').getContext('2d');
         if (myChart) {
-            myChart.data.labels = labels; 
+            myChart.data.labels = shortLabels; 
             myChart.data.datasets[0].data = targetD; 
             myChart.data.datasets[1].data = actualD; 
             myChart.update();
         } else {
             myChart = new Chart(ctx, {
                 type: 'bar',
-                data: { labels, datasets: [
-                    { label: 'Target', data: targetD, backgroundColor: '#e5e5ea', borderRadius: 4, borderSkipped: false },
-                    { label: 'Sebenar', data: actualD, backgroundColor: '#007AFF', borderRadius: 4, borderSkipped: false }
+                data: { labels: shortLabels, datasets: [
+                    { label: 'Target', data: targetD, backgroundColor: '#e5e5ea', borderRadius: {topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0}, borderSkipped: false },
+                    { label: 'Sebenar', data: actualD, backgroundColor: '#007AFF', borderRadius: {topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0}, borderSkipped: false }
                 ]},
                 options: { 
                     responsive: true, 
@@ -270,8 +274,17 @@
                         } 
                     },
                     scales: {
-                        y: { display: false, beginAtZero: true },
-                        x: { grid: { display: false }, ticks: { font: { size: 9, weight: '600' } } }
+                        y: { 
+                            display: true, 
+                            beginAtZero: true,
+                            grid: { color: 'rgba(0,0,0,0.05)' },
+                            ticks: { font: { size: 8 } }
+                        },
+                        x: { 
+                            display: true, 
+                            grid: { display: false }, 
+                            ticks: { font: { size: 9, weight: '600' } } 
+                        }
                     }
                 }
             });
