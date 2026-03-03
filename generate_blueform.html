@@ -2,152 +2,191 @@
 <html lang="ms">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>M&E Connect | Pendaftaran & Laporan</title>
+    <title>M&E-Connect Blueform System</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
-        :root { --blue: #007AFF; --dark: #1c1c1e; }
-        body { font-family: sans-serif; background: #f2f2f7; margin: 0; padding: 20px; }
+        /* --- TETAPAN UI APP --- */
+        body { font-family: -apple-system, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
+        .no-print { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 30px; }
+        button { cursor: pointer; padding: 10px 20px; border-radius: 8px; border: none; font-weight: bold; }
+        .btn-print { background: #007AFF; color: white; }
         
-        /* Layout */
-        .main-grid { display: grid; grid-template-columns: 400px 1fr; gap: 20px; max-width: 1400px; margin: auto; }
-        
-        /* Form Styling */
-        .form-card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #666; }
-        input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-        
-        button { width: 100%; padding: 12px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin-top: 10px; }
-        .btn-save { background: var(--blue); color: white; }
-        .btn-download { background: #34C759; color: white; }
-
-        /* Template Styling (The "Paper" Look) */
-        #report-template { 
-            background: white; width: 210mm; min-height: 297mm; 
-            padding: 15mm; margin: auto; border: 2px double #000;
-            color: black; position: relative; font-size: 12px; line-height: 1.5;
+        /* --- TETAPAN CETAKAN A4 --- */
+        @media print {
+            .no-print { display: none; }
+            body { background: white; padding: 0; }
+            .a4-container { border: none; box-shadow: none; margin: 0; }
         }
-        .header-logo { text-align: right; }
-        .header-logo img { width: 80px; }
-        .title { text-align: center; font-weight: bold; text-decoration: underline; margin: 20px 0; font-size: 14px; }
+
+        @page { size: A4; margin: 1cm; }
+
+        .a4-container {
+            width: 18cm;
+            min-height: 26cm;
+            margin: auto;
+            background: white;
+            padding: 1cm;
+            border: 1px solid #eee;
+            position: relative;
+            color: black;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        .logo-saj { position: absolute; right: 1cm; top: 1cm; width: 80px; }
+        .title { text-align: center; font-weight: bold; text-decoration: underline; font-size: 13px; margin: 40px 0 30px 0; }
+
+        /* --- STRUKTUR BARIS --- */
+        .row { display: flex; align-items: flex-start; margin-bottom: 6px; }
+        .num { width: 30px; font-weight: bold; }
+        .label { width: 180px; text-transform: uppercase; font-weight: bold; }
+        .colon { width: 15px; }
+        .value { flex: 1; border-bottom: 1px solid #ddd; min-height: 16px; padding-left: 5px; }
+        .rm { width: 30px; font-weight: bold; text-align: right; padding-right: 5px; }
+        .val-num { flex: 1; border-bottom: 1px solid #ddd; text-align: left; }
+
+        .line-bold { border-top: 2px solid black; margin: 15px 0; }
         
-        .row { display: flex; margin-bottom: 8px; border-bottom: 0.1px solid #eee; padding-bottom: 2px; }
-        .label-col { width: 180px; font-weight: normal; }
-        .colon { width: 20px; }
-        .val-col { flex: 1; font-weight: bold; }
-        .val-red { color: red; }
+        /* --- BAKI SECTION (NO 14) --- */
+        .baki-table { width: 100%; margin-left: 30px; }
+        .baki-row { display: flex; justify-content: flex-end; margin-bottom: 2px; }
+        .baki-label { width: 150px; }
+        .baki-val { width: 120px; text-align: right; border-bottom: 1px solid #eee; }
 
-        /* Signature Table */
-        .sign-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 50px; margin-top: 60px; }
-        .sign-box { border-top: 1px dotted #000; padding-top: 10px; text-align: left; font-weight: bold; font-size: 11px; }
-
-        @media print { .no-print { display: none; } body { padding: 0; } }
+        /* --- TANDATANGAN --- */
+        .sig-container { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; margin-top: 80px; }
+        .sig-box { text-align: center; }
+        .sig-line { border-top: 1px dotted black; width: 200px; margin: 0 auto 5px auto; }
+        .footer-note { font-size: 9px; font-style: italic; margin-top: 50px; }
     </style>
 </head>
 <body>
 
-<div class="main-grid">
-    <div class="form-card no-print">
-        <h2 style="margin-top:0">Daftar Work Order</h2>
-        <div class="form-group">
-            <label>NO. WORK ORDER</label>
-            <input type="text" id="in_wo" placeholder="Contoh: C 358196" oninput="sync()">
-        </div>
-        <div class="form-group">
-            <label>TAJUK KERJA</label>
-            <input type="text" id="in_tajuk" placeholder="Contoh: PEMBAIKAN..." oninput="sync()">
-        </div>
-        <div class="form-group">
-            <label>ANGGARAN KERJA (RM)</label>
-            <input type="number" id="in_amt" placeholder="3665.00" oninput="sync()">
-        </div>
-        <div class="form-group">
-            <label>NO. RUJUKAN</label>
-            <input type="text" id="in_rujukan" value="SAJ/M&E/IP/11-57/24 - MR048" oninput="sync()">
-        </div>
-
-        <button class="btn-save" onclick="alert('Data disimpan ke Database!')">SIMPAN DATA</button>
-        <button class="btn-download" onclick="downloadPDF()">MUAT TURUN PDF</button>
+    <div class="no-print">
+        <h3>Cetak Blueform</h3>
+        <p>Masukkan ID Kerja untuk menjana borang:</p>
+        <input type="text" id="input_work_id" placeholder="Cth: SGT001" style="padding:10px; width:200px;">
+        <button class="btn-print" onclick="fetchData()">Jana Borang</button>
+        <button onclick="window.print()" style="background:#34C759; color:white;">Cetak ke PDF/Kertas</button>
     </div>
 
-    <div id="report-template">
-        <div class="header-logo">
-            <img src="https://upload.wikimedia.org/wikipedia/en/thumb/5/5f/Ranhill_SAJ_Logo.svg/1200px-Ranhill_SAJ_Logo.svg.png" alt="Logo">
-        </div>
-
+    <div class="a4-container" id="blueform">
+        <img src="https://upload.wikimedia.org/wikipedia/en/thumb/3/3d/Ranhill_SAJ_logo.svg/1200px-Ranhill_SAJ_logo.svg.png" class="logo-saj">
+        
         <div class="title">PERMOHONAN KERJA-KERJA S.O.R / TAMBAHAN DALAM KONTRAK PENYELENGGARAAN</div>
 
-        <div class="row"><div class="label-col">1 NO. RUJUKAN</div><div class="colon">:</div><div class="val-col" id="out_rujukan">SAJ/M&E/IP/11-57/24 - <span class="val-red">MR048</span></div></div>
-        <div class="row"><div class="label-col">2 NO. WORK ORDER</div><div class="colon">:</div><div class="val-col val-red" id="out_wo">C 358196</div></div>
-        <div class="row"><div class="label-col">3 NO. KONTRAK</div><div class="colon">:</div><div class="val-col">SAJ/KP/T/57/2024</div></div>
-        <div class="row"><div class="label-col">4 NAMA KONTAKTOR</div><div class="colon">:</div><div class="val-col">WIJATI SDN BHD</div></div>
-        <div class="row"><div class="label-col">5 TEMPOH KONTRAK</div><div class="colon">:</div><div class="val-col">01 DECEMBER 2024 ~ 31 NOVEMBER 2027</div></div>
+        <div class="row"><div class="num">1</div><div class="label">No. Rujukan</div><div class="colon">:</div><div class="value" id="f_ref"></div></div>
+        <div class="row"><div class="num">2</div><div class="label">No. Work Order</div><div class="colon">:</div><div class="value" id="f_work_id"></div></div>
+        <div class="row"><div class="num">3</div><div class="label">No. Kontrak</div><div class="colon">:</div><div class="value" id="f_contract_code"></div></div>
+        <div class="row"><div class="num">4</div><div class="label">Nama Kontraktor</div><div class="colon">:</div><div class="value" id="f_contractor"></div></div>
+        <div class="row"><div class="num">5</div><div class="label">Tempoh Kontrak</div><div class="colon">:</div><div class="value" id="f_period"></div></div>
 
-        <hr>
-        <div class="row"><div class="label-col">6 LABOUR CHARGES SUM</div><div class="colon">:</div><div class="val-col">RM 96,000.00</div></div>
-        <div class="row"><div class="label-col">7 ANGGARAN KERJA (L.C)</div><div class="colon">:</div><div class="val-col">RM -</div></div>
-        
-        <hr>
-        <div class="row"><div class="label-col">8 SUPPLY SPARE PART SUM</div><div class="colon">:</div><div class="val-col">RM 340,434.00</div></div>
-        <div class="row"><div class="label-col">9 ANGGARAN KERJA (S.S.P)</div><div class="colon">:</div><div class="val-col">RM -</div></div>
+        <div class="line-bold"></div>
 
-        <hr>
-        <div class="row"><div class="label-col">10 PROVISIONAL SUM</div><div class="colon">:</div><div class="val-col">RM 2,200,000.00</div></div>
-        <div class="row"><div class="label-col">11 ANGGARAN KERJA (S.O.R)</div><div class="colon">:</div><div class="val-col">RM <span class="val-red" id="out_amt">3,665.00</span></div></div>
-        <div class="row"><div class="label-col">12 ANGGARAN KERJA (Tambahan)</div><div class="colon">:</div><div class="val-col">RM -</div></div>
+        <div class="row"><div class="num">6</div><div class="label">LABOUR CHARGES SUM</div><div class="colon">:</div><div class="rm">RM</div><div class="val-num" id="f_lc_sum">0.00</div></div>
+        <div class="row"><div class="num">7</div><div class="label">ANGGARAN KERJA (L.C)</div><div class="colon">:</div><div class="rm">RM</div><div class="val-num" id="f_lc_work">0.00</div></div>
 
-        <hr>
-        <div class="row"><div class="label-col">13 JUMLAH HARGA KONTRAK</div><div class="colon">:</div><div class="val-col">RM 4,608,384.00</div></div>
-        
+        <div class="line-bold"></div>
+
+        <div class="row"><div class="num">8</div><div class="label">SUPPLY SPARE PART SUM</div><div class="colon">:</div><div class="rm">RM</div><div class="val-num" id="f_ssp_sum">0.00</div></div>
+        <div class="row"><div class="num">9</div><div class="label">ANGGARAN KERJA (S.S.P)</div><div class="colon">:</div><div class="rm">RM</div><div class="val-num" id="f_ssp_work">0.00</div></div>
+
+        <div class="line-bold"></div>
+
+        <div class="row"><div class="num">10</div><div class="label">PROVISIONAL SUM</div><div class="colon">:</div><div class="rm">RM</div><div class="val-num" id="f_ps_sum">0.00</div></div>
+        <div class="row"><div class="num">11</div><div class="label">ANGGARAN KERJA (S.O.R)</div><div class="colon">:</div><div class="rm">RM</div><div class="val-num" id="f_sor_work">0.00</div></div>
+        <div class="row"><div class="num">12</div><div class="label">ANGGARAN KERJA (Tambahan)</div><div class="colon">:</div><div class="rm">RM</div><div class="val-num"> - </div></div>
+
+        <div class="line-bold"></div>
+
+        <div class="row"><div class="num">13</div><div class="label">JUMLAH HARGA KONTRAK</div><div class="colon">:</div><div class="rm">RM</div><div class="val-num" id="f_contract_sum" style="font-weight:bold;">0.00</div></div>
+
         <div class="row">
-            <div class="label-col">14 BAKI : G&P<br>PM<br>PROACTIVE<br>WORKMANSHIP<br>SUPPLY SPARE PART</div>
-            <div class="colon">:</div>
-            <div class="val-col">
-                RM 24,500.00<br>RM 125,500.00<br>RM 1,003,650.00<br>RM <span class="val-red">9,900.00</span><br>RM <span class="val-red">160,787.00</span>
+            <div class="num">14</div><div class="label">BAKI :</div>
+            <div class="baki-table">
+                <div class="baki-row"><div class="baki-label">G&P</div><div class="rm">RM</div><div class="baki-val" id="b_gp">0.00</div></div>
+                <div class="baki-row"><div class="baki-label">PM</div><div class="rm">RM</div><div class="baki-val" id="b_pm">0.00</div></div>
+                <div class="baki-row"><div class="baki-label">PROACTIVE</div><div class="rm">RM</div><div class="baki-val" id="b_pro">0.00</div></div>
+                <div class="baki-row"><div class="baki-label">SUPPLY SPARE PART</div><div class="rm">RM</div><div class="baki-val" id="b_ssp">0.00</div></div>
+                <div class="baki-row"><div class="baki-label">PROVISIONAL SUM</div><div class="rm">RM</div><div class="baki-val" id="b_ps">0.00</div></div>
+                <div class="baki-row"><div class="baki-label">SALVAGE VALUE</div><div class="rm">RM</div><div class="baki-val" id="f_salvage">0.00</div></div>
             </div>
         </div>
-        
-        <div class="row"><div class="label-col">15 BAKI HARGA KONTRAK</div><div class="colon">:</div><div class="val-col">RM 2,114,182.67</div></div>
-        
-        <div class="row">
-            <div class="label-col">16 TAJUK KERJA</div><div class="colon">:</div>
-            <div class="val-col val-red" id="out_tajuk">PEMBAIKAN PENIMBANG KLORIN ROSAK DI LRA BUKIT SERAMPANG</div>
+
+        <div class="row" style="margin-top:10px;"><div class="num">15</div><div class="label">BAKI HARGA KONTRAK</div><div class="colon">:</div><div class="rm">RM</div><div class="val-num" id="f_rem_bal" style="font-weight:bold;">0.00</div></div>
+
+        <div class="line-bold"></div>
+        <div class="row"><div class="num">16</div><div class="label">TAJUK KERJA</div><div class="colon">:</div><div class="value" id="f_job_title" style="color:red; font-weight:bold; border:none;"></div></div>
+
+        <div class="sig-container">
+            <div class="sig-box"><div class="sig-line"></div><strong>Eksekutif Instrumentasi</strong></div>
+            <div class="sig-box"><div class="sig-line"></div><strong>Ketua Seksyen Selenggara</strong></div>
+            <div class="sig-box" style="margin-top:40px;"><div class="sig-line"></div><strong>Ketua Mekanikal & Elektrikal</strong></div>
+            <div class="sig-box" style="margin-top:40px;"><div class="sig-line"></div><strong>Ketua Bahagian Operasi & Penyelenggaraan</strong></div>
         </div>
 
-        <div class="sign-grid">
-            <div class="sign-box">Dimohon oleh:<br><br><br><br>Eksekutif Instrumentasi</div>
-            <div class="sign-box">Disemak oleh:<br><br><br><br>Ketua Seksyen Selenggara</div>
-            <div class="sign-box">Disahkan oleh:<br><br><br><br>Ketua Mekanikal & Elektrikal</div>
-            <div class="sign-box">Disokong oleh:<br><br><br><br>Ketua Bahagian Operasi & Penyelenggaraan</div>
-        </div>
-        
-        <p style="font-size: 10px; font-style: italic; margin-top: 40px;">*Sebut harga dan Work Order telah disemak sepenuhnya oleh Pihak Daerah</p>
+        <div class="footer-note">* Sebutharga dan Work Order telah disemak sepenuhnya oleh Pihak Daerah</div>
     </div>
-</div>
 
-<script>
-    // Fungsi untuk Live Update dari Borang ke Templat
-    function sync() {
-        document.getElementById('out_wo').innerText = document.getElementById('in_wo').value;
-        document.getElementById('out_rujukan').innerText = document.getElementById('in_rujukan').value;
-        document.getElementById('out_tajuk').innerText = document.getElementById('in_tajuk').value + " (RM " + document.getElementById('in_amt').value + ")";
-        document.getElementById('out_amt').innerText = parseFloat(document.getElementById('in_amt').value).toLocaleString();
-    }
+    <script>
+        const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
+        const SB_KEY = 'YOUR_API_KEY'; // Sila masukkan Anon Key anda
 
-    // Fungsi Muat Turun PDF
-    function downloadPDF() {
-        const element = document.getElementById('report-template');
-        const opt = {
-            margin:       0,
-            filename:     'WorkOrder_' + document.getElementById('in_wo').value + '.pdf',
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2 },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-        html2pdf().set(opt).from(element).save();
-    }
-</script>
+        async function fetchData() {
+            const searchId = document.getElementById('input_work_id').value;
+            if(!searchId) return alert("Sila masukkan ID!");
 
+            const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` };
+            
+            try {
+                // Ambil data Work Order dan join dengan Contract
+                const res = await fetch(`${SB_URL}/rest/v1/work_orders?sequence_no=eq.${searchId}&select=*,contract(*)`, { headers });
+                const result = await res.json();
+                
+                if(result.length === 0) return alert("Data tidak dijumpai!");
+                const data = result[0];
+                const c = data.contract;
+                const b = c.contract_sections_breakdown || {};
+                const s = data.section_category || {};
+
+                // Isi Data ke Form
+                document.getElementById('f_ref').innerText = `${c.contract_code} - ${data.sequence_no}`;
+                document.getElementById('f_work_id').innerText = data.work_id;
+                document.getElementById('f_contract_code').innerText = c.contract_code;
+                document.getElementById('f_contractor').innerText = c.contractor;
+                document.getElementById('f_period').innerText = `${c.contract_start} ~ ${c.contract_end}`;
+                
+                // Nilai Section dari Kontrak (Master)
+                document.getElementById('f_lc_sum').innerText = (b["LABOUR CHARGES"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+                document.getElementById('f_ssp_sum').innerText = (b["SUPPLY SPARE PART"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+                document.getElementById('f_ps_sum').innerText = (b["PROVISIONAL SUM"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+                document.getElementById('f_contract_sum').innerText = (c.contract_sum || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+
+                // Anggaran Kerja Semasa (ID ini sahaja)
+                document.getElementById('f_lc_work').innerText = (s["LABOUR CHARGES"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+                document.getElementById('f_ssp_work').innerText = (s["SUPPLY SPARE PART"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+                document.getElementById('f_sor_work').innerText = (s["PROVISIONAL SUM"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+
+                // Baki Keseluruhan (No 14)
+                document.getElementById('b_gp').innerText = (b["G&P"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+                document.getElementById('b_pm').innerText = (b["PM"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+                document.getElementById('b_pro').innerText = (b["PROACTIVE"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+                document.getElementById('b_ssp').innerText = (b["SUPPLY SPARE PART"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+                document.getElementById('b_ps').innerText = (b["PROVISIONAL SUM"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+                
+                // Kira Baki Akhir
+                let totalRem = 0;
+                Object.values(b).forEach(v => totalRem += v.amt);
+                document.getElementById('f_rem_bal').innerText = totalRem.toLocaleString(undefined, {minimumFractionDigits: 2});
+
+                // Tajuk Kerja (No 16)
+                document.getElementById('f_job_title').innerText = `${data.description.toUpperCase()} (RM ${data.amount_spent.toLocaleString(undefined, {minimumFractionDigits: 2})})`;
+
+            } catch (e) {
+                console.error(e);
+                alert("Ralat sistem!");
+            }
+        }
+    </script>
 </body>
 </html>
