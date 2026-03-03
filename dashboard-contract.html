@@ -77,16 +77,8 @@
         .chart-box { padding: 10px; background: #f9f9fb; border-radius: 15px; flex: 1; position: relative; min-height: 0; display: flex; flex-direction: column;}
         
         .section-row { background: #fff; border: 1px solid var(--ios-blue); border-radius: 12px; padding: 10px; margin-bottom: 8px; }
-        
-        /* Bar Container */
-        .prog-wrapper { position: relative; width: 100%; height: 12px; background: #eee; border-radius: 6px; margin-top: 8px; overflow: hidden; }
-        
-        /* Planned Bar (Background layer) */
-        .planned-bar-fill { position: absolute; top: 0; left: 0; height: 100%; background: #e0e0e0; border-right: 2px solid #34C759; transition: 1s ease-in-out; z-index: 1; width: 0 !important; }
-        
-        /* Actual Bar (Foreground layer) */
-        .prog-bar-fill { position: absolute; top: 0; left: 0; height: 100%; border-radius: 6px; transition: 1s cubic-bezier(0.4, 0, 0.2, 1); z-index: 2; width: 0 !important; }
-
+        .prog-bar-bg { width: 100%; height: 8px; background: #eee; border-radius: 4px; margin-top: 5px; overflow: hidden; }
+        .prog-bar-fill { height: 100%; border-radius: 4px; transition: 1s cubic-bezier(0.4, 0, 0.2, 1); width: 0 !important; }
         .avg-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 5px; }
         .avg-item { font-size: 9px; font-weight: 600; color: #666; }
         .manage-btn { background: #f2f2f7; border: none; padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; color: var(--ios-blue); cursor: pointer; }
@@ -227,13 +219,10 @@
         if(!currentContract) return;
         const sections = currentContract.contract_sections_breakdown || {};
         
-        // --- LOGIK PLANNED PROGRESS (TIME-BASED) ---
+        // --- LOGIK TEMPOH KONTRAK ---
         const start = new Date(currentContract.contract_start);
         const end = new Date(currentContract.contract_end);
-        const today = new Date();
-        const totalDuration = end - start;
-        const elapsedDuration = today - start;
-        const plannedTimePercent = Math.min(100, Math.max(0, (elapsedDuration / totalDuration) * 100));
+        const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
 
         document.getElementById('fullSectionList').innerHTML = Object.keys(sections).sort().map(s => `
             <span class="sel-chip ${selectedSections.includes(s) ? 'active' : ''}" onclick="toggleSection('${s}')">${s}</span>
@@ -248,11 +237,9 @@
             currentWO.forEach(wo => { if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; });
 
             const budget = sections[s].amt || 0; 
-            const actualPercent = (used/budget)*100 || 0;
-            const plannedUtilAmt = budget * (plannedTimePercent / 100);
-            
-            // Warna Status: Merah jika guna lebih dari sepatutnya
-            const color = actualPercent > plannedTimePercent ? 'var(--ios-red)' : (actualPercent > (plannedTimePercent * 0.8) ? 'var(--ios-orange)' : 'var(--ios-blue)');
+            const plannedMonthly = budget / totalMonths; // Kira bajet dirancang bulanan
+            const percent = (used/budget)*100 || 0;
+            const color = percent > 85 ? 'var(--ios-red)' : (percent > 60 ? 'var(--ios-orange)' : 'var(--ios-blue)');
 
             mainContainer.innerHTML += `
                 <div class="section-row">
@@ -260,40 +247,32 @@
                         <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">${s}: ${sections[s].desc || s}</div>
                         <i class="fa fa-times-circle" style="color:#ccc; cursor:pointer;" onclick="toggleSection('${s}')"></i>
                     </div>
-                    
                     <div class="avg-stats">
                         <div class="avg-item">BAJET: RM ${budget.toLocaleString()}</div>
-                        <div class="avg-item" style="color:var(--ios-green)">PATUT GUNA: RM ${plannedUtilAmt.toLocaleString(undefined, {maximumFractionDigits:0})}</div>
+                        <div class="avg-item" style="color: #8e8e93;">PLANNED (MO): RM ${plannedMonthly.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
                     </div>
-                    
-                    <div class="avg-stats" style="margin-top:2px;">
-                        <div class="avg-item">SEBENAR: RM ${used.toLocaleString()}</div>
-                        <div class="avg-item" style="color:${color}">UTIL: ${actualPercent.toFixed(1)}% / ${plannedTimePercent.toFixed(1)}%</div>
+                    <div class="avg-stats">
+                        <div class="avg-item">GUNA: RM ${used.toLocaleString()}</div>
+                        <div class="avg-item" style="color: ${color};">PROGRESS: ${percent.toFixed(1)}%</div>
                     </div>
-
-                    <div class="prog-wrapper">
-                        <div class="planned-bar-fill" data-planned="${plannedTimePercent}%"></div>
-                        <div class="prog-bar-fill" data-actual="${actualPercent}%" style="background:${color}"></div>
+                    <div class="prog-bar-bg">
+                        <div class="prog-bar-fill" data-width="${percent}%" style="background:${color}"></div>
                     </div>
                 </div>
             `;
         });
 
         updateChart();
-        
-        // Trigger Animasi Bar
         setTimeout(() => {
-            document.querySelectorAll('.planned-bar-fill').forEach(bar => {
-                bar.style.setProperty('width', bar.getAttribute('data-planned'), 'important');
-            });
             document.querySelectorAll('.prog-bar-fill').forEach(bar => {
-                bar.style.setProperty('width', bar.getAttribute('data-actual'), 'important');
+                bar.style.setProperty('width', bar.getAttribute('data-width'), 'important');
             });
         }, 100);
     }
 
     function updateChart() {
         const sections = currentContract.contract_sections_breakdown || {};
+        
         const start = new Date(currentContract.contract_start);
         const end = new Date(currentContract.contract_end);
         const today = new Date();
@@ -305,6 +284,7 @@
 
         selectedSections.sort().forEach(s => {
             labels.push(s);
+            
             const fullBudget = sections[s].amt || 0;
             const targetMonthly = fullBudget / totalMonths;
             targetAvgData.push(targetMonthly.toFixed(2));
