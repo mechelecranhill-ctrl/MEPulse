@@ -45,6 +45,10 @@
         .bf-sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 50px; text-align: center; }
         .bf-sig-line { border-top: 1px dotted black; width: 140px; margin: 0 auto 3px auto; }
         @media print { .no-print { display: none !important; } body { background: white; padding: 0; } .a4-container { border: none; } }
+        
+        /* Modal VO Style */
+        .modal { display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter:blur(5px); }
+        .modal-content { background:white; margin:15% auto; padding:20px; border-radius:20px; width:90%; max-width:400px; }
     </style>
 </head>
 <body>
@@ -56,7 +60,24 @@
         <div class="glass-card" onclick="showPage('registerWorkPage')"><strong>📝 Pendaftaran Kerja (ID)</strong></div>
         <div class="glass-card" onclick="showPage('adminPage')"><strong>➕ Pengurusan Kontrak</strong></div>
         <div class="glass-card" style="border: 2px solid var(--ios-orange);" onclick="showPage('interimPage')"><strong>📑 Kemaskini Interim Claim</strong></div>
+        <div class="glass-card" style="background: var(--ios-red); color:white;" onclick="openVOModal()"><strong>⚠️ Tambah VO (Variation Order)</strong></div>
         <div class="glass-card" style="background: rgba(0,0,0,0.05);" onclick="showPage('settingsPage')"><i class="fa-solid fa-gear"></i> Tetapan Unit</div>
+    </div>
+
+    <div id="voModal" class="modal">
+        <div class="modal-content">
+            <h3>Pendaftaran VO Baru</h3>
+            <label>Pilih Kontrak</label>
+            <select id="vo_contract_id"></select>
+            <label>Nama VO (Cth: VO 01)</label>
+            <input type="text" id="vo_name" placeholder="VO 01">
+            <label>Jumlah Tambahan (RM)</label>
+            <input type="number" id="vo_amt" step="0.01" placeholder="0.00">
+            <label>Keterangan Tambahan</label>
+            <textarea id="vo_desc" placeholder="Sebab kenaikan kos..."></textarea>
+            <button onclick="submitVO()" style="background:var(--ios-red);">Simpan VO & Kemaskini Audit</button>
+            <button onclick="closeVOModal()" style="background:#ccc; margin-top:5px;">Batal</button>
+        </div>
     </div>
 
     <div id="detailsPage" class="page">
@@ -203,6 +224,45 @@
         if(['registerWorkPage', 'interimPage'].includes(id)) loadContractsToDropdowns();
     }
 
+    // VO FUNCTIONS START
+    function openVOModal() {
+        document.getElementById('voModal').style.display = 'block';
+        loadContractsToDropdowns();
+    }
+    function closeVOModal() { document.getElementById('voModal').style.display = 'none'; }
+    
+    async function submitVO() {
+        const cId = document.getElementById('vo_contract_id').value;
+        const voName = document.getElementById('vo_name').value.trim().toUpperCase();
+        const voDesc = document.getElementById('vo_desc').value.trim();
+        const voAmt = parseFloat(document.getElementById('vo_amt').value);
+
+        if (!cId || !voName || !voAmt) return alert("Sila lengkapkan maklumat VO!");
+
+        const resGet = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { headers });
+        const contract = (await resGet.json())[0];
+
+        let vBreak = contract.vo_breakdown || {};
+        if (vBreak[voName]) return alert("Nama VO ini sudah wujud!");
+
+        vBreak[voName] = { "amt": voAmt, "desc": voDesc, "date": new Date().toISOString() };
+        const newVoTotal = (parseFloat(contract.total_vo_amount) || 0) + voAmt;
+
+        const resUpdate = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({ vo_breakdown: vBreak, total_vo_amount: newVoTotal })
+        });
+
+        if (resUpdate.ok) {
+            alert("VO Berjaya Direkodkan!");
+            location.reload();
+        } else {
+            alert("Gagal menyimpan VO. Pastikan kolum database wujud.");
+        }
+    }
+    // VO FUNCTIONS END
+
     async function fetchUnits() {
         const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
         const units = await res.json();
@@ -252,6 +312,7 @@
 
         const c = data.contract;
         const b = c.contract_sections_breakdown || {};
+        const v = c.vo_breakdown || {}; // VO Breakdown
         const s = data.section_category || {};
 
         let content = `
@@ -267,11 +328,12 @@
             <div class="bf-row"><div class="bf-num">6</div><div class="bf-label">LABOUR CHARGES SUM</div><div class="bf-colon">:</div><div class="bf-value">RM ${(b["SECTION E"]?.amt || 0).toLocaleString()}</div></div>
             <div class="bf-row"><div class="bf-num">7</div><div class="bf-label">ANGGARAN KERJA (L.C)</div><div class="bf-colon">:</div><div class="bf-value">RM ${(s["SECTION E"]?.amt || 0).toLocaleString()}</div></div>
             <div class="bf-line"></div>
-            <div class="bf-row"><div class="bf-num">13</div><div class="bf-label">JUMLAH HARGA KONTRAK</div><div class="bf-colon">:</div><div class="bf-value">RM ${(c.contract_sum || 0).toLocaleString()}</div></div>
+            <div class="bf-row"><div class="bf-num">13</div><div class="bf-label">JUMLAH KONTRAK + VO</div><div class="bf-colon">:</div><div class="bf-value">RM ${((parseFloat(c.contract_sum) || 0) + (parseFloat(c.total_vo_amount) || 0)).toLocaleString()}</div></div>
             <div class="bf-row">
-                <div class="bf-num">14</div><div class="bf-label">BAKI :</div><div class="bf-colon"></div>
+                <div class="bf-num">14</div><div class="bf-label">AUDIT PECAHAN :</div><div class="bf-colon"></div>
                 <div style="flex:1;">
-                    ${Object.keys(b).map(sec => `<div style="display:flex; justify-content:space-between;"><span>${sec}</span><span>RM ${b[sec].amt.toLocaleString()}</span></div>`).join('')}
+                    ${Object.keys(b).map(sec => `<div style="display:flex; justify-content:space-between;"><span>${sec} (BQ)</span><span>RM ${b[sec].amt.toLocaleString()}</span></div>`).join('')}
+                    ${Object.keys(v).map(voK => `<div style="display:flex; justify-content:space-between; color:blue; font-style:italic;"><span>${voK} (VO)</span><span>RM ${v[voK].amt.toLocaleString()}</span></div>`).join('')}
                 </div>
             </div>
             <div class="bf-line"></div>
@@ -285,7 +347,7 @@
     async function loadContractsToDropdowns() {
         const res = await fetch(`${SB_URL}/rest/v1/contract?select=*`, { headers });
         const data = await res.json();
-        ['w_contract_id', 'i_contract_id'].forEach(id => {
+        ['w_contract_id', 'i_contract_id', 'vo_contract_id'].forEach(id => {
             const s = document.getElementById(id); if(!s) return;
             s.innerHTML = '<option value="">Pilih Kontrak</option>';
             data.forEach(c => {
@@ -467,7 +529,9 @@
             district: document.getElementById('c_dist').value,
             area_code: document.getElementById('c_area').value,
             contract_sections_breakdown: sections,
-            contract_sum: calculateContractSum()
+            contract_sum: calculateContractSum(),
+            vo_breakdown: {},
+            total_vo_amount: 0
         };
 
         const res = await fetch(`${SB_URL}/rest/v1/contract`, { method: 'POST', headers, body: JSON.stringify(payload) });
