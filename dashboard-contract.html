@@ -69,10 +69,13 @@
         .c-card.active { border-color: var(--ios-blue); background: #f0f7ff; }
         .c-card h4 { margin: 0; font-size: 11px; color: #1c1c1e; overflow: hidden; text-overflow: ellipsis; }
         .c-card .sub-text { font-size: 9px; color: #888; margin-top: 2px; }
+        
         .analysis-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
         #analysis-panel { display: none; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); flex: 1; overflow: hidden; flex-direction: column; }
+        
         .health-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; flex: 1; overflow: hidden; margin-top: 5px; }
-        .chart-box { padding: 10px; background: #f9f9fb; border-radius: 15px; flex: 1; position: relative; min-height: 0; }
+        .chart-box { padding: 10px; background: #f9f9fb; border-radius: 15px; flex: 1; position: relative; min-height: 0; display: flex; flex-direction: column;}
+        
         .section-row { background: #fff; border: 1px solid var(--ios-blue); border-radius: 12px; padding: 10px; margin-bottom: 8px; }
         .prog-bar-bg { width: 100%; height: 8px; background: #eee; border-radius: 4px; margin-top: 5px; overflow: hidden; }
         .prog-bar-fill { height: 100%; border-radius: 4px; transition: 1s cubic-bezier(0.4, 0, 0.2, 1); width: 0 !important; }
@@ -107,7 +110,7 @@
                     </div>
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <span style="font-size: 10px; font-weight: 800; color: #34C759; background: #eafaf1; padding: 4px 10px; border-radius: 6px; margin-right: 10px;">
-                            <i class="fa fa-circle" style="font-size: 7px; vertical-align: middle;"></i> LIVE DATA
+                            <i class="fa fa-circle" style="font-size: 7px; vertical-align: middle;"></i> LIVE PURATA BULANAN
                         </span>
                         <button onclick="document.getElementById('analysis-panel').style.display='none'" 
                                 style="background:#f2f2f7; border:none; width: 38px; height: 38px; border-radius:12px; cursor:pointer; display: flex; align-items: center; justify-content: center;">
@@ -118,6 +121,7 @@
 
                 <div class="health-grid">
                     <div class="chart-box">
+                        <div style="font-size: 11px; font-weight: bold; color: #666; margin-bottom: 10px;">PURATA BULANAN: SEBENAR VS SASARAN (RM)</div>
                         <canvas id="healthChart"></canvas>
                     </div>
                     <div style="display: flex; flex-direction: column; overflow: hidden;">
@@ -153,17 +157,12 @@
         try {
             const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
             const units = await res.json();
-            
             const nav = document.getElementById('unitNav');
             nav.innerHTML = units.map(u => `<button class="unit-pill" id="unit-${u.id}" onclick="fetchContracts(${u.id}, this)">${u.unit_name}</button>`).join('');
             
-            // Cari INSTRUMENTASI atau ambil yang pertama
             const instUnit = units.find(u => u.unit_name.toUpperCase() === 'INSTRUMENTASI');
-            if(instUnit) {
-                document.getElementById(`unit-${instUnit.id}`).click();
-            } else if(units.length > 0) {
-                document.querySelector('.unit-pill').click();
-            }
+            if(instUnit) { document.getElementById(`unit-${instUnit.id}`).click(); } 
+            else if(units.length > 0) { document.querySelector('.unit-pill').click(); }
         } catch (e) { console.error("Error units:", e); }
     }
 
@@ -171,10 +170,8 @@
         document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
         btn.classList.add('active');
         try {
-            // Fetch contracts sorted by contract_start descending (terbaru di atas)
-            const res = await fetch(`${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}&order=contract_start.asc`, { headers });
+            const res = await fetch(`${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}&order=contract_start.desc`, { headers });
             const data = await res.json();
-            
             const list = document.getElementById('contractList');
             list.innerHTML = data.map(c => `
                 <div class="c-card" id="card-${c.id}" onclick='selectCard(${c.id}); openAnalysis(${JSON.stringify(c)})'>
@@ -183,7 +180,6 @@
                 </div>
             `).join('');
 
-            // Automatik buka kontrak pertama jika ada
             if(data.length > 0) {
                 selectCard(data[0].id);
                 openAnalysis(data[0]);
@@ -206,8 +202,7 @@
         
         try {
             const resC = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${contract.id}&select=*`, { headers });
-            const freshContract = (await resC.json())[0];
-            currentContract = freshContract;
+            currentContract = (await resC.json())[0];
 
             const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}`, { headers });
             currentWO = await resW.json();
@@ -224,6 +219,11 @@
         if(!currentContract) return;
         const sections = currentContract.contract_sections_breakdown || {};
         
+        // --- LOGIK TEMPOH KONTRAK ---
+        const start = new Date(currentContract.contract_start);
+        const end = new Date(currentContract.contract_end);
+        const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
+
         document.getElementById('fullSectionList').innerHTML = Object.keys(sections).sort().map(s => `
             <span class="sel-chip ${selectedSections.includes(s) ? 'active' : ''}" onclick="toggleSection('${s}')">${s}</span>
         `).join('');
@@ -234,11 +234,10 @@
         selectedSections.sort().forEach(s => {
             if(!sections[s]) return;
             let used = 0;
-            currentWO.forEach(wo => { 
-                if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; 
-            });
+            currentWO.forEach(wo => { if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; });
 
             const budget = sections[s].amt || 0; 
+            const plannedMonthly = budget / totalMonths; // Kira bajet dirancang bulanan
             const percent = (used/budget)*100 || 0;
             const color = percent > 85 ? 'var(--ios-red)' : (percent > 60 ? 'var(--ios-orange)' : 'var(--ios-blue)');
 
@@ -250,14 +249,14 @@
                     </div>
                     <div class="avg-stats">
                         <div class="avg-item">BAJET: RM ${budget.toLocaleString()}</div>
+                        <div class="avg-item" style="color: #8e8e93;">PLANNED (MO): RM ${plannedMonthly.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+                    </div>
+                    <div class="avg-stats">
                         <div class="avg-item">GUNA: RM ${used.toLocaleString()}</div>
+                        <div class="avg-item" style="color: ${color};">PROGRESS: ${percent.toFixed(1)}%</div>
                     </div>
                     <div class="prog-bar-bg">
                         <div class="prog-bar-fill" data-width="${percent}%" style="background:${color}"></div>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; font-size:10px; margin-top:5px; font-weight:700;">
-                        <span>BAKI: RM ${(budget-used).toLocaleString()}</span>
-                        <span>${percent.toFixed(1)}%</span>
                     </div>
                 </div>
             `;
@@ -273,21 +272,33 @@
 
     function updateChart() {
         const sections = currentContract.contract_sections_breakdown || {};
-        let labels = [], bData = [], sData = [];
+        
+        const start = new Date(currentContract.contract_start);
+        const end = new Date(currentContract.contract_end);
+        const today = new Date();
+        
+        const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
+        const monthsElapsed = Math.max(1, (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()));
+
+        let labels = [], targetAvgData = [], actualAvgData = [];
 
         selectedSections.sort().forEach(s => {
             labels.push(s);
-            const budget = sections[s].amt || 0;
-            bData.push(budget);
-            let used = 0;
-            currentWO.forEach(wo => { if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; });
-            sData.push(used);
+            
+            const fullBudget = sections[s].amt || 0;
+            const targetMonthly = fullBudget / totalMonths;
+            targetAvgData.push(targetMonthly.toFixed(2));
+
+            let totalUsed = 0;
+            currentWO.forEach(wo => { if(wo.section_category?.[s]) totalUsed += wo.section_category[s].amt || 0; });
+            const actualMonthly = totalUsed / monthsElapsed;
+            actualAvgData.push(actualMonthly.toFixed(2));
         });
 
         if (myChart) {
             myChart.data.labels = labels;
-            myChart.data.datasets[0].data = bData;
-            myChart.data.datasets[1].data = sData;
+            myChart.data.datasets[0].data = targetAvgData;
+            myChart.data.datasets[1].data = actualAvgData;
             myChart.update(); 
         } else {
             const ctx = document.getElementById('healthChart').getContext('2d');
@@ -296,30 +307,40 @@
                 data: {
                     labels: labels,
                     datasets: [
-                        { label: 'Bajet Penuh', data: bData, backgroundColor: '#e5e5ea', borderRadius: 8 },
-                        { label: 'Guna', data: sData, backgroundColor: '#007AFF', borderRadius: 8 }
+                        { 
+                            label: 'Anggaran Bulanan', 
+                            data: targetAvgData, 
+                            backgroundColor: 'rgba(200, 200, 205, 0.5)',
+                            borderColor: '#8e8e93',
+                            borderWidth: 1,
+                            borderRadius: 5
+                        },
+                        { 
+                            label: 'Sebenar Bulanan', 
+                            data: actualAvgData, 
+                            backgroundColor: 'rgba(0, 122, 255, 0.8)',
+                            borderColor: '#007AFF',
+                            borderWidth: 1,
+                            borderRadius: 5
+                        }
                     ]
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    animation: { duration: 800, easing: 'easeOutQuart' },
                     plugins: {
+                        legend: { position: 'top', labels: { font: { size: 10, weight: 'bold' } } },
                         datalabels: { 
-                            align: 'top', anchor: 'end', textAlign: 'center',
-                            formatter: (value, context) => {
-                                if (context.datasetIndex === 1) {
-                                    const budget = context.chart.data.datasets[0].data[context.dataIndex];
-                                    const percent = budget > 0 ? Math.round((value / budget) * 100) : 0;
-                                    return value > 0 ? `RM ${value.toLocaleString()}\n(${percent}%)` : '';
-                                }
-                                return value > 0 ? `RM ${value.toLocaleString()}` : '';
-                            },
+                            anchor: 'end', align: 'top', 
                             font: { size: 9, weight: 'bold' },
-                            color: (context) => context.datasetIndex === 1 ? '#007AFF' : '#8e8e93'
+                            formatter: (val) => val > 0 ? `RM ${Math.round(val).toLocaleString()}` : ''
                         }
                     },
                     scales: {
-                        y: { beginAtZero: true, grid: { display: false }, ticks: { font: { size: 9 } } },
+                        y: { 
+                            beginAtZero: true, 
+                            ticks: { font: { size: 9 } },
+                            title: { display: true, text: 'RM / Bulan', font: { size: 10 } }
+                        },
                         x: { ticks: { font: { size: 10, weight: 'bold' } } }
                     }
                 }
