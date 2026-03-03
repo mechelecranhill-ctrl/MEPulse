@@ -1,4 +1,242 @@
-function updateChart() {
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M&E-Connect | Global Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <style>
+        :root { 
+            --ios-blue: #007AFF; --ios-green: #34C759; --ios-orange: #FF9500; --ios-red: #FF3B30;
+            --dark-bg: #1c1c1e; --card-bg: #ffffff; --glass: rgba(255,255,255,0.8);
+        }
+        body { font-family: -apple-system, system-ui, sans-serif; background: #f2f2f7; margin: 0; padding-top: 80px; overflow-x: hidden; }
+        
+        .glass-header { 
+            position: fixed; top: 0; width: 100%; height: 70px; 
+            background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 1px 10px rgba(0,0,0,0.05); z-index: 1000;
+        }
+        .unit-container { display: flex; gap: 12px; overflow-x: auto; padding: 0 20px; max-width: 800px; scrollbar-width: none; }
+        .unit-pill { 
+            padding: 10px 22px; border-radius: 20px; background: #e5e5ea; 
+            border: none; cursor: pointer; font-weight: 600; font-size: 13px; white-space: nowrap; transition: 0.3s;
+        }
+        .unit-pill.active { background: var(--ios-blue); color: white; transform: scale(1.05); box-shadow: 0 4px 10px rgba(0,122,255,0.3); }
+
+        .fab { 
+            position: fixed; top: 15px; right: 25px; width: 45px; height: 45px; 
+            background: var(--ios-blue); color: white; border-radius: 14px;
+            display: flex; align-items: center; justify-content: center; 
+            cursor: pointer; z-index: 1100; box-shadow: 0 4px 12px rgba(0,122,255,0.4);
+        }
+
+        .container { max-width: 1200px; margin: auto; padding: 20px; }
+        .contract-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+
+        .c-card { 
+            background: var(--card-bg); border-radius: 16px; padding: 12px 15px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04); transition: 0.2s; cursor: pointer;
+            border: 1px solid rgba(0,0,0,0.05); position: relative;
+        }
+        .c-card h4 { margin: 5px 0; font-size: 13px; color: #1c1c1e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        #analysis-panel { 
+            display: none; background: white; border-radius: 30px; padding: 35px; 
+            margin-top: 30px; box-shadow: 0 20px 50px rgba(0,0,0,0.1); animation: slideUp 0.5s ease;
+        }
+        @keyframes slideUp { from { opacity:0; transform: translateY(40px); } to { opacity:1; transform: translateY(0); } }
+
+        .health-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 30px; margin-top: 20px; }
+        @media (max-width: 900px) { .health-grid { grid-template-columns: 1fr; } }
+
+        .chart-box { padding: 20px; background: #f9f9fb; border-radius: 25px; height: 350px; position: relative; }
+        
+        .section-row { 
+            background: #fff; border: 1px solid var(--ios-blue); border-radius: 18px; 
+            padding: 15px; margin-bottom: 12px; cursor: default;
+        }
+
+        .prog-bar-bg { width: 100%; height: 8px; background: #eee; border-radius: 4px; margin-top: 8px; overflow: hidden; }
+        .prog-bar-fill { height: 100%; border-radius: 4px; transition: 1s; width: 0; }
+        
+        .avg-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+        .avg-item { font-size: 10px; font-weight: 600; color: #666; }
+
+        .manage-btn {
+            background: #f2f2f7; border: none; padding: 8px 15px; border-radius: 10px;
+            font-size: 12px; font-weight: 700; color: var(--ios-blue); cursor: pointer; margin-bottom: 15px;
+        }
+        #sectionSelector {
+            display: none; background: #f9f9fb; padding: 15px; border-radius: 20px;
+            margin-bottom: 20px; border: 1px dashed #ccc;
+        }
+        .sel-chip {
+            display: inline-block; padding: 6px 12px; border-radius: 15px; 
+            background: #e5e5ea; margin: 4px; font-size: 11px; cursor: pointer; font-weight: 600;
+        }
+        .sel-chip.active { background: var(--ios-blue); color: white; }
+
+        #subModuleOverlay { display: none; position: fixed; inset: 0; background: #f2f2f7; z-index: 2000; padding: 10px; }
+        .close-sub { position: fixed; top: 15px; left: 15px; z-index: 2100; background: var(--ios-red); color: white; border: none; padding: 8px 15px; border-radius: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div class="fab" onclick="toggleSubModule(true)"><i class="fa fa-plus"></i></div>
+
+    <div class="glass-header">
+        <div class="unit-container" id="unitNav"></div>
+    </div>
+
+    <div class="container">
+        <div id="contractList" class="contract-grid"></div>
+
+        <div id="analysis-panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                <div>
+                    <h1 id="panel-title" style="margin:0; font-size: 28px; color: var(--ios-blue);">Analisis</h1>
+                    <p id="panel-vendor" style="margin:5px 0 0 0; color: #888; font-size: 14px; font-weight: 600;"></p>
+                </div>
+                <button onclick="document.getElementById('analysis-panel').style.display='none'" style="background:#f2f2f7; border:none; padding:12px 25px; border-radius:15px; cursor:pointer;">Tutup</button>
+            </div>
+
+            <div class="health-grid">
+                <div class="chart-box">
+                    <canvas id="healthChart"></canvas>
+                </div>
+                <div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3 style="margin:0; font-size: 18px;">Section Dipilih</h3>
+                        <button class="manage-btn" onclick="toggleSelector()"><i class="fa fa-cog"></i> Urus Section</button>
+                    </div>
+
+                    <div id="sectionSelector">
+                        <p style="font-size:11px; color:#666; margin-top:0;">Klik untuk Pilih/Sembunyi dari Dashboard:</p>
+                        <div id="fullSectionList"></div>
+                    </div>
+
+                    <div id="selectedSectionContainer" style="max-height: 450px; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="subModuleOverlay">
+        <button class="close-sub" onclick="toggleSubModule(false)">TUTUP X</button>
+        <iframe src="about:blank" id="formFrame" style="width: 100%; height: 90vh; border: none; border-radius: 20px; background: white; margin-top: 50px;"></iframe>
+    </div>
+
+<script>
+    const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
+    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
+    const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
+
+    let myChart = null;
+    let currentContract = null;
+    let currentWO = [];
+    let selectedSections = [];
+
+    Chart.register(ChartDataLabels);
+
+    window.onload = () => fetchUnits();
+
+    async function fetchUnits() {
+        const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
+        const units = await res.json();
+        document.getElementById('unitNav').innerHTML = units.map(u => `<button class="unit-pill" onclick="fetchContracts(${u.id}, this)">${u.unit_name}</button>`).join('');
+        if(units.length > 0) document.querySelector('.unit-pill').click();
+    }
+
+    async function fetchContracts(unitId, btn) {
+        document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        const res = await fetch(`${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}`, { headers });
+        const data = await res.json();
+        document.getElementById('contractList').innerHTML = data.map(c => `
+            <div class="c-card" onclick='openAnalysis(${JSON.stringify(c)})'>
+                <h4>${c.contract_code}</h4>
+                <div style="font-size:11px;">${c.contract_name}</div>
+            </div>
+        `).join('');
+    }
+
+    async function openAnalysis(contract) {
+        currentContract = contract;
+        document.getElementById('analysis-panel').style.display = 'block';
+        document.getElementById('panel-title').innerText = contract.contract_code;
+        document.getElementById('sectionSelector').style.display = 'none';
+        
+        const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contract.id}`, { headers });
+        currentWO = await resW.json();
+
+        const saved = localStorage.getItem('sel_' + contract.id);
+        selectedSections = saved ? JSON.parse(saved) : Object.keys(contract.contract_sections_breakdown || {});
+
+        renderUI();
+    }
+
+    function toggleSelector() {
+        const el = document.getElementById('sectionSelector');
+        el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function renderUI() {
+        const sections = currentContract.contract_sections_breakdown || {};
+        const selectorContainer = document.getElementById('fullSectionList');
+        selectorContainer.innerHTML = Object.keys(sections).sort().map(s => `
+            <span class="sel-chip ${selectedSections.includes(s) ? 'active' : ''}" onclick="toggleSection('${s}')">
+                ${s}
+            </span>
+        `).join('');
+
+        const mainContainer = document.getElementById('selectedSectionContainer');
+        mainContainer.innerHTML = '';
+
+        const start = new Date(currentContract.contract_start);
+        const end = new Date(currentContract.contract_end);
+        const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
+        const monthsPassed = Math.max(1, (new Date().getFullYear() - start.getFullYear()) * 12 + (new Date().getMonth() - start.getMonth()));
+
+        selectedSections.sort().forEach(s => {
+            if(!sections[s]) return;
+            let used = 0;
+            currentWO.forEach(wo => { if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; });
+            
+            const budget = sections[s].amt || 0;
+            const percent = (used/budget)*100 || 0;
+            const color = percent > 85 ? 'var(--ios-red)' : (percent > 60 ? 'var(--ios-orange)' : 'var(--ios-blue)');
+
+            mainContainer.innerHTML += `
+                <div class="section-row">
+                    <div style="display:flex; justify-content:space-between; align-items:start;">
+                        <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">${s}: ${sections[s].desc || s}</div>
+                        <i class="fa fa-times-circle" style="color:#ccc; cursor:pointer;" onclick="toggleSection('${s}')"></i>
+                    </div>
+                    <div class="avg-stats">
+                        <div class="avg-item">PLAN: RM ${(budget/totalMonths).toLocaleString()}/bln</div>
+                        <div class="avg-item">ACTUAL: RM ${(used/monthsPassed).toLocaleString()}/bln</div>
+                    </div>
+                    <div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${percent}%; background:${color}"></div></div>
+                    <div style="font-size:10px; margin-top:5px; font-weight:700;">BAKI: RM ${(budget-used).toLocaleString()}</div>
+                </div>
+            `;
+        });
+
+        updateChart();
+    }
+
+    function toggleSection(s) {
+        if(selectedSections.includes(s)) selectedSections = selectedSections.filter(x => x !== s);
+        else selectedSections.push(s);
+        localStorage.setItem('sel_' + currentContract.id, JSON.stringify(selectedSections));
+        renderUI();
+    }
+
+    function updateChart() {
         const sections = currentContract.contract_sections_breakdown || {};
         let labels = [], bData = [], sData = [];
 
@@ -26,10 +264,18 @@ function updateChart() {
                     datalabels: { 
                         align: 'top', 
                         anchor: 'end', 
-                        formatter: (v) => v > 0 ? 'RM' + v.toLocaleString() : '', 
+                        formatter: (v) => v > 0 ? 'RM ' + v.toLocaleString() : '', 
                         font: { size: 9, weight: 'bold' } 
                     }
                 }
             }
         });
     }
+
+    function toggleSubModule(show) {
+        document.getElementById('subModuleOverlay').style.display = show ? 'block' : 'none';
+        document.getElementById('formFrame').src = show ? 'kontrak.html' : 'about:blank';
+    }
+</script>
+</body>
+</html>
