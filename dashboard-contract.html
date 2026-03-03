@@ -213,10 +213,15 @@
 
         selectedSections.sort().forEach(s => {
             if(!sections[s]) return;
+            
+            // PENGIRAAN DINAMIK: Kira total guna dari Work Orders
             let used = 0;
-            currentWO.forEach(wo => { if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; });
+            currentWO.forEach(wo => { 
+                if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; 
+            });
 
-            const budget = sections[s].amt || 0;
+            // BAJET ASAL (Baseline dari Breakdown)
+            const budget = sections[s].amt || 0; 
             const percent = (used/budget)*100 || 0;
             const color = percent > 85 ? 'var(--ios-red)' : (percent > 60 ? 'var(--ios-orange)' : 'var(--ios-blue)');
 
@@ -227,13 +232,16 @@
                         <i class="fa fa-times-circle" style="color:#ccc; cursor:pointer;" onclick="toggleSection('${s}')"></i>
                     </div>
                     <div class="avg-stats">
-                        <div class="avg-item">PLAN: RM ${(budget/totalMonths).toLocaleString()}/bln</div>
-                        <div class="avg-item">ACTUAL: RM ${(used/monthsPassed).toLocaleString()}/bln</div>
+                        <div class="avg-item">BAJET: RM ${budget.toLocaleString()}</div>
+                        <div class="avg-item">GUNA: RM ${used.toLocaleString()}</div>
                     </div>
                     <div class="prog-bar-bg">
                         <div class="prog-bar-fill" data-width="${percent}%" style="background:${color}"></div>
                     </div>
-                    <div style="font-size:10px; margin-top:5px; font-weight:700;">BAKI: RM ${(budget-used).toLocaleString()}</div>
+                    <div style="display:flex; justify-content:space-between; font-size:10px; margin-top:5px; font-weight:700;">
+                        <span>BAKI: RM ${(budget-used).toLocaleString()}</span>
+                        <span>${percent.toFixed(1)}%</span>
+                    </div>
                 </div>
             `;
         });
@@ -252,9 +260,12 @@
 
         selectedSections.sort().forEach(s => {
             labels.push(s);
+            
+            // Bajet Asal
             const budget = sections[s].amt || 0;
             bData.push(budget);
             
+            // Penggunaan Sebenar (Dinamik dari WO)
             let used = 0;
             currentWO.forEach(wo => { if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; });
             sData.push(used);
@@ -272,7 +283,7 @@
                 data: {
                     labels: labels,
                     datasets: [
-                        { label: 'Bajet', data: bData, backgroundColor: '#e5e5ea', borderRadius: 8 },
+                        { label: 'Bajet Penuh', data: bData, backgroundColor: '#e5e5ea', borderRadius: 8 },
                         { label: 'Guna', data: sData, backgroundColor: '#007AFF', borderRadius: 8 }
                     ]
                 },
@@ -285,13 +296,11 @@
                             anchor: 'end', 
                             textAlign: 'center',
                             formatter: (value, context) => {
-                                // Hanya papar peratusan pada palang 'Guna' (dataset index 1)
                                 if (context.datasetIndex === 1) {
                                     const budget = context.chart.data.datasets[0].data[context.dataIndex];
                                     const percent = budget > 0 ? Math.round((value / budget) * 100) : 0;
                                     return value > 0 ? `RM ${value.toLocaleString()}\n(${percent}%)` : '';
                                 }
-                                // Untuk palang 'Bajet', papar RM sahaja
                                 return value > 0 ? `RM ${value.toLocaleString()}` : '';
                             },
                             font: { size: 9, weight: 'bold' },
