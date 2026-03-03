@@ -219,7 +219,6 @@
         if(!currentContract) return;
         const sections = currentContract.contract_sections_breakdown || {};
         
-        // --- LOGIK TEMPOH KONTRAK ---
         const start = new Date(currentContract.contract_start);
         const end = new Date(currentContract.contract_end);
         const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
@@ -237,7 +236,7 @@
             currentWO.forEach(wo => { if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; });
 
             const budget = sections[s].amt || 0; 
-            const plannedMonthly = budget / totalMonths; // Kira bajet dirancang bulanan
+            const plannedMonthly = budget / totalMonths; 
             const percent = (used/budget)*100 || 0;
             const color = percent > 85 ? 'var(--ios-red)' : (percent > 60 ? 'var(--ios-orange)' : 'var(--ios-blue)');
 
@@ -271,6 +270,7 @@
     }
 
     function updateChart() {
+        if (!currentContract) return;
         const sections = currentContract.contract_sections_breakdown || {};
         
         const start = new Date(currentContract.contract_start);
@@ -283,9 +283,9 @@
         let labels = [], targetAvgData = [], actualAvgData = [];
 
         selectedSections.sort().forEach(s => {
-            labels.push(s);
+            labels.push(s); 
             
-            const fullBudget = sections[s].amt || 0;
+            const fullBudget = sections[s]?.amt || 0;
             const targetMonthly = fullBudget / totalMonths;
             targetAvgData.push(targetMonthly.toFixed(2));
 
@@ -311,16 +311,12 @@
                             label: 'Anggaran Bulanan', 
                             data: targetAvgData, 
                             backgroundColor: 'rgba(200, 200, 205, 0.5)',
-                            borderColor: '#8e8e93',
-                            borderWidth: 1,
                             borderRadius: 5
                         },
                         { 
                             label: 'Sebenar Bulanan', 
                             data: actualAvgData, 
-                            backgroundColor: 'rgba(0, 122, 255, 0.8)',
-                            borderColor: '#007AFF',
-                            borderWidth: 1,
+                            backgroundColor: '#007AFF',
                             borderRadius: 5
                         }
                     ]
@@ -332,16 +328,24 @@
                         datalabels: { 
                             anchor: 'end', align: 'top', 
                             font: { size: 9, weight: 'bold' },
-                            formatter: (val) => val > 0 ? `RM ${Math.round(val).toLocaleString()}` : ''
+                            formatter: (val) => val > 0 ? `RM${Math.round(val).toLocaleString()}` : ''
                         }
                     },
                     scales: {
                         y: { 
                             beginAtZero: true, 
-                            ticks: { font: { size: 9 } },
-                            title: { display: true, text: 'RM / Bulan', font: { size: 10 } }
+                            ticks: { font: { size: 9 } }
                         },
-                        x: { ticks: { font: { size: 10, weight: 'bold' } } }
+                        x: { 
+                            display: true, // Paksa X-axis muncul
+                            ticks: { 
+                                display: true,
+                                font: { size: 10, weight: 'bold' },
+                                autoSkip: false, // JANGAN skip label walaupun rapat
+                                maxRotation: 45,
+                                minRotation: 0
+                            }
+                        }
                     }
                 }
             });
