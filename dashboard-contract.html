@@ -8,79 +8,92 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
         :root { 
             --ios-blue: #007AFF; --ios-green: #34C759; --ios-orange: #FF9500; --ios-red: #FF3B30;
-            --dark-bg: #1c1c1e; --card-bg: #ffffff; --glass: rgba(255,255,255,0.8);
+            --bg: #f5f5f7; --card: #ffffff; --text-main: #1d1d1f; --text-sub: #86868b;
         }
         
         body { 
-            font-family: -apple-system, system-ui, sans-serif; 
-            background: #f2f2f7; 
-            margin: 0; 
-            height: 100vh; 
-            display: flex; 
-            flex-direction: column; 
-            overflow: hidden; 
+            font-family: 'Inter', -apple-system, sans-serif; 
+            background: var(--bg); color: var(--text-main);
+            margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; 
+            -webkit-font-smoothing: antialiased;
         }
 
         .glass-header { 
-            width: 100%; height: 60px; 
-            background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 1px 10px rgba(0,0,0,0.05); z-index: 1000; flex-shrink: 0;
-            position: relative;
+            width: 100%; height: 65px; background: rgba(255,255,255,0.7); backdrop-filter: blur(20px);
+            display: flex; align-items: center; box-shadow: 0 1px 0 rgba(0,0,0,0.05); z-index: 1000; flex-shrink: 0;
         }
 
         .back-btn {
-            position: absolute; left: 20px; background: #e5e5ea; border: none;
-            width: 35px; height: 35px; border-radius: 10px; display: flex;
-            align-items: center; justify-content: center; cursor: pointer;
-            color: var(--ios-blue); transition: 0.2s;
+            margin-left: 20px; background: #eee; border: none; width: 32px; height: 32px; 
+            border-radius: 50%; display: flex; align-items: center; justify-content: center; 
+            cursor: pointer; color: #555; transition: 0.2s;
         }
 
-        .unit-container { display: flex; gap: 8px; overflow-x: auto; padding: 0 40px 0 70px; scrollbar-width: none; }
+        .unit-container { display: flex; gap: 12px; overflow-x: auto; padding: 0 20px; scrollbar-width: none; flex: 1; }
         .unit-pill { 
-            padding: 8px 16px; border-radius: 15px; background: #e5e5ea; 
-            border: none; cursor: pointer; font-weight: 600; font-size: 12px; white-space: nowrap; transition: 0.3s;
+            padding: 6px 14px; border-radius: 20px; background: transparent; color: var(--text-sub);
+            border: 1px solid transparent; cursor: pointer; font-weight: 500; font-size: 13px; white-space: nowrap; transition: 0.3s;
         }
-        .unit-pill.active { background: var(--ios-blue); color: white; }
+        .unit-pill.active { background: #000; color: #fff; }
 
-        .fab { position: fixed; top: 12px; right: 20px; width: 35px; height: 35px; background: var(--ios-blue); color: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1100; }
-
-        .main-wrapper { display: flex; flex: 1; overflow: hidden; padding: 10px; gap: 15px; }
-        .contract-sidebar { width: 220px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex-shrink: 0; padding-right: 5px; }
-        .c-card { background: var(--card-bg); border-radius: 12px; padding: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); cursor: pointer; border: 1px solid rgba(0,0,0,0.05); }
-        .c-card.active { border-color: var(--ios-blue); background: #f0f7ff; }
-        .c-card h4 { margin: 0; font-size: 11px; color: #1c1c1e; }
-        .c-card .sub-text { font-size: 9px; color: #888; margin-top: 2px; }
+        .main-wrapper { display: flex; flex: 1; overflow: hidden; padding: 20px; gap: 20px; }
         
+        /* Sidebar Aesthetic */
+        .contract-sidebar { width: 260px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; flex-shrink: 0; }
+        .c-card { 
+            background: var(--card); border-radius: 14px; padding: 15px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03); cursor: pointer; border: 1px solid rgba(0,0,0,0.02); transition: 0.3s;
+        }
+        .c-card.active { border-color: var(--ios-blue); box-shadow: 0 8px 20px rgba(0,122,255,0.1); }
+        .c-card h4 { margin: 0; font-size: 12px; font-weight: 700; color: var(--ios-blue); letter-spacing: 0.5px; }
+        .c-card .sub-text { font-size: 10px; color: var(--text-sub); margin-top: 4px; line-height: 1.4; font-weight: 500; }
+        
+        /* Panel Aesthetic */
         .analysis-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-        #analysis-panel { display: none; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); flex: 1; overflow: hidden; flex-direction: column; }
-        
-        .health-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex: 1; overflow: hidden; margin-top: 5px; }
-        .chart-box { padding: 15px; background: #f9f9fb; border-radius: 15px; display: flex; flex-direction: column; min-height: 0; position: relative; }
-        
-        .section-row { background: #fff; border: 1px solid var(--ios-blue); border-radius: 12px; padding: 10px; margin-bottom: 8px; }
-        
-        .bar-stack { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
-        .prog-bar-bg { width: 100%; height: 8px; background: #eee; border-radius: 4px; overflow: hidden; position: relative; }
-        .prog-bar-fill { height: 100%; border-radius: 4px; transition: 1s cubic-bezier(0.4, 0, 0.2, 1); width: 0 !important; }
-        
-        .label-row { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1px; }
-        .label-txt { font-size: 8px; font-weight: 800; color: #8e8e93; text-transform: uppercase; }
-        .val-txt { font-size: 9px; font-weight: bold; }
+        #analysis-panel { 
+            display: none; background: white; border-radius: 24px; padding: 25px; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.04); flex: 1; overflow: hidden; flex-direction: column; 
+        }
 
-        .avg-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
-        .avg-item { font-size: 9px; font-weight: 600; color: #666; }
-        #selectedSectionContainer { flex: 1; overflow-y: auto; padding-right: 5px; }
-        .manage-btn { background: #f2f2f7; border: none; padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; color: var(--ios-blue); cursor: pointer; }
-        .sel-chip { display: inline-block; padding: 4px 10px; border-radius: 12px; background: #e5e5ea; margin: 3px; font-size: 10px; cursor: pointer; font-weight: 600; }
+        .health-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 25px; flex: 1; overflow: hidden; }
+        
+        /* Chart Box */
+        .chart-box { padding: 20px; background: #fbfbfd; border-radius: 20px; display: flex; flex-direction: column; }
+        .chart-header { font-size: 11px; font-weight: 700; color: #a1a1a6; letter-spacing: 1px; margin-bottom: 15px; }
+
+        /* Section Rows - THE AESTHETIC PART */
+        .section-row { 
+            background: #fff; border-radius: 16px; padding: 16px; margin-bottom: 12px;
+            border: 1px solid #f2f2f7; box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+            border-left: 4px solid var(--ios-blue);
+        }
+        
+        .section-header-flex { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+        .sec-title { font-size: 14px; font-weight: 800; color: var(--text-main); letter-spacing: -0.3px; }
+        .sec-desc { font-size: 10px; font-weight: 500; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.3px; flex: 1; }
+        .sec-var { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: #f2f2f7; }
+
+        .bar-stack { display: flex; flex-direction: column; gap: 6px; }
+        .prog-bar-bg { width: 100%; height: 6px; background: #f2f2f7; border-radius: 10px; overflow: hidden; }
+        .prog-bar-fill { height: 100%; border-radius: 10px; transition: 1.2s cubic-bezier(0.2, 0.8, 0.2, 1); width: 0 !important; }
+        
+        .label-row { display: flex; justify-content: space-between; font-size: 9px; font-weight: 600; color: var(--text-sub); }
+        .val-bold { color: var(--text-main); font-weight: 700; }
+
+        #selectedSectionContainer { flex: 1; overflow-y: auto; padding-right: 8px; scrollbar-width: thin; }
+        
+        .manage-btn { background: #000; color: #fff; border: none; padding: 7px 15px; border-radius: 10px; font-size: 11px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .manage-btn:hover { opacity: 0.8; }
+
+        .sel-chip { display: inline-block; padding: 6px 12px; border-radius: 10px; background: #f2f2f7; margin: 4px; font-size: 10px; cursor: pointer; font-weight: 600; transition: 0.2s; }
         .sel-chip.active { background: var(--ios-blue); color: white; }
     </style>
 </head>
 <body>
-
-    <div class="fab" onclick="window.location.href='kontrak.html'"><i class="fa fa-plus"></i></div>
 
     <div class="glass-header">
         <button class="back-btn" onclick="window.location.href='index.html'"><i class="fa fa-chevron-left"></i></button>
@@ -92,29 +105,30 @@
 
         <div class="analysis-container">
             <div id="analysis-panel">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #f2f2f7;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 25px;">
                     <div>
-                        <h1 id="panel-title" style="margin:0; font-size: 24px; letter-spacing: -0.5px; color: var(--ios-blue);">Analisis</h1>
-                        <p id="panel-vendor" style="margin:2px 0 0 0; color: #8e8e93; font-size: 13px; font-weight: 500;"></p>
+                        <h1 id="panel-title" style="margin:0; font-size: 26px; font-weight: 800; letter-spacing: -1px;">Analisis</h1>
+                        <p id="panel-vendor" style="margin:4px 0 0 0; color: var(--text-sub); font-size: 13px; font-weight: 500;"></p>
                     </div>
-                    <button onclick="document.getElementById('analysis-panel').style.display='none'" style="background:#f2f2f7; border:none; width: 35px; height: 35px; border-radius:10px; cursor:pointer;">
+                    <button onclick="document.getElementById('analysis-panel').style.display='none'" style="background:#f2f2f7; border:none; width: 32px; height: 32px; border-radius:50%; cursor:pointer;">
                         <i class="fa fa-times" style="color: #8e8e93;"></i>
                     </button>
                 </div>
 
                 <div class="health-grid">
                     <div class="chart-box">
-                        <div style="font-size: 10px; font-weight: bold; color: #666; margin-bottom: 10px;">PURATA BULANAN (RM)</div>
+                        <div class="chart-header">PURATA BULANAN (RM)</div>
                         <div style="flex:1; min-height:0; width:100%;">
                             <canvas id="healthChart"></canvas>
                         </div>
                     </div>
+                    
                     <div style="display: flex; flex-direction: column; overflow: hidden;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px; flex-shrink: 0;">
-                            <h3 style="margin:0; font-size: 16px;">Section Breakdown</h3>
-                            <button class="manage-btn" onclick="toggleSelector()"><i class="fa fa-cog"></i> Urus</button>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+                            <h3 style="margin:0; font-size: 17px; font-weight: 800; letter-spacing: -0.5px;">Breakdown</h3>
+                            <button class="manage-btn" onclick="toggleSelector()"><i class="fa fa-sliders"></i> Filter</button>
                         </div>
-                        <div id="sectionSelector" style="display:none; background: #f9f9fb; padding: 10px; border-radius: 15px; margin-bottom: 10px; flex-shrink:0;">
+                        <div id="sectionSelector" style="display:none; background: #f2f2f7; padding: 12px; border-radius: 16px; margin-bottom: 15px;">
                             <div id="fullSectionList"></div>
                         </div>
                         <div id="selectedSectionContainer"></div>
@@ -147,7 +161,12 @@
         btn.classList.add('active');
         const res = await fetch(`${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}&order=contract_start.asc`, { headers });
         const data = await res.json();
-        document.getElementById('contractList').innerHTML = data.map(c => `<div class="c-card" id="card-${c.id}" onclick='selectCard(${c.id}); openAnalysis(${JSON.stringify(c)})'><h4>${c.contract_code}</h4><div class="sub-text">${c.contract_name}</div></div>`).join('');
+        document.getElementById('contractList').innerHTML = data.map(c => `
+            <div class="c-card" id="card-${c.id}" onclick='selectCard(${c.id}); openAnalysis(${JSON.stringify(c)})'>
+                <h4>${c.contract_code}</h4>
+                <div class="sub-text">${c.contract_name}</div>
+            </div>
+        `).join('');
         if(data.length > 0) { selectCard(data[0].id); openAnalysis(data[0]); }
     }
 
@@ -165,7 +184,6 @@
         const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}`, { headers });
         currentWO = await resW.json();
         
-        // Ambil list section dari keys JSONB
         const allSections = Object.keys(currentContract.contract_sections_breakdown || {});
         selectedSections = currentContract.selected_sections?.length ? currentContract.selected_sections : allSections;
         
@@ -175,9 +193,7 @@
     function renderUI() {
         if(!currentContract) return;
         const sections = currentContract.contract_sections_breakdown || {};
-        const start = new Date(currentContract.contract_start);
-        const end = new Date(currentContract.contract_end);
-        const today = new Date();
+        const start = new Date(currentContract.contract_start), end = new Date(currentContract.contract_end), today = new Date();
         const plannedPercent = Math.min(100, Math.max(0, ((today - start) / (end - start)) * 100));
 
         const mainContainer = document.getElementById('selectedSectionContainer');
@@ -188,42 +204,35 @@
             if(!sectionData) return;
             
             let used = 0;
-            currentWO.forEach(wo => { 
-                if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; 
-            });
+            currentWO.forEach(wo => { if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; });
 
             const budget = sectionData.amt || 0;
-            const description = sectionData.desc || s; // Ambil desc dari JSONB
-            
             const actualPercent = budget > 0 ? (used/budget)*100 : 0;
             const plannedAmt = budget * (plannedPercent / 100);
             const diff = actualPercent - plannedPercent;
             
-            let statusColor = 'var(--ios-green)';
-            if(diff > 10) statusColor = 'var(--ios-red)'; 
-            else if(diff > 0) statusColor = 'var(--ios-orange)';
+            let statusColor = var(--ios-green);
+            if(diff > 10) statusColor = var(--ios-red); 
+            else if(diff > 0) statusColor = var(--ios-orange);
 
             mainContainer.innerHTML += `
-                <div class="section-row">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
-                        <div style="flex:1;">
-                            <div style="font-weight:bold; font-size:11px; color:var(--ios-blue);">${s}</div>
-                            <div style="font-size:10px; color:#555; font-weight:500; line-height:1.2; margin-top:2px;">${description}</div>
-                        </div>
-                        <div style="font-size:10px; font-weight:800; color:${statusColor}; white-space:nowrap;">${diff > 0 ? '+' : ''}${diff.toFixed(1)}% var</div>
+                <div class="section-row" style="border-left-color: ${statusColor}">
+                    <div class="section-header-flex">
+                        <div class="sec-title">${s}</div>
+                        <div class="sec-desc">${sectionData.desc}</div>
+                        <div class="sec-var" style="color: ${statusColor}">${diff > 0 ? '+' : ''}${diff.toFixed(1)}%</div>
                     </div>
-                    <div class="avg-stats">
-                        <div class="avg-item">BAJET: RM ${budget.toLocaleString()}</div>
-                    </div>
+                    
                     <div class="bar-stack">
                         <div class="label-row">
-                            <span class="label-txt">PLANNED: RM ${plannedAmt.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
-                            <span class="val-txt" style="color:#888;">${plannedPercent.toFixed(1)}%</span>
+                            <span>PLANNED <span class="val-bold">RM ${plannedAmt.toLocaleString()}</span></span>
+                            <span>${plannedPercent.toFixed(1)}%</span>
                         </div>
                         <div class="prog-bar-bg"><div class="prog-bar-fill" data-width="${plannedPercent}%" style="background:#d1d1d6;"></div></div>
-                        <div class="label-row" style="margin-top:2px;">
-                            <span class="label-txt" style="color:${statusColor}">ACTUAL: RM ${used.toLocaleString()}</span>
-                            <span class="val-txt" style="color:${statusColor}">${actualPercent.toFixed(1)}%</span>
+                        
+                        <div class="label-row" style="margin-top:4px;">
+                            <span>ACTUAL <span class="val-bold" style="color:${statusColor}">RM ${used.toLocaleString()}</span></span>
+                            <span style="color:${statusColor}">${actualPercent.toFixed(1)}%</span>
                         </div>
                         <div class="prog-bar-bg"><div class="prog-bar-fill" data-width="${actualPercent}%" style="background:${statusColor}"></div></div>
                     </div>
@@ -245,17 +254,11 @@
         const totalMonths = Math.max(1, (end.getFullYear()-start.getFullYear())*12 + (end.getMonth()-start.getMonth()));
         const monthsElapsed = Math.max(1, (today.getFullYear()-start.getFullYear())*12 + (today.getMonth()-start.getMonth()));
 
-        let shortLabels = [], targetD = [], actualD = [];
-        
+        let labels = [], targetD = [], actualD = [];
         selectedSections.sort().forEach(s => {
-            const sectionData = sections[s];
-            if(!sectionData) return;
-
-            shortLabels.push(s); // "SECTION A", "SECTION B" etc
-            
-            const b = sectionData.amt || 0;
+            labels.push(s); 
+            const b = sections[s]?.amt || 0;
             targetD.push((b/totalMonths).toFixed(0));
-            
             let u = 0;
             currentWO.forEach(wo => { if(wo.section_category?.[s]) u += wo.section_category[s].amt || 0; });
             actualD.push((u/monthsElapsed).toFixed(0));
@@ -263,44 +266,29 @@
 
         const ctx = document.getElementById('healthChart').getContext('2d');
         if (myChart) {
-            myChart.data.labels = shortLabels; 
+            myChart.data.labels = labels; 
             myChart.data.datasets[0].data = targetD; 
             myChart.data.datasets[1].data = actualD; 
             myChart.update();
         } else {
             myChart = new Chart(ctx, {
                 type: 'bar',
-                data: { labels: shortLabels, datasets: [
-                    { label: 'Target', data: targetD, backgroundColor: '#e5e5ea', borderRadius: 6, borderSkipped: false },
-                    { label: 'Sebenar', data: actualD, backgroundColor: '#007AFF', borderRadius: 6, borderSkipped: false }
+                data: { labels, datasets: [
+                    { label: 'Target', data: targetD, backgroundColor: '#e5e5ea', borderRadius: 8 },
+                    { label: 'Actual', data: actualD, backgroundColor: '#007AFF', borderRadius: 8 }
                 ]},
                 options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false,
-                    layout: { padding: { top: 30, bottom: 5 } },
+                    responsive: true, maintainAspectRatio: false,
                     plugins: { 
                         legend: { display: false },
                         datalabels: { 
-                            display: true, 
-                            anchor: 'end', 
-                            align: 'top', 
-                            offset: 2,
-                            font: { size: 9, weight: 'bold' },
+                            anchor: 'end', align: 'top', font: { size: 9, weight: '700', family: 'Inter' },
                             formatter: (val) => val > 0 ? Number(val).toLocaleString() : ''
                         } 
                     },
                     scales: {
-                        y: { 
-                            display: true, 
-                            beginAtZero: true,
-                            grid: { color: 'rgba(0,0,0,0.05)' },
-                            ticks: { font: { size: 8 } }
-                        },
-                        x: { 
-                            display: true, 
-                            grid: { display: false }, 
-                            ticks: { font: { size: 9, weight: '700' } } 
-                        }
+                        y: { beginAtZero: true, grid: { color: '#f2f2f7' }, ticks: { font: { size: 9 } } },
+                        x: { grid: { display: false }, ticks: { font: { size: 9, weight: '600' } } }
                     }
                 }
             });
@@ -311,14 +299,18 @@
         const el = document.getElementById('sectionSelector');
         el.style.display = el.style.display === 'none' ? 'block' : 'none';
         const sections = currentContract.contract_sections_breakdown || {};
-        document.getElementById('fullSectionList').innerHTML = Object.keys(sections).sort().map(s => `<span class="sel-chip ${selectedSections.includes(s)?'active':''}" onclick="toggleSection('${s}')">${s}</span>`).join('');
+        document.getElementById('fullSectionList').innerHTML = Object.keys(sections).sort().map(s => `
+            <span class="sel-chip ${selectedSections.includes(s)?'active':''}" onclick="toggleSection('${s}')">${s}</span>
+        `).join('');
     }
 
     async function toggleSection(s) {
         if(selectedSections.includes(s)) selectedSections = selectedSections.filter(x => x !== s);
         else selectedSections.push(s);
         renderUI();
-        await fetch(`${SB_URL}/rest/v1/contract?id=eq.${currentContract.id}`, { method: 'PATCH', headers, body: JSON.stringify({ selected_sections: selectedSections }) });
+        await fetch(`${SB_URL}/rest/v1/contract?id=eq.${currentContract.id}`, { 
+            method: 'PATCH', headers, body: JSON.stringify({ selected_sections: selectedSections }) 
+        });
     }
 </script>
 </body>
