@@ -95,7 +95,7 @@
 
         <div class="row"><div class="num">10</div><div class="label">PROVISIONAL SUM</div><div class="colon">:</div><div class="rm">RM</div><div class="val-num" id="f_ps_sum">0.00</div></div>
         <div class="row"><div class="num">11</div><div class="label">ANGGARAN KERJA (S.O.R)</div><div class="colon">:</div><div class="rm">RM</div><div class="val-num" id="f_sor_work">0.00</div></div>
-        <div class="row"><div class="num">12</div><div class="label">ANGGARAN KERJA (Tambahan)</div><div class="colon">:</div><div class="rm">RM</div><div class="val-num"> - </div></div>
+        <div class="row"><div class="num">12</div><div class="label">ANGGARAN KERJA (Tambahan)</div><div class="colon">:</div><div class="rm">RM</div><div class="val-num" id="f_add_work">0.00</div></div>
 
         <div class="line-bold"></div>
 
@@ -130,7 +130,7 @@
 
     <script>
         const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
-        const SB_KEY = 'YOUR_API_KEY'; // Sila masukkan Anon Key anda
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks'; // Sila masukkan Anon Key anda semula
 
         async function fetchData() {
             const searchId = document.getElementById('input_work_id').value;
@@ -149,34 +149,38 @@
                 const b = c.contract_sections_breakdown || {};
                 const s = data.section_category || {};
 
-                // Isi Data ke Form
+                // Isi Data ke Form Utama
                 document.getElementById('f_ref').innerText = `${c.contract_code} - ${data.sequence_no}`;
                 document.getElementById('f_work_id').innerText = data.work_id;
                 document.getElementById('f_contract_code').innerText = c.contract_code;
                 document.getElementById('f_contractor').innerText = c.contractor;
                 document.getElementById('f_period').innerText = `${c.contract_start} ~ ${c.contract_end}`;
                 
-                // Nilai Section dari Kontrak (Master)
+                // --- PERBAIKAN BARIS 8 - 12 (Anggaran Master & Kerja Semasa) ---
+                
+                // Nilai Master dari Kontrak (No 6, 8, 10)
                 document.getElementById('f_lc_sum').innerText = (b["LABOUR CHARGES"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
                 document.getElementById('f_ssp_sum').innerText = (b["SUPPLY SPARE PART"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
                 document.getElementById('f_ps_sum').innerText = (b["PROVISIONAL SUM"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
                 document.getElementById('f_contract_sum').innerText = (c.contract_sum || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
 
-                // Anggaran Kerja Semasa (ID ini sahaja)
+                // Nilai Kerja Semasa (No 7, 9, 11, 12)
                 document.getElementById('f_lc_work').innerText = (s["LABOUR CHARGES"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
                 document.getElementById('f_ssp_work').innerText = (s["SUPPLY SPARE PART"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
                 document.getElementById('f_sor_work').innerText = (s["PROVISIONAL SUM"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+                document.getElementById('f_add_work').innerText = (s["ADDITIONAL"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
 
-                // Baki Keseluruhan (No 14)
+                // --- Baki Keseluruhan (No 14) ---
                 document.getElementById('b_gp').innerText = (b["G&P"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
                 document.getElementById('b_pm').innerText = (b["PM"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
                 document.getElementById('b_pro').innerText = (b["PROACTIVE"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
                 document.getElementById('b_ssp').innerText = (b["SUPPLY SPARE PART"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
                 document.getElementById('b_ps').innerText = (b["PROVISIONAL SUM"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+                document.getElementById('f_salvage').innerText = (data.salvage_value || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
                 
-                // Kira Baki Akhir
+                // Kira Baki Akhir Kontrak (No 15)
                 let totalRem = 0;
-                Object.values(b).forEach(v => totalRem += v.amt);
+                Object.values(b).forEach(v => totalRem += (v.amt || 0));
                 document.getElementById('f_rem_bal').innerText = totalRem.toLocaleString(undefined, {minimumFractionDigits: 2});
 
                 // Tajuk Kerja (No 16)
@@ -184,7 +188,7 @@
 
             } catch (e) {
                 console.error(e);
-                alert("Ralat sistem!");
+                alert("Ralat sistem! Sila semak konsol browser anda.");
             }
         }
     </script>
