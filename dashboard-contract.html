@@ -170,7 +170,7 @@
         document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
         btn.classList.add('active');
         try {
-            const res = await fetch(`${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}&order=contract_start.asc`, { headers });
+            const res = await fetch(`${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}&order=contract_start.desc`, { headers });
             const data = await res.json();
             const list = document.getElementById('contractList');
             list.innerHTML = data.map(c => `
@@ -219,10 +219,15 @@
         if(!currentContract) return;
         const sections = currentContract.contract_sections_breakdown || {};
         
-        // --- LOGIK TEMPOH KONTRAK ---
+        // --- LOGIK TEMPOH & PLANNED PROGRESS ---
         const start = new Date(currentContract.contract_start);
         const end = new Date(currentContract.contract_end);
-        const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
+        const today = new Date();
+        
+        const totalDuration = end - start;
+        const elapsedDuration = today - start;
+        // Peratusan masa yang sepatutnya sudah berlalu (maksimum 100%)
+        const plannedTimePercent = Math.min(100, Math.max(0, (elapsedDuration / totalDuration) * 100));
 
         document.getElementById('fullSectionList').innerHTML = Object.keys(sections).sort().map(s => `
             <span class="sel-chip ${selectedSections.includes(s) ? 'active' : ''}" onclick="toggleSection('${s}')">${s}</span>
@@ -237,9 +242,12 @@
             currentWO.forEach(wo => { if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; });
 
             const budget = sections[s].amt || 0; 
-            const plannedMonthly = budget / totalMonths; // Kira bajet dirancang bulanan
-            const percent = (used/budget)*100 || 0;
-            const color = percent > 85 ? 'var(--ios-red)' : (percent > 60 ? 'var(--ios-orange)' : 'var(--ios-blue)');
+            const actualPercent = (used/budget)*100 || 0;
+            
+            // Penggunaan bajet yang sepatutnya (berdasarkan masa berlalu)
+            const plannedUtilisedAmt = budget * (plannedTimePercent / 100);
+            
+            const color = actualPercent > plannedTimePercent ? 'var(--ios-red)' : (actualPercent > (plannedTimePercent * 0.8) ? 'var(--ios-orange)' : 'var(--ios-blue)');
 
             mainContainer.innerHTML += `
                 <div class="section-row">
@@ -249,14 +257,14 @@
                     </div>
                     <div class="avg-stats">
                         <div class="avg-item">BAJET: RM ${budget.toLocaleString()}</div>
-                        <div class="avg-item" style="color: #8e8e93;">PLANNED (MO): RM ${plannedMonthly.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+                        <div class="avg-item" style="color: #34C759;">PLANNED UTIL: RM ${plannedUtilisedAmt.toLocaleString(undefined, {maximumFractionDigits:0})} (${plannedTimePercent.toFixed(1)}%)</div>
                     </div>
                     <div class="avg-stats">
                         <div class="avg-item">GUNA: RM ${used.toLocaleString()}</div>
-                        <div class="avg-item" style="color: ${color};">PROGRESS: ${percent.toFixed(1)}%</div>
+                        <div class="avg-item" style="color:${color}">ACTUAL UTIL: ${actualPercent.toFixed(1)}%</div>
                     </div>
                     <div class="prog-bar-bg">
-                        <div class="prog-bar-fill" data-width="${percent}%" style="background:${color}"></div>
+                        <div class="prog-bar-fill" data-width="${actualPercent}%" style="background:${color}"></div>
                     </div>
                 </div>
             `;
@@ -272,7 +280,6 @@
 
     function updateChart() {
         const sections = currentContract.contract_sections_breakdown || {};
-        
         const start = new Date(currentContract.contract_start);
         const end = new Date(currentContract.contract_end);
         const today = new Date();
@@ -284,7 +291,6 @@
 
         selectedSections.sort().forEach(s => {
             labels.push(s);
-            
             const fullBudget = sections[s].amt || 0;
             const targetMonthly = fullBudget / totalMonths;
             targetAvgData.push(targetMonthly.toFixed(2));
