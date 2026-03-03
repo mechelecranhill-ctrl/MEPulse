@@ -66,6 +66,7 @@
         .main-wrapper { display: flex; flex: 1; overflow: hidden; padding: 10px; gap: 15px; }
         .contract-sidebar { width: 220px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex-shrink: 0; padding-right: 5px; }
         .c-card { background: var(--card-bg); border-radius: 12px; padding: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); transition: 0.2s; cursor: pointer; border: 1px solid rgba(0,0,0,0.05); }
+        .c-card.active { border-color: var(--ios-blue); background: #f0f7ff; }
         .c-card h4 { margin: 0; font-size: 11px; color: #1c1c1e; overflow: hidden; text-overflow: ellipsis; }
         .c-card .sub-text { font-size: 9px; color: #888; margin-top: 2px; }
         .analysis-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
@@ -81,8 +82,6 @@
         #selectedSectionContainer { flex: 1; overflow-y: auto; padding-right: 5px; }
         .sel-chip { display: inline-block; padding: 4px 10px; border-radius: 12px; background: #e5e5ea; margin: 3px; font-size: 10px; cursor: pointer; font-weight: 600; }
         .sel-chip.active { background: var(--ios-blue); color: white; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: #d1d1d6; border-radius: 10px; }
     </style>
 </head>
 <body>
@@ -154,8 +153,17 @@
         try {
             const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
             const units = await res.json();
-            document.getElementById('unitNav').innerHTML = units.map(u => `<button class="unit-pill" onclick="fetchContracts(${u.id}, this)">${u.unit_name}</button>`).join('');
-            if(units.length > 0) document.querySelector('.unit-pill').click();
+            
+            const nav = document.getElementById('unitNav');
+            nav.innerHTML = units.map(u => `<button class="unit-pill" id="unit-${u.id}" onclick="fetchContracts(${u.id}, this)">${u.unit_name}</button>`).join('');
+            
+            // Cari INSTRUMENTASI atau ambil yang pertama
+            const instUnit = units.find(u => u.unit_name.toUpperCase() === 'INSTRUMENTASI');
+            if(instUnit) {
+                document.getElementById(`unit-${instUnit.id}`).click();
+            } else if(units.length > 0) {
+                document.querySelector('.unit-pill').click();
+            }
         } catch (e) { console.error("Error units:", e); }
     }
 
@@ -163,15 +171,32 @@
         document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
         btn.classList.add('active');
         try {
-            const res = await fetch(`${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}`, { headers });
+            // Fetch contracts sorted by contract_start descending (terbaru di atas)
+            const res = await fetch(`${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}&order=contract_start.desc`, { headers });
             const data = await res.json();
-            document.getElementById('contractList').innerHTML = data.map(c => `
-                <div class="c-card" onclick='openAnalysis(${JSON.stringify(c)})'>
+            
+            const list = document.getElementById('contractList');
+            list.innerHTML = data.map(c => `
+                <div class="c-card" id="card-${c.id}" onclick='selectCard(${c.id}); openAnalysis(${JSON.stringify(c)})'>
                     <h4>${c.contract_code}</h4>
                     <div class="sub-text">${c.contract_name}</div>
                 </div>
             `).join('');
+
+            // Automatik buka kontrak pertama jika ada
+            if(data.length > 0) {
+                selectCard(data[0].id);
+                openAnalysis(data[0]);
+            } else {
+                document.getElementById('analysis-panel').style.display = 'none';
+            }
         } catch (e) { console.error("Error contracts:", e); }
+    }
+
+    function selectCard(id) {
+        document.querySelectorAll('.c-card').forEach(c => c.classList.remove('active'));
+        const activeCard = document.getElementById(`card-${id}`);
+        if(activeCard) activeCard.classList.add('active');
     }
 
     async function openAnalysis(contract) {
@@ -198,29 +223,21 @@
     function renderUI() {
         if(!currentContract) return;
         const sections = currentContract.contract_sections_breakdown || {};
-        const selectorContainer = document.getElementById('fullSectionList');
-        selectorContainer.innerHTML = Object.keys(sections).sort().map(s => `
+        
+        document.getElementById('fullSectionList').innerHTML = Object.keys(sections).sort().map(s => `
             <span class="sel-chip ${selectedSections.includes(s) ? 'active' : ''}" onclick="toggleSection('${s}')">${s}</span>
         `).join('');
 
         const mainContainer = document.getElementById('selectedSectionContainer');
         mainContainer.innerHTML = '';
 
-        const start = new Date(currentContract.contract_start);
-        const end = new Date(currentContract.contract_end);
-        const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
-        const monthsPassed = Math.max(1, (new Date().getFullYear() - start.getFullYear()) * 12 + (new Date().getMonth() - start.getMonth()));
-
         selectedSections.sort().forEach(s => {
             if(!sections[s]) return;
-            
-            // PENGIRAAN DINAMIK: Kira total guna dari Work Orders
             let used = 0;
             currentWO.forEach(wo => { 
                 if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; 
             });
 
-            // BAJET ASAL (Baseline dari Breakdown)
             const budget = sections[s].amt || 0; 
             const percent = (used/budget)*100 || 0;
             const color = percent > 85 ? 'var(--ios-red)' : (percent > 60 ? 'var(--ios-orange)' : 'var(--ios-blue)');
@@ -260,12 +277,8 @@
 
         selectedSections.sort().forEach(s => {
             labels.push(s);
-            
-            // Bajet Asal
             const budget = sections[s].amt || 0;
             bData.push(budget);
-            
-            // Penggunaan Sebenar (Dinamik dari WO)
             let used = 0;
             currentWO.forEach(wo => { if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; });
             sData.push(used);
@@ -292,9 +305,7 @@
                     animation: { duration: 800, easing: 'easeOutQuart' },
                     plugins: {
                         datalabels: { 
-                            align: 'top', 
-                            anchor: 'end', 
-                            textAlign: 'center',
+                            align: 'top', anchor: 'end', textAlign: 'center',
                             formatter: (value, context) => {
                                 if (context.datasetIndex === 1) {
                                     const budget = context.chart.data.datasets[0].data[context.dataIndex];
@@ -308,14 +319,8 @@
                         }
                     },
                     scales: {
-                        y: { 
-                            beginAtZero: true, 
-                            grid: { display: false },
-                            ticks: { font: { size: 9 } }
-                        },
-                        x: {
-                            ticks: { font: { size: 10, weight: 'bold' } }
-                        }
+                        y: { beginAtZero: true, grid: { display: false }, ticks: { font: { size: 9 } } },
+                        x: { ticks: { font: { size: 10, weight: 'bold' } } }
                     }
                 }
             });
