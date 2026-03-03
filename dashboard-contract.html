@@ -164,7 +164,11 @@
         document.getElementById('panel-vendor').innerText = currentContract.contract_name;
         const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}`, { headers });
         currentWO = await resW.json();
-        selectedSections = currentContract.selected_sections?.length ? currentContract.selected_sections : Object.keys(currentContract.contract_sections_breakdown || {});
+        
+        // Ambil list section dari keys JSONB
+        const allSections = Object.keys(currentContract.contract_sections_breakdown || {});
+        selectedSections = currentContract.selected_sections?.length ? currentContract.selected_sections : allSections;
+        
         renderUI();
     }
 
@@ -180,24 +184,33 @@
         mainContainer.innerHTML = '';
 
         selectedSections.sort().forEach(s => {
-            if(!sections[s]) return;
+            const sectionData = sections[s];
+            if(!sectionData) return;
+            
             let used = 0;
-            currentWO.forEach(wo => { if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; });
+            currentWO.forEach(wo => { 
+                if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; 
+            });
 
-            const budget = sections[s].amt || 0;
-            const actualPercent = (used/budget)*100 || 0;
+            const budget = sectionData.amt || 0;
+            const description = sectionData.desc || s; // Ambil desc dari JSONB
+            
+            const actualPercent = budget > 0 ? (used/budget)*100 : 0;
             const plannedAmt = budget * (plannedPercent / 100);
             const diff = actualPercent - plannedPercent;
+            
             let statusColor = 'var(--ios-green)';
             if(diff > 10) statusColor = 'var(--ios-red)'; 
             else if(diff > 0) statusColor = 'var(--ios-orange)';
 
-            // PAPAR NAMA PENUH KAT SINI
             mainContainer.innerHTML += `
                 <div class="section-row">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div style="font-weight:bold; font-size:12px; color:var(--ios-blue);">${s}</div>
-                        <div style="font-size:10px; font-weight:800; color:${statusColor}">${diff > 0 ? '+' : ''}${diff.toFixed(1)}% variance</div>
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+                        <div style="flex:1;">
+                            <div style="font-weight:bold; font-size:11px; color:var(--ios-blue);">${s}</div>
+                            <div style="font-size:10px; color:#555; font-weight:500; line-height:1.2; margin-top:2px;">${description}</div>
+                        </div>
+                        <div style="font-size:10px; font-weight:800; color:${statusColor}; white-space:nowrap;">${diff > 0 ? '+' : ''}${diff.toFixed(1)}% var</div>
                     </div>
                     <div class="avg-stats">
                         <div class="avg-item">BAJET: RM ${budget.toLocaleString()}</div>
@@ -232,14 +245,17 @@
         const totalMonths = Math.max(1, (end.getFullYear()-start.getFullYear())*12 + (end.getMonth()-start.getMonth()));
         const monthsElapsed = Math.max(1, (today.getFullYear()-start.getFullYear())*12 + (today.getMonth()-start.getMonth()));
 
-        let labels = [], shortLabels = [], targetD = [], actualD = [];
+        let shortLabels = [], targetD = [], actualD = [];
+        
         selectedSections.sort().forEach(s => {
-            labels.push(s);
-            // AMBIL "SECTION A" SAHAJA DARIPADA "SECTION A - LABOUR"
-            shortLabels.push(s.split(' - ')[0]); 
+            const sectionData = sections[s];
+            if(!sectionData) return;
+
+            shortLabels.push(s); // "SECTION A", "SECTION B" etc
             
-            const b = sections[s].amt || 0;
+            const b = sectionData.amt || 0;
             targetD.push((b/totalMonths).toFixed(0));
+            
             let u = 0;
             currentWO.forEach(wo => { if(wo.section_category?.[s]) u += wo.section_category[s].amt || 0; });
             actualD.push((u/monthsElapsed).toFixed(0));
@@ -255,8 +271,8 @@
             myChart = new Chart(ctx, {
                 type: 'bar',
                 data: { labels: shortLabels, datasets: [
-                    { label: 'Target', data: targetD, backgroundColor: '#e5e5ea', borderRadius: {topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0}, borderSkipped: false },
-                    { label: 'Sebenar', data: actualD, backgroundColor: '#007AFF', borderRadius: {topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0}, borderSkipped: false }
+                    { label: 'Target', data: targetD, backgroundColor: '#e5e5ea', borderRadius: 6, borderSkipped: false },
+                    { label: 'Sebenar', data: actualD, backgroundColor: '#007AFF', borderRadius: 6, borderSkipped: false }
                 ]},
                 options: { 
                     responsive: true, 
@@ -283,7 +299,7 @@
                         x: { 
                             display: true, 
                             grid: { display: false }, 
-                            ticks: { font: { size: 9, weight: '600' } } 
+                            ticks: { font: { size: 9, weight: '700' } } 
                         }
                     }
                 }
