@@ -165,22 +165,32 @@
     }
 
     async function openAnalysis(contract) {
-        currentContract = contract;
+        // Paparkan panel dan tajuk dahulu supaya UI rasa responsif
         document.getElementById('analysis-panel').style.display = 'block';
         document.getElementById('panel-title').innerText = contract.contract_code;
         document.getElementById('sectionSelector').style.display = 'none';
 
-        const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contract.id}`, { headers });
-        currentWO = await resW.json();
+        // AMBIL DATA FRESH: Dapatkan data kontrak terkini dari DB untuk pastikan selected_sections yang paling baru dipapar
+        try {
+            const resC = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${contract.id}&select=*`, { headers });
+            const freshContractArray = await resC.json();
+            currentContract = freshContractArray[0];
 
-        // Ambil dari database (selected_sections), jika null/kosong baru ambil semua dari breakdown
-        if(contract.selected_sections && contract.selected_sections.length > 0) {
-            selectedSections = contract.selected_sections;
-        } else {
-            selectedSections = Object.keys(contract.contract_sections_breakdown || {});
+            // Ambil data Work Orders
+            const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}`, { headers });
+            currentWO = await resW.json();
+
+            // Setkan seksyen yang dipilih secara global
+            if(currentContract.selected_sections && currentContract.selected_sections.length > 0) {
+                selectedSections = currentContract.selected_sections;
+            } else {
+                selectedSections = Object.keys(currentContract.contract_sections_breakdown || {});
+            }
+
+            renderUI();
+        } catch (error) {
+            console.error("Gagal memuatkan data analisis:", error);
         }
-
-        renderUI();
     }
 
     function toggleSelector() {
