@@ -54,10 +54,10 @@
         .baki-val { width: 120px; text-align: right; border-bottom: 1px solid #eee; }
 
         /* --- TANDATANGAN --- */
-        .sig-container { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; margin-top: 80px; }
+        .sig-container { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; margin-top: 60px; }
         .sig-box { text-align: center; }
         .sig-line { border-top: 1px dotted black; width: 200px; margin: 0 auto 5px auto; }
-        .footer-note { font-size: 9px; font-style: italic; margin-top: 50px; }
+        .footer-note { font-size: 9px; font-style: italic; margin-top: 40px; }
     </style>
 </head>
 <body>
@@ -107,6 +107,8 @@
                 <div class="baki-row"><div class="baki-label">G&P</div><div class="rm">RM</div><div class="baki-val" id="b_gp">0.00</div></div>
                 <div class="baki-row"><div class="baki-label">PM</div><div class="rm">RM</div><div class="baki-val" id="b_pm">0.00</div></div>
                 <div class="baki-row"><div class="baki-label">PROACTIVE</div><div class="rm">RM</div><div class="baki-val" id="b_pro">0.00</div></div>
+                <div class="baki-row"><div class="baki-label">CALIBRATION</div><div class="rm">RM</div><div class="baki-val" id="b_cal">0.00</div></div>
+                <div class="baki-row"><div class="baki-label">WORKMANSHIP</div><div class="rm">RM</div><div class="baki-val" id="b_work">0.00</div></div>
                 <div class="baki-row"><div class="baki-label">SUPPLY SPARE PART</div><div class="rm">RM</div><div class="baki-val" id="b_ssp">0.00</div></div>
                 <div class="baki-row"><div class="baki-label">PROVISIONAL SUM</div><div class="rm">RM</div><div class="baki-val" id="b_ps">0.00</div></div>
                 <div class="baki-row"><div class="baki-label">SALVAGE VALUE</div><div class="rm">RM</div><div class="baki-val" id="f_salvage">0.00</div></div>
@@ -119,10 +121,10 @@
         <div class="row"><div class="num">16</div><div class="label">TAJUK KERJA</div><div class="colon">:</div><div class="value" id="f_job_title" style="color:red; font-weight:bold; border:none;"></div></div>
 
         <div class="sig-container">
-            <div class="sig-box"><div class="sig-line"></div><strong>Eksekutif Instrumentasi</strong></div>
-            <div class="sig-box"><div class="sig-line"></div><strong>Ketua Seksyen Selenggara</strong></div>
-            <div class="sig-box" style="margin-top:40px;"><div class="sig-line"></div><strong>Ketua Mekanikal & Elektrikal</strong></div>
-            <div class="sig-box" style="margin-top:40px;"><div class="sig-line"></div><strong>Ketua Bahagian Operasi & Penyelenggaraan</strong></div>
+            <div class="sig-box">Dimohon oleh:<br><br><br><br><div class="sig-line"></div><strong>Eksekutif Instrumentasi</strong></div>
+            <div class="sig-box">Disemak oleh:<br><br><br><br><div class="sig-line"></div><strong>Ketua Seksyen Selenggara</strong></div>
+            <div class="sig-box" style="margin-top:30px;">Disahkan oleh:<br><br><br><br><div class="sig-line"></div><strong>Ketua Mekanikal & Elektrikal</strong></div>
+            <div class="sig-box" style="margin-top:30px;">Disokong oleh:<br><br><br><br><div class="sig-line"></div><strong>Ketua Bahagian Operasi & Penyelenggaraan</strong></div>
         </div>
 
         <div class="footer-note">* Sebutharga dan Work Order telah disemak sepenuhnya oleh Pihak Daerah</div>
@@ -130,7 +132,7 @@
 
     <script>
         const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
-        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks'; // Sila masukkan Anon Key anda semula
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
 
         async function fetchData() {
             const searchId = document.getElementById('input_work_id').value;
@@ -139,7 +141,6 @@
             const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` };
             
             try {
-                // Ambil data Work Order dan join dengan Contract
                 const res = await fetch(`${SB_URL}/rest/v1/work_orders?sequence_no=eq.${searchId}&select=*,contract(*)`, { headers });
                 const result = await res.json();
                 
@@ -149,46 +150,50 @@
                 const b = c.contract_sections_breakdown || {};
                 const s = data.section_category || {};
 
-                // Isi Data ke Form Utama
-                document.getElementById('f_ref').innerText = `${c.contract_code} - ${data.sequence_no}`;
+                // 1-5: Info Asas
+                document.getElementById('f_ref').innerText = `RanhillSAJ/M&E/IP/11-57/24 - ${data.sequence_no}`;
                 document.getElementById('f_work_id').innerText = data.work_id;
                 document.getElementById('f_contract_code').innerText = c.contract_code;
                 document.getElementById('f_contractor').innerText = c.contractor;
                 document.getElementById('f_period').innerText = `${c.contract_start} ~ ${c.contract_end}`;
-                
-                // --- PERBAIKAN BARIS 8 - 12 (Anggaran Master & Kerja Semasa) ---
-                
-                // Nilai Master dari Kontrak (No 6, 8, 10)
-                document.getElementById('f_lc_sum').innerText = (b["LABOUR CHARGES"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
-                document.getElementById('f_ssp_sum').innerText = (b["SUPPLY SPARE PART"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
-                document.getElementById('f_ps_sum').innerText = (b["PROVISIONAL SUM"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
-                document.getElementById('f_contract_sum').innerText = (c.contract_sum || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
 
-                // Nilai Kerja Semasa (No 7, 9, 11, 12)
+                // 6-7: Labour Charges
+                document.getElementById('f_lc_sum').innerText = (b["LABOUR CHARGES"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
                 document.getElementById('f_lc_work').innerText = (s["LABOUR CHARGES"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+
+                // 8-9: Supply Spare Part
+                document.getElementById('f_ssp_sum').innerText = (b["SUPPLY SPARE PART"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
                 document.getElementById('f_ssp_work').innerText = (s["SUPPLY SPARE PART"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+
+                // 10-11: Provisional Sum (S.O.R)
+                document.getElementById('f_ps_sum').innerText = (b["PROVISIONAL SUM"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
                 document.getElementById('f_sor_work').innerText = (s["PROVISIONAL SUM"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+
+                // 12: Tambahan
                 document.getElementById('f_add_work').innerText = (s["ADDITIONAL"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
 
-                // --- Baki Keseluruhan (No 14) ---
+                // 13: Jumlah Kontrak
+                document.getElementById('f_contract_sum').innerText = (c.contract_sum || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+
+                // 14: Baki Breakdown
                 document.getElementById('b_gp').innerText = (b["G&P"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
                 document.getElementById('b_pm').innerText = (b["PM"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
                 document.getElementById('b_pro').innerText = (b["PROACTIVE"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+                document.getElementById('b_cal').innerText = (b["CALIBRATION"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+                document.getElementById('b_work').innerText = (b["WORKMANSHIP"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
                 document.getElementById('b_ssp').innerText = (b["SUPPLY SPARE PART"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
                 document.getElementById('b_ps').innerText = (b["PROVISIONAL SUM"]?.amt || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
                 document.getElementById('f_salvage').innerText = (data.salvage_value || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
                 
-                // Kira Baki Akhir Kontrak (No 15)
-                let totalRem = 0;
-                Object.values(b).forEach(v => totalRem += (v.amt || 0));
-                document.getElementById('f_rem_bal').innerText = totalRem.toLocaleString(undefined, {minimumFractionDigits: 2});
+                // 15: Baki Keseluruhan
+                document.getElementById('f_rem_bal').innerText = (data.remaining_balance || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
 
-                // Tajuk Kerja (No 16)
+                // 16: Tajuk Kerja
                 document.getElementById('f_job_title').innerText = `${data.description.toUpperCase()} (RM ${data.amount_spent.toLocaleString(undefined, {minimumFractionDigits: 2})})`;
 
             } catch (e) {
                 console.error(e);
-                alert("Ralat sistem! Sila semak konsol browser anda.");
+                alert("Ralat sistem! Sila semak konsol.");
             }
         }
     </script>
