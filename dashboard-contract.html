@@ -56,21 +56,30 @@
         .chart-box { padding: 20px; background: #f9f9fb; border-radius: 25px; height: 350px; position: relative; }
         
         .section-row { 
-            background: #fff; border: 1px solid #f0f0f0; border-radius: 18px; 
-            padding: 18px; margin-bottom: 15px; cursor: pointer; transition: 0.2s;
+            background: #fff; border: 1px solid var(--ios-blue); border-radius: 18px; 
+            padding: 15px; margin-bottom: 12px; cursor: default;
         }
-        /* Style untuk section yang dipilih */
-        .section-row.active-section { border: 2px solid var(--ios-blue); background: #f0f7ff; }
-        
-        /* Sembunyikan detail jika tidak dipilih */
-        .section-details { display: none; }
-        .section-row.active-section .section-details { display: block; }
 
-        .prog-bar-bg { width: 100%; height: 10px; background: #eee; border-radius: 5px; margin-top: 10px; overflow: hidden; }
-        .prog-bar-fill { height: 100%; border-radius: 5px; transition: 1.2s cubic-bezier(0.1, 0, 0.1, 1); width: 0; }
+        .prog-bar-bg { width: 100%; height: 8px; background: #eee; border-radius: 4px; margin-top: 8px; overflow: hidden; }
+        .prog-bar-fill { height: 100%; border-radius: 4px; transition: 1s; width: 0; }
         
-        .avg-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .avg-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
         .avg-item { font-size: 10px; font-weight: 600; color: #666; }
+
+        /* Style untuk pemilih section (Manager) */
+        .manage-btn {
+            background: #f2f2f7; border: none; padding: 8px 15px; border-radius: 10px;
+            font-size: 12px; font-weight: 700; color: var(--ios-blue); cursor: pointer; margin-bottom: 15px;
+        }
+        #sectionSelector {
+            display: none; background: #f9f9fb; padding: 15px; border-radius: 20px;
+            margin-bottom: 20px; border: 1px dashed #ccc;
+        }
+        .sel-chip {
+            display: inline-block; padding: 6px 12px; border-radius: 15px; 
+            background: #e5e5ea; margin: 4px; font-size: 11px; cursor: pointer; font-weight: 600;
+        }
+        .sel-chip.active { background: var(--ios-blue); color: white; }
 
         #subModuleOverlay { display: none; position: fixed; inset: 0; background: #f2f2f7; z-index: 2000; padding: 10px; }
         .close-sub { position: fixed; top: 15px; left: 15px; z-index: 2100; background: var(--ios-red); color: white; border: none; padding: 8px 15px; border-radius: 10px; cursor: pointer; }
@@ -101,8 +110,17 @@
                     <canvas id="healthChart"></canvas>
                 </div>
                 <div>
-                    <h3 style="margin-top:0; font-size: 18px;">Sila Pilih Section:</h3>
-                    <div id="sectionContainer" style="max-height: 500px; overflow-y: auto;"></div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3 style="margin:0; font-size: 18px;">Section Dipilih</h3>
+                        <button class="manage-btn" onclick="toggleSelector()"><i class="fa fa-cog"></i> Urus Section</button>
+                    </div>
+
+                    <div id="sectionSelector">
+                        <p style="font-size:11px; color:#666; margin-top:0;">Klik untuk Pilih/Sembunyi dari Dashboard:</p>
+                        <div id="fullSectionList"></div>
+                    </div>
+
+                    <div id="selectedSectionContainer" style="max-height: 450px; overflow-y: auto;"></div>
                 </div>
             </div>
         </div>
@@ -151,29 +169,44 @@
         currentContract = contract;
         document.getElementById('analysis-panel').style.display = 'block';
         document.getElementById('panel-title').innerText = contract.contract_code;
+        document.getElementById('sectionSelector').style.display = 'none'; // reset selector bila buka kontrak baru
         
         const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contract.id}`, { headers });
         currentWO = await resW.json();
 
-        // Ambil data pilihan lama
         const saved = localStorage.getItem('sel_' + contract.id);
         selectedSections = saved ? JSON.parse(saved) : Object.keys(contract.contract_sections_breakdown || {});
 
         renderUI();
     }
 
+    function toggleSelector() {
+        const el = document.getElementById('sectionSelector');
+        el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
     function renderUI() {
         const sections = currentContract.contract_sections_breakdown || {};
-        const container = document.getElementById('sectionContainer');
-        container.innerHTML = '';
+        
+        // 1. Render Selector (Chips untuk semua section)
+        const selectorContainer = document.getElementById('fullSectionList');
+        selectorContainer.innerHTML = Object.keys(sections).sort().map(s => `
+            <span class="sel-chip ${selectedSections.includes(s) ? 'active' : ''}" onclick="toggleSection('${s}')">
+                ${s}
+            </span>
+        `).join('');
+
+        // 2. Render Main List (Hanya yang dipilih)
+        const mainContainer = document.getElementById('selectedSectionContainer');
+        mainContainer.innerHTML = '';
 
         const start = new Date(currentContract.contract_start);
         const end = new Date(currentContract.contract_end);
         const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
         const monthsPassed = Math.max(1, (new Date().getFullYear() - start.getFullYear()) * 12 + (new Date().getMonth() - start.getMonth()));
 
-        Object.keys(sections).sort().forEach(s => {
-            const isSel = selectedSections.includes(s);
+        selectedSections.sort().forEach(s => {
+            if(!sections[s]) return;
             let used = 0;
             currentWO.forEach(wo => { if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; });
             
@@ -181,24 +214,26 @@
             const percent = (used/budget)*100 || 0;
             const color = percent > 85 ? 'var(--ios-red)' : (percent > 60 ? 'var(--ios-orange)' : 'var(--ios-blue)');
 
-            container.innerHTML += `
-                <div class="section-row ${isSel ? 'active-section' : ''}" onclick="toggle('${s}')">
-                    <div style="font-weight:bold;">${sections[s].desc || s}</div>
-                    <div class="section-details">
-                        <div class="avg-stats">
-                            <div class="avg-item">PLAN: RM ${(budget/totalMonths).toLocaleString()}/bln</div>
-                            <div class="avg-item">ACTUAL: RM ${(used/monthsPassed).toLocaleString()}/bln</div>
-                        </div>
-                        <div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${percent}%; background:${color}"></div></div>
-                        <div style="font-size:10px; margin-top:5px;">BAKI: RM ${(budget-used).toLocaleString()}</div>
+            mainContainer.innerHTML += `
+                <div class="section-row">
+                    <div style="display:flex; justify-content:space-between; align-items:start;">
+                        <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">${s}: ${sections[s].desc || s}</div>
+                        <i class="fa fa-times-circle" style="color:#ccc; cursor:pointer;" onclick="toggleSection('${s}')"></i>
                     </div>
+                    <div class="avg-stats">
+                        <div class="avg-item">PLAN: RM ${(budget/totalMonths).toLocaleString()}/bln</div>
+                        <div class="avg-item">ACTUAL: RM ${(used/monthsPassed).toLocaleString()}/bln</div>
+                    </div>
+                    <div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${percent}%; background:${color}"></div></div>
+                    <div style="font-size:10px; margin-top:5px; font-weight:700;">BAKI: RM ${(budget-used).toLocaleString()}</div>
                 </div>
             `;
         });
+
         updateChart();
     }
 
-    function toggle(s) {
+    function toggleSection(s) {
         if(selectedSections.includes(s)) selectedSections = selectedSections.filter(x => x !== s);
         else selectedSections.push(s);
         localStorage.setItem('sel_' + currentContract.id, JSON.stringify(selectedSections));
@@ -230,7 +265,7 @@
             options: {
                 responsive: true, maintainAspectRatio: false,
                 plugins: {
-                    datalabels: { align: 'top', anchor: 'end', formatter: (v) => v > 0 ? 'RM' + v.toLocaleString() : '', font: { size: 9, weight: 'bold' } }
+                    datalabels: { align: 'top', anchor: 'end', formatter: (v) => v > 0 ? (v/1000).toFixed(1) + 'k' : '', font: { size: 9, weight: 'bold' } }
                 }
             }
         });
