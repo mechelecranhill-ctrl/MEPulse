@@ -309,7 +309,7 @@
         }
     }
 
-    function updateChart() {
+   function updateChart() {
         const sections = currentContract.contract_sections_breakdown || {};
         let labels = [], bData = [], sData = [];
 
@@ -321,35 +321,42 @@
             sData.push(used);
         });
 
-        if (myChart) myChart.destroy();
-        myChart = new Chart(document.getElementById('healthChart'), {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    { label: 'Bajet', data: bData, backgroundColor: '#e5e5ea' },
-                    { label: 'Guna', data: sData, backgroundColor: '#007AFF' }
-                ]
-            },
-            options: {
-                responsive: true, 
-                maintainAspectRatio: false,
-                // --- ANIMASI DITAMBAH DI SINI ---
-                animation: {
-                    duration: 1000,
-                    easing: 'easeOutQuart'
+        // JIKA GRAF SUDAH ADA, KEMASKINI DATA SAHAJA (TRANSISI BERLAKU DI SINI)
+        if (myChart) {
+            myChart.data.labels = labels;
+            myChart.data.datasets[0].data = bData;
+            myChart.data.datasets[1].data = sData;
+            myChart.update(); // Chart.js akan uruskan animasi transisi secara automatik
+        } 
+        // JIKA GRAF BELUM ADA, BINA BARU
+        else {
+            myChart = new Chart(document.getElementById('healthChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Bajet', data: bData, backgroundColor: '#e5e5ea' },
+                        { label: 'Guna', data: sData, backgroundColor: '#007AFF' }
+                    ]
                 },
-                // -------------------------------
-                plugins: {
-                    datalabels: { 
-                        align: 'top', 
-                        anchor: 'end', 
-                        formatter: (v) => v > 0 ? 'RM ' + v.toLocaleString() : '', 
-                        font: { size: 9, weight: 'bold' } 
+                options: {
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 800,
+                        easing: 'easeOutQuart'
+                    },
+                    plugins: {
+                        datalabels: { 
+                            align: 'top', 
+                            anchor: 'end', 
+                            formatter: (v) => v > 0 ? 'RM ' + v.toLocaleString() : '', 
+                            font: { size: 9, weight: 'bold' } 
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
     }
 
     function toggleSubModule(show) {
