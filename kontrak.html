@@ -133,11 +133,17 @@
                         <strong class="sec-label">SECTION A</strong>
                         <input type="text" class="b_n" value="SECTION A" hidden>
                         <input type="text" class="b_d" placeholder="Keterangan (Cth: GENERAL & PRELIMINARIES)" required>
-                        <input type="number" class="b_v" placeholder="Jumlah RM" step="0.01" required>
+                        <input type="number" class="b_v" placeholder="Jumlah RM" step="0.01" required oninput="calculateContractSum()">
                     </div>
                 </div>
                 
                 <button type="button" onclick="addB()" style="background:none; color:var(--ios-blue); border:1px dashed var(--ios-blue); font-size:12px;">+ TAMBAH SECTION</button>
+                
+                <div style="margin-top: 15px; padding: 12px; background: rgba(0,0,0,0.05); border-radius: 10px; border-left: 5px solid var(--ios-blue);">
+                    <label style="margin-top:0;">Jumlah Keseluruhan Kontrak (Automatik)</label>
+                    <div id="c_sum_display" style="font-size: 18px; font-weight: 800; color: #333;">RM 0.00</div>
+                </div>
+
                 <button type="submit" style="margin-top:20px; background:var(--ios-blue);">Daftar Kontrak</button>
             </form>
         </div>
@@ -292,6 +298,16 @@
         document.getElementById('total_display').innerText = `RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
     }
 
+    function calculateContractSum() {
+        let total = 0;
+        const amounts = document.querySelectorAll('.b_v');
+        amounts.forEach(input => {
+            total += parseFloat(input.value) || 0;
+        });
+        document.getElementById('c_sum_display').innerText = `RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+        return total;
+    }
+
     function addB() {
         const container = document.getElementById('b_inputs');
         const currentCount = container.querySelectorAll('.sec-input-wrapper').length;
@@ -301,11 +317,11 @@
         d.className = "sec-input-wrapper";
         d.style = "background:rgba(255,255,255,0.2); padding:10px; border-radius:10px; margin-bottom:5px; position:relative;";
         d.innerHTML = `
-            <div onclick="this.parentElement.remove(); reIndexSections();" style="position:absolute; right:5px; top:5px; color:red; cursor:pointer;">X</div>
+            <div onclick="this.parentElement.remove(); reIndexSections(); calculateContractSum();" style="position:absolute; right:5px; top:5px; color:red; cursor:pointer;">X</div>
             <strong class="sec-label">${sectionName}</strong>
             <input type="text" class="b_n" value="${sectionName}" hidden>
             <input type="text" class="b_d" placeholder="Keterangan" required>
-            <input type="number" class="b_v" placeholder="Jumlah RM" step="0.01" required>
+            <input type="number" class="b_v" placeholder="Jumlah RM" step="0.01" required oninput="calculateContractSum()">
         `;
         container.appendChild(d);
     }
@@ -417,11 +433,15 @@
     document.getElementById('contractForm').onsubmit = async (e) => {
         e.preventDefault();
         let b = {}; 
+        let totalSum = 0;
         document.querySelectorAll('.sec-input-wrapper').forEach(w => { 
             const n = w.querySelector('.b_n').value; 
             const d = w.querySelector('.b_d').value; 
-            const v = parseFloat(w.querySelector('.b_v').value); 
-            if(n) b[n] = { desc: d, amt: v }; 
+            const v = parseFloat(w.querySelector('.b_v').value) || 0; 
+            if(n) {
+                b[n] = { desc: d, amt: v }; 
+                totalSum += v;
+            }
         });
         const data = { 
             unit_id: parseInt(document.getElementById('c_unit_id').value), 
@@ -431,6 +451,7 @@
             district: document.getElementById('c_dist').value, 
             area_code: document.getElementById('c_area').value, 
             contract_sections_breakdown: b,
+            contract_sum: totalSum,
             contract_start: document.getElementById('c_start').value,
             contract_end: document.getElementById('c_end').value
         };
