@@ -52,7 +52,6 @@
             gap: 15px;
         }
 
-        /* SIDEBAR KONTRAK KECIL */
         .contract-sidebar { 
             width: 220px; 
             display: flex; 
@@ -203,6 +202,9 @@
     }
 
     async function openAnalysis(contract) {
+        // RESET GRAF UNTUK ENTRY ANIMATION
+        if (myChart) { myChart.destroy(); myChart = null; }
+        
         document.getElementById('analysis-panel').style.display = 'flex';
         document.getElementById('panel-title').innerText = contract.contract_code;
         document.getElementById('sectionSelector').style.display = 'none';
@@ -277,7 +279,7 @@
         });
 
         updateChart();
-        triggerAnimations(); // Aktifkan animasi bar
+        triggerAnimations();
     }
 
     function triggerAnimations() {
@@ -309,7 +311,7 @@
         }
     }
 
-   function updateChart() {
+    function updateChart() {
         const sections = currentContract.contract_sections_breakdown || {};
         let labels = [], bData = [], sData = [];
 
@@ -321,54 +323,40 @@
             sData.push(used);
         });
 
-        // Musnahkan graf lama supaya animasi 'Entry' (melompat naik) muncul setiap kali tukar kontrak
         if (myChart) {
-            myChart.destroy();
-        }
-
-        myChart = new Chart(document.getElementById('healthChart'), {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    { 
-                        label: 'Bajet', 
-                        data: bData, 
-                        backgroundColor: '#e5e5ea',
-                        borderRadius: 8, // Tambah curve pada graf
-                        borderSkipped: false
-                    },
-                    { 
-                        label: 'Guna', 
-                        data: sData, 
-                        backgroundColor: '#007AFF',
-                        borderRadius: 8, // Tambah curve pada graf
-                        borderSkipped: false
-                    }
-                ]
-            },
-            options: {
-                responsive: true, 
-                maintainAspectRatio: false,
-                // --- ENTRY ANIMATION ---
-                animation: {
-                    duration: 1200,
-                    easing: 'easeOutQuart'
+            myChart.data.labels = labels;
+            myChart.data.datasets[0].data = bData;
+            myChart.data.datasets[1].data = sData;
+            myChart.update(); 
+        } else {
+            myChart = new Chart(document.getElementById('healthChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { 
+                            label: 'Bajet', data: bData, backgroundColor: '#e5e5ea',
+                            borderRadius: {topLeft: 8, topRight: 8, bottomLeft: 0, bottomRight: 0}
+                        },
+                        { 
+                            label: 'Guna', data: sData, backgroundColor: '#007AFF',
+                            borderRadius: {topLeft: 8, topRight: 8, bottomLeft: 0, bottomRight: 0}
+                        }
+                    ]
                 },
-                // -----------------------
-                plugins: {
-                    datalabels: { 
-                        align: 'top', 
-                        anchor: 'end', 
-                        formatter: (v) => v > 0 ? 'RM ' + v.toLocaleString() : '', 
-                        font: { size: 9, weight: 'bold' } 
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    animation: { duration: 1000, easing: 'easeOutQuart' },
+                    plugins: {
+                        datalabels: { 
+                            align: 'top', anchor: 'end', 
+                            formatter: (v) => v > 0 ? 'RM ' + v.toLocaleString() : '', 
+                            font: { size: 9, weight: 'bold' } 
+                        }
                     }
-                },
-                scales: {
-                    y: { beginAtZero: true }
                 }
-            }
-        });
+            });
+        }
     }
 
     function toggleSubModule(show) {
