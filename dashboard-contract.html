@@ -57,12 +57,11 @@
         .analysis-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
         #analysis-panel { display: none; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); flex: 1; overflow: hidden; flex-direction: column; }
         
-        .health-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; flex: 1; overflow: hidden; margin-top: 5px; }
-        .chart-box { padding: 10px; background: #f9f9fb; border-radius: 15px; display: flex; flex-direction: column; min-height: 0; }
+        .health-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex: 1; overflow: hidden; margin-top: 5px; }
+        .chart-box { padding: 15px; background: #f9f9fb; border-radius: 15px; display: flex; flex-direction: column; min-height: 0; position: relative; }
         
         .section-row { background: #fff; border: 1px solid var(--ios-blue); border-radius: 12px; padding: 10px; margin-bottom: 8px; }
         
-        /* Bar Atas Bawah - 8px Fixed */
         .bar-stack { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
         .prog-bar-bg { width: 100%; height: 8px; background: #eee; border-radius: 4px; overflow: hidden; position: relative; }
         .prog-bar-fill { height: 100%; border-radius: 4px; transition: 1s cubic-bezier(0.4, 0, 0.2, 1); width: 0 !important; }
@@ -106,7 +105,9 @@
                 <div class="health-grid">
                     <div class="chart-box">
                         <div style="font-size: 10px; font-weight: bold; color: #666; margin-bottom: 10px;">PURATA BULANAN (RM)</div>
-                        <canvas id="healthChart"></canvas>
+                        <div style="flex:1; min-height:0; width:100%;">
+                            <canvas id="healthChart"></canvas>
+                        </div>
                     </div>
                     <div style="display: flex; flex-direction: column; overflow: hidden;">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px; flex-shrink: 0;">
@@ -234,22 +235,47 @@
         selectedSections.sort().forEach(s => {
             labels.push(s);
             const b = sections[s].amt || 0;
-            targetD.push((b/totalMonths).toFixed(2));
+            targetD.push((b/totalMonths).toFixed(0));
             let u = 0;
             currentWO.forEach(wo => { if(wo.section_category?.[s]) u += wo.section_category[s].amt || 0; });
-            actualD.push((u/monthsElapsed).toFixed(2));
+            actualD.push((u/monthsElapsed).toFixed(0));
         });
 
+        const ctx = document.getElementById('healthChart').getContext('2d');
         if (myChart) {
-            myChart.data.labels = labels; myChart.data.datasets[0].data = targetD; myChart.data.datasets[1].data = actualD; myChart.update();
+            myChart.data.labels = labels; 
+            myChart.data.datasets[0].data = targetD; 
+            myChart.data.datasets[1].data = actualD; 
+            myChart.update();
         } else {
-            myChart = new Chart(document.getElementById('healthChart'), {
+            myChart = new Chart(ctx, {
                 type: 'bar',
                 data: { labels, datasets: [
-                    { label: 'Target', data: targetD, backgroundColor: '#e5e5ea', borderRadius: 20 },
-                    { label: 'Sebenar', data: actualD, backgroundColor: '#007AFF', borderRadius: 20 }
+                    { label: 'Target', data: targetD, backgroundColor: '#e5e5ea', borderRadius: 4, borderSkipped: false },
+                    { label: 'Sebenar', data: actualD, backgroundColor: '#007AFF', borderRadius: 4, borderSkipped: false }
                 ]},
-                options: { responsive: true, maintainAspectRatio: false, plugins: { datalabels: { display: false } } }
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    layout: { padding: { top: 35, bottom: 0 } },
+                    plugins: { 
+                        legend: { display: false },
+                        datalabels: { 
+                            display: true, 
+                            anchor: 'end', 
+                            align: 'top', 
+                            offset: 2,
+                            font: { size: 10, weight: 'bold' },
+                            formatter: (val) => val > 0 ? Number(val).toLocaleString() : ''
+                        } 
+                    },
+                    scales: {
+                        y: { display: false, beginAtZero: true },
+                        x: { 
+                            display: false // BUANG NAMA SECTION KAT GRAF
+                        }
+                    }
+                }
             });
         }
     }
