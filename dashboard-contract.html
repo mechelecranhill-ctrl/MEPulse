@@ -39,16 +39,23 @@
 
         /* Main Layout */
         .container { max-width: 1200px; margin: auto; padding: 20px; }
-        .contract-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
-
-        /* Contract Card */
-        .c-card { 
-            background: var(--card-bg); border-radius: 24px; padding: 25px; 
-            box-shadow: 0 10px 25px rgba(0,0,0,0.05); transition: 0.3s; cursor: pointer;
-            border: 1px solid rgba(0,0,0,0.03); position: relative;
+        
+        /* Contract Grid - Versi Kompak */
+        .contract-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); 
+            gap: 12px; 
         }
-        .c-card:hover { transform: translateY(-8px); box-shadow: 0 15px 35px rgba(0,0,0,0.1); border-color: var(--ios-blue); }
-        .status-dot { width: 10px; height: 10px; background: var(--ios-green); border-radius: 50%; display: inline-block; margin-right: 8px; box-shadow: 0 0 8px var(--ios-green); }
+
+        /* Contract Card - Versi Kompak */
+        .c-card { 
+            background: var(--card-bg); border-radius: 16px; padding: 12px 15px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04); transition: 0.2s; cursor: pointer;
+            border: 1px solid rgba(0,0,0,0.05); position: relative;
+        }
+        .c-card:hover { transform: translateY(-3px); border-color: var(--ios-blue); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
+        .c-card h4 { margin: 5px 0; font-size: 13px; color: #1c1c1e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+        .status-dot { width: 7px; height: 7px; background: var(--ios-green); border-radius: 50%; display: inline-block; margin-right: 5px; }
 
         /* Analysis Panel */
         #analysis-panel { 
@@ -68,10 +75,11 @@
             padding: 18px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);
         }
         .prog-bar-bg { width: 100%; height: 10px; background: #eee; border-radius: 5px; margin-top: 10px; overflow: hidden; }
-        .prog-bar-fill { height: 100%; border-radius: 5px; transition: 1.5s cubic-bezier(0.1, 0, 0.1, 1); width: 0; }
+        .prog-bar-fill { height: 100%; border-radius: 5px; transition: 1.2s cubic-bezier(0.1, 0, 0.1, 1); width: 0; }
         
-        .desc-text { font-size: 11px; color: #8e8e93; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; display: block; }
-        
+        .avg-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .avg-item { font-size: 10px; font-weight: 600; color: #666; }
+
         /* Sub-Module Overlay */
         #subModuleOverlay { 
             display: none; position: fixed; inset: 0; background: #f2f2f7; z-index: 2000; 
@@ -97,7 +105,7 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
                 <div>
                     <h1 id="panel-title" style="margin:0; font-size: 28px; color: var(--ios-blue);">Analisis Kontrak</h1>
-                    <p id="panel-vendor" style="margin:5px 0 0 0; color: #888; font-size: 14px;"></p>
+                    <p id="panel-vendor" style="margin:5px 0 0 0; color: #888; font-size: 14px; font-weight: 600;"></p>
                 </div>
                 <button onclick="document.getElementById('analysis-panel').style.display='none'" style="background:#f2f2f7; border:none; padding:12px 25px; border-radius:15px; font-weight: 600; cursor:pointer;">Tutup</button>
             </div>
@@ -109,7 +117,7 @@
 
                 <div>
                     <h3 style="margin-top:0; font-size: 18px; display: flex; align-items: center; gap: 10px;">
-                        <i class="fa fa-chart-line" style="color: var(--ios-blue);"></i> Pecahan Bajet & Section
+                        <i class="fa fa-chart-line" style="color: var(--ios-blue);"></i> Pecahan Bajet & Penggunaan
                     </h3>
                     <div id="sectionContainer" style="max-height: 500px; overflow-y: auto; padding-right: 10px; scrollbar-width: thin;"></div>
                 </div>
@@ -130,7 +138,6 @@
     const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
 
     let myChart = null;
-    let selectedContract = null;
 
     window.onload = async () => {
         await fetchUnits();
@@ -142,8 +149,6 @@
             const units = await res.json();
             const nav = document.getElementById('unitNav');
             nav.innerHTML = units.map(u => `<button class="unit-pill" onclick="fetchContracts(${u.id}, this)">${u.unit_name}</button>`).join('');
-            
-            // Auto click first unit
             if(units.length > 0) document.querySelector('.unit-pill').click();
         } catch (e) { console.error("Error units:", e); }
     }
@@ -157,34 +162,34 @@
         
         document.getElementById('contractList').innerHTML = data.map(c => `
             <div class="c-card" onclick='openAnalysis(${JSON.stringify(c)})'>
-                <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-                    <span style="font-size:12px; font-weight:800; color:var(--ios-blue); letter-spacing: 1px;">${c.contract_code}</span>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:10px; font-weight:800; color:var(--ios-blue);">${c.contract_code}</span>
                     <span class="status-dot"></span>
                 </div>
-                <h4 style="margin:0; font-size:16px; color:#1c1c1e; line-height: 1.4;">${c.contract_name}</h4>
-                <div style="margin-top:20px; padding-top:15px; border-top: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size:11px; color:#888;"><i class="fa fa-id-badge"></i> ${c.contractor}</span>
-                    <i class="fa fa-chevron-right" style="font-size: 10px; color: #ccc;"></i>
-                </div>
+                <h4>${c.contract_name}</h4>
+                <div style="font-size:9px; color:#999; font-weight:600;">${c.contractor}</div>
             </div>
         `).join('');
         document.getElementById('analysis-panel').style.display = 'none';
     }
 
     async function openAnalysis(contract) {
-        selectedContract = contract;
         document.getElementById('analysis-panel').style.display = 'block';
         document.getElementById('panel-title').innerText = contract.contract_code;
-        document.getElementById('panel-vendor').innerText = `Kontraktor: ${contract.contractor}`;
+        document.getElementById('panel-vendor').innerText = `KONTRAK ASAL: RM ${contract.contract_sum?.toLocaleString()}`;
 
-        // FETCH REAL DATA FROM WORK ORDERS
         const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contract.id}&select=amount_spent,section_category`, { headers });
         const workOrders = await resW.json();
 
-        // Calculate Period
-        const start = new Date(contract.start_date || new Date());
-        const end = new Date(contract.end_date || new Date());
-        const months = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
+        // Kiraan Tarikh & Tempoh
+        const start = new Date(contract.contract_start);
+        const end = new Date(contract.contract_end);
+        const today = new Date();
+        
+        // Tempoh keseluruhan (sepatutnya)
+        const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
+        // Tempoh berlalu (untuk purata sebenar)
+        const monthsPassed = Math.max(1, (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()));
 
         const sections = contract.contract_sections_breakdown || {};
         const container = document.getElementById('sectionContainer');
@@ -194,9 +199,8 @@
 
         Object.keys(sections).sort().forEach(s => {
             const totalBudget = sections[s].amt || 0;
-            const desc = sections[s].desc || "KONTRAK ASAL";
             
-            // AGGREGATE SPENT FROM WORK ORDERS
+            // Agregat penggunaan dari work orders
             let usedAmount = 0;
             workOrders.forEach(wo => {
                 if(wo.section_category && wo.section_category[s]) {
@@ -204,10 +208,13 @@
                 }
             });
 
-            const monthlyPlanned = totalBudget / months;
+            const balance = totalBudget - usedAmount;
             const usedPercent = Math.min(100, (usedAmount / totalBudget) * 100);
             
-            // Health Color Logic
+            // Pengiraan Purata
+            const avgPlanned = totalBudget / totalMonths; // Purata Sepatutnya
+            const avgActual = usedAmount / monthsPassed; // Purata Sebenar
+
             const hColor = usedPercent > 85 ? 'var(--ios-red)' : (usedPercent > 60 ? 'var(--ios-orange)' : 'var(--ios-blue)');
 
             labels.push(s);
@@ -216,20 +223,27 @@
 
             container.innerHTML += `
                 <div class="section-row">
-                    <div style="width: 100%;">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <span style="font-weight:bold; font-size:14px;">${s}</span>
-                            <span style="color:var(--ios-green); font-size:11px; font-weight:800;">PLANNED: RM ${monthlyPlanned.toLocaleString(undefined,{maximumFractionDigits:0})}/bln</span>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                        <span style="font-weight:bold; font-size:14px;">${s}</span>
+                        <span style="color:var(--ios-blue); font-size:12px; font-weight:800;">BAKI: RM ${balance.toLocaleString()}</span>
+                    </div>
+                    
+                    <div class="avg-stats">
+                        <div class="avg-item" style="color:var(--ios-green);">
+                            • Purata Sepatutnya: <br>RM ${avgPlanned.toLocaleString(undefined,{maximumFractionDigits:0})}/bln
                         </div>
-                        <span class="desc-text">${desc}</span>
-                        
-                        <div class="prog-bar-bg">
-                            <div class="prog-bar-fill" style="width:${usedPercent}%; background:${hColor}"></div>
+                        <div class="avg-item" style="color:${avgActual > avgPlanned ? 'var(--ios-red)' : '#555'};">
+                            • Purata Sebenar: <br>RM ${avgActual.toLocaleString(undefined,{maximumFractionDigits:0})}/bln
                         </div>
-                        <div style="display:flex; justify-content:space-between; font-size:10px; margin-top:8px; font-weight: 600;">
-                            <span style="color: #444;">PENGGUNAAN: ${usedPercent.toFixed(1)}%</span>
-                            <span style="color: var(--ios-blue);">BAKI: RM ${(totalBudget - usedAmount).toLocaleString()}</span>
-                        </div>
+                    </div>
+
+                    <div class="prog-bar-bg">
+                        <div class="prog-bar-fill" style="width:${usedPercent}%; background:${hColor}"></div>
+                    </div>
+                    
+                    <div style="display:flex; justify-content:space-between; font-size:10px; margin-top:8px; font-weight: 600;">
+                        <span style="color: #444;">PENGGUNAAN: ${usedPercent.toFixed(1)}%</span>
+                        <span style="color: #888;">ASAL: RM ${totalBudget.toLocaleString()}</span>
                     </div>
                 </div>
             `;
@@ -247,8 +261,8 @@
             data: {
                 labels: labels,
                 datasets: [
-                    { label: 'Budget (RM)', data: budget, backgroundColor: '#e5e5ea', borderRadius: 8, barThickness: 25 },
-                    { label: 'Spent (RM)', data: spent, backgroundColor: '#007AFF', borderRadius: 8, barThickness: 25 }
+                    { label: 'Bajet (RM)', data: budget, backgroundColor: '#e5e5ea', borderRadius: 8, barThickness: 20 },
+                    { label: 'Guna (RM)', data: spent, backgroundColor: '#007AFF', borderRadius: 8, barThickness: 20 }
                 ]
             },
             options: {
@@ -265,17 +279,14 @@
         });
     }
 
-    // Toggle Sub-Module (Iframe)
     function toggleSubModule(show) {
         const overlay = document.getElementById('subModuleOverlay');
         overlay.style.display = show ? 'block' : 'none';
         if(show) {
-            // Gantian ini dengan URL fail kod asal anda jika ia fail berasingan
-            // Atau letakkan kod asal dalam format data URI
             document.getElementById('formFrame').src = 'kontrak.html'; 
         } else {
             document.getElementById('formFrame').src = 'about:blank';
-            fetchUnits(); // Refresh dashboard data when form closes
+            fetchUnits();
         }
     }
 </script>
