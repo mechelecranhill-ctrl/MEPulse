@@ -32,7 +32,6 @@
         .dash-label { font-size: 8px; color: #888; text-transform: uppercase; }
         .c-code { font-weight: bold; font-size: 14px; color: var(--ios-blue); }
 
-        /* --- BLUEFORM SPECIFIC CSS --- */
         #blueformPage { background: white; padding: 0; }
         .a4-container { width: 18cm; min-height: 25cm; margin: auto; background: white; padding: 1cm; position: relative; color: black; font-size: 10px; line-height: 1.3; border: 1px solid #eee; }
         .logo-saj { position: absolute; right: 1cm; top: 1cm; width: 60px; }
@@ -54,20 +53,14 @@
     <div id="homePage" class="page active">
         <h1 style="text-align:center; padding: 30px 0 20px 0; margin:0;">M&E-Connect</h1>
         
-        <div class="glass-card" onclick="showPage('kontrakPage')"><strong>📂 Direktori Kontrak</strong></div>
         <div class="glass-card" onclick="showPage('registerWorkPage')"><strong>📝 Pendaftaran Kerja (ID)</strong></div>
         <div class="glass-card" onclick="showPage('adminPage')"><strong>➕ Pengurusan Kontrak</strong></div>
         <div class="glass-card" style="border: 2px solid var(--ios-orange);" onclick="showPage('interimPage')"><strong>📑 Kemaskini Interim Claim</strong></div>
         <div class="glass-card" style="background: rgba(0,0,0,0.05);" onclick="showPage('settingsPage')"><i class="fa-solid fa-gear"></i> Tetapan Unit</div>
     </div>
 
-    <div id="kontrakPage" class="page">
-        <span class="nav-link" onclick="showPage('homePage')">← Kembali</span>
-        <div id="listContainer"></div>
-    </div>
-
     <div id="detailsPage" class="page">
-        <span class="nav-link" onclick="showPage('kontrakPage')">← Kembali</span>
+        <span class="nav-link" onclick="showPage('homePage')">← Kembali</span>
         <div id="detailsHeader" class="glass-card" style="background: var(--ios-blue); color: white; margin-bottom: 20px;"></div>
         <div id="workListContainer"></div>
     </div>
@@ -203,14 +196,11 @@
 
     let selectedWorksForInterim = [];
 
-    // FUNGSI DASHBOARD TELAH DIBUANG
-
     function showPage(id) {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.getElementById(id).classList.add('active');
         if(['registerWorkPage', 'interimPage', 'adminPage', 'settingsPage'].includes(id)) fetchUnits();
         if(['registerWorkPage', 'interimPage'].includes(id)) loadContractsToDropdowns();
-        if(id === 'kontrakPage') loadData();
     }
 
     async function fetchUnits() {
@@ -223,17 +213,6 @@
         }
         const uList = document.getElementById('unitListDisplay');
         if(uList) uList.innerHTML = units.map(u => `<div>• ${u.unit_name}</div>`).join('');
-    }
-
-    async function loadData() {
-        const res = await fetch(`${SB_URL}/rest/v1/contract?select=*,units(unit_name)`, { headers });
-        const data = await res.json();
-        document.getElementById('listContainer').innerHTML = data.map(c => `
-            <div class="glass-card" onclick="openDetails(${c.id}, '${c.contract_code}', '${c.contract_name.replace(/'/g, "\\'")}')">
-                <span class="unit-tag">${c.units?.unit_name || 'N/A'}</span><br>
-                <strong style="font-size:16px;">${c.contract_code}</strong><br>
-                <small><i class="fa-solid fa-location-dot" style="color:var(--ios-red)"></i> ${c.district}</small>
-            </div>`).join('');
     }
 
     async function openDetails(id, code, name) {
@@ -500,7 +479,8 @@
         e.preventDefault();
         const name = document.getElementById('new_unit_name').value;
         const res = await fetch(`${SB_URL}/rest/v1/units`, { method: 'POST', headers, body: JSON.stringify({ unit_name: name }) });
-        if(res.ok) { alert("Unit Berjaya Disimpan!"); fetchUnits(); document.getElementById('new_unit_name').value = ''; }
+        if(res.ok) { alert("Unit Berjaya Disimpan!"); location.reload(); }
+        else { alert("Gagal menyimpan unit."); }
     };
 </script>
 </body>
