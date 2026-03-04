@@ -17,31 +17,12 @@
             font-family: -apple-system, system-ui, sans-serif; 
             background: #f2f2f7; 
             margin: 0; 
-            height: 100vh; 
+            min-height: 100vh; 
             display: flex; 
             flex-direction: column; 
-            overflow: hidden; 
-        }
-
-        /* FORCE LANDSCAPE VIEW FOR MOBILE DEVICES */
-        @media only screen and (max-width: 850px) {
-            .main-wrapper {
-                flex-direction: row !important; /* Kekalkan side-by-side */
-            }
-            .contract-sidebar {
-                width: 150px !important; /* Kecilkan sidebar di phone */
-            }
-            .health-grid {
-                grid-template-columns: 1fr !important; /* Chart atas, List bawah dalam panel */
-                overflow-y: auto !important;
-            }
-            #analysis-panel {
-                padding: 10px !important;
-            }
-            .chart-box {
-                min-height: 250px !important;
-            }
-            h1 { font-size: 18px !important; }
+            /* Dibenarkan skrol jika kandungan melebihi skrin (penting untuk rotation) */
+            overflow-x: hidden;
+            overflow-y: auto;
         }
 
         .glass-header { 
@@ -49,7 +30,7 @@
             background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             display: flex; align-items: center; justify-content: center;
             box-shadow: 0 1px 10px rgba(0,0,0,0.05); z-index: 1000; flex-shrink: 0;
-            position: relative;
+            position: sticky; top: 0;
         }
 
         .back-btn {
@@ -77,25 +58,70 @@
         .unit-pill.active { background: var(--ios-blue); color: white; }
 
         .fab { 
-            position: fixed; top: 12px; right: 20px; width: 35px; height: 35px; 
-            background: var(--ios-blue); color: white; border-radius: 10px;
+            position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; 
+            background: var(--ios-blue); color: white; border-radius: 25px;
             display: flex; align-items: center; justify-content: center; 
             cursor: pointer; z-index: 1100; transition: transform 0.2s;
+            box-shadow: 0 4px 12px rgba(0,122,255,0.3);
         }
         .fab:active { transform: scale(0.9); }
 
-        .main-wrapper { display: flex; flex: 1; overflow: hidden; padding: 10px; gap: 15px; }
-        .contract-sidebar { width: 220px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex-shrink: 0; padding-right: 5px; }
+        /* WRAPPER RESPONSIF */
+        .main-wrapper { 
+            display: flex; 
+            flex: 1; 
+            padding: 15px; 
+            gap: 15px; 
+            flex-direction: row; /* Default: Side-by-side */
+        }
+
+        /* SUSUNAN UNTUK MOD PORTRET (PHONES) */
+        @media (max-width: 768px) {
+            .main-wrapper {
+                flex-direction: column; /* Sidebar atas, Analisis bawah */
+            }
+            .contract-sidebar {
+                width: 100% !important;
+                flex-direction: row !important;
+                display: flex;
+                overflow-x: auto !important;
+                padding-bottom: 10px;
+            }
+            .c-card {
+                min-width: 160px;
+            }
+            .health-grid {
+                grid-template-columns: 1fr !important; /* Stack chart atas list */
+            }
+            #analysis-panel {
+                padding: 15px !important;
+            }
+        }
+
+        /* SUSUNAN UNTUK MOD LANDSKAP (PHONES) */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .main-wrapper {
+                flex-direction: row;
+            }
+            .contract-sidebar {
+                width: 180px !important;
+            }
+            .chart-box {
+                min-height: 200px;
+            }
+        }
+
+        .contract-sidebar { width: 220px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex-shrink: 0; }
         .c-card { background: var(--card-bg); border-radius: 12px; padding: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); transition: 0.2s; cursor: pointer; border: 1px solid rgba(0,0,0,0.05); }
         .c-card.active { border-color: var(--ios-blue); background: #f0f7ff; }
         .c-card h4 { margin: 0; font-size: 11px; color: #1c1c1e; overflow: hidden; text-overflow: ellipsis; }
         .c-card .sub-text { font-size: 9px; color: #888; margin-top: 2px; }
 
-        .analysis-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-        #analysis-panel { display: none; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); flex: 1; overflow: hidden; flex-direction: column; }
+        .analysis-container { flex: 1; display: flex; flex-direction: column; }
+        #analysis-panel { display: none; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); flex: 1; flex-direction: column; }
 
-        .health-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; flex: 1; overflow: hidden; margin-top: 5px; }
-        .chart-box { padding: 10px; background: #f9f9fb; border-radius: 15px; flex: 1; position: relative; min-height: 0; display: flex; flex-direction: column;}
+        .health-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; margin-top: 5px; }
+        .chart-box { padding: 10px; background: #f9f9fb; border-radius: 15px; position: relative; min-height: 300px; display: flex; flex-direction: column;}
 
         .section-row { background: #fff; border: 1px solid var(--ios-blue); border-radius: 12px; padding: 10px; margin-bottom: 8px; }
         .prog-bar-bg { width: 100%; height: 8px; background: #eee; border-radius: 4px; margin-top: 5px; overflow: hidden; }
@@ -103,7 +129,6 @@
         .avg-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 5px; }
         .avg-item { font-size: 9px; font-weight: 600; color: #666; }
         .manage-btn { background: #f2f2f7; border: none; padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; color: var(--ios-blue); cursor: pointer; }
-        #selectedSectionContainer { flex: 1; overflow-y: auto; padding-right: 5px; }
         .sel-chip { display: inline-block; padding: 4px 10px; border-radius: 12px; background: #e5e5ea; margin: 3px; font-size: 10px; cursor: pointer; font-weight: 600; }
         .sel-chip.active { background: var(--ios-blue); color: white; }
     </style>
@@ -124,17 +149,17 @@
 
         <div class="analysis-container">
             <div id="analysis-panel">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #f2f2f7;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #f2f2f7; flex-wrap: wrap; gap: 10px;">
                     <div>
                         <h1 id="panel-title" style="margin:0; font-size: 24px; letter-spacing: -0.5px; color: var(--ios-blue);">Analisis</h1>
                         <p id="panel-vendor" style="margin:2px 0 0 0; color: #8e8e93; font-size: 13px; font-weight: 500;"></p>
                     </div>
                     <div style="display: flex; gap: 10px; align-items: center;">
-                        <span style="font-size: 10px; font-weight: 800; color: #34C759; background: #eafaf1; padding: 4px 10px; border-radius: 6px; margin-right: 10px;">
-                            <i class="fa fa-circle" style="font-size: 7px; vertical-align: middle;"></i> LIVE PURATA BULANAN
+                        <span style="font-size: 10px; font-weight: 800; color: #34C759; background: #eafaf1; padding: 4px 10px; border-radius: 6px;">
+                            <i class="fa fa-circle" style="font-size: 7px; vertical-align: middle;"></i> LIVE PURATA
                         </span>
                         <button onclick="document.getElementById('analysis-panel').style.display='none'" 
-                                style="background:#f2f2f7; border:none; width: 38px; height: 38px; border-radius:12px; cursor:pointer; display: flex; align-items: center; justify-content: center;">
+                                style="background:#f2f2f7; border:none; width: 38px; height: 38px; border-radius:12px; cursor:pointer;">
                             <i class="fa fa-times" style="color: #8e8e93;"></i>
                         </button>
                     </div>
@@ -142,11 +167,11 @@
 
                 <div class="health-grid">
                     <div class="chart-box">
-                        <div style="font-size: 11px; font-weight: bold; color: #666; margin-bottom: 10px;">PURATA BULANAN: SEBENAR VS SASARAN (RM)</div>
+                        <div style="font-size: 11px; font-weight: bold; color: #666; margin-bottom: 10px;">PURATA BULANAN: ACTUAL VS PLANNED (RM)</div>
                         <canvas id="healthChart"></canvas>
                     </div>
-                    <div style="display: flex; flex-direction: column; overflow: hidden;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; flex-shrink: 0; margin-bottom: 8px;">
+                    <div style="display: flex; flex-direction: column;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
                             <h3 style="margin:0; font-size: 16px;">Section Dipilih</h3>
                             <button class="manage-btn" onclick="toggleSelector()"><i class="fa fa-cog"></i> Urus</button>
                         </div>
@@ -173,6 +198,11 @@
     Chart.register(ChartDataLabels);
 
     window.onload = () => fetchUnits();
+
+    // Detect rotation to fix Chart size
+    window.addEventListener('resize', () => {
+        if(myChart) myChart.resize();
+    });
 
     async function fetchUnits() {
         try {
@@ -261,11 +291,9 @@
 
             const budget = sections[s].amt || 0; 
             const plannedMonthly = budget / totalMonths; 
-            
             const plannedTotalToDate = plannedMonthly * monthsElapsed;
             const variance = used - plannedTotalToDate;
             const variancePercent = (variance / plannedTotalToDate) * 100 || 0;
-            
             const color = variance > 0 ? 'var(--ios-red)' : 'var(--ios-green)';
             const progressPercent = (used / budget) * 100 || 0;
 
@@ -301,27 +329,20 @@
     function updateChart() {
         if (!currentContract) return;
         const sections = currentContract.contract_sections_breakdown || {};
-
         const start = new Date(currentContract.contract_start);
         const end = new Date(currentContract.contract_end);
         const today = new Date();
-
         const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
         const monthsElapsed = Math.max(1, (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()));
 
         let labels = [], targetAvgData = [], actualAvgData = [];
-
         selectedSections.sort().forEach(s => {
             labels.push(s); 
-
-            const fullBudget = sections[s]?.amt || 0;
-            const targetMonthly = fullBudget / totalMonths;
+            const targetMonthly = (sections[s]?.amt || 0) / totalMonths;
             targetAvgData.push(targetMonthly.toFixed(2));
-
             let totalUsed = 0;
             currentWO.forEach(wo => { if(wo.section_category?.[s]) totalUsed += wo.section_category[s].amt || 0; });
-            const actualMonthly = totalUsed / monthsElapsed;
-            actualAvgData.push(actualMonthly.toFixed(2));
+            actualAvgData.push((totalUsed / monthsElapsed).toFixed(2));
         });
 
         if (myChart) {
@@ -336,52 +357,23 @@
                 data: {
                     labels: labels,
                     datasets: [
-                        { 
-                            label: 'Planned Monthly', 
-                            data: targetAvgData, 
-                            backgroundColor: 'rgba(200, 200, 205, 0.5)',
-                            borderRadius: 5
-                        },
-                        { 
-                            label: 'Actual Monthly', 
-                            data: actualAvgData, 
-                            backgroundColor: '#007AFF',
-                            borderRadius: 5
-                        }
+                        { label: 'Planned Monthly', data: targetAvgData, backgroundColor: 'rgba(200, 200, 205, 0.5)', borderRadius: 5 },
+                        { label: 'Actual Monthly', data: actualAvgData, backgroundColor: '#007AFF', borderRadius: 5 }
                     ]
                 },
                 options: {
                     responsive: true, 
                     maintainAspectRatio: false,
-                    layout: {
-                        padding: {
-                            bottom: 20
-                        }
-                    },
                     plugins: {
-                        legend: { position: 'top', labels: { font: { size: 10, weight: 'bold' } } },
+                        legend: { position: 'top', labels: { font: { size: 10 } } },
                         datalabels: { 
-                            anchor: 'end', align: 'top', 
-                            font: { size: 9, weight: 'bold' },
+                            anchor: 'end', align: 'top', font: { size: 9, weight: 'bold' },
                             formatter: (val) => val > 0 ? `RM${Math.round(val).toLocaleString()}` : ''
                         }
                     },
                     scales: {
-                        y: { 
-                            beginAtZero: true, 
-                            ticks: { font: { size: 9 } }
-                        },
-                        x: { 
-                            display: true,
-                            ticks: { 
-                                display: true,
-                                color: '#333',
-                                font: { size: 10, weight: 'bold' },
-                                autoSkip: false,
-                                maxRotation: 45,
-                                minRotation: 45
-                            }
-                        }
+                        y: { beginAtZero: true },
+                        x: { ticks: { font: { size: 10, weight: 'bold' }, maxRotation: 45 } }
                     }
                 }
             });
