@@ -12,7 +12,6 @@
             --glass-bg: rgba(255, 255, 255, 0.4); --glass-border: rgba(255, 255, 255, 0.6); 
             --glass: rgba(255,255,255,0.8);
             --sidebar-width: 300px;
-            --right-panel-width: 220px;
         }
         * { box-sizing: border-box; font-family: -apple-system, system-ui, sans-serif; }
         
@@ -35,16 +34,6 @@
             display: flex;
             flex-direction: column;
             z-index: 100;
-        }
-
-        /* RIGHT PANEL STYLE */
-        .right-panel {
-            width: var(--right-panel-width);
-            background: rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(10px);
-            border-left: 1px solid var(--glass-border);
-            padding: 20px;
-            overflow-y: auto;
         }
 
         .sidebar-header {
@@ -75,27 +64,6 @@
             text-transform: uppercase;
             letter-spacing: 1px;
             margin-bottom: 15px;
-        }
-
-        /* DISTRICT CARDS (RIGHT SIDE) */
-        .dist-card {
-            background: white;
-            border-radius: 12px;
-            padding: 12px 15px;
-            margin-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.03);
-            border: 1px solid transparent;
-        }
-        .dist-card .count {
-            background: var(--ios-blue);
-            color: white;
-            font-size: 10px;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-weight: 800;
         }
 
         /* CONTRACT LIST ITEMS */
@@ -214,13 +182,13 @@
         <div class="dashboard-header">
             <div>
                 <h1 id="viewTitle" style="margin:0; font-size: 24px;">Selamat Datang</h1>
-                <p id="viewSubtitle" style="margin:5px 0 0 0; color: #666;">Sila pilih kontrak dari senarai kiri untuk melihat ID Kerja.</p>
+                <p id="viewSubtitle" style="margin:5px 0 0 0; color: #666;">Sila pilih kontrak dari senarai kiri untuk melihat maklumat terperinci.</p>
             </div>
         </div>
 
         <div class="glass-card" id="tableWrapper" style="display: none;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="margin:0;"><i class="fa-solid fa-list-check" style="margin-right: 10px; color: var(--ios-blue);"></i> Senarai Work Order</h3>
+                <h3 style="margin:0;"><i class="fa-solid fa-list-check" style="margin-right: 10px; color: var(--ios-blue);"></i> Senarai Work Order & Tuntutan</h3>
                 <input type="text" id="tableSearch" placeholder="Cari ID Kerja atau Lokasi..." style="padding: 10px; border-radius: 10px; border: 1px solid #ddd; width: 250px;">
             </div>
             
@@ -230,21 +198,15 @@
                         <th>Status</th>
                         <th>ID Kerja / Seq</th>
                         <th>Keterangan & Lokasi</th>
-                        <th>Claimed Interim</th>
-                        <th>Tarikh QPB</th>
-                        <th>Amaun (RM)</th>
+                        <th>Interim No</th>
+                        <th>Amaun Kerja (RM)</th>
+                        <th>Amaun Claim (RM)</th>
                         <th>Tindakan</th>
                     </tr>
                 </thead>
                 <tbody id="workOrderTbody"></tbody>
             </table>
         </div>
-    </div>
-
-    <div class="right-panel no-print">
-        <div class="sidebar-title">Pecahan Daerah</div>
-        <div id="districtSummaryContainer">
-            </div>
     </div>
 
     <div id="blueformPage" class="page">
@@ -273,49 +235,25 @@
     const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
 
     let allWorks = [];
-    let allContracts = [];
 
     window.onload = loadContracts;
 
     async function loadContracts() {
         try {
-            // Fetch contracts sorted by district
             const res = await fetch(`${SB_URL}/rest/v1/contract?select=*,units(unit_name)&order=district.asc`, { headers });
-            allContracts = await res.json();
+            const data = await res.json();
             
-            renderContractList(allContracts);
-            renderDistrictSummary(allContracts);
-        } catch (e) { console.error(e); }
-    }
-
-    function renderContractList(data) {
-        const container = document.getElementById('contractListContainer');
-        container.innerHTML = data.map(c => `
-            <div class="contract-item" id="c_card_${c.id}" onclick="selectContract(${c.id}, '${c.contract_code}', '${c.contract_name.replace(/'/g, "\\'")}')">
-                <div style="font-size: 9px; background: var(--ios-orange); color: white; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 5px;">
-                    ${c.units?.unit_name || 'UNIT'}
+            const container = document.getElementById('contractListContainer');
+            container.innerHTML = data.map(c => `
+                <div class="contract-item" id="c_card_${c.id}" onclick="selectContract(${c.id}, '${c.contract_code}', '${c.contract_name.replace(/'/g, "\\'")}')">
+                    <div style="font-size: 9px; background: var(--ios-orange); color: white; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 5px;">
+                        ${c.units?.unit_name || 'UNIT'}
+                    </div>
+                    <div style="font-weight: bold; font-size: 14px;">${c.contract_code}</div>
+                    <small style="color: #666;"><i class="fa-solid fa-location-dot"></i> ${c.district}</small>
                 </div>
-                <div style="font-weight: bold; font-size: 14px;">${c.contract_code}</div>
-                <small style="color: #666;"><i class="fa-solid fa-location-dot"></i> ${c.district}</small>
-            </div>
-        `).join('');
-    }
-
-    function renderDistrictSummary(data) {
-        const container = document.getElementById('districtSummaryContainer');
-        const summary = {};
-        
-        // Group by district
-        data.forEach(c => {
-            summary[c.district] = (summary[c.district] || 0) + 1;
-        });
-
-        container.innerHTML = Object.keys(summary).map(dist => `
-            <div class="dist-card">
-                <span style="font-size: 12px; font-weight: 600;">${dist}</span>
-                <span class="count">${summary[dist]}</span>
-            </div>
-        `).join('');
+            `).join('');
+        } catch (e) { console.error(e); }
     }
 
     async function selectContract(id, code, name) {
@@ -329,6 +267,7 @@
         const tbody = document.getElementById('workOrderTbody');
         tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px;">Memuatkan rekod...</td></tr>';
 
+        // Fetch Work Orders and their claimed amounts
         const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}&order=sequence_no.asc`, { headers });
         allWorks = await res.json();
         renderTable(allWorks);
@@ -341,10 +280,15 @@
             return;
         }
 
-        tbody.innerHTML = data.map(w => `
+        tbody.innerHTML = data.map(w => {
+            // Check if amount is claimed
+            const isClaimed = w.status === 'Claimed';
+            const claimAmt = isClaimed ? (w.amount_spent || 0) : 0;
+            
+            return `
             <tr>
                 <td>
-                    <span class="tag" style="background:${w.status === 'Claimed' ? 'var(--ios-green)' : 'var(--ios-blue)'}">
+                    <span class="tag" style="background:${isClaimed ? 'var(--ios-green)' : 'var(--ios-blue)'}">
                         ${w.status || 'PENDING'}
                     </span>
                 </td>
@@ -357,17 +301,20 @@
                     <div style="font-size:11px; color:var(--ios-orange);"><i class="fa-solid fa-map-pin"></i> ${w.location || 'N/A'}</div>
                 </td>
                 <td>
-                    <div style="font-weight:bold; color: #444;">${w.interim_no ? 'INTERIM ' + w.interim_no : '-'}</div>
+                    <div style="font-weight:bold; color: #444;">${w.interim_no ? 'INT-' + w.interim_no : '-'}</div>
                 </td>
-                <td>${w.qpb_date || '-'}</td>
-                <td style="font-weight:bold; color:var(--ios-blue);">RM ${(w.amount_spent || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                <td style="color:#666;">RM ${(w.amount_spent || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                <td style="font-weight:bold; color:${isClaimed ? 'var(--ios-green)' : '#ccc'};">
+                    RM ${claimAmt.toLocaleString(undefined, {minimumFractionDigits:2})}
+                </td>
                 <td>
                     <button class="btn-action" style="background: var(--ios-orange); padding: 5px 12px; font-size: 11px;" onclick="openBlueform(${w.id})">
                         <i class="fa-solid fa-print"></i> Blueform
                     </button>
                 </td>
             </tr>
-        `).join('');
+            `;
+        }).join('');
     }
 
     async function openBlueform(id) {
