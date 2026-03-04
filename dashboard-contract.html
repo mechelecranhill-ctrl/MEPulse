@@ -23,36 +23,25 @@
             overflow: hidden; 
         }
 
-        /* --- LOGIK MOBILE SLIDE-IN & CLOSE BUTTON --- */
-        .mobile-close-btn { display: none !important; }
-        .card-usage-link { display: none; } /* Sembunyi secara default (Desktop) */
+        /* --- LOGIK MOBILE & USAGE BUTTON --- */
+        .mobile-usage-btn { display: none; } /* Sembunyi di desktop */
 
         @media (max-width: 768px) {
-            .mobile-close-btn { display: flex !important; }
-            
-            /* Sembunyikan butang asal bawah kanan di mobile */
-            .next-container { display: none !important; }
+            /* Sembunyikan Nama Kontrak & Butang Bawah Kanan di mobile */
+            #panel-vendor, .next-container { display: none !important; }
 
-            /* Gaya butang Usage Schedule dalam kad (Mobile Only) */
-            .card-usage-link {
+            /* Tunjukkan butang usage dalam panel */
+            .mobile-usage-btn {
                 display: flex;
                 background: var(--ios-blue);
                 color: white;
                 text-decoration: none;
-                padding: 5px 10px;
-                border-radius: 8px;
+                padding: 8px 12px;
+                border-radius: 10px;
                 font-size: 10px;
                 font-weight: 800;
                 align-items: center;
-                gap: 4px;
-                box-shadow: 0 2px 4px rgba(0, 122, 255, 0.3);
-            }
-
-            .c-card-top {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 4px;
+                gap: 5px;
             }
 
             .contract-sidebar {
@@ -80,7 +69,6 @@
             .health-grid { grid-template-columns: 1fr !important; overflow-y: auto !important; }
             .chart-box { min-height: 250px; }
         }
-        /* --- TAMAT LOGIK MOBILE --- */
 
         .glass-header { 
             width: 100%; height: 60px; 
@@ -136,7 +124,6 @@
             box-shadow: 0 4px 12px rgba(0, 122, 255, 0.4);
             transition: 0.2s;
         }
-        .next-btn-circle:active { transform: scale(0.9); }
 
         .unit-container { display: flex; gap: 8px; overflow-x: auto; padding: 0 70px; scrollbar-width: none; }
         .unit-pill { 
@@ -159,9 +146,7 @@
         .c-card h4 { margin: 0; font-size: 11px; color: #1c1c1e; overflow: hidden; text-overflow: ellipsis; }
         .c-card .sub-text { font-size: 9px; color: #888; margin-top: 2px; }
 
-        .analysis-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
         #analysis-panel { display: none; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); flex: 1; overflow: hidden; flex-direction: column; }
-
         .health-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; flex: 1; overflow: hidden; margin-top: 5px; }
         .chart-box { padding: 10px; background: #f9f9fb; border-radius: 15px; flex: 1; position: relative; min-height: 0; display: flex; flex-direction: column;}
 
@@ -204,11 +189,12 @@
                         <h1 id="panel-title" style="margin:0; font-size: 24px; letter-spacing: -0.5px; color: var(--ios-blue);">Analisis</h1>
                         <p id="panel-vendor" style="margin:2px 0 0 0; color: #8e8e93; font-size: 13px; font-weight: 500;"></p>
                     </div>
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <span style="font-size: 10px; font-weight: 800; color: #34C759; background: #eafaf1; padding: 4px 10px; border-radius: 6px; margin-right: 10px;">
-                            <i class="fa fa-circle" style="font-size: 7px; vertical-align: middle;"></i> LIVE
-                        </span>
-                        <button class="mobile-close-btn" onclick="document.body.classList.remove('analysis-active')" 
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <a href="dashboard-interimclaim.html" class="mobile-usage-btn">
+                            USAGE <i class="fa fa-chevron-right"></i>
+                        </a>
+                        
+                        <button onclick="document.body.classList.remove('analysis-active')" 
                                 style="background:#f2f2f7; border:none; width: 38px; height: 38px; border-radius:12px; cursor:pointer; display: flex; align-items: center; justify-content: center;">
                             <i class="fa fa-times" style="color: #8e8e93;"></i>
                         </button>
@@ -269,27 +255,17 @@
             const res = await fetch(`${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}&order=contract_start.asc`, { headers });
             const data = await res.json();
             const list = document.getElementById('contractList');
-            
+
             list.innerHTML = data.map(c => `
                 <div class="c-card" id="card-${c.id}" onclick='selectCard(${c.id}); openAnalysis(${JSON.stringify(c)})'>
-                    <div class="c-card-top">
-                        <h4>${c.contract_code}</h4>
-                        <a href="dashboard-interimclaim.html" class="card-usage-link" onclick="event.stopPropagation()">
-                            USAGE <i class="fa fa-chevron-right" style="font-size: 8px;"></i>
-                        </a>
-                    </div>
+                    <h4>${c.contract_code}</h4>
                     <div class="sub-text">${c.contract_name}</div>
                 </div>
             `).join('');
 
-            if(data.length > 0) {
-                if(window.innerWidth > 768) {
-                    selectCard(data[0].id);
-                    openAnalysis(data[0]);
-                }
-            } else {
-                document.getElementById('analysis-panel').style.display = 'none';
-                document.body.classList.remove('analysis-active');
+            if(data.length > 0 && window.innerWidth > 768) {
+                selectCard(data[0].id);
+                openAnalysis(data[0]);
             }
         } catch (e) { console.error("Error contracts:", e); }
     }
@@ -302,7 +278,6 @@
 
     async function openAnalysis(contract) {
         document.body.classList.add('analysis-active');
-
         document.getElementById('analysis-panel').style.display = 'flex';
         document.getElementById('panel-title').innerText = contract.contract_code;
         document.getElementById('panel-vendor').innerText = contract.contract_name;
@@ -310,14 +285,11 @@
         try {
             const resC = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${contract.id}&select=*`, { headers });
             currentContract = (await resC.json())[0];
-
             const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}`, { headers });
             currentWO = await resW.json();
-
             selectedSections = (currentContract.selected_sections && currentContract.selected_sections.length > 0) 
                 ? currentContract.selected_sections 
                 : Object.keys(currentContract.contract_sections_breakdown || {});
-
             renderUI();
         } catch (error) { console.error(error); }
     }
@@ -325,17 +297,10 @@
     function renderUI() {
         if(!currentContract) return;
         const sections = currentContract.contract_sections_breakdown || {};
-
         const start = new Date(currentContract.contract_start);
         const end = new Date(currentContract.contract_end);
-        const today = new Date();
-
         const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
-        const monthsElapsed = Math.max(1, (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()));
-
-        document.getElementById('fullSectionList').innerHTML = Object.keys(sections).sort().map(s => `
-            <span class="sel-chip ${selectedSections.includes(s) ? 'active' : ''}" onclick="toggleSection('${s}')">${s}</span>
-        `).join('');
+        const monthsElapsed = Math.max(1, (new Date().getFullYear() - start.getFullYear()) * 12 + (new Date().getMonth() - start.getMonth()));
 
         const mainContainer = document.getElementById('selectedSectionContainer');
         mainContainer.innerHTML = '';
@@ -344,69 +309,44 @@
             if(!sections[s]) return;
             let used = 0;
             currentWO.forEach(wo => { if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; });
-
             const budget = sections[s].amt || 0; 
-            const plannedMonthly = budget / totalMonths; 
-
-            const plannedTotalToDate = plannedMonthly * monthsElapsed;
-            const variance = used - plannedTotalToDate;
-            const variancePercent = (variance / plannedTotalToDate) * 100 || 0;
-
-            const color = variance > 0 ? 'var(--ios-red)' : 'var(--ios-green)';
+            const plannedTotalToDate = (budget / totalMonths) * monthsElapsed;
+            const variancePercent = ((used - plannedTotalToDate) / plannedTotalToDate) * 100 || 0;
+            const color = (used - plannedTotalToDate) > 0 ? 'var(--ios-red)' : 'var(--ios-green)';
             const progressPercent = (used / budget) * 100 || 0;
 
             mainContainer.innerHTML += `
                 <div class="section-row">
-                    <div style="display:flex; justify-content:space-between; align-items:start;">
-                        <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">${s}: ${sections[s].desc || s}</div>
-                        <i class="fa fa-times-circle" style="color:#ccc; cursor:pointer;" onclick="toggleSection('${s}')"></i>
-                    </div>
+                    <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">${s}</div>
                     <div class="avg-stats">
                         <div class="avg-item">BUDGET: RM ${budget.toLocaleString()}</div>
-                        <div class="avg-item" style="color: #8e8e93;">PLANNED: RM ${plannedTotalToDate.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+                        <div class="avg-item" style="color: ${color};">VAR: ${variancePercent.toFixed(1)}%</div>
                     </div>
-                    <div class="avg-stats">
-                        <div class="avg-item">ACTUAL: RM ${used.toLocaleString()}</div>
-                        <div class="avg-item" style="color: ${color};">VARIANCE: ${variancePercent > 0 ? '+' : ''}${variancePercent.toFixed(1)}%</div>
-                    </div>
-                    <div class="prog-bar-bg">
-                        <div class="prog-bar-fill" data-width="${progressPercent}%" style="background:${color}"></div>
-                    </div>
+                    <div class="prog-bar-bg"><div class="prog-bar-fill" data-width="${progressPercent}%" style="background:${color}"></div></div>
                 </div>
             `;
         });
-
         updateChart();
         setTimeout(() => {
-            document.querySelectorAll('.prog-bar-fill').forEach(bar => {
-                bar.style.setProperty('width', bar.getAttribute('data-width'), 'important');
-            });
+            document.querySelectorAll('.prog-bar-fill').forEach(bar => bar.style.width = bar.getAttribute('data-width'));
         }, 100);
     }
 
     function updateChart() {
         if (!currentContract) return;
         const sections = currentContract.contract_sections_breakdown || {};
-
         const start = new Date(currentContract.contract_start);
         const end = new Date(currentContract.contract_end);
-        const today = new Date();
-
         const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
-        const monthsElapsed = Math.max(1, (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()));
+        const monthsElapsed = Math.max(1, (new Date().getFullYear() - start.getFullYear()) * 12 + (new Date().getMonth() - start.getMonth()));
 
         let labels = [], targetAvgData = [], actualAvgData = [];
-
         selectedSections.sort().forEach(s => {
             labels.push(s); 
-            const fullBudget = sections[s]?.amt || 0;
-            const targetMonthly = fullBudget / totalMonths;
-            targetAvgData.push(targetMonthly.toFixed(2));
-
-            let totalUsed = 0;
-            currentWO.forEach(wo => { if(wo.section_category?.[s]) totalUsed += wo.section_category[s].amt || 0; });
-            const actualMonthly = totalUsed / monthsElapsed;
-            actualAvgData.push(actualMonthly.toFixed(2));
+            targetAvgData.push((sections[s]?.amt / totalMonths).toFixed(2));
+            let used = 0;
+            currentWO.forEach(wo => { if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; });
+            actualAvgData.push((used / monthsElapsed).toFixed(2));
         });
 
         if (myChart) {
@@ -421,25 +361,11 @@
                 data: {
                     labels: labels,
                     datasets: [
-                        { label: 'Planned Monthly', data: targetAvgData, backgroundColor: 'rgba(200, 200, 205, 0.5)', borderRadius: 5 },
-                        { label: 'Actual Monthly', data: actualAvgData, backgroundColor: '#007AFF', borderRadius: 5 }
+                        { label: 'Planned', data: targetAvgData, backgroundColor: 'rgba(200, 200, 205, 0.5)', borderRadius: 5 },
+                        { label: 'Actual', data: actualAvgData, backgroundColor: '#007AFF', borderRadius: 5 }
                     ]
                 },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    layout: { padding: { bottom: 20 } },
-                    plugins: {
-                        legend: { position: 'top', labels: { font: { size: 10, weight: 'bold' } } },
-                        datalabels: { 
-                            anchor: 'end', align: 'top', font: { size: 9, weight: 'bold' },
-                            formatter: (val) => val > 0 ? `RM${Math.round(val).toLocaleString()}` : ''
-                        }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, ticks: { font: { size: 9 } } },
-                        x: { display: true, ticks: { display: true, color: '#333', font: { size: 10, weight: 'bold' }, autoSkip: false, maxRotation: 45, minRotation: 45 } }
-                    }
-                }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { display: false } } }
             });
         }
     }
@@ -447,17 +373,6 @@
     function toggleSelector() {
         const el = document.getElementById('sectionSelector');
         el.style.display = el.style.display === 'none' ? 'block' : 'none';
-    }
-
-    async function toggleSection(s) {
-        if(selectedSections.includes(s)) selectedSections = selectedSections.filter(x => x !== s);
-        else selectedSections.push(s);
-        renderUI();
-        await fetch(`${SB_URL}/rest/v1/contract?id=eq.${currentContract.id}`, {
-            method: 'PATCH',
-            headers: headers,
-            body: JSON.stringify({ selected_sections: selectedSections })
-        });
     }
 </script>
 </body>
