@@ -163,7 +163,6 @@
             box-sizing: border-box;
         }
 
-        /* Border Double 1cm dari tepi */
         .a4-container::after {
             content: "";
             position: absolute;
@@ -202,6 +201,22 @@
             height: auto;
             z-index: 10;
         }
+
+        /* Group Control CSS */
+        .bf-visibility-panel {
+            background: rgba(255,255,255,0.1);
+            width: 210mm;
+            margin: 0 auto 15px auto;
+            padding: 10px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            color: white;
+            font-size: 12px;
+        }
+        .bf-visibility-panel label { cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        .hide-group { display: none !important; }
 
         @media print {
             @page {
@@ -280,11 +295,17 @@
             <button class="btn-action" style="background: #666;" onclick="closeBlueform()">Tutup</button>
             <button class="btn-action" style="background: var(--ios-green);" onclick="window.print()">Cetak / Simpan PDF</button>
         </div>
+
+        <div class="bf-visibility-panel no-print">
+            <label><input type="checkbox" checked onchange="toggleBfGroup('grp-lc', this.checked)"> Papar Labour Charges (6-7)</label>
+            <label><input type="checkbox" checked onchange="toggleBfGroup('grp-ssp', this.checked)"> Papar Spare Part (8-9)</label>
+            <label><input type="checkbox" checked onchange="toggleBfGroup('grp-sor', this.checked)"> Papar SOR/Provisional (10-12)</label>
+        </div>
         
         <div class="a4-container" id="bf_area">
             <img src="RSAJ.png" class="bf-logo" alt="RSAJ Logo" onerror="this.src='https://upload.wikimedia.org/wikipedia/en/thumb/3/3d/Ranhill_SAJ_logo.svg/1200px-Ranhill_SAJ_logo.svg.png'">
             
-            <div style="text-align: center; font-weight: bold; text-decoration: underline; none; margin: 25px 0 20px 0; padding: 0 50px;">
+            <div style="text-align: center; font-weight: bold; text-decoration: underline; margin: 25px 0 20px 0; padding: 0 50px;">
                 PERMOHONAN KERJA-KERJA S.O.R / TAMBAHAN DALAM KONTRAK PENYELENGGARAAN
             </div>
             
@@ -368,6 +389,14 @@
         }).join('');
     }
 
+    function toggleBfGroup(className, isVisible) {
+        const elements = document.getElementsByClassName(className);
+        for (let el of elements) {
+            if (isVisible) el.classList.remove('hide-group');
+            else el.classList.add('hide-group');
+        }
+    }
+
     async function openBlueform(id) {
         try {
             const res = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}&select=*,contract(*)`, { headers });
@@ -383,18 +412,22 @@
                 <div class="bf-row"><div class="bf-label">3    No. Kontrak</div><div class="bf-colon">:</div><div class="bf-value">${c.contract_code}</div></div>
                 <div class="bf-row"><div class="bf-label">4    Nama Kontraktor</div><div class="bf-colon">:</div><div class="bf-value">${c.contractor}</div></div>
                 <div class="bf-row"><div class="bf-label">5    Tempoh Kontrak</div><div class="bf-colon">:</div><div class="bf-value">${c.contract_start} sehingga ${c.contract_end}</div></div>
+                
+                <div class="grp-lc"><hr style="border: 0.5px solid #000; margin: 10px 0;"></div>
+                <div class="bf-row grp-lc"><div class="bf-label">6    Labour Charges Sum</div><div class="bf-colon">:</div><div class="bf-value">RM ${(b["LABOUR CHARGES"]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+                <div class="bf-row grp-lc"><div class="bf-label">7    Anggaran Kerja (L.C)</div><div class="bf-colon">:</div><div class="bf-value">RM ${(s["LABOUR CHARGES"]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+                
+                <div class="grp-ssp"><hr style="border: 0.5px solid #000; margin: 10px 0;"></div>
+                <div class="bf-row grp-ssp" style="margin-top:6px;"><div class="bf-label">8    Supply Spare Part Sum</div><div class="bf-colon">:</div><div class="bf-value">RM ${(b["SUPPLY SPARE PART"]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+                <div class="bf-row grp-ssp"><div class="bf-label">9    Anggaran Kerja (S.S.P)</div><div class="bf-colon">:</div><div class="bf-value">RM ${(s["SUPPLY SPARE PART"]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+                
+                <div class="grp-sor"><hr style="border: 0.5px solid #000; margin: 10px 0;"></div>
+                <div class="bf-row grp-sor" style="margin-top:6px;"><div class="bf-label">10   Provisional Sum</div><div class="bf-colon">:</div><div class="bf-value">RM ${(b["PROVISIONAL SUM"]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+                <div class="bf-row grp-sor"><div class="bf-label">11   Anggaran Kerja (S.O.R)</div><div class="bf-colon">:</div><div class="bf-value">RM ${(s["PROVISIONAL SUM"]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+                <div class="bf-row grp-sor"><div class="bf-label">12   Anggaran Kerja (Tambahan)</div><div class="bf-colon">:</div><div class="bf-value" style="font-weight:bold; font-size:10px;">${data.description.toUpperCase()}</div></div>
+                
                 <hr style="border: 0.5px solid #000; margin: 10px 0;">
-                <div class="bf-row"><div class="bf-label">6    Labour Charges Sum</div><div class="bf-colon">:</div><div class="bf-value">RM ${(b["LABOUR CHARGES"]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
-                <div class="bf-row"><div class="bf-label">7    Anggaran Kerja (L.C)</div><div class="bf-colon">:</div><div class="bf-value">RM ${(s["LABOUR CHARGES"]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
-                <hr style="border: 0.5px solid #000; margin: 10px 0;">
-                <div class="bf-row" style="margin-top:6px;"><div class="bf-label">8    Supply Spare Part Sum</div><div class="bf-colon">:</div><div class="bf-value">RM ${(b["SUPPLY SPARE PART"]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
-                <div class="bf-row"><div class="bf-label">9    Anggaran Kerja (S.S.P)</div><div class="bf-colon">:</div><div class="bf-value">RM ${(s["SUPPLY SPARE PART"]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
-                <hr style="border: 0.5px solid #000; margin: 10px 0;">
-                <div class="bf-row" style="margin-top:6px;"><div class="bf-label">10   Provisional Sum</div><div class="bf-colon">:</div><div class="bf-value">RM ${(b["PROVISIONAL SUM"]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
-                <div class="bf-row"><div class="bf-label">11   Anggaran Kerja (S.O.R)</div><div class="bf-colon">:</div><div class="bf-value">RM ${(s["PROVISIONAL SUM"]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
-                <div class="bf-row"><div class="bf-label">12   Anggaran Kerja (Tambahan)</div><div class="bf-colon">:</div><div class="bf-value" style="font-weight:bold; font-size:10px;">${data.description.toUpperCase()}</div></div>
-                <hr style="border: 0.5px solid #000; margin: 10px 0;">
-                <div class="bf-row"><div class="bf-label">13   Jumlah Harga Kontrak</div><div class="bf-colon">:</div><div class="bf-value">${data.location} (SEKSYEN: ${data.section || '-'})</div></div>
+                <div class="bf-row"><div class="bf-label">13   Lokasi / Seksyen</div><div class="bf-colon">:</div><div class="bf-value">${data.location} (SEKSYEN: ${data.section || '-'})</div></div>
                 <div style="margin-top: 10px;">
                     <strong style="font-size:10.5px;">14   Baki:</strong>
                     <div style="margin-top:5px; padding: 6px; border: 1px solid #000;">
@@ -411,9 +444,9 @@
                         </div>
                     </div>
                 </div>
-                <div class="bf-row"><div class="bf-label">15   Baki Harga Kontrak</div><div class="bf-colon">:</div><div class="bf-value" style="font-weight:bold;">RM ${data.amount_spent.toLocaleString(undefined, {minimumFractionDigits:2})}</div></div>
+                <div class="bf-row" style="margin-top:10px;"><div class="bf-label">15   Baki Harga Kontrak</div><div class="bf-colon">:</div><div class="bf-value" style="font-weight:bold;">RM ${data.amount_spent.toLocaleString(undefined, {minimumFractionDigits:2})}</div></div>
                 <hr style="border: 0.5px solid #000; margin: 10px 0;">
-                <div class="bf-row"><div class="bf-label">16   Tajuk Kerja</div><div class="bf-colon">:</div><div class="bf-value">${data.description.toUpperCase()} DI ${data.location} (RM ${data.amount_spent.toLocaleString(undefined, {minimumFractionDigits:2})})</div></div>
+                <div class="bf-row"><div class="bf-label">16   Tajuk Kerja</div><div class="bf-colon">:</div><div class="bf-value">${data.description.toUpperCase()} (RM ${data.amount_spent.toLocaleString(undefined, {minimumFractionDigits:2})})</div></div>
             `;
             
             document.getElementById('bf_content').innerHTML = html;
