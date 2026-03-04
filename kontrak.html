@@ -117,8 +117,6 @@
         .excel-table td { padding: 8px; border-bottom: 1px solid #eee; }
         .funding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(255,255,255,0.2); padding: 10px; border-radius: 12px; }
 
-        .modal { display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter:blur(10px); }
-        .modal-content { width: 92%; max-width: 450px; margin: 50px auto; }
     </style>
 </head>
 <body onload="initApp()">
@@ -141,7 +139,7 @@
             <div id="menu_interimPage" class="menu-item" onclick="showPage('interimPage', this)">
                 <i class="fa-solid fa-file-invoice-dollar" style="margin-right:12px;"></i> Interim Claims
             </div>
-            <div class="menu-item" onclick="openVOModal()">
+            <div id="menu_voPage" class="menu-item" onclick="showPage('voPage', this)">
                 <i class="fa-solid fa-triangle-exclamation" style="margin-right:12px;"></i> Variation Order (VO)
             </div>
             <div id="menu_settingsPage" class="menu-item" onclick="showPage('settingsPage', this)">
@@ -199,6 +197,33 @@
             </div>
         </div>
 
+        <div id="voPage" class="page">
+            <div class="glass-card">
+                <h3 style="margin-top:0;"><i class="fa-solid fa-triangle-exclamation"></i> Borang Variation Order (VO)</h3>
+                <label>Pilih Kontrak</label>
+                <select id="vo_contract_id" onchange="onVOContractSelect()" required><option value="">Pilih Kontrak</option></select>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label>Nama VO</label>
+                        <input type="text" id="vo_name" placeholder="Cth: VO 01" required>
+                    </div>
+                    <div>
+                        <label>Masukkan Ke Section</label>
+                        <select id="vo_target_sec" required><option value="">Pilih Kontrak Dahulu</option></select>
+                    </div>
+                </div>
+
+                <label>Jumlah Tambahan (RM)</label>
+                <input type="number" id="vo_amt" step="0.01" placeholder="0.00" required>
+                
+                <label>Keterangan</label>
+                <textarea id="vo_desc" rows="3" placeholder="Sebab kenaikan kos..."></textarea>
+                
+                <button onclick="submitVO()" class="btn-primary" style="background:var(--ios-red);">Daftar VO & Kemaskini Baki</button>
+            </div>
+        </div>
+
         <div id="adminPage" class="page">
             <div class="glass-card">
                 <h3 style="margin-top:0;"><i class="fa-solid fa-file-contract"></i> Borang Kontrak</h3>
@@ -251,59 +276,29 @@
 
     </div>
 
-    <div id="voModal" class="modal">
-        <div class="glass-card modal-content">
-            <div style="display:flex; align-items:center; justify-content: space-between; margin-bottom:15px;">
-                <h3 style="margin:0;">Borang Variation Order</h3>
-                <button class="back-btn" style="margin:0;" onclick="closeVOModal()"><i class="fa fa-times"></i></button>
-            </div>
-            <label>Pilih Kontrak</label>
-            <select id="vo_contract_id" onchange="onVOContractSelect()" required><option value="">Pilih Kontrak</option></select>
-            <label>Nama VO</label>
-            <input type="text" id="vo_name" placeholder="VO 01" required>
-            <label>Masukkan Ke Section</label>
-            <select id="vo_target_sec" required><option value="">Pilih Kontrak Dahulu</option></select>
-            <label>Jumlah Tambahan (RM)</label>
-            <input type="number" id="vo_amt" step="0.01" placeholder="0.00" required>
-            <label>Keterangan</label>
-            <textarea id="vo_desc" rows="2" placeholder="Sebab kenaikan kos..."></textarea>
-            <button onclick="submitVO()" class="btn-primary">Daftar VO & Kemaskini Baki</button>
-        </div>
-    </div>
-
 <script>
     const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
     const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
     const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
 
-    // Fungsi asal untuk mulakan aplikasi
     function initApp() {
-        // Tunjukkan borang pendaftaran ID secara default
         showPage('registerWorkPage', document.getElementById('menu_registerWorkPage'));
     }
 
     function showPage(id, element) {
-        // Sembunyikan semua page
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        // Buang status aktif dari semua menu
         document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
         
-        // Aktifkan page yang dipilih
         const targetPage = document.getElementById(id);
         if(targetPage) targetPage.classList.add('active');
-        
-        // Aktifkan menu sidebar yang dipilih
         if(element) element.classList.add('active');
 
-        // Trigger data loading
-        if(['registerWorkPage', 'interimPage', 'adminPage', 'settingsPage'].includes(id)) fetchUnits();
-        if(['registerWorkPage', 'interimPage'].includes(id)) loadContractsToDropdowns();
+        // Trigger data loading based on page
+        if(['registerWorkPage', 'interimPage', 'adminPage', 'settingsPage', 'voPage'].includes(id)) fetchUnits();
+        if(['registerWorkPage', 'interimPage', 'voPage'].includes(id)) loadContractsToDropdowns();
     }
 
-    // VO FUNCTIONS
-    function openVOModal() { document.getElementById('voModal').style.display = 'block'; loadContractsToDropdowns(); }
-    function closeVOModal() { document.getElementById('voModal').style.display = 'none'; }
-    
+    // VO FUNCTIONS (MODIFIED TO WORK AS PAGE)
     function onVOContractSelect() {
         const opt = document.getElementById('vo_contract_id').selectedOptions[0];
         const sSec = document.getElementById('vo_target_sec');
@@ -334,32 +329,40 @@
             body: JSON.stringify({ vo_breakdown: vBreak, total_vo_amount: newVoTotal })
         });
 
-        if(resUpd.ok) { alert("VO Berjaya!"); location.reload(); }
-    }
-
-    async function fetchUnits() {
-        const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
-        const units = await res.json();
-        const sAdmin = document.getElementById('c_unit_id');
-        if(sAdmin) {
-            sAdmin.innerHTML = '<option value="">Pilih Unit</option>';
-            units.forEach(u => sAdmin.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`);
+        if(resUpd.ok) { 
+            alert("VO Berjaya Didaftarkan!"); 
+            showPage('registerWorkPage', document.getElementById('menu_registerWorkPage'));
         }
     }
 
+    // CORE DATABASE FUNCTIONS
+    async function fetchUnits() {
+        try {
+            const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
+            const units = await res.json();
+            const sAdmin = document.getElementById('c_unit_id');
+            if(sAdmin) {
+                sAdmin.innerHTML = '<option value="">Pilih Unit</option>';
+                units.forEach(u => sAdmin.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`);
+            }
+        } catch (e) { console.error("Error fetching units", e); }
+    }
+
     async function loadContractsToDropdowns() {
-        const res = await fetch(`${SB_URL}/rest/v1/contract?select=*`, { headers });
-        const data = await res.json();
-        ['w_contract_id', 'i_contract_id', 'vo_contract_id'].forEach(id => {
-            const s = document.getElementById(id); if(!s) return;
-            s.innerHTML = '<option value="">Pilih Kontrak</option>';
-            data.forEach(c => {
-                const opt = document.createElement('option'); opt.value = c.id; opt.text = c.contract_code;
-                opt.dataset.b = JSON.stringify(c.contract_sections_breakdown); 
-                opt.dataset.dist = c.district;
-                s.appendChild(opt);
+        try {
+            const res = await fetch(`${SB_URL}/rest/v1/contract?select=*`, { headers });
+            const data = await res.json();
+            ['w_contract_id', 'i_contract_id', 'vo_contract_id'].forEach(id => {
+                const s = document.getElementById(id); if(!s) return;
+                s.innerHTML = '<option value="">Pilih Kontrak</option>';
+                data.forEach(c => {
+                    const opt = document.createElement('option'); opt.value = c.id; opt.text = c.contract_code;
+                    opt.dataset.b = JSON.stringify(c.contract_sections_breakdown); 
+                    opt.dataset.dist = c.district;
+                    s.appendChild(opt);
+                });
             });
-        });
+        } catch (e) { console.error("Error loading contracts", e); }
     }
 
     function onContractSelect() {
