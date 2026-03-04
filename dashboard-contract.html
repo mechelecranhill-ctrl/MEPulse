@@ -23,6 +23,54 @@
             overflow: hidden; 
         }
 
+        /* CSS BARU: Mobile Slide-In Logic */
+        .mobile-close-btn { display: none !important; }
+
+        @media (max-width: 768px) {
+            .mobile-close-btn { display: flex !important; }
+            
+            .contract-sidebar {
+                width: 100% !important;
+                transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+
+            .analysis-container {
+                position: fixed;
+                top: 60px; /* Bawah header */
+                left: 0;
+                width: 100%;
+                height: calc(100% - 60px);
+                background: #f2f2f7;
+                z-index: 1500;
+                transform: translateX(100%); /* Sembunyi ke kanan */
+                transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                padding: 10px !important;
+            }
+
+            /* Bila aktif, slide masuk dari kanan */
+            body.analysis-active .analysis-container {
+                transform: translateX(0);
+            }
+
+            body.analysis-active .contract-sidebar {
+                transform: translateX(-20%);
+                opacity: 0.5;
+            }
+
+            #analysis-panel {
+                border-radius: 20px 20px 0 0 !important;
+                height: 100%;
+            }
+
+            .health-grid {
+                grid-template-columns: 1fr !important;
+                overflow-y: auto !important;
+            }
+            
+            .chart-box { min-height: 250px; }
+        }
+        /* TAMAT CSS BARU */
+
         .glass-header { 
             width: 100%; height: 60px; 
             background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
@@ -31,7 +79,6 @@
             position: relative;
         }
 
-        /* Nav Buttons Base */
         .nav-btn {
             position: absolute;
             background: #e5e5ea;
@@ -47,10 +94,9 @@
             padding: 0 10px;
         }
         .nav-btn:active { transform: scale(0.9); background: #d1d1d6; }
-        
+
         .back-btn { left: 20px; width: 35px; }
-        
-        /* Next Button Positioned at Bottom Right */
+
         .next-container {
             position: fixed;
             bottom: 30px;
@@ -134,7 +180,6 @@
         <button class="nav-btn back-btn" onclick="window.location.href='index.html'">
             <i class="fa fa-chevron-left"></i>
         </button>
-
         <div class="unit-container" id="unitNav"></div>
     </div>
 
@@ -159,7 +204,7 @@
                         <span style="font-size: 10px; font-weight: 800; color: #34C759; background: #eafaf1; padding: 4px 10px; border-radius: 6px; margin-right: 10px;">
                             <i class="fa fa-circle" style="font-size: 7px; vertical-align: middle;"></i> LIVE
                         </span>
-                        <button onclick="document.getElementById('analysis-panel').style.display='none'" 
+                        <button class="mobile-close-btn" onclick="document.body.classList.remove('analysis-active')" 
                                 style="background:#f2f2f7; border:none; width: 38px; height: 38px; border-radius:12px; cursor:pointer; display: flex; align-items: center; justify-content: center;">
                             <i class="fa fa-times" style="color: #8e8e93;"></i>
                         </button>
@@ -228,10 +273,14 @@
             `).join('');
 
             if(data.length > 0) {
-                selectCard(data[0].id);
-                openAnalysis(data[0]);
+                // Di Desktop auto open, tapi di phone kita jangan auto open supaya tak terus slide-in
+                if(window.innerWidth > 768) {
+                    selectCard(data[0].id);
+                    openAnalysis(data[0]);
+                }
             } else {
                 document.getElementById('analysis-panel').style.display = 'none';
+                document.body.classList.remove('analysis-active');
             }
         } catch (e) { console.error("Error contracts:", e); }
     }
@@ -243,6 +292,9 @@
     }
 
     async function openAnalysis(contract) {
+        // Trigger Slide-in untuk Phone
+        document.body.classList.add('analysis-active');
+        
         document.getElementById('analysis-panel').style.display = 'flex';
         document.getElementById('panel-title').innerText = contract.contract_code;
         document.getElementById('panel-vendor').innerText = contract.contract_name;
@@ -287,11 +339,11 @@
 
             const budget = sections[s].amt || 0; 
             const plannedMonthly = budget / totalMonths; 
-            
+
             const plannedTotalToDate = plannedMonthly * monthsElapsed;
             const variance = used - plannedTotalToDate;
             const variancePercent = (variance / plannedTotalToDate) * 100 || 0;
-            
+
             const color = variance > 0 ? 'var(--ios-red)' : 'var(--ios-green)';
             const progressPercent = (used / budget) * 100 || 0;
 
