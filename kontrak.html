@@ -7,51 +7,65 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
-        :root { --ios-blue: #007AFF; --ios-green: #34C759; --ios-orange: #FF9500; --ios-red: #FF3B30; --glass-bg: rgba(255, 255, 255, 0.4); --glass-border: rgba(255, 255, 255, 0.6); }
+        :root { 
+            --ios-blue: #007AFF; --ios-green: #34C759; --ios-orange: #FF9500; --ios-red: #FF3B30; 
+            --glass-bg: rgba(255, 255, 255, 0.4); --glass-border: rgba(255, 255, 255, 0.6); 
+            --glass: rgba(255,255,255,0.8);
+        }
         * { box-sizing: border-box; font-family: -apple-system, system-ui, sans-serif; }
-        body { background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); background-attachment: fixed; margin: 0; padding: 15px; min-height: 100vh; }
-        .app-container { width: 100%; max-width: 500px; margin: auto; }
+        
+        body { background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); background-attachment: fixed; margin: 0; min-height: 100vh; }
+        
+        /* Glass Header Style (Sama seperti Dashboard) */
+        .glass-header { 
+            width: 100%; height: 60px; 
+            background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 1px 10px rgba(0,0,0,0.05); z-index: 1000; flex-shrink: 0;
+            position: sticky; top: 0; margin-bottom: 20px;
+        }
+
+        .back-btn {
+            position: absolute; left: 20px;
+            background: #e5e5ea; border: none;
+            width: 35px; height: 35px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: var(--ios-blue); transition: 0.2s;
+        }
+        .back-btn:active { transform: scale(0.9); background: #d1d1d6; }
+        .header-title { font-weight: 700; font-size: 17px; color: #000; }
+
+        .app-container { width: 100%; max-width: 500px; margin: auto; padding: 0 15px 30px 15px; }
         .glass-card { background: var(--glass-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border-radius: 20px; padding: 20px; margin-bottom: 15px; border: 1px solid var(--glass-border); box-shadow: 0 8px 32px 0 rgba(31,38,135,0.1); cursor: pointer; transition: transform 0.2s; }
         .glass-card:active { transform: scale(0.98); }
-        .page { display: none; } .page.active { display: block; animation: slideUp 0.3s ease; }
+        
+        .page { display: none; } 
+        .page.active { display: block; animation: slideUp 0.3s ease; }
+        
         @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
         label { font-size: 10px; font-weight: 700; color: #4b4b4b; display: block; margin-top: 10px; text-transform: uppercase; }
         input, select, textarea { width: 100%; padding: 12px; margin: 5px 0; border-radius: 10px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255, 255, 255, 0.4); font-size: 14px; outline: none; }
-        button { width: 100%; padding: 14px; border-radius: 12px; border: none; background: var(--ios-blue); color: white; font-weight: 600; cursor: pointer; margin-top: 10px; }
-        .nav-link { color: var(--ios-blue); font-weight: 600; cursor: pointer; margin-bottom: 15px; display: inline-block; }
-        .work-card { background: white; border-radius: 15px; padding: 15px; margin-bottom: 12px; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .status-tag { font-size: 9px; padding: 2px 6px; border-radius: 5px; color: white; font-weight: bold; }
+        
+        .btn-primary { width: 100%; padding: 14px; border-radius: 12px; border: none; background: var(--ios-blue); color: white; font-weight: 600; cursor: pointer; margin-top: 10px; }
+        
         .excel-table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; font-size: 11px; margin-top: 10px; }
         .excel-table th { background: #f1f1f1; padding: 8px; text-align: left; }
         .excel-table td { padding: 8px; border-bottom: 1px solid #eee; }
         .funding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(255,255,255,0.2); padding: 10px; border-radius: 12px; }
 
-        /* VO Modal Fit & Aesthetic */
         .modal { display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); overflow-y: auto; }
         .modal-content { width: 92%; max-width: 450px; margin: 20px auto; border: 1px solid var(--glass-border); cursor: default; }
-        .modal-content:active { transform: none; }
 
-        #blueformPage { background: white; padding: 0; }
-        .a4-container { width: 18cm; min-height: 25cm; margin: auto; background: white; padding: 1cm; position: relative; color: black; font-size: 10px; line-height: 1.3; border: 1px solid #eee; }
-        .logo-saj { position: absolute; right: 1cm; top: 1cm; width: 60px; }
-        .bf-title { text-align: center; font-weight: bold; text-decoration: underline; font-size: 11px; margin: 30px 0 20px 0; }
-        .bf-row { display: flex; margin-bottom: 4px; align-items: flex-start; }
-        .bf-num { width: 20px; font-weight: bold; }
-        .bf-label { width: 160px; text-transform: uppercase; font-weight: bold; }
-        .bf-colon { width: 10px; }
-        .bf-value { flex: 1; border-bottom: 0.5px solid #000; min-height: 14px; }
-        .bf-line { border-top: 1.5px solid black; margin: 10px 0; }
-        .bf-sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 50px; text-align: center; }
-        .bf-sig-line { border-top: 1px dotted black; width: 140px; margin: 0 auto 3px auto; }
-        @media print { .no-print { display: none !important; } body { background: white; padding: 0; } .a4-container { border: none; } }
+        @media print { .no-print { display: none !important; } body { background: white; } }
     </style>
 </head>
 <body>
 
 <div class="app-container no-print">
+    
     <div id="homePage" class="page active">
-        <h1 style="text-align:center; padding: 30px 0 20px 0; margin:0;">M&E-Connect</h1>
-        
+        <h1 style="text-align:center; padding: 40px 0 20px 0; margin:0; font-weight: 800; letter-spacing: -1px;">M&E-Connect</h1>
         <div class="glass-card" onclick="showPage('registerWorkPage')"><strong>📝 Pendaftaran Kerja (ID)</strong></div>
         <div class="glass-card" onclick="showPage('adminPage')"><strong>➕ Pengurusan Kontrak</strong></div>
         <div class="glass-card" style="border: 2px solid var(--ios-orange);" onclick="showPage('interimPage')"><strong>📑 Kemaskini Interim Claim</strong></div>
@@ -59,32 +73,11 @@
         <div class="glass-card" style="background: rgba(0,0,0,0.05);" onclick="showPage('settingsPage')"><i class="fa-solid fa-gear"></i> Tetapan Unit</div>
     </div>
 
-    <div id="voModal" class="modal">
-        <div class="glass-card modal-content">
-            <span class="nav-link" onclick="closeVOModal()">← Kembali</span>
-            <h3 style="margin-top:0;"><i class="fa-solid fa-file-invoice-dollar" style="color:var(--ios-blue)"></i> Borang VO Kontrak</h3>
-            
-            <label>Pilih Kontrak</label>
-            <select id="vo_contract_id" onchange="onVOContractSelect()" required><option value="">Pilih Kontrak</option></select>
-            
-            <label>Nama VO</label>
-            <input type="text" id="vo_name" placeholder="VO 01" required>
-            
-            <label>Masukkan Ke Section</label>
-            <select id="vo_target_sec" required><option value="">Pilih Kontrak Dahulu</option></select>
-            
-            <label>Jumlah Tambahan (RM)</label>
-            <input type="number" id="vo_amt" step="0.01" placeholder="0.00" required>
-            
-            <label>Keterangan</label>
-            <textarea id="vo_desc" rows="2" placeholder="Sebab kenaikan kos..."></textarea>
-            
-            <button onclick="submitVO()" style="background:var(--ios-blue); margin-top:15px;">Daftar VO & Kemaskini Baki</button>
-        </div>
-    </div>
-
     <div id="registerWorkPage" class="page">
-        <span class="nav-link" onclick="showPage('homePage')">← Kembali</span>
+        <div class="glass-header" style="margin-left:-15px; margin-right:-15px; width: calc(100% + 30px);">
+            <button class="back-btn" onclick="showPage('homePage')"><i class="fa fa-chevron-left"></i></button>
+            <div class="header-title">ID Kerja</div>
+        </div>
         <div class="glass-card">
             <h3>Borang ID Kerja</h3>
             <form id="workOrderForm">
@@ -103,13 +96,16 @@
                 <div style="margin-top:15px; padding:10px; background:rgba(0,122,255,0.1); border-radius:10px; display:flex; justify-content:space-between;">
                     <strong>Jumlah:</strong><span id="total_display" style="color:var(--ios-blue); font-weight:bold;">RM 0.00</span>
                 </div>
-                <button type="submit" style="background:var(--ios-green);">Daftar & Tolak Baki</button>
+                <button type="submit" class="btn-primary" style="background:var(--ios-green);">Daftar & Tolak Baki</button>
             </form>
         </div>
     </div>
 
     <div id="interimPage" class="page">
-        <span class="nav-link" onclick="showPage('homePage')">← Kembali</span>
+        <div class="glass-header" style="margin-left:-15px; margin-right:-15px; width: calc(100% + 30px);">
+            <button class="back-btn" onclick="showPage('homePage')"><i class="fa fa-chevron-left"></i></button>
+            <div class="header-title">Interim Claim</div>
+        </div>
         <div class="glass-card">
             <h3>Kemaskini Interim Claim</h3>
             <label>Pilih Kontrak</label>
@@ -121,21 +117,24 @@
             <label>Salvage Value (RM)</label>
             <input type="number" id="i_salvage" placeholder="0.00" step="0.01">
             <div id="i_sec_inputs"></div>
-            <label>Tampal ID Kerja (Dari Excel/Text)</label>
+            <label>Tampal ID Kerja</label>
             <textarea id="i_paste_area" rows="3" placeholder="Tampal ID di sini..."></textarea>
-            <button type="button" onclick="processExcelPaste()">Cari ID</button>
+            <button type="button" class="btn-primary" onclick="processExcelPaste()">Cari ID</button>
             <table class="excel-table">
                 <thead><tr><th>ID Kerja</th><th>Seq</th><th>Amaun</th><th>Hapus</th></tr></thead>
                 <tbody id="i_work_tbody"></tbody>
             </table>
-            <button onclick="submitInterim()" style="background:var(--ios-orange);">Hantar & Selaras Baki</button>
+            <button onclick="submitInterim()" class="btn-primary" style="background:var(--ios-orange);">Hantar & Selaras Baki</button>
         </div>
     </div>
 
     <div id="adminPage" class="page">
-        <span class="nav-link" onclick="showPage('homePage')">← Kembali</span>
+        <div class="glass-header" style="margin-left:-15px; margin-right:-15px; width: calc(100% + 30px);">
+            <button class="back-btn" onclick="showPage('homePage')"><i class="fa fa-chevron-left"></i></button>
+            <div class="header-title">Daftar Kontrak</div>
+        </div>
         <div class="glass-card">
-            <h3>Daftar Kontrak Baru</h3>
+            <h3>Maklumat Kontrak</h3>
             <form id="contractForm">
                 <label>Unit</label>
                 <select id="c_unit_id" required></select>
@@ -149,9 +148,9 @@
                 </div>
                 <label>Kontraktor</label>
                 <input type="text" id="c_contractor" placeholder="Nama Syarikat" required>
-                <label>Daerah (Gunakan koma: Segamat, Muar)</label>
+                <label>Daerah</label>
                 <input type="text" id="c_dist" placeholder="Segamat, Muar" required>
-                <label>Kod Kawasan (Cth: Segamat:SGT, Muar:MR)</label>
+                <label>Kod Kawasan</label>
                 <input type="text" id="c_area" placeholder="Segamat:SGT, Muar:MR" required>
                 
                 <label>Pecahan Section BQ</label>
@@ -159,31 +158,56 @@
                     <div class="sec-input-wrapper" style="background:rgba(255,255,255,0.2); padding:10px; border-radius:10px; margin-bottom:5px;">
                         <strong class="sec-label">SECTION A</strong>
                         <input type="text" class="b_n" value="SECTION A" hidden>
-                        <input type="text" class="b_d" placeholder="Keterangan (Cth: GENERAL & PRELIMINARIES)" required>
+                        <input type="text" class="b_d" placeholder="Keterangan" required>
                         <input type="number" class="b_v" placeholder="Jumlah RM" step="0.01" required oninput="calculateContractSum()">
                     </div>
                 </div>
-                <button type="button" onclick="addB()" style="background:none; color:var(--ios-blue); border:1px dashed var(--ios-blue); font-size:12px;">+ TAMBAH SECTION</button>
+                <button type="button" onclick="addB()" style="background:none; color:var(--ios-blue); border:1px dashed var(--ios-blue); font-size:12px; padding:10px; width:100%; border-radius:10px; cursor:pointer;">+ TAMBAH SECTION</button>
                 <div style="margin-top: 15px; padding: 12px; background: rgba(0,0,0,0.05); border-radius: 10px; border-left: 5px solid var(--ios-blue);">
                     <label style="margin-top:0;">Jumlah Keseluruhan Kontrak</label>
                     <div id="c_sum_display" style="font-size: 18px; font-weight: 800; color: #333;">RM 0.00</div>
                 </div>
-                <button type="submit" style="margin-top:20px; background:var(--ios-blue);">Daftar Kontrak</button>
+                <button type="submit" class="btn-primary">Daftar Kontrak</button>
             </form>
         </div>
     </div>
 
     <div id="settingsPage" class="page">
-        <span class="nav-link" onclick="showPage('homePage')">← Kembali</span>
+        <div class="glass-header" style="margin-left:-15px; margin-right:-15px; width: calc(100% + 30px);">
+            <button class="back-btn" onclick="showPage('homePage')"><i class="fa fa-chevron-left"></i></button>
+            <div class="header-title">Tetapan</div>
+        </div>
         <div class="glass-card">
             <h3>Pendaftaran Unit</h3>
             <form id="unitForm">
                 <input type="text" id="new_unit_name" placeholder="Cth: INSTRUMENTASI" required>
-                <button type="submit">Simpan Unit</button>
+                <button type="submit" class="btn-primary">Simpan Unit</button>
             </form>
             <div id="unitListDisplay" style="margin-top:20px; font-size:13px;"></div>
         </div>
     </div>
+
+    <div id="voModal" class="modal">
+        <div class="glass-card modal-content">
+            <div style="display:flex; align-items:center; margin-bottom:15px;">
+                <button class="back-btn" style="position:static; margin-right:15px;" onclick="closeVOModal()"><i class="fa fa-chevron-left"></i></button>
+                <h3 style="margin:0;">Borang VO</h3>
+            </div>
+            
+            <label>Pilih Kontrak</label>
+            <select id="vo_contract_id" onchange="onVOContractSelect()" required><option value="">Pilih Kontrak</option></select>
+            <label>Nama VO</label>
+            <input type="text" id="vo_name" placeholder="VO 01" required>
+            <label>Masukkan Ke Section</label>
+            <select id="vo_target_sec" required><option value="">Pilih Kontrak Dahulu</option></select>
+            <label>Jumlah Tambahan (RM)</label>
+            <input type="number" id="vo_amt" step="0.01" placeholder="0.00" required>
+            <label>Keterangan</label>
+            <textarea id="vo_desc" rows="2" placeholder="Sebab kenaikan kos..."></textarea>
+            <button onclick="submitVO()" class="btn-primary">Daftar VO & Kemaskini Baki</button>
+        </div>
+    </div>
+
 </div>
 
 <script>
@@ -194,6 +218,7 @@
     function showPage(id) {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.getElementById(id).classList.add('active');
+        window.scrollTo(0,0);
         if(['registerWorkPage', 'interimPage', 'adminPage', 'settingsPage'].includes(id)) fetchUnits();
         if(['registerWorkPage', 'interimPage'].includes(id)) loadContractsToDropdowns();
     }
@@ -235,7 +260,6 @@
         if(resUpd.ok) { alert("VO Berjaya!"); location.reload(); }
     }
 
-    // CORE FUNCTIONS
     async function fetchUnits() {
         const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
         const units = await res.json();
@@ -292,7 +316,7 @@
         d.className = "sec-input-wrapper";
         d.style = "background:rgba(255,255,255,0.2); padding:10px; border-radius:10px; margin-bottom:5px; position:relative;";
         d.innerHTML = `
-            <div onclick="this.parentElement.remove(); reIndexSections(); calculateContractSum();" style="position:absolute; right:5px; top:5px; color:red; cursor:pointer;">X</div>
+            <div onclick="this.parentElement.remove(); reIndexSections(); calculateContractSum();" style="position:absolute; right:10px; top:10px; color:red; cursor:pointer; font-weight:bold;">✕</div>
             <strong class="sec-label">${sectionName}</strong>
             <input type="text" class="b_n" value="${sectionName}" hidden>
             <input type="text" class="b_d" placeholder="Keterangan" required>
