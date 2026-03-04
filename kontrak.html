@@ -185,7 +185,9 @@
                 </div>
                 <label>Salvage Value (RM)</label>
                 <input type="number" id="i_salvage" placeholder="0.00" step="0.01">
+                
                 <div id="i_sec_inputs"></div>
+                
                 <label>Tampal ID Kerja</label>
                 <textarea id="i_paste_area" rows="3" placeholder="Tampal ID di sini..."></textarea>
                 <button type="button" class="btn-primary" onclick="processExcelPaste()">Cari ID</button>
@@ -298,7 +300,87 @@
         if(['registerWorkPage', 'interimPage', 'voPage'].includes(id)) loadContractsToDropdowns();
     }
 
-    // VO FUNCTIONS (MODIFIED TO WORK AS PAGE)
+    // INTERIM FUNCTIONS
+    async function loadInterimData() {
+        const opt = document.getElementById('i_contract_id').selectedOptions[0];
+        const secContainer = document.getElementById('i_sec_inputs');
+        secContainer.innerHTML = ''; 
+
+        if (opt && opt.dataset.b) {
+            const b = JSON.parse(opt.dataset.b);
+            secContainer.innerHTML = '<label style="margin-top:15px;">Pecahan Amaun Interim (Ikut Section)</label>';
+            const grid = document.createElement('div');
+            grid.className = 'funding-grid';
+            
+            Object.keys(b).sort().forEach(sec => {
+                grid.innerHTML += `
+                    <div class="funding-item">
+                        <label>${sec}</label>
+                        <input type="number" class="i_sec_val" data-sec="${sec}" placeholder="0.00" step="0.01">
+                    </div>`;
+            });
+            secContainer.appendChild(grid);
+        }
+    }
+
+    async function processExcelPaste() {
+        const pasteArea = document.getElementById('i_paste_area');
+        const tbody = document.getElementById('i_work_tbody');
+        const lines = pasteArea.value.split('\n').filter(l => l.trim() !== '');
+        
+        if (lines.length === 0) return alert("Sila tampal ID Kerja dahulu.");
+
+        lines.forEach(rawId => {
+            const workId = rawId.trim();
+            if (Array.from(tbody.rows).some(row => row.cells[0].innerText === workId)) return;
+
+            const row = tbody.insertRow();
+            row.innerHTML = `
+                <td>${workId}</td>
+                <td><input type="number" class="row-seq" value="1" style="width:50px; padding:5px;"></td>
+                <td><input type="number" class="row-amt" placeholder="0.00" step="0.01" style="width:80px; padding:5px;"></td>
+                <td><button onclick="this.parentElement.parentElement.remove()" style="color:red; border:none; background:none; cursor:pointer;"><i class="fa fa-trash"></i></button></td>
+            `;
+        });
+        pasteArea.value = '';
+    }
+
+    async function submitInterim() {
+        const cId = document.getElementById('i_contract_id').value;
+        const iNo = document.getElementById('i_no').value;
+        const iDate = document.getElementById('i_date_received').value;
+        const iSalvage = parseFloat(document.getElementById('i_salvage').value) || 0;
+
+        if (!cId || !iNo || !iDate) return alert("Sila lengkapkan No. Interim dan Tarikh!");
+
+        // Bina format: {"SECTION C": {"amt": 161000}, ...}
+        const breakdown = {};
+        document.querySelectorAll('.i_sec_val').forEach(input => {
+            breakdown[input.dataset.sec] = { "amt": parseFloat(input.value) || 0 };
+        });
+
+        const payload = {
+            contract_id: cId,
+            interim_no: parseInt(iNo),
+            date_received: iDate,
+            salvage_value: iSalvage,
+            claim_breakdown: breakdown
+        };
+
+        const res = await fetch(`${SB_URL}/rest/v1/interims`, {
+            method: 'POST', headers, body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            alert("Interim Berjaya Didaftarkan!");
+            showPage('registerWorkPage', document.getElementById('menu_registerWorkPage'));
+        } else {
+            const err = await res.json();
+            alert("Ralat Simpan: " + err.message);
+        }
+    }
+
+    // VO FUNCTIONS
     function onVOContractSelect() {
         const opt = document.getElementById('vo_contract_id').selectedOptions[0];
         const sSec = document.getElementById('vo_target_sec');
