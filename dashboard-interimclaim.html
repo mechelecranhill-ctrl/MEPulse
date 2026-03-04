@@ -12,6 +12,7 @@
             --glass-bg: rgba(255, 255, 255, 0.4); --glass-border: rgba(255, 255, 255, 0.6); 
             --glass: rgba(255,255,255,0.8);
             --sidebar-width: 300px;
+            --right-panel-width: 220px;
         }
         * { box-sizing: border-box; font-family: -apple-system, system-ui, sans-serif; }
         
@@ -24,7 +25,7 @@
             overflow: hidden;
         }
 
-        /* SIDEBAR STYLE */
+        /* SIDEBAR STYLE (LEFT) */
         .sidebar {
             width: var(--sidebar-width);
             background: var(--glass);
@@ -34,6 +35,16 @@
             display: flex;
             flex-direction: column;
             z-index: 100;
+        }
+
+        /* RIGHT PANEL STYLE */
+        .right-panel {
+            width: var(--right-panel-width);
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border-left: 1px solid var(--glass-border);
+            padding: 20px;
+            overflow-y: auto;
         }
 
         .sidebar-header {
@@ -64,6 +75,27 @@
             text-transform: uppercase;
             letter-spacing: 1px;
             margin-bottom: 15px;
+        }
+
+        /* DISTRICT CARDS (RIGHT SIDE) */
+        .dist-card {
+            background: white;
+            border-radius: 12px;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+            border: 1px solid transparent;
+        }
+        .dist-card .count {
+            background: var(--ios-blue);
+            color: white;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 800;
         }
 
         /* CONTRACT LIST ITEMS */
@@ -118,7 +150,7 @@
             background: #f8f9fa;
             padding: 15px;
             text-align: left;
-            font-size: 12px;
+            font-size: 11px;
             text-transform: uppercase;
             color: #666;
             border-bottom: 2px solid #eee;
@@ -131,7 +163,6 @@
         }
         .desktop-table tr:hover { background: #fcfcfc; }
 
-        /* STATUS TAGS */
         .tag {
             padding: 4px 10px;
             border-radius: 6px;
@@ -140,7 +171,6 @@
             color: white;
         }
 
-        /* BLUEFORM PAGE (FIXED OVERLAY) */
         #blueformPage {
             display: none;
             position: fixed;
@@ -152,34 +182,9 @@
             padding: 40px 0;
         }
         #blueformPage.active { display: block; }
-
-        .a4-container {
-            width: 21cm;
-            min-height: 29.7cm;
-            margin: auto;
-            background: white;
-            padding: 1.5cm;
-            position: relative;
-            box-shadow: 0 0 50px rgba(0,0,0,0.5);
-            font-size: 12px;
-        }
-
-        .print-tools {
-            position: fixed;
-            top: 20px;
-            right: 40px;
-            display: flex;
-            gap: 10px;
-        }
-
-        .btn-action {
-            padding: 10px 20px;
-            border-radius: 10px;
-            border: none;
-            cursor: pointer;
-            font-weight: 600;
-            color: white;
-        }
+        .a4-container { width: 21cm; min-height: 29.7cm; margin: auto; background: white; padding: 1.5cm; position: relative; box-shadow: 0 0 50px rgba(0,0,0,0.5); font-size: 12px; }
+        .print-tools { position: fixed; top: 20px; right: 40px; display: flex; gap: 10px; }
+        .btn-action { padding: 10px 20px; border-radius: 10px; border: none; cursor: pointer; font-weight: 600; color: white; }
 
         @media print {
             .no-print { display: none !important; }
@@ -192,7 +197,7 @@
 
     <div class="sidebar no-print">
         <div class="sidebar-header">
-            <button class="back-btn" onclick="window.location.href='dashboard-main.html'">
+            <button class="back-btn" onclick="window.location.href='dashboard-contract.html'">
                 <i class="fa fa-chevron-left"></i>
             </button>
             <div style="font-weight: 800; font-size: 18px;">DIREKTORI</div>
@@ -211,8 +216,6 @@
                 <h1 id="viewTitle" style="margin:0; font-size: 24px;">Selamat Datang</h1>
                 <p id="viewSubtitle" style="margin:5px 0 0 0; color: #666;">Sila pilih kontrak dari senarai kiri untuk melihat ID Kerja.</p>
             </div>
-            <div id="statsSummary" style="display: flex; gap: 20px;">
-                </div>
         </div>
 
         <div class="glass-card" id="tableWrapper" style="display: none;">
@@ -227,15 +230,21 @@
                         <th>Status</th>
                         <th>ID Kerja / Seq</th>
                         <th>Keterangan & Lokasi</th>
+                        <th>Claimed Interim</th>
                         <th>Tarikh QPB</th>
                         <th>Amaun (RM)</th>
                         <th>Tindakan</th>
                     </tr>
                 </thead>
-                <tbody id="workOrderTbody">
-                    </tbody>
+                <tbody id="workOrderTbody"></tbody>
             </table>
         </div>
+    </div>
+
+    <div class="right-panel no-print">
+        <div class="sidebar-title">Pecahan Daerah</div>
+        <div id="districtSummaryContainer">
+            </div>
     </div>
 
     <div id="blueformPage" class="page">
@@ -243,16 +252,12 @@
             <button class="btn-action" style="background: #666;" onclick="closeBlueform()">Tutup</button>
             <button class="btn-action" style="background: var(--ios-green);" onclick="window.print()">Cetak / Simpan PDF</button>
         </div>
-        
         <div class="a4-container" id="bf_area">
             <div style="text-align: right;"><img src="RSAJ.png" style="width: 80px;"></div>
             <div style="text-align: center; font-weight: bold; text-decoration: underline; font-size: 14px; margin: 20px 0 30px 0;">
                 PERMOHONAN KERJA-KERJA S.O.R / TAMBAHAN DALAM KONTRAK PENYELENGGARAAN
             </div>
-            
-            <div id="bf_content">
-                </div>
-
+            <div id="bf_content"></div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 50px; margin-top: 80px; text-align: center;">
                 <div><div style="border-top: 1px dotted #000; width: 80%; margin: 0 auto 5px auto;"></div><strong>Disediakan Oleh</strong></div>
                 <div><div style="border-top: 1px dotted #000; width: 80%; margin: 0 auto 5px auto;"></div><strong>Disemak Oleh</strong></div>
@@ -268,29 +273,52 @@
     const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
 
     let allWorks = [];
+    let allContracts = [];
 
     window.onload = loadContracts;
 
     async function loadContracts() {
         try {
-            const res = await fetch(`${SB_URL}/rest/v1/contract?select=*,units(unit_name)`, { headers });
-            const data = await res.json();
-            const container = document.getElementById('contractListContainer');
+            // Fetch contracts sorted by district
+            const res = await fetch(`${SB_URL}/rest/v1/contract?select=*,units(unit_name)&order=district.asc`, { headers });
+            allContracts = await res.json();
             
-            container.innerHTML = data.map(c => `
-                <div class="contract-item" id="c_card_${c.id}" onclick="selectContract(${c.id}, '${c.contract_code}', '${c.contract_name.replace(/'/g, "\\'")}')">
-                    <div style="font-size: 9px; background: var(--ios-orange); color: white; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 5px;">
-                        ${c.units?.unit_name || 'UNIT'}
-                    </div>
-                    <div style="font-weight: bold; font-size: 14px;">${c.contract_code}</div>
-                    <small style="color: #666;"><i class="fa-solid fa-location-dot"></i> ${c.district}</small>
-                </div>
-            `).join('');
+            renderContractList(allContracts);
+            renderDistrictSummary(allContracts);
         } catch (e) { console.error(e); }
     }
 
+    function renderContractList(data) {
+        const container = document.getElementById('contractListContainer');
+        container.innerHTML = data.map(c => `
+            <div class="contract-item" id="c_card_${c.id}" onclick="selectContract(${c.id}, '${c.contract_code}', '${c.contract_name.replace(/'/g, "\\'")}')">
+                <div style="font-size: 9px; background: var(--ios-orange); color: white; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 5px;">
+                    ${c.units?.unit_name || 'UNIT'}
+                </div>
+                <div style="font-weight: bold; font-size: 14px;">${c.contract_code}</div>
+                <small style="color: #666;"><i class="fa-solid fa-location-dot"></i> ${c.district}</small>
+            </div>
+        `).join('');
+    }
+
+    function renderDistrictSummary(data) {
+        const container = document.getElementById('districtSummaryContainer');
+        const summary = {};
+        
+        // Group by district
+        data.forEach(c => {
+            summary[c.district] = (summary[c.district] || 0) + 1;
+        });
+
+        container.innerHTML = Object.keys(summary).map(dist => `
+            <div class="dist-card">
+                <span style="font-size: 12px; font-weight: 600;">${dist}</span>
+                <span class="count">${summary[dist]}</span>
+            </div>
+        `).join('');
+    }
+
     async function selectContract(id, code, name) {
-        // UI Updates
         document.querySelectorAll('.contract-item').forEach(el => el.classList.remove('active'));
         document.getElementById(`c_card_${id}`).classList.add('active');
         
@@ -299,19 +327,17 @@
         document.getElementById('tableWrapper').style.display = 'block';
         
         const tbody = document.getElementById('workOrderTbody');
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 40px;">Memuatkan rekod...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px;">Memuatkan rekod...</td></tr>';
 
-        // Fetch Work Orders
         const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}&order=sequence_no.asc`, { headers });
         allWorks = await res.json();
-
         renderTable(allWorks);
     }
 
     function renderTable(data) {
         const tbody = document.getElementById('workOrderTbody');
         if(data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 40px;">Tiada rekod ID Kerja ditemui.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px;">Tiada rekod ID Kerja ditemui.</td></tr>';
             return;
         }
 
@@ -330,7 +356,10 @@
                     <div style="font-weight:500;">${w.description}</div>
                     <div style="font-size:11px; color:var(--ios-orange);"><i class="fa-solid fa-map-pin"></i> ${w.location || 'N/A'}</div>
                 </td>
-                <td>${w.qpb_date}</td>
+                <td>
+                    <div style="font-weight:bold; color: #444;">${w.interim_no ? 'INTERIM ' + w.interim_no : '-'}</div>
+                </td>
+                <td>${w.qpb_date || '-'}</td>
                 <td style="font-weight:bold; color:var(--ios-blue);">RM ${(w.amount_spent || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
                 <td>
                     <button class="btn-action" style="background: var(--ios-orange); padding: 5px 12px; font-size: 11px;" onclick="openBlueform(${w.id})">
@@ -388,7 +417,6 @@
         document.getElementById('blueformPage').classList.remove('active');
     }
 
-    // Search Functionality
     document.getElementById('tableSearch').addEventListener('input', function(e) {
         const term = e.target.value.toLowerCase();
         const filtered = allWorks.filter(w => 
