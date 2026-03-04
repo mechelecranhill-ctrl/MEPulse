@@ -24,7 +24,6 @@
             overflow: hidden;
         }
 
-        /* SIDEBAR STYLE (LEFT) */
         .sidebar {
             width: var(--sidebar-width);
             background: var(--glass);
@@ -66,7 +65,6 @@
             margin-bottom: 15px;
         }
 
-        /* CONTRACT LIST ITEMS */
         .contract-item {
             background: white;
             padding: 15px;
@@ -80,7 +78,6 @@
         .contract-item.active { border-color: var(--ios-blue); background: var(--ios-blue); color: white; }
         .contract-item.active small { color: rgba(255,255,255,0.8); }
 
-        /* MAIN CONTENT */
         .main-panel {
             flex-grow: 1;
             padding: 30px;
@@ -105,7 +102,6 @@
             box-shadow: 0 8px 32px 0 rgba(31,38,135,0.05);
         }
 
-        /* TABLE STYLE */
         .desktop-table {
             width: 100%;
             border-collapse: collapse;
@@ -168,7 +164,7 @@
             <button class="back-btn" onclick="window.location.href='dashboard-contract.html'">
                 <i class="fa fa-chevron-left"></i>
             </button>
-            <div style="font-weight: 800; font-size: 18px;">DIREKTORI</div>
+            <div style="font-weight: 800; font-size: 18px; margin-left:10px;">DIREKTORI</div>
         </div>
         <div class="sidebar-content">
             <div class="sidebar-title">Senarai Kontrak Aktif</div>
@@ -182,7 +178,7 @@
         <div class="dashboard-header">
             <div>
                 <h1 id="viewTitle" style="margin:0; font-size: 24px;">Selamat Datang</h1>
-                <p id="viewSubtitle" style="margin:5px 0 0 0; color: #666;">Sila pilih kontrak dari senarai kiri untuk melihat maklumat terperinci.</p>
+                <p id="viewSubtitle" style="margin:5px 0 0 0; color: #666;">Sila pilih kontrak untuk maklumat terperinci.</p>
             </div>
         </div>
 
@@ -196,7 +192,7 @@
                 <thead>
                     <tr>
                         <th>Status</th>
-                        <th>ID Kerja / Seq</th>
+                        <th>ID Kerja / Seksyen</th>
                         <th>Keterangan & Lokasi</th>
                         <th>Interim No</th>
                         <th>Amaun Kerja (RM)</th>
@@ -242,7 +238,6 @@
         try {
             const res = await fetch(`${SB_URL}/rest/v1/contract?select=*,units(unit_name)&order=district.asc`, { headers });
             const data = await res.json();
-            
             const container = document.getElementById('contractListContainer');
             container.innerHTML = data.map(c => `
                 <div class="contract-item" id="c_card_${c.id}" onclick="selectContract(${c.id}, '${c.contract_code}', '${c.contract_name.replace(/'/g, "\\'")}')">
@@ -259,16 +254,13 @@
     async function selectContract(id, code, name) {
         document.querySelectorAll('.contract-item').forEach(el => el.classList.remove('active'));
         document.getElementById(`c_card_${id}`).classList.add('active');
-        
         document.getElementById('viewTitle').innerText = code;
         document.getElementById('viewSubtitle').innerText = name;
         document.getElementById('tableWrapper').style.display = 'block';
-        
         const tbody = document.getElementById('workOrderTbody');
         tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px;">Memuatkan rekod...</td></tr>';
 
-        // Fetch Work Orders and their claimed amounts
-        const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}&order=sequence_no.asc`, { headers });
+        const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}&order=section.asc,sequence_no.asc`, { headers });
         allWorks = await res.json();
         renderTable(allWorks);
     }
@@ -276,44 +268,33 @@
     function renderTable(data) {
         const tbody = document.getElementById('workOrderTbody');
         if(data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px;">Tiada rekod ID Kerja ditemui.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px;">Tiada rekod ditemui.</td></tr>';
             return;
         }
 
         tbody.innerHTML = data.map(w => {
-            // Check if amount is claimed
             const isClaimed = w.status === 'Claimed';
             const claimAmt = isClaimed ? (w.amount_spent || 0) : 0;
-            
             return `
             <tr>
-                <td>
-                    <span class="tag" style="background:${isClaimed ? 'var(--ios-green)' : 'var(--ios-blue)'}">
-                        ${w.status || 'PENDING'}
-                    </span>
-                </td>
+                <td><span class="tag" style="background:${isClaimed ? 'var(--ios-green)' : 'var(--ios-blue)'}">${w.status || 'PENDING'}</span></td>
                 <td>
                     <div style="font-weight:bold;">${w.work_id}</div>
-                    <div style="font-size:11px; color:#999;">${w.sequence_no}</div>
+                    <div style="font-size:11px; color:var(--ios-blue); font-weight:700;">SEKSYEN ${w.section || '-'}</div>
                 </td>
                 <td>
                     <div style="font-weight:500;">${w.description}</div>
                     <div style="font-size:11px; color:var(--ios-orange);"><i class="fa-solid fa-map-pin"></i> ${w.location || 'N/A'}</div>
                 </td>
-                <td>
-                    <div style="font-weight:bold; color: #444;">${w.interim_no ? 'INT-' + w.interim_no : '-'}</div>
-                </td>
+                <td><div style="font-weight:bold; color: #444;">${w.interim_no ? 'INT-' + w.interim_no : '-'}</div></td>
                 <td style="color:#666;">RM ${(w.amount_spent || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                <td style="font-weight:bold; color:${isClaimed ? 'var(--ios-green)' : '#ccc'};">
-                    RM ${claimAmt.toLocaleString(undefined, {minimumFractionDigits:2})}
-                </td>
+                <td style="font-weight:bold; color:${isClaimed ? 'var(--ios-green)' : '#ccc'};">RM ${claimAmt.toLocaleString(undefined, {minimumFractionDigits:2})}</td>
                 <td>
                     <button class="btn-action" style="background: var(--ios-orange); padding: 5px 12px; font-size: 11px;" onclick="openBlueform(${w.id})">
                         <i class="fa-solid fa-print"></i> Blueform
                     </button>
                 </td>
-            </tr>
-            `;
+            </tr>`;
         }).join('');
     }
 
@@ -336,40 +317,39 @@
             <hr style="border: 1px solid #000; margin: 20px 0;">
             <table style="width:100%; border-spacing: 0 8px;">
                 <tr><td width="30%"><strong>6. TAJUK KERJA</strong></td><td width="5%">:</td><td style="border-bottom: 1px solid #000; font-weight:bold;">${data.description.toUpperCase()}</td></tr>
-                <tr><td><strong>7. LOKASI</strong></td><td>:</td><td style="border-bottom: 1px solid #000;">${data.location} (${data.district})</td></tr>
+                <tr><td><strong>7. LOKASI / SEKSYEN</strong></td><td>:</td><td style="border-bottom: 1px solid #000;">${data.location} (SEKSYEN: ${data.section || '-'})</td></tr>
                 <tr><td><strong>8. ANGGARAN KOS</strong></td><td>:</td><td style="border-bottom: 1px solid #000; font-weight:bold;">RM ${data.amount_spent.toLocaleString(undefined, {minimumFractionDigits:2})}</td></tr>
             </table>
             <div style="margin-top: 20px;">
                 <strong>9. PECAHAN BAKI KONTRAK (SEMASA):</strong>
                 <div style="margin-top:10px; padding: 10px; border: 1px solid #000;">
-                    ${Object.keys(b).map(sec => `
-                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                            <span>${sec} - ${b[sec].desc || ''}</span>
+                    ${Object.keys(b).map(sec => {
+                        const isThisSection = (data.section && sec.includes(data.section));
+                        return `
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px; ${isThisSection ? 'background:#f0f7ff; font-weight:bold;' : ''}">
+                            <span>${sec} - ${b[sec].desc || ''} ${isThisSection ? '◀' : ''}</span>
                             <span>RM ${b[sec].amt.toLocaleString(undefined, {minimumFractionDigits:2})}</span>
-                        </div>
-                    `).join('')}
+                        </div>`;
+                    }).join('')}
                     <div style="border-top: 1px solid #000; margin-top:5px; padding-top:5px; display:flex; justify-content:space-between; font-weight:bold;">
                         <span>JUMLAH KESELURUHAN BAKI</span>
                         <span>RM ${c.contract_sum.toLocaleString(undefined, {minimumFractionDigits:2})}</span>
                     </div>
                 </div>
-            </div>
-        `;
-
+            </div>`;
         document.getElementById('bf_content').innerHTML = html;
         document.getElementById('blueformPage').classList.add('active');
     }
 
-    function closeBlueform() {
-        document.getElementById('blueformPage').classList.remove('active');
-    }
+    function closeBlueform() { document.getElementById('blueformPage').classList.remove('active'); }
 
     document.getElementById('tableSearch').addEventListener('input', function(e) {
         const term = e.target.value.toLowerCase();
         const filtered = allWorks.filter(w => 
             w.work_id.toLowerCase().includes(term) || 
             w.description.toLowerCase().includes(term) ||
-            w.location.toLowerCase().includes(term)
+            w.location.toLowerCase().includes(term) ||
+            (w.section && w.section.toLowerCase().includes(term))
         );
         renderTable(filtered);
     });
