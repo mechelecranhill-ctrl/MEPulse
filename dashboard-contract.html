@@ -23,12 +23,38 @@
             overflow: hidden; 
         }
 
-        /* CSS BARU: Mobile Slide-In Logic */
+        /* --- LOGIK MOBILE SLIDE-IN & CLOSE BUTTON --- */
         .mobile-close-btn { display: none !important; }
+        .card-usage-link { display: none; } /* Sembunyi secara default (Desktop) */
 
         @media (max-width: 768px) {
             .mobile-close-btn { display: flex !important; }
             
+            /* Sembunyikan butang asal bawah kanan di mobile */
+            .next-container { display: none !important; }
+
+            /* Gaya butang Usage Schedule dalam kad (Mobile Only) */
+            .card-usage-link {
+                display: flex;
+                background: var(--ios-blue);
+                color: white;
+                text-decoration: none;
+                padding: 5px 10px;
+                border-radius: 8px;
+                font-size: 10px;
+                font-weight: 800;
+                align-items: center;
+                gap: 4px;
+                box-shadow: 0 2px 4px rgba(0, 122, 255, 0.3);
+            }
+
+            .c-card-top {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 4px;
+            }
+
             .contract-sidebar {
                 width: 100% !important;
                 transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -36,40 +62,25 @@
 
             .analysis-container {
                 position: fixed;
-                top: 60px; /* Bawah header */
+                top: 60px;
                 left: 0;
                 width: 100%;
                 height: calc(100% - 60px);
                 background: #f2f2f7;
                 z-index: 1500;
-                transform: translateX(100%); /* Sembunyi ke kanan */
+                transform: translateX(100%);
                 transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
                 padding: 10px !important;
             }
 
-            /* Bila aktif, slide masuk dari kanan */
-            body.analysis-active .analysis-container {
-                transform: translateX(0);
-            }
+            body.analysis-active .analysis-container { transform: translateX(0); }
+            body.analysis-active .contract-sidebar { transform: translateX(-20%); opacity: 0.5; }
 
-            body.analysis-active .contract-sidebar {
-                transform: translateX(-20%);
-                opacity: 0.5;
-            }
-
-            #analysis-panel {
-                border-radius: 20px 20px 0 0 !important;
-                height: 100%;
-            }
-
-            .health-grid {
-                grid-template-columns: 1fr !important;
-                overflow-y: auto !important;
-            }
-            
+            #analysis-panel { border-radius: 20px 20px 0 0 !important; height: 100%; }
+            .health-grid { grid-template-columns: 1fr !important; overflow-y: auto !important; }
             .chart-box { min-height: 250px; }
         }
-        /* TAMAT CSS BARU */
+        /* --- TAMAT LOGIK MOBILE --- */
 
         .glass-header { 
             width: 100%; height: 60px; 
@@ -94,7 +105,6 @@
             padding: 0 10px;
         }
         .nav-btn:active { transform: scale(0.9); background: #d1d1d6; }
-
         .back-btn { left: 20px; width: 35px; }
 
         .next-container {
@@ -111,13 +121,7 @@
             box-shadow: 0 8px 25px rgba(0,0,0,0.15);
             border: 1px solid rgba(0, 122, 255, 0.2);
         }
-        .next-label {
-            font-size: 11px;
-            font-weight: 800;
-            color: #48484a;
-            letter-spacing: 0.8px;
-            text-align: right;
-        }
+        .next-label { font-size: 11px; font-weight: 800; color: #48484a; letter-spacing: 0.8px; text-align: right; }
         .next-btn-circle {
             background: var(--ios-blue);
             border: none;
@@ -265,15 +269,20 @@
             const res = await fetch(`${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}&order=contract_start.asc`, { headers });
             const data = await res.json();
             const list = document.getElementById('contractList');
+            
             list.innerHTML = data.map(c => `
                 <div class="c-card" id="card-${c.id}" onclick='selectCard(${c.id}); openAnalysis(${JSON.stringify(c)})'>
-                    <h4>${c.contract_code}</h4>
+                    <div class="c-card-top">
+                        <h4>${c.contract_code}</h4>
+                        <a href="dashboard-interimclaim.html" class="card-usage-link" onclick="event.stopPropagation()">
+                            USAGE <i class="fa fa-chevron-right" style="font-size: 8px;"></i>
+                        </a>
+                    </div>
                     <div class="sub-text">${c.contract_name}</div>
                 </div>
             `).join('');
 
             if(data.length > 0) {
-                // Di Desktop auto open, tapi di phone kita jangan auto open supaya tak terus slide-in
                 if(window.innerWidth > 768) {
                     selectCard(data[0].id);
                     openAnalysis(data[0]);
@@ -292,9 +301,8 @@
     }
 
     async function openAnalysis(contract) {
-        // Trigger Slide-in untuk Phone
         document.body.classList.add('analysis-active');
-        
+
         document.getElementById('analysis-panel').style.display = 'flex';
         document.getElementById('panel-title').innerText = contract.contract_code;
         document.getElementById('panel-vendor').innerText = contract.contract_name;
@@ -391,7 +399,6 @@
 
         selectedSections.sort().forEach(s => {
             labels.push(s); 
-
             const fullBudget = sections[s]?.amt || 0;
             const targetMonthly = fullBudget / totalMonths;
             targetAvgData.push(targetMonthly.toFixed(2));
@@ -414,52 +421,23 @@
                 data: {
                     labels: labels,
                     datasets: [
-                        { 
-                            label: 'Planned Monthly', 
-                            data: targetAvgData, 
-                            backgroundColor: 'rgba(200, 200, 205, 0.5)',
-                            borderRadius: 5
-                        },
-                        { 
-                            label: 'Actual Monthly', 
-                            data: actualAvgData, 
-                            backgroundColor: '#007AFF',
-                            borderRadius: 5
-                        }
+                        { label: 'Planned Monthly', data: targetAvgData, backgroundColor: 'rgba(200, 200, 205, 0.5)', borderRadius: 5 },
+                        { label: 'Actual Monthly', data: actualAvgData, backgroundColor: '#007AFF', borderRadius: 5 }
                     ]
                 },
                 options: {
-                    responsive: true, 
-                    maintainAspectRatio: false,
-                    layout: {
-                        padding: {
-                            bottom: 20
-                        }
-                    },
+                    responsive: true, maintainAspectRatio: false,
+                    layout: { padding: { bottom: 20 } },
                     plugins: {
                         legend: { position: 'top', labels: { font: { size: 10, weight: 'bold' } } },
                         datalabels: { 
-                            anchor: 'end', align: 'top', 
-                            font: { size: 9, weight: 'bold' },
+                            anchor: 'end', align: 'top', font: { size: 9, weight: 'bold' },
                             formatter: (val) => val > 0 ? `RM${Math.round(val).toLocaleString()}` : ''
                         }
                     },
                     scales: {
-                        y: { 
-                            beginAtZero: true, 
-                            ticks: { font: { size: 9 } }
-                        },
-                        x: { 
-                            display: true,
-                            ticks: { 
-                                display: true,
-                                color: '#333',
-                                font: { size: 10, weight: 'bold' },
-                                autoSkip: false,
-                                maxRotation: 45,
-                                minRotation: 45
-                            }
-                        }
+                        y: { beginAtZero: true, ticks: { font: { size: 9 } } },
+                        x: { display: true, ticks: { display: true, color: '#333', font: { size: 10, weight: 'bold' }, autoSkip: false, maxRotation: 45, minRotation: 45 } }
                     }
                 }
             });
