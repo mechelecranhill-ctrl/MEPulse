@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>M&E-Connect v1.0 (Desktop Edition)</title>
+    <title>M&E-Connect v1.0</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
@@ -21,10 +21,10 @@
             margin: 0; 
             height: 100vh;
             display: flex;
-            overflow: hidden; /* Mengunci scroll utama desktop */
+            overflow: hidden;
         }
 
-        /* SIDEBAR (PANEL PENGURUSAN) DI KIRI */
+        /* SIDEBAR */
         .sidebar {
             width: var(--sidebar-width);
             background: var(--glass);
@@ -57,7 +57,7 @@
             flex-grow: 1;
         }
 
-        /* MAIN CONTENT (BORANG) DI KANAN */
+        /* MAIN CONTENT AREA */
         .main-content {
             flex-grow: 1;
             padding: 40px;
@@ -77,11 +77,11 @@
             border: 1px solid var(--glass-border); 
             box-shadow: 0 8px 32px 0 rgba(31,38,135,0.1); 
             width: 100%;
-            max-width: 700px; /* Saiz borang lebih lebar untuk desktop */
+            max-width: 700px;
             transition: transform 0.2s;
         }
 
-        /* Item Menu Sidebar */
+        /* Menu Sidebar */
         .menu-item {
             background: white;
             padding: 15px;
@@ -93,6 +93,7 @@
             align-items: center;
             transition: 0.3s;
             border: 1px solid transparent;
+            color: #333;
         }
         .menu-item:hover { transform: translateX(5px); background: rgba(255,255,255,0.8); }
         .menu-item.active { 
@@ -101,12 +102,13 @@
             color: white;
         }
 
-        .page { display: none; width: 100%; display: flex; justify-content: center; } 
+        /* Hide all pages by default */
+        .page { display: none; width: 100%; justify-content: center; } 
         .page.active { display: flex; animation: fadeIn 0.4s ease; }
 
-        @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Kekalkan gaya asal form */
+        /* Form Styles */
         label { font-size: 10px; font-weight: 700; color: #4b4b4b; display: block; margin-top: 10px; text-transform: uppercase; }
         input, select, textarea { width: 100%; padding: 12px; margin: 5px 0; border-radius: 10px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255, 255, 255, 0.4); font-size: 14px; outline: none; }
         .btn-primary { width: 100%; padding: 14px; border-radius: 12px; border: none; background: var(--ios-blue); color: white; font-weight: 600; cursor: pointer; margin-top: 10px; }
@@ -119,30 +121,30 @@
         .modal-content { width: 92%; max-width: 450px; margin: 50px auto; }
     </style>
 </head>
-<body>
+<body onload="initApp()">
 
     <div class="sidebar no-print">
         <div class="sidebar-header">
             <button class="back-btn" onclick="window.location.href='dashboard-contract.html'"><i class="fa fa-chevron-left"></i></button>
-            <div style="font-weight: 800; font-size: 18px;">M&E-Connect</div>
+            <div style="font-weight: 800; font-size: 18px;">REGISTRATION FORMS</div>
         </div>
         
         <div class="sidebar-content">
-            <p style="font-size: 12px; color: #666; font-weight: 700; margin-bottom: 15px;">PANEL PENGURUSAN</p>
+            <p style="font-size: 12px; color: #666; font-weight: 700; margin-bottom: 15px;">MENU UTAMA</p>
             
-            <div class="menu-item" onclick="showPage('registerWorkPage', this)">
-                <i class="fa-solid fa-file-pen" style="margin-right:12px;"></i> Pendaftaran Kerja (ID)
+            <div id="menu_registerWorkPage" class="menu-item" onclick="showPage('registerWorkPage', this)">
+                <i class="fa-solid fa-file-pen" style="margin-right:12px;"></i> Pendaftaran Work Order (ID)
             </div>
-            <div class="menu-item" onclick="showPage('adminPage', this)">
+            <div id="menu_adminPage" class="menu-item" onclick="showPage('adminPage', this)">
                 <i class="fa-solid fa-file-contract" style="margin-right:12px;"></i> Pengurusan Kontrak
             </div>
-            <div class="menu-item" onclick="showPage('interimPage', this)">
-                <i class="fa-solid fa-file-invoice-dollar" style="margin-right:12px;"></i> Kemaskini Interim
+            <div id="menu_interimPage" class="menu-item" onclick="showPage('interimPage', this)">
+                <i class="fa-solid fa-file-invoice-dollar" style="margin-right:12px;"></i> Interim Claims
             </div>
             <div class="menu-item" onclick="openVOModal()">
-                <i class="fa-solid fa-triangle-exclamation" style="margin-right:12px;"></i> Tambah VO
+                <i class="fa-solid fa-triangle-exclamation" style="margin-right:12px;"></i> Variation Order (VO)
             </div>
-            <div class="menu-item" onclick="showPage('settingsPage', this)">
+            <div id="menu_settingsPage" class="menu-item" onclick="showPage('settingsPage', this)">
                 <i class="fa-solid fa-gear" style="margin-right:12px;"></i> Tetapan Unit
             </div>
         </div>
@@ -150,17 +152,9 @@
 
     <div class="main-content">
         
-        <div id="welcomePage" class="page active">
-            <div class="glass-card" style="text-align: center; padding: 60px;">
-                <i class="fa-solid fa-desktop" style="font-size: 50px; color: var(--ios-blue); margin-bottom: 20px;"></i>
-                <h2>Selamat Datang ke M&E-Connect</h2>
-                <p>Sila pilih menu di sebelah kiri untuk memulakan tugasan pengurusan anda.</p>
-            </div>
-        </div>
-
         <div id="registerWorkPage" class="page">
             <div class="glass-card">
-                <h3 style="margin-top:0;"><i class="fa-solid fa-file-pen"></i> Borang ID Kerja</h3>
+                <h3 style="margin-top:0;"><i class="fa-solid fa-file-pen"></i> Borang Work Order</h3>
                 <form id="workOrderForm">
                     <label>Pilih Kontrak</label>
                     <select id="w_contract_id" onchange="onContractSelect()" required><option value="">Pilih Kontrak</option></select>
@@ -175,7 +169,7 @@
                     <label>Pecahan Kos</label>
                     <div id="w_sections_container" class="funding-grid"></div>
                     <div style="margin-top:15px; padding:10px; background:rgba(0,122,255,0.1); border-radius:10px; display:flex; justify-content:space-between;">
-                        <strong>Jumlah Keseluruhan:</strong><span id="total_display" style="color:var(--ios-blue); font-weight:bold;">RM 0.00</span>
+                        <strong>Jumlah:</strong><span id="total_display" style="color:var(--ios-blue); font-weight:bold;">RM 0.00</span>
                     </div>
                     <button type="submit" class="btn-primary" style="background:var(--ios-green);">Daftar & Tolak Baki</button>
                 </form>
@@ -207,7 +201,7 @@
 
         <div id="adminPage" class="page">
             <div class="glass-card">
-                <h3 style="margin-top:0;"><i class="fa-solid fa-file-contract"></i> Maklumat Kontrak Baru</h3>
+                <h3 style="margin-top:0;"><i class="fa-solid fa-file-contract"></i> Borang Kontrak</h3>
                 <form id="contractForm">
                     <label>Unit</label>
                     <select id="c_unit_id" required></select>
@@ -225,7 +219,6 @@
                     <input type="text" id="c_dist" placeholder="Segamat, Muar" required>
                     <label>Kod Kawasan</label>
                     <input type="text" id="c_area" placeholder="Segamat:SGT, Muar:MR" required>
-                    
                     <label>Pecahan Section BQ</label>
                     <div id="b_inputs">
                         <div class="sec-input-wrapper" style="background:rgba(255,255,255,0.2); padding:10px; border-radius:10px; margin-bottom:5px;">
@@ -261,7 +254,7 @@
     <div id="voModal" class="modal">
         <div class="glass-card modal-content">
             <div style="display:flex; align-items:center; justify-content: space-between; margin-bottom:15px;">
-                <h3 style="margin:0;">Borang VO</h3>
+                <h3 style="margin:0;">Borang Variation Order</h3>
                 <button class="back-btn" style="margin:0;" onclick="closeVOModal()"><i class="fa fa-times"></i></button>
             </div>
             <label>Pilih Kontrak</label>
@@ -283,16 +276,26 @@
     const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
     const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
 
+    // Fungsi asal untuk mulakan aplikasi
+    function initApp() {
+        // Tunjukkan borang pendaftaran ID secara default
+        showPage('registerWorkPage', document.getElementById('menu_registerWorkPage'));
+    }
+
     function showPage(id, element) {
-        // Hilangkan page aktif
+        // Sembunyikan semua page
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        // Hilangkan status aktif pada menu sidebar
+        // Buang status aktif dari semua menu
         document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
         
-        // Aktifkan page baru
-        document.getElementById(id).classList.add('active');
+        // Aktifkan page yang dipilih
+        const targetPage = document.getElementById(id);
+        if(targetPage) targetPage.classList.add('active');
+        
+        // Aktifkan menu sidebar yang dipilih
         if(element) element.classList.add('active');
 
+        // Trigger data loading
         if(['registerWorkPage', 'interimPage', 'adminPage', 'settingsPage'].includes(id)) fetchUnits();
         if(['registerWorkPage', 'interimPage'].includes(id)) loadContractsToDropdowns();
     }
