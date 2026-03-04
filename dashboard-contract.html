@@ -23,25 +23,26 @@
             overflow: hidden; 
         }
 
-        /* --- LOGIK MOBILE & USAGE BUTTON --- */
-        .mobile-usage-btn { display: none; } /* Sembunyi di desktop */
+        /* --- LOGIK MOBILE SLIDE-IN & USAGE BUTTON --- */
+        .mobile-usage-btn { display: none; } 
 
         @media (max-width: 768px) {
             /* Sembunyikan Nama Kontrak & Butang Bawah Kanan di mobile */
             #panel-vendor, .next-container { display: none !important; }
 
-            /* Tunjukkan butang usage dalam panel */
+            /* Tunjukkan butang usage dalam panel sahaja */
             .mobile-usage-btn {
                 display: flex;
                 background: var(--ios-blue);
                 color: white;
                 text-decoration: none;
-                padding: 8px 12px;
+                padding: 6px 12px;
                 border-radius: 10px;
-                font-size: 10px;
+                font-size: 11px;
                 font-weight: 800;
                 align-items: center;
                 gap: 5px;
+                box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
             }
 
             .contract-sidebar {
@@ -67,8 +68,9 @@
 
             #analysis-panel { border-radius: 20px 20px 0 0 !important; height: 100%; }
             .health-grid { grid-template-columns: 1fr !important; overflow-y: auto !important; }
-            .chart-box { min-height: 250px; }
+            .chart-box { min-height: 250px; flex-shrink: 0; }
         }
+        /* --- TAMAT LOGIK MOBILE --- */
 
         .glass-header { 
             width: 100%; height: 60px; 
@@ -146,7 +148,9 @@
         .c-card h4 { margin: 0; font-size: 11px; color: #1c1c1e; overflow: hidden; text-overflow: ellipsis; }
         .c-card .sub-text { font-size: 9px; color: #888; margin-top: 2px; }
 
+        .analysis-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
         #analysis-panel { display: none; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); flex: 1; overflow: hidden; flex-direction: column; }
+
         .health-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; flex: 1; overflow: hidden; margin-top: 5px; }
         .chart-box { padding: 10px; background: #f9f9fb; border-radius: 15px; flex: 1; position: relative; min-height: 0; display: flex; flex-direction: column;}
 
@@ -191,9 +195,9 @@
                     </div>
                     <div style="display: flex; gap: 8px; align-items: center;">
                         <a href="dashboard-interimclaim.html" class="mobile-usage-btn">
-                            USAGE <i class="fa fa-chevron-right"></i>
+                            USAGE <i class="fa fa-chevron-right" style="font-size: 8px;"></i>
                         </a>
-                        
+
                         <button onclick="document.body.classList.remove('analysis-active')" 
                                 style="background:#f2f2f7; border:none; width: 38px; height: 38px; border-radius:12px; cursor:pointer; display: flex; align-items: center; justify-content: center;">
                             <i class="fa fa-times" style="color: #8e8e93;"></i>
@@ -299,8 +303,14 @@
         const sections = currentContract.contract_sections_breakdown || {};
         const start = new Date(currentContract.contract_start);
         const end = new Date(currentContract.contract_end);
+        const today = new Date();
+
         const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
-        const monthsElapsed = Math.max(1, (new Date().getFullYear() - start.getFullYear()) * 12 + (new Date().getMonth() - start.getMonth()));
+        const monthsElapsed = Math.max(1, (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()));
+
+        document.getElementById('fullSectionList').innerHTML = Object.keys(sections).sort().map(s => `
+            <span class="sel-chip ${selectedSections.includes(s) ? 'active' : ''}" onclick="toggleSection('${s}')">${s}</span>
+        `).join('');
 
         const mainContainer = document.getElementById('selectedSectionContainer');
         mainContainer.innerHTML = '';
@@ -309,26 +319,40 @@
             if(!sections[s]) return;
             let used = 0;
             currentWO.forEach(wo => { if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; });
+
             const budget = sections[s].amt || 0; 
             const plannedTotalToDate = (budget / totalMonths) * monthsElapsed;
-            const variancePercent = ((used - plannedTotalToDate) / plannedTotalToDate) * 100 || 0;
-            const color = (used - plannedTotalToDate) > 0 ? 'var(--ios-red)' : 'var(--ios-green)';
+            const variance = used - plannedTotalToDate;
+            const variancePercent = (variance / plannedTotalToDate) * 100 || 0;
+            const color = variance > 0 ? 'var(--ios-red)' : 'var(--ios-green)';
             const progressPercent = (used / budget) * 100 || 0;
 
             mainContainer.innerHTML += `
                 <div class="section-row">
-                    <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">${s}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:start;">
+                        <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">${s}: ${sections[s].desc || s}</div>
+                        <i class="fa fa-times-circle" style="color:#ccc; cursor:pointer;" onclick="toggleSection('${s}')"></i>
+                    </div>
                     <div class="avg-stats">
                         <div class="avg-item">BUDGET: RM ${budget.toLocaleString()}</div>
-                        <div class="avg-item" style="color: ${color};">VAR: ${variancePercent.toFixed(1)}%</div>
+                        <div class="avg-item" style="color: #8e8e93;">PLANNED: RM ${plannedTotalToDate.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
                     </div>
-                    <div class="prog-bar-bg"><div class="prog-bar-fill" data-width="${progressPercent}%" style="background:${color}"></div></div>
+                    <div class="avg-stats">
+                        <div class="avg-item">ACTUAL: RM ${used.toLocaleString()}</div>
+                        <div class="avg-item" style="color: ${color};">VARIANCE: ${variancePercent > 0 ? '+' : ''}${variancePercent.toFixed(1)}%</div>
+                    </div>
+                    <div class="prog-bar-bg">
+                        <div class="prog-bar-fill" data-width="${progressPercent}%" style="background:${color}"></div>
+                    </div>
                 </div>
             `;
         });
+
         updateChart();
         setTimeout(() => {
-            document.querySelectorAll('.prog-bar-fill').forEach(bar => bar.style.width = bar.getAttribute('data-width'));
+            document.querySelectorAll('.prog-bar-fill').forEach(bar => {
+                bar.style.setProperty('width', bar.getAttribute('data-width'), 'important');
+            });
         }, 100);
     }
 
@@ -337,8 +361,9 @@
         const sections = currentContract.contract_sections_breakdown || {};
         const start = new Date(currentContract.contract_start);
         const end = new Date(currentContract.contract_end);
+        const today = new Date();
         const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
-        const monthsElapsed = Math.max(1, (new Date().getFullYear() - start.getFullYear()) * 12 + (new Date().getMonth() - start.getMonth()));
+        const monthsElapsed = Math.max(1, (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()));
 
         let labels = [], targetAvgData = [], actualAvgData = [];
         selectedSections.sort().forEach(s => {
@@ -365,7 +390,14 @@
                         { label: 'Actual', data: actualAvgData, backgroundColor: '#007AFF', borderRadius: 5 }
                     ]
                 },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { display: false } } }
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { position: 'top', labels: { font: { size: 10, weight: 'bold' } } },
+                        datalabels: { anchor: 'end', align: 'top', font: { size: 9, weight: 'bold' }, formatter: (v) => v > 0 ? `RM${Math.round(v).toLocaleString()}` : '' }
+                    },
+                    scales: { y: { beginAtZero: true }, x: { ticks: { font: { size: 10, weight: 'bold' }, maxRotation: 45, minRotation: 45 } } }
+                }
             });
         }
     }
@@ -373,6 +405,17 @@
     function toggleSelector() {
         const el = document.getElementById('sectionSelector');
         el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    async function toggleSection(s) {
+        if(selectedSections.includes(s)) selectedSections = selectedSections.filter(x => x !== s);
+        else selectedSections.push(s);
+        renderUI();
+        await fetch(`${SB_URL}/rest/v1/contract?id=eq.${currentContract.id}`, {
+            method: 'PATCH',
+            headers: headers,
+            body: JSON.stringify({ selected_sections: selectedSections })
+        });
     }
 </script>
 </body>
