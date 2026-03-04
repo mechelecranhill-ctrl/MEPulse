@@ -221,7 +221,10 @@
 
         const start = new Date(currentContract.contract_start);
         const end = new Date(currentContract.contract_end);
+        const today = new Date();
+
         const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
+        const monthsElapsed = Math.max(1, (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()));
 
         document.getElementById('fullSectionList').innerHTML = Object.keys(sections).sort().map(s => `
             <span class="sel-chip ${selectedSections.includes(s) ? 'active' : ''}" onclick="toggleSection('${s}')">${s}</span>
@@ -237,8 +240,17 @@
 
             const budget = sections[s].amt || 0; 
             const plannedMonthly = budget / totalMonths; 
-            const percent = (used/budget)*100 || 0;
-            const color = percent > 85 ? 'var(--ios-red)' : (percent > 60 ? 'var(--ios-orange)' : 'var(--ios-blue)');
+            
+            // 1. PLANNED TOTAL USAGE (Setakat tarikh hari ini)
+            const plannedTotalToDate = plannedMonthly * monthsElapsed;
+            
+            // 2. VARIANCE (Guna Sebenar vs Planned Total)
+            const variance = used - plannedTotalToDate;
+            const variancePercent = (variance / plannedTotalToDate) * 100 || 0;
+            
+            // Tentukan warna berdasarkan Variance
+            const color = variance > 0 ? 'var(--ios-red)' : 'var(--ios-green)';
+            const progressPercent = (used / budget) * 100 || 0;
 
             mainContainer.innerHTML += `
                 <div class="section-row">
@@ -248,14 +260,14 @@
                     </div>
                     <div class="avg-stats">
                         <div class="avg-item">BAJET: RM ${budget.toLocaleString()}</div>
-                        <div class="avg-item" style="color: #8e8e93;">PLANNED (MO): RM ${plannedMonthly.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+                        <div class="avg-item" style="color: #8e8e93;">PLANNED TOTAL: RM ${plannedTotalToDate.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
                     </div>
                     <div class="avg-stats">
                         <div class="avg-item">GUNA: RM ${used.toLocaleString()}</div>
-                        <div class="avg-item" style="color: ${color};">PROGRESS: ${percent.toFixed(1)}%</div>
+                        <div class="avg-item" style="color: ${color};">VARIANCE: ${variancePercent > 0 ? '+' : ''}${variancePercent.toFixed(1)}%</div>
                     </div>
                     <div class="prog-bar-bg">
-                        <div class="prog-bar-fill" data-width="${percent}%" style="background:${color}"></div>
+                        <div class="prog-bar-fill" data-width="${progressPercent}%" style="background:${color}"></div>
                     </div>
                 </div>
             `;
@@ -326,7 +338,7 @@
                     maintainAspectRatio: false,
                     layout: {
                         padding: {
-                            bottom: 20 // Tambah ruang bawah supaya label tidak terpotong
+                            bottom: 20
                         }
                     },
                     plugins: {
@@ -348,8 +360,8 @@
                                 display: true,
                                 color: '#333',
                                 font: { size: 10, weight: 'bold' },
-                                autoSkip: false, // PAKSA semua label keluar
-                                maxRotation: 45, // Putar label supaya muat
+                                autoSkip: false,
+                                maxRotation: 45,
                                 minRotation: 45
                             }
                         }
