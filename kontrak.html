@@ -2,8 +2,8 @@
 <html lang="ms">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>M&E-Connect v1.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>M&E-Connect v1.0 (Desktop Edition)</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
@@ -11,195 +11,259 @@
             --ios-blue: #007AFF; --ios-green: #34C759; --ios-orange: #FF9500; --ios-red: #FF3B30; 
             --glass-bg: rgba(255, 255, 255, 0.4); --glass-border: rgba(255, 255, 255, 0.6); 
             --glass: rgba(255,255,255,0.8);
+            --sidebar-width: 320px;
         }
         * { box-sizing: border-box; font-family: -apple-system, system-ui, sans-serif; }
         
-        body { background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); background-attachment: fixed; margin: 0; min-height: 100vh; }
-        
-        /* Glass Header Style */
-        .glass-header { 
-            width: 100%; height: 60px; 
-            background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 1px 10px rgba(0,0,0,0.05); z-index: 1000; flex-shrink: 0;
-            position: sticky; top: 0; margin-bottom: 20px;
+        body { 
+            background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); 
+            background-attachment: fixed; 
+            margin: 0; 
+            height: 100vh;
+            display: flex;
+            overflow: hidden; /* Mengunci scroll utama desktop */
+        }
+
+        /* SIDEBAR (PANEL PENGURUSAN) DI KIRI */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-right: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
         }
 
         .back-btn {
-            position: absolute; left: 20px;
             background: #e5e5ea; border: none;
             width: 35px; height: 35px; border-radius: 10px;
             display: flex; align-items: center; justify-content: center;
             cursor: pointer; color: var(--ios-blue); transition: 0.2s;
+            margin-right: 15px;
         }
-        .back-btn:active { transform: scale(0.9); background: #d1d1d6; }
-        .header-title { font-weight: 700; font-size: 17px; color: #000; }
 
-        .app-container { width: 100%; max-width: 500px; margin: auto; padding: 0 15px 30px 15px; }
-        .glass-card { background: var(--glass-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border-radius: 20px; padding: 20px; margin-bottom: 15px; border: 1px solid var(--glass-border); box-shadow: 0 8px 32px 0 rgba(31,38,135,0.1); cursor: pointer; transition: transform 0.2s; }
-        .glass-card:active { transform: scale(0.98); }
-        
-        .page { display: none; } 
-        .page.active { display: block; animation: slideUp 0.3s ease; }
-        
-        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
+        .sidebar-content {
+            padding: 20px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        /* MAIN CONTENT (BORANG) DI KANAN */
+        .main-content {
+            flex-grow: 1;
+            padding: 40px;
+            overflow-y: auto;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .glass-card { 
+            background: var(--glass-bg); 
+            backdrop-filter: blur(15px); 
+            -webkit-backdrop-filter: blur(15px); 
+            border-radius: 20px; 
+            padding: 25px; 
+            margin-bottom: 15px; 
+            border: 1px solid var(--glass-border); 
+            box-shadow: 0 8px 32px 0 rgba(31,38,135,0.1); 
+            width: 100%;
+            max-width: 700px; /* Saiz borang lebih lebar untuk desktop */
+            transition: transform 0.2s;
+        }
+
+        /* Item Menu Sidebar */
+        .menu-item {
+            background: white;
+            padding: 15px;
+            border-radius: 15px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            transition: 0.3s;
+            border: 1px solid transparent;
+        }
+        .menu-item:hover { transform: translateX(5px); background: rgba(255,255,255,0.8); }
+        .menu-item.active { 
+            border-color: var(--ios-blue);
+            background: var(--ios-blue);
+            color: white;
+        }
+
+        .page { display: none; width: 100%; display: flex; justify-content: center; } 
+        .page.active { display: flex; animation: fadeIn 0.4s ease; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+
+        /* Kekalkan gaya asal form */
         label { font-size: 10px; font-weight: 700; color: #4b4b4b; display: block; margin-top: 10px; text-transform: uppercase; }
         input, select, textarea { width: 100%; padding: 12px; margin: 5px 0; border-radius: 10px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255, 255, 255, 0.4); font-size: 14px; outline: none; }
-        
         .btn-primary { width: 100%; padding: 14px; border-radius: 12px; border: none; background: var(--ios-blue); color: white; font-weight: 600; cursor: pointer; margin-top: 10px; }
-        
         .excel-table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; font-size: 11px; margin-top: 10px; }
         .excel-table th { background: #f1f1f1; padding: 8px; text-align: left; }
         .excel-table td { padding: 8px; border-bottom: 1px solid #eee; }
         .funding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(255,255,255,0.2); padding: 10px; border-radius: 12px; }
 
-        .modal { display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); overflow-y: auto; }
-        .modal-content { width: 92%; max-width: 450px; margin: 20px auto; border: 1px solid var(--glass-border); cursor: default; }
-
-        @media print { .no-print { display: none !important; } body { background: white; } }
+        .modal { display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter:blur(10px); }
+        .modal-content { width: 92%; max-width: 450px; margin: 50px auto; }
     </style>
 </head>
 <body>
 
-<div class="app-container no-print">
-    
-    <div id="homePage" class="page active">
-        <div class="glass-header" style="margin-left:-15px; margin-right:-15px; width: calc(100% + 30px);">
+    <div class="sidebar no-print">
+        <div class="sidebar-header">
             <button class="back-btn" onclick="window.location.href='dashboard-contract.html'"><i class="fa fa-chevron-left"></i></button>
-            <div class="header-title">M&E-Connect</div>
+            <div style="font-weight: 800; font-size: 18px;">M&E-Connect</div>
         </div>
         
-        <h2 style="text-align:center; padding: 10px 0 20px 0; margin:0; font-weight: 800; letter-spacing: -1px; color: #1d1d1f;">Panel Pengurusan</h2>
-        
-        <div class="glass-card" onclick="showPage('registerWorkPage')"><strong>📝 Pendaftaran Kerja (ID)</strong></div>
-        <div class="glass-card" onclick="showPage('adminPage')"><strong>➕ Pengurusan Kontrak</strong></div>
-        <div class="glass-card" style="border: 2px solid var(--ios-orange);" onclick="showPage('interimPage')"><strong>📑 Kemaskini Interim Claim</strong></div>
-        <div class="glass-card" onclick="openVOModal()"><strong>⚠️ Tambah VO (Variation Order)</strong></div>
-        <div class="glass-card" style="background: rgba(0,0,0,0.05);" onclick="showPage('settingsPage')"><i class="fa-solid fa-gear"></i> Tetapan Unit</div>
-    </div>
-
-    <div id="registerWorkPage" class="page">
-        <div class="glass-header" style="margin-left:-15px; margin-right:-15px; width: calc(100% + 30px);">
-            <button class="back-btn" onclick="showPage('homePage')"><i class="fa fa-chevron-left"></i></button>
-            <div class="header-title">ID Kerja</div>
-        </div>
-        <div class="glass-card">
-            <h3>Borang ID Kerja</h3>
-            <form id="workOrderForm">
-                <label>Pilih Kontrak</label>
-                <select id="w_contract_id" onchange="onContractSelect()" required><option value="">Pilih Kontrak</option></select>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div><label>ID Kerja</label><input type="text" id="w_id" placeholder="C 123456" required></div>
-                    <div><label>Proceed Blueform</label><input type="date" id="w_qpb_date" required></div>
-                </div>
-                <input type="text" id="w_location" placeholder="Lokasi (Cth: JEMENTAH)">
-                <label>Pilih Daerah</label>
-                <select id="w_dist" required><option value="">Pilih Kontrak Dahulu</option></select>
-                <textarea id="w_desc" rows="2" placeholder="Keterangan"></textarea>
-                <label>Pecahan Kos</label>
-                <div id="w_sections_container" class="funding-grid"></div>
-                <div style="margin-top:15px; padding:10px; background:rgba(0,122,255,0.1); border-radius:10px; display:flex; justify-content:space-between;">
-                    <strong>Jumlah:</strong><span id="total_display" style="color:var(--ios-blue); font-weight:bold;">RM 0.00</span>
-                </div>
-                <button type="submit" class="btn-primary" style="background:var(--ios-green);">Daftar & Tolak Baki</button>
-            </form>
-        </div>
-    </div>
-
-    <div id="interimPage" class="page">
-        <div class="glass-header" style="margin-left:-15px; margin-right:-15px; width: calc(100% + 30px);">
-            <button class="back-btn" onclick="showPage('homePage')"><i class="fa fa-chevron-left"></i></button>
-            <div class="header-title">Interim Claim</div>
-        </div>
-        <div class="glass-card">
-            <h3>Kemaskini Interim Claim</h3>
-            <label>Pilih Kontrak</label>
-            <select id="i_contract_id" onchange="loadInterimData()"><option value="">Pilih Kontrak</option></select>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <div><label>No. Interim</label><input type="number" id="i_no"></div>
-                <div><label>Tarikh Terima</label><input type="date" id="i_date_received"></div>
+        <div class="sidebar-content">
+            <p style="font-size: 12px; color: #666; font-weight: 700; margin-bottom: 15px;">PANEL PENGURUSAN</p>
+            
+            <div class="menu-item" onclick="showPage('registerWorkPage', this)">
+                <i class="fa-solid fa-file-pen" style="margin-right:12px;"></i> Pendaftaran Kerja (ID)
             </div>
-            <label>Salvage Value (RM)</label>
-            <input type="number" id="i_salvage" placeholder="0.00" step="0.01">
-            <div id="i_sec_inputs"></div>
-            <label>Tampal ID Kerja</label>
-            <textarea id="i_paste_area" rows="3" placeholder="Tampal ID di sini..."></textarea>
-            <button type="button" class="btn-primary" onclick="processExcelPaste()">Cari ID</button>
-            <table class="excel-table">
-                <thead><tr><th>ID Kerja</th><th>Seq</th><th>Amaun</th><th>Hapus</th></tr></thead>
-                <tbody id="i_work_tbody"></tbody>
-            </table>
-            <button onclick="submitInterim()" class="btn-primary" style="background:var(--ios-orange);">Hantar & Selaras Baki</button>
+            <div class="menu-item" onclick="showPage('adminPage', this)">
+                <i class="fa-solid fa-file-contract" style="margin-right:12px;"></i> Pengurusan Kontrak
+            </div>
+            <div class="menu-item" onclick="showPage('interimPage', this)">
+                <i class="fa-solid fa-file-invoice-dollar" style="margin-right:12px;"></i> Kemaskini Interim
+            </div>
+            <div class="menu-item" onclick="openVOModal()">
+                <i class="fa-solid fa-triangle-exclamation" style="margin-right:12px;"></i> Tambah VO
+            </div>
+            <div class="menu-item" onclick="showPage('settingsPage', this)">
+                <i class="fa-solid fa-gear" style="margin-right:12px;"></i> Tetapan Unit
+            </div>
         </div>
     </div>
 
-    <div id="adminPage" class="page">
-        <div class="glass-header" style="margin-left:-15px; margin-right:-15px; width: calc(100% + 30px);">
-            <button class="back-btn" onclick="showPage('homePage')"><i class="fa fa-chevron-left"></i></button>
-            <div class="header-title">Daftar Kontrak</div>
+    <div class="main-content">
+        
+        <div id="welcomePage" class="page active">
+            <div class="glass-card" style="text-align: center; padding: 60px;">
+                <i class="fa-solid fa-desktop" style="font-size: 50px; color: var(--ios-blue); margin-bottom: 20px;"></i>
+                <h2>Selamat Datang ke M&E-Connect</h2>
+                <p>Sila pilih menu di sebelah kiri untuk memulakan tugasan pengurusan anda.</p>
+            </div>
         </div>
-        <div class="glass-card">
-            <h3>Maklumat Kontrak</h3>
-            <form id="contractForm">
-                <label>Unit</label>
-                <select id="c_unit_id" required></select>
-                <label>Kod Kontrak</label>
-                <input type="text" id="c_code" placeholder="Cth: RanhillSAJ/KP/T/57/2024" required>
-                <label>Tajuk Kontrak</label>
-                <textarea id="c_name" placeholder="Tajuk Kontrak" required></textarea>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div><label>Tarikh Mula</label><input type="date" id="c_start" required></div>
-                    <div><label>Tarikh Tamat</label><input type="date" id="c_end" required></div>
-                </div>
-                <label>Kontraktor</label>
-                <input type="text" id="c_contractor" placeholder="Nama Syarikat" required>
-                <label>Daerah</label>
-                <input type="text" id="c_dist" placeholder="Segamat, Muar" required>
-                <label>Kod Kawasan</label>
-                <input type="text" id="c_area" placeholder="Segamat:SGT, Muar:MR" required>
-                
-                <label>Pecahan Section BQ</label>
-                <div id="b_inputs">
-                    <div class="sec-input-wrapper" style="background:rgba(255,255,255,0.2); padding:10px; border-radius:10px; margin-bottom:5px;">
-                        <strong class="sec-label">SECTION A</strong>
-                        <input type="text" class="b_n" value="SECTION A" hidden>
-                        <input type="text" class="b_d" placeholder="Keterangan" required>
-                        <input type="number" class="b_v" placeholder="Jumlah RM" step="0.01" required oninput="calculateContractSum()">
+
+        <div id="registerWorkPage" class="page">
+            <div class="glass-card">
+                <h3 style="margin-top:0;"><i class="fa-solid fa-file-pen"></i> Borang ID Kerja</h3>
+                <form id="workOrderForm">
+                    <label>Pilih Kontrak</label>
+                    <select id="w_contract_id" onchange="onContractSelect()" required><option value="">Pilih Kontrak</option></select>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div><label>ID Kerja</label><input type="text" id="w_id" placeholder="C 123456" required></div>
+                        <div><label>Proceed Blueform</label><input type="date" id="w_qpb_date" required></div>
                     </div>
-                </div>
-                <button type="button" onclick="addB()" style="background:none; color:var(--ios-blue); border:1px dashed var(--ios-blue); font-size:12px; padding:10px; width:100%; border-radius:10px; cursor:pointer;">+ TAMBAH SECTION</button>
-                <div style="margin-top: 15px; padding: 12px; background: rgba(0,0,0,0.05); border-radius: 10px; border-left: 5px solid var(--ios-blue);">
-                    <label style="margin-top:0;">Jumlah Keseluruhan Kontrak</label>
-                    <div id="c_sum_display" style="font-size: 18px; font-weight: 800; color: #333;">RM 0.00</div>
-                </div>
-                <button type="submit" class="btn-primary">Daftar Kontrak</button>
-            </form>
+                    <input type="text" id="w_location" placeholder="Lokasi (Cth: JEMENTAH)">
+                    <label>Pilih Daerah</label>
+                    <select id="w_dist" required><option value="">Pilih Kontrak Dahulu</option></select>
+                    <textarea id="w_desc" rows="2" placeholder="Keterangan"></textarea>
+                    <label>Pecahan Kos</label>
+                    <div id="w_sections_container" class="funding-grid"></div>
+                    <div style="margin-top:15px; padding:10px; background:rgba(0,122,255,0.1); border-radius:10px; display:flex; justify-content:space-between;">
+                        <strong>Jumlah Keseluruhan:</strong><span id="total_display" style="color:var(--ios-blue); font-weight:bold;">RM 0.00</span>
+                    </div>
+                    <button type="submit" class="btn-primary" style="background:var(--ios-green);">Daftar & Tolak Baki</button>
+                </form>
+            </div>
         </div>
-    </div>
 
-    <div id="settingsPage" class="page">
-        <div class="glass-header" style="margin-left:-15px; margin-right:-15px; width: calc(100% + 30px);">
-            <button class="back-btn" onclick="showPage('homePage')"><i class="fa fa-chevron-left"></i></button>
-            <div class="header-title">Tetapan</div>
+        <div id="interimPage" class="page">
+            <div class="glass-card">
+                <h3 style="margin-top:0;"><i class="fa-solid fa-file-invoice-dollar"></i> Kemaskini Interim Claim</h3>
+                <label>Pilih Kontrak</label>
+                <select id="i_contract_id" onchange="loadInterimData()"><option value="">Pilih Kontrak</option></select>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div><label>No. Interim</label><input type="number" id="i_no"></div>
+                    <div><label>Tarikh Terima</label><input type="date" id="i_date_received"></div>
+                </div>
+                <label>Salvage Value (RM)</label>
+                <input type="number" id="i_salvage" placeholder="0.00" step="0.01">
+                <div id="i_sec_inputs"></div>
+                <label>Tampal ID Kerja</label>
+                <textarea id="i_paste_area" rows="3" placeholder="Tampal ID di sini..."></textarea>
+                <button type="button" class="btn-primary" onclick="processExcelPaste()">Cari ID</button>
+                <table class="excel-table">
+                    <thead><tr><th>ID Kerja</th><th>Seq</th><th>Amaun</th><th>Hapus</th></tr></thead>
+                    <tbody id="i_work_tbody"></tbody>
+                </table>
+                <button onclick="submitInterim()" class="btn-primary" style="background:var(--ios-orange);">Hantar & Selaras Baki</button>
+            </div>
         </div>
-        <div class="glass-card">
-            <h3>Pendaftaran Unit</h3>
-            <form id="unitForm">
-                <input type="text" id="new_unit_name" placeholder="Cth: INSTRUMENTASI" required>
-                <button type="submit" class="btn-primary">Simpan Unit</button>
-            </form>
-            <div id="unitListDisplay" style="margin-top:20px; font-size:13px;"></div>
+
+        <div id="adminPage" class="page">
+            <div class="glass-card">
+                <h3 style="margin-top:0;"><i class="fa-solid fa-file-contract"></i> Maklumat Kontrak Baru</h3>
+                <form id="contractForm">
+                    <label>Unit</label>
+                    <select id="c_unit_id" required></select>
+                    <label>Kod Kontrak</label>
+                    <input type="text" id="c_code" placeholder="Cth: RanhillSAJ/KP/T/57/2024" required>
+                    <label>Tajuk Kontrak</label>
+                    <textarea id="c_name" placeholder="Tajuk Kontrak" required></textarea>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div><label>Tarikh Mula</label><input type="date" id="c_start" required></div>
+                        <div><label>Tarikh Tamat</label><input type="date" id="c_end" required></div>
+                    </div>
+                    <label>Kontraktor</label>
+                    <input type="text" id="c_contractor" placeholder="Nama Syarikat" required>
+                    <label>Daerah</label>
+                    <input type="text" id="c_dist" placeholder="Segamat, Muar" required>
+                    <label>Kod Kawasan</label>
+                    <input type="text" id="c_area" placeholder="Segamat:SGT, Muar:MR" required>
+                    
+                    <label>Pecahan Section BQ</label>
+                    <div id="b_inputs">
+                        <div class="sec-input-wrapper" style="background:rgba(255,255,255,0.2); padding:10px; border-radius:10px; margin-bottom:5px;">
+                            <strong class="sec-label">SECTION A</strong>
+                            <input type="text" class="b_n" value="SECTION A" hidden>
+                            <input type="text" class="b_d" placeholder="Keterangan" required>
+                            <input type="number" class="b_v" placeholder="Jumlah RM" step="0.01" required oninput="calculateContractSum()">
+                        </div>
+                    </div>
+                    <button type="button" onclick="addB()" style="background:none; color:var(--ios-blue); border:1px dashed var(--ios-blue); font-size:12px; padding:10px; width:100%; border-radius:10px; cursor:pointer;">+ TAMBAH SECTION</button>
+                    <div style="margin-top: 15px; padding: 12px; background: rgba(0,0,0,0.05); border-radius: 10px; border-left: 5px solid var(--ios-blue);">
+                        <label style="margin-top:0;">Jumlah Keseluruhan Kontrak</label>
+                        <div id="c_sum_display" style="font-size: 18px; font-weight: 800; color: #333;">RM 0.00</div>
+                    </div>
+                    <button type="submit" class="btn-primary">Daftar Kontrak</button>
+                </form>
+            </div>
         </div>
+
+        <div id="settingsPage" class="page">
+            <div class="glass-card">
+                <h3 style="margin-top:0;"><i class="fa-solid fa-gear"></i> Pendaftaran Unit</h3>
+                <form id="unitForm">
+                    <input type="text" id="new_unit_name" placeholder="Cth: INSTRUMENTASI" required>
+                    <button type="submit" class="btn-primary">Simpan Unit</button>
+                </form>
+                <div id="unitListDisplay" style="margin-top:20px; font-size:13px;"></div>
+            </div>
+        </div>
+
     </div>
 
     <div id="voModal" class="modal">
         <div class="glass-card modal-content">
-            <div style="display:flex; align-items:center; margin-bottom:15px;">
-                <button class="back-btn" style="position:static; margin-right:15px;" onclick="closeVOModal()"><i class="fa fa-chevron-left"></i></button>
+            <div style="display:flex; align-items:center; justify-content: space-between; margin-bottom:15px;">
                 <h3 style="margin:0;">Borang VO</h3>
+                <button class="back-btn" style="margin:0;" onclick="closeVOModal()"><i class="fa fa-times"></i></button>
             </div>
-            
             <label>Pilih Kontrak</label>
             <select id="vo_contract_id" onchange="onVOContractSelect()" required><option value="">Pilih Kontrak</option></select>
             <label>Nama VO</label>
@@ -214,17 +278,21 @@
         </div>
     </div>
 
-</div>
-
 <script>
     const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
     const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
     const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
 
-    function showPage(id) {
+    function showPage(id, element) {
+        // Hilangkan page aktif
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        // Hilangkan status aktif pada menu sidebar
+        document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+        
+        // Aktifkan page baru
         document.getElementById(id).classList.add('active');
-        window.scrollTo(0,0);
+        if(element) element.classList.add('active');
+
         if(['registerWorkPage', 'interimPage', 'adminPage', 'settingsPage'].includes(id)) fetchUnits();
         if(['registerWorkPage', 'interimPage'].includes(id)) loadContractsToDropdowns();
     }
