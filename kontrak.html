@@ -452,14 +452,23 @@
     }
 
     function addWorkOrdersToList() {
-        const area = document.getElementById('i_paste_area');
-        const rawIds = area.value.split(/\r?\n|,|\t/);
-        const cleanIds = rawIds.map(s => s.trim()).filter(s => s !== "" && !attachedWorkOrders.includes(s));
-        
-        attachedWorkOrders = [...attachedWorkOrders, ...cleanIds];
-        area.value = '';
-        renderIDTags();
-    }
+    const area = document.getElementById('i_paste_area');
+    
+    // 1. Pecahkan input berdasarkan baris baru, koma, atau tab
+    const rawIds = area.value.split(/\r?\n|,|\t/);
+    
+    // 2. "Clean" ID: Buang semua jarak (spaces) di tengah atau hujung
+    // Contoh: "C 123 456" akan jadi "C123456"
+    const cleanIds = rawIds
+        .map(id => id.replace(/\s+/g, '').toUpperCase()) // Buang semua space & tukar ke UpperCase
+        .filter(id => id !== "" && !attachedWorkOrders.includes(id));
+    
+    // 3. Masukkan ke dalam senarai global
+    attachedWorkOrders = [...attachedWorkOrders, ...cleanIds];
+    
+    area.value = '';
+    renderIDTags();
+}
 
     function renderIDTags() {
         const container = document.getElementById('i_id_list_tags');
