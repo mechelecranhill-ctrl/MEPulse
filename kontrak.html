@@ -432,7 +432,7 @@
         document.getElementById('total_display').innerText = `RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
     }
 
-    // --- INTERIM LOGIC ---
+    // --- INTERIM LOGIC (KEMASKINI FORMAT JSON) ---
     function onInterimContractSelect() {
         const opt = document.getElementById('i_contract_id').selectedOptions[0];
         const container = document.getElementById('i_section_inputs_container');
@@ -493,7 +493,8 @@
 
     async function submitInterim() {
         const cId = document.getElementById('i_contract_id').value;
-        const iNo = parseInt(document.getElementById('i_no').value);
+        const iNoStr = document.getElementById('i_no').value;
+        const iNo = parseInt(iNoStr);
         const iDate = document.getElementById('i_date_received').value;
         const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
         
@@ -502,9 +503,13 @@
 
         if (!cId || !iNo || !iDate) return alert("Sila lengkapkan maklumat utama!");
 
+        // BINA FORMAT JSON: {"SECTION B": {"amt": 1400}, ...}
         const claimBreakdown = {};
         document.querySelectorAll('.i_sec_claim_val').forEach(input => {
-            claimBreakdown[input.dataset.sec] = parseFloat(input.value) || 0;
+            const val = parseFloat(input.value) || 0;
+            if (val > 0) {
+                claimBreakdown[input.dataset.sec] = { "amt": val };
+            }
         });
 
         const interimPayload = {
@@ -525,7 +530,10 @@
                 body: JSON.stringify(interimPayload) 
             });
 
-            if (!resInterim.ok) throw new Error("Gagal simpan Interim.");
+            if (!resInterim.ok) {
+                const errorData = await resInterim.json();
+                throw new Error(errorData.message || "Gagal simpan Interim.");
+            }
 
             // 2. Link Work Orders
             if (attachedWorkOrders.length > 0) {
