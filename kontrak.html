@@ -172,22 +172,24 @@
             <div class="glass-card">
                 <h3 style="margin-top:0;"><i class="fa-solid fa-file-invoice-dollar"></i> Kemaskini Interim Claim</h3>
                 <label>Pilih Kontrak</label>
-                <select id="i_contract_id" onchange="loadInterimData()"><option value="">Pilih Kontrak</option></select>
+                <select id="i_contract_id"><option value="">Pilih Kontrak</option></select>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div><label>No. Interim</label><input type="number" id="i_no"></div>
                     <div><label>Tarikh Terima</label><input type="date" id="i_date_received"></div>
                 </div>
                 <label>Salvage Value (RM)</label>
                 <input type="number" id="i_salvage" placeholder="0.00" step="0.01">
-                <div id="i_sec_inputs"></div>
+                
                 <label>Tampal ID Kerja</label>
                 <textarea id="i_paste_area" rows="3" placeholder="Tampal ID di sini..."></textarea>
-                <button type="button" class="btn-primary" onclick="processExcelPaste()">Cari ID</button>
+                <button type="button" class="btn-primary" onclick="processExcelPaste()">Cari ID & Ambil Amaun</button>
+                
                 <table class="excel-table">
-                    <thead><tr><th>ID Kerja</th><th>Seq</th><th>Amaun</th><th>Hapus</th></tr></thead>
+                    <thead><tr><th>ID Kerja</th><th>Status</th><th>Amaun (RM)</th><th>Hapus</th></tr></thead>
                     <tbody id="i_work_tbody"></tbody>
                 </table>
-                <button onclick="submitInterim()" class="btn-primary" style="background:var(--ios-orange);">Hantar & Selaras Baki</button>
+                <div id="i_total_display" style="margin-top:10px; text-align:right; font-weight:bold; color:var(--ios-orange);">Jumlah Claim: RM 0.00</div>
+                <button onclick="submitInterim()" class="btn-primary" style="background:var(--ios-orange); margin-top:20px;">Hantar & Selaras Baki</button>
             </div>
         </div>
 
@@ -267,7 +269,7 @@
 
     function initApp() {
         showPage('registerWorkPage', document.getElementById('menu_registerWorkPage'));
-        setupFormListeners(); // Initialize all submit listeners
+        setupFormListeners(); 
     }
 
     function showPage(id, element) {
@@ -280,9 +282,7 @@
         if(['registerWorkPage', 'interimPage', 'voPage'].includes(id)) loadContractsToDropdowns();
     }
 
-    // --- FORM LISTENERS (FIXED) ---
     function setupFormListeners() {
-        // 1. Simpan Unit
         document.getElementById('unitForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const unitName = document.getElementById('new_unit_name').value.trim().toUpperCase();
@@ -292,7 +292,6 @@
             if (res.ok) { alert("Unit berjaya disimpan!"); document.getElementById('new_unit_name').value = ''; fetchUnits(); }
         });
 
-        // 2. Daftar Kontrak
         document.getElementById('contractForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const sections = {};
@@ -318,7 +317,6 @@
             if (res.ok) { alert("Kontrak berjaya didaftar!"); location.reload(); }
         });
 
-        // 3. Daftar Work Order
         document.getElementById('workOrderForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const breakdown = {};
@@ -339,7 +337,6 @@
         });
     }
 
-    // --- CORE DATABASE FUNCTIONS ---
     async function fetchUnits() {
         try {
             const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
@@ -374,7 +371,6 @@
         } catch (e) { console.error(e); }
     }
 
-    // --- LOGIC UI & CALC ---
     function onContractSelect() {
         const opt = document.getElementById('w_contract_id').selectedOptions[0];
         const dSel = document.getElementById('w_dist');
@@ -421,30 +417,96 @@
         document.getElementById('total_display').innerText = `RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
     }
 
-    // --- INTERIM & VO LOGIC (RETAINED) ---
-    async function loadInterimData() {
-        const opt = document.getElementById('i_contract_id').selectedOptions[0];
-        const secContainer = document.getElementById('i_sec_inputs');
-        secContainer.innerHTML = ''; 
-        if (opt && opt.dataset.b) {
-            const b = JSON.parse(opt.dataset.b);
-            secContainer.innerHTML = '<label>Pecahan Amaun Interim</label><div class="funding-grid"></div>';
-            const grid = secContainer.querySelector('.funding-grid');
-            Object.keys(b).sort().forEach(sec => {
-                grid.innerHTML += `<div class="funding-item"><label>${sec}</label><input type="number" class="i_sec_val" data-sec="${sec}" placeholder="0.00"></div>`;
-            });
+    // --- KOD INTERIM (DIKEMASKINI: AUTOMATIK AMAUN DARI WORK ORDER) ---
+    async function processExcelPaste() {
+        const pasteArea = document.getElementById('i_paste_area');
+        const contractId = document.getElementById('i_contract_id').value;
+        const tbody = document.getElementById('i_work_tbody');
+
+        if (!contractId) return alert("Sila pilih kontrak dahulu!");
+        
+        const lines = pasteArea.value.split(/[\n, \t]+/).map(s => s.trim()).filter(s => s !== "");
+        if (lines.length === 0) return;
+
+        for (const workId of lines) {
+            try {
+                const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${workId}&select=*`, { headers });
+                const data = await res.json();
+
+                if (data.length > 0) {
+                    const work = data[0];
+                    const breakdown = work.cost_breakdown || {};
+                    const totalAmt = Object.values(breakdown).reduce((a, b) => a + b, 0);
+
+                    if (document.querySelector(`tr[data-work-id="${work.work_id}"]`)) continue;
+
+                    const row = tbody.insertRow();
+                    row.dataset.workId = work.work_id;
+                    row.dataset.breakdown = JSON.stringify(breakdown);
+
+                    row.innerHTML = `
+                        <td style="font-weight:bold;">${work.work_id}</td>
+                        <td style="color:green;">Ditemui</td>
+                        <td class="row-amt">RM ${totalAmt.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                        <td><button onclick="this.parentElement.parentElement.remove(); calcInterimGrandTotal();" style="border:none; background:none; color:red; cursor:pointer;"><i class="fa fa-trash"></i></button></td>
+                    `;
+                } else {
+                    alert(`ID Kerja ${workId} tidak dijumpai dalam kontrak ini!`);
+                }
+            } catch (e) { console.error(e); }
         }
+        pasteArea.value = ''; 
+        calcInterimGrandTotal();
+    }
+
+    function calcInterimGrandTotal() {
+        let grandTotal = 0;
+        document.querySelectorAll('#i_work_tbody tr').forEach(row => {
+            const breakdown = JSON.parse(row.dataset.breakdown);
+            grandTotal += Object.values(breakdown).reduce((a, b) => a + b, 0);
+        });
+        document.getElementById('i_total_display').innerText = `Jumlah Claim: RM ${grandTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
     }
 
     async function submitInterim() {
         const cId = document.getElementById('i_contract_id').value;
-        const breakdown = {};
-        document.querySelectorAll('.i_sec_val').forEach(i => breakdown[i.dataset.sec] = parseFloat(i.value) || 0);
-        const payload = { contract_id: cId, interim_no: parseInt(document.getElementById('i_no').value), date_received: document.getElementById('i_date_received').value, claim_breakdown: breakdown };
+        const iNo = document.getElementById('i_no').value;
+        const iDate = document.getElementById('i_date_received').value;
+        const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
+
+        if (!cId || !iNo || !iDate) return alert("Sila lengkapkan maklumat utama interim!");
+
+        const workRows = document.querySelectorAll('#i_work_tbody tr');
+        if (workRows.length === 0) return alert("Sila masukkan sekurang-kurangnya satu ID Kerja!");
+
+        const workOrderIds = [];
+        const totalClaimBreakdown = {};
+
+        workRows.forEach(row => {
+            workOrderIds.push(row.dataset.workId);
+            const breakdown = JSON.parse(row.dataset.breakdown);
+            for (const [sec, amt] of Object.entries(breakdown)) {
+                totalClaimBreakdown[sec] = (totalClaimBreakdown[sec] || 0) + amt;
+            }
+        });
+
+        const payload = {
+            contract_id: cId,
+            interim_no: parseInt(iNo),
+            date_received: iDate,
+            salvage_value: salvage,
+            work_order_ids: workOrderIds,
+            claim_breakdown: totalClaimBreakdown
+        };
+
         const res = await fetch(`${SB_URL}/rest/v1/interims`, { method: 'POST', headers, body: JSON.stringify(payload) });
-        if(res.ok) alert("Interim Berjaya!");
+        if(res.ok) {
+            alert("Interim Berjaya Dihantar!");
+            location.reload();
+        }
     }
 
+    // --- KOD VO ---
     function onVOContractSelect() {
         const opt = document.getElementById('vo_contract_id').selectedOptions[0];
         const sSec = document.getElementById('vo_target_sec');
