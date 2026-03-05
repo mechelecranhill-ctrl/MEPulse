@@ -24,6 +24,7 @@
             overflow: hidden;
         }
 
+        /* Sidebar Styling */
         .sidebar {
             width: var(--sidebar-width);
             background: var(--glass);
@@ -78,6 +79,7 @@
         .contract-item.active { border-color: var(--ios-blue); background: var(--ios-blue); color: white; }
         .contract-item.active small { color: rgba(255,255,255,0.8); }
 
+        /* Main Panel Styling */
         .main-panel {
             flex-grow: 1;
             padding: 30px;
@@ -144,6 +146,7 @@
         .modal-row { margin-bottom: 10px; display: grid; grid-template-columns: 1fr 1fr 40px; gap: 10px; align-items: center; }
         .modal-row input { padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; }
 
+        /* Blueform Page Overlay */
         #blueformPage {
             display: none;
             position: fixed;
@@ -156,7 +159,7 @@
         }
         #blueformPage.active { display: block; }
 
-        /* A4 Container */
+        /* A4 Document Container */
         .a4-container { 
             width: 210mm; 
             height: 297mm; 
@@ -175,18 +178,14 @@
         .a4-container::after {
             content: "";
             position: absolute;
-            top: 1cm;
-            left: 1cm;
-            right: 1cm;
-            bottom: 1cm;
+            top: 1cm; left: 1cm; right: 1cm; bottom: 1cm;
             border: 4px double #000;
             pointer-events: none;
         }
 
         .bf-footer-note {
             position: absolute;
-            bottom: 0.4cm;
-            left: 1.0cm;
+            bottom: 0.4cm; left: 1.0cm;
             text-align: left;
             font-size: 9px;
             font-style: italic;
@@ -200,29 +199,21 @@
         .bf-row { display: flex; margin-bottom: 4px; align-items: flex-start; }
         .bf-label { width: 220px; font-weight: bold; text-transform: uppercase; font-size: 10px; }
         .bf-colon { width: 15px; }
-        .bf-value { flex: 1; border-bottom: none; min-height: 14px; font-size: 10px; }
+        .bf-value { flex: 1; min-height: 14px; font-size: 10px; }
 
         .bf-logo {
             position: absolute;
-            top: 1.3cm;
-            right: 1.3cm;
-            width: 40px;
-            height: auto;
+            top: 1.3cm; right: 1.3cm;
+            width: 40px; height: auto;
             z-index: 10;
         }
 
         .bf-visibility-panel {
             background: rgba(255,255,255,0.1);
-            width: 210mm;
-            margin: 0 auto 15px auto;
-            padding: 10px;
-            border-radius: 10px;
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 15px;
-            color: white;
-            font-size: 11px;
+            width: 210mm; margin: 0 auto 15px auto;
+            padding: 10px; border-radius: 10px;
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 15px;
+            color: white; font-size: 11px;
         }
         .bf-visibility-panel label { cursor: pointer; display: flex; align-items: center; gap: 5px; }
         .hide-group { display: none !important; }
@@ -343,7 +334,7 @@
 
     let allWorks = [];
     
-    // Konfigurasi Dinamik (Senarai Section)
+    // Default Sections for Blueform
     let bfSections = JSON.parse(localStorage.getItem('bf_sections_v2')) || [
         { label: "Labour Charges", key: "LABOUR CHARGES" },
         { label: "Supply Spare Part", key: "SUPPLY SPARE PART" },
@@ -352,6 +343,7 @@
 
     window.onload = loadContracts;
 
+    // --- TEMPLATE MANAGER LOGIC ---
     function openTemplate() {
         const container = document.getElementById('dynamicRowsContainer');
         container.innerHTML = '';
@@ -388,11 +380,11 @@
 
     function closeTemplate() { document.getElementById('templateModal').style.display = 'none'; }
 
+    // --- DATA FETCHING LOGIC ---
     async function loadContracts() {
         try {
             const res = await fetch(`${SB_URL}/rest/v1/contract?select=*,units(unit_name)&order=contract_start.asc`, { headers });
             const data = await res.json();
-            if (!Array.isArray(data)) return;
             const container = document.getElementById('contractListContainer');
             container.innerHTML = data.map(c => `
                 <div class="contract-item" id="c_card_${c.id}" onclick="selectContract(${c.id}, '${c.contract_code}', '${c.contract_name.replace(/'/g, "\\'")}')">
@@ -408,8 +400,7 @@
 
     async function selectContract(id, code, name) {
         document.querySelectorAll('.contract-item').forEach(el => el.classList.remove('active'));
-        const activeCard = document.getElementById(`c_card_${id}`);
-        if(activeCard) activeCard.classList.add('active');
+        document.getElementById(`c_card_${id}`).classList.add('active');
         document.getElementById('viewTitle').innerText = code;
         document.getElementById('viewSubtitle').innerText = name;
         document.getElementById('tableWrapper').style.display = 'block';
@@ -434,24 +425,25 @@
             </tr>`).join('');
     }
 
+    // --- BLUEFORM GENERATION LOGIC ---
     async function openBlueform(id) {
         try {
             const res = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}&select=*,contract(*)`, { headers });
             const result = await res.json();
             const data = result[0];
             const c = data.contract;
-            const b = c.contract_sections_breakdown || {}; // JSONB dari table contract
-            const s = data.section_category || {};          // JSONB dari table work_order
+            const b = c.contract_sections_breakdown || {}; 
+            const s = data.section_category || {};
 
-            // Bina Konten Baris 6 ke Bawah secara Dinamik
             let dynamicHtml = '';
             let currentRow = 6;
             
-            // Panel Visibiliti
+            // Generate visibility toggles
             document.getElementById('visibilityPanel').innerHTML = bfSections.map((sec, idx) => 
                 `<label><input type="checkbox" checked onchange="toggleBfGroup('grp-dyn-${idx}', this.checked)"> Papar ${sec.label}</label>`
             ).join('');
 
+            // Generate dynamic rows based on Template
             bfSections.forEach((sec, idx) => {
                 const sumValue = (b[sec.key]?.amt || 0);
                 const workValue = (s[sec.key]?.amt || 0);
@@ -473,13 +465,12 @@
                 `;
             });
 
-            // Cantumkan semua
             let html = `
-                <div class="bf-row"><div class="bf-label">1    No. Rujukan</div><div class="bf-colon">:</div><div class="bf-value">RSAJ/M&E/IP/11-57/24 - ${data.sequence_no}</div></div>
-                <div class="bf-row"><div class="bf-label">2    No. Work Order</div><div class="bf-colon">:</div><div class="bf-value">${data.work_id}</div></div>
-                <div class="bf-row"><div class="bf-label">3    No. Kontrak</div><div class="bf-colon">:</div><div class="bf-value">${c.contract_code}</div></div>
-                <div class="bf-row"><div class="bf-label">4    Nama Kontraktor</div><div class="bf-colon">:</div><div class="bf-value">${c.contractor}</div></div>
-                <div class="bf-row"><div class="bf-label">5    Tempoh Kontrak</div><div class="bf-colon">:</div><div class="bf-value">${c.contract_start} sehingga ${c.contract_end}</div></div>
+                <div class="bf-row"><div class="bf-label">1   No. Rujukan</div><div class="bf-colon">:</div><div class="bf-value">RSAJ/M&E/IP/11-57/24 - ${data.sequence_no}</div></div>
+                <div class="bf-row"><div class="bf-label">2   No. Work Order</div><div class="bf-colon">:</div><div class="bf-value">${data.work_id}</div></div>
+                <div class="bf-row"><div class="bf-label">3   No. Kontrak</div><div class="bf-colon">:</div><div class="bf-value">${c.contract_code}</div></div>
+                <div class="bf-row"><div class="bf-label">4   Nama Kontraktor</div><div class="bf-colon">:</div><div class="bf-value">${c.contractor}</div></div>
+                <div class="bf-row"><div class="bf-label">5   Tempoh Kontrak</div><div class="bf-colon">:</div><div class="bf-value">${c.contract_start} sehingga ${c.contract_end}</div></div>
                 
                 ${dynamicHtml}
 
