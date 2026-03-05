@@ -494,6 +494,11 @@
     const iNo = parseInt(document.getElementById('i_no').value);
     const iDate = document.getElementById('i_date_received').value;
     const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
+    
+    // Kira total dari input pecahan section
+    const totalClaim = calcInterimManualTotal(); 
+    // Net amount = Total Claim - Salvage (atau ikut logik bisnes anda)
+    const netAmt = totalClaim - salvage;
 
     if (!cId || !iNo || !iDate) return alert("Sila lengkapkan maklumat utama!");
 
@@ -502,32 +507,38 @@
         claimBreakdown[input.dataset.sec] = parseFloat(input.value) || 0;
     });
 
+    // Sesuaikan dengan nama kolum table anda: claim_amount & net_amount
     const interimPayload = {
         contract_id: cId,
         interim_no: iNo,
         date_received: iDate,
         salvage_value: salvage,
         claim_breakdown: claimBreakdown,
-        net_amount: calcInterimManualTotal()
+        claim_amount: totalClaim, 
+        net_amount: netAmt
     };
 
     try {
-        // 1. Simpan rekod ke table 'interims'
+        // 1. Simpan/Kemaskini rekod ke table 'interims'
         const resInterim = await fetch(`${SB_URL}/rest/v1/interims`, { 
             method: 'POST', 
             headers: { ...headers, 'Prefer': 'resolution=merge-duplicates' }, 
             body: JSON.stringify(interimPayload) 
         });
 
-        if (!resInterim.ok) throw new Error("Gagal simpan data Interim.");
+        if (!resInterim.ok) {
+            const err = await resInterim.json();
+            throw new Error("Gagal simpan Interim: " + err.message);
+        }
 
-        // 2. KEMASKINI WORK ORDERS (Bahagian Kritikal)
+        // 2. KEMASKINI WORK ORDERS (Proses 'Linking')
         if (attachedWorkOrders.length > 0) {
             for (let id of attachedWorkOrders) {
-                // Buang jarak untuk carian fleksibel (C123 -> %C%123%)
-                const searchPattern = `%${id.replace(/\s+/g, '')}%`;
+                // Trik: Buang semua space dari input user (C123456) 
+                // dan cari guna ILIKE dengan wildcard % supaya jumpa "C 123456"
+                const cleanId = id.replace(/\s+/g, '');
+                const searchPattern = `%${cleanId.split('').join('%')}%`; // Jadi: %C%1%2%3%...
 
-                // Kita kemaskini work_orders yang mempunyai ID yang mirip DAN contract_id yang sama
                 const resUpdate = await fetch(
                     `${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=ilike.${searchPattern}`, 
                     {
@@ -541,7 +552,7 @@
             }
         }
 
-        alert(`Interim No.${iNo} berjaya. ${attachedWorkOrders.length} ID telah cuba di-link.`);
+        alert(`Interim No.${iNo} berjaya direkod.\nClaim: RM ${totalClaim}\nNet: RM ${netAmt}`);
         location.reload();
 
     } catch (err) {
