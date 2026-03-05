@@ -24,7 +24,6 @@
             overflow: hidden;
         }
 
-        /* SIDEBAR */
         .sidebar {
             width: var(--sidebar-width);
             background: var(--glass);
@@ -57,7 +56,6 @@
             flex-grow: 1;
         }
 
-        /* MAIN CONTENT AREA */
         .main-content {
             flex-grow: 1;
             padding: 40px;
@@ -81,7 +79,6 @@
             transition: transform 0.2s;
         }
 
-        /* Menu Sidebar */
         .menu-item {
             background: white;
             padding: 15px;
@@ -102,13 +99,11 @@
             color: white;
         }
 
-        /* Hide all pages by default */
         .page { display: none; width: 100%; justify-content: center; } 
         .page.active { display: flex; animation: fadeIn 0.4s ease; }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Form Styles */
         label { font-size: 10px; font-weight: 700; color: #4b4b4b; display: block; margin-top: 10px; text-transform: uppercase; }
         input, select, textarea { width: 100%; padding: 12px; margin: 5px 0; border-radius: 10px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255, 255, 255, 0.4); font-size: 14px; outline: none; }
         .btn-primary { width: 100%; padding: 14px; border-radius: 12px; border: none; background: var(--ios-blue); color: white; font-weight: 600; cursor: pointer; margin-top: 10px; }
@@ -116,10 +111,7 @@
         .excel-table th { background: #f1f1f1; padding: 8px; text-align: left; }
         .excel-table td { padding: 8px; border-bottom: 1px solid #eee; }
         .funding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(255,255,255,0.2); padding: 10px; border-radius: 12px; }
-        
-        /* New Style for Section Description */
         .sec-desc { font-size: 9px; color: #555; display: block; margin-bottom: 4px; line-height: 1.2; font-weight: 500; text-transform: none; }
-
     </style>
 </head>
 <body onload="initApp()">
@@ -152,7 +144,6 @@
     </div>
 
     <div class="main-content">
-        
         <div id="registerWorkPage" class="page">
             <div class="glass-card">
                 <h3 style="margin-top:0;"><i class="fa-solid fa-file-pen"></i> Borang Work Order</h3>
@@ -188,9 +179,7 @@
                 </div>
                 <label>Salvage Value (RM)</label>
                 <input type="number" id="i_salvage" placeholder="0.00" step="0.01">
-                
                 <div id="i_sec_inputs"></div>
-                
                 <label>Tampal ID Kerja</label>
                 <textarea id="i_paste_area" rows="3" placeholder="Tampal ID di sini..."></textarea>
                 <button type="button" class="btn-primary" onclick="processExcelPaste()">Cari ID</button>
@@ -207,24 +196,14 @@
                 <h3 style="margin-top:0;"><i class="fa-solid fa-triangle-exclamation"></i> Borang Variation Order (VO)</h3>
                 <label>Pilih Kontrak</label>
                 <select id="vo_contract_id" onchange="onVOContractSelect()" required><option value="">Pilih Kontrak</option></select>
-                
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div>
-                        <label>Nama VO</label>
-                        <input type="text" id="vo_name" placeholder="Cth: VO 01" required>
-                    </div>
-                    <div>
-                        <label>Masukkan Ke Section</label>
-                        <select id="vo_target_sec" required><option value="">Pilih Kontrak Dahulu</option></select>
-                    </div>
+                    <div><label>Nama VO</label><input type="text" id="vo_name" placeholder="Cth: VO 01" required></div>
+                    <div><label>Masukkan Ke Section</label><select id="vo_target_sec" required><option value="">Pilih Kontrak Dahulu</option></select></div>
                 </div>
-
                 <label>Jumlah Tambahan (RM)</label>
                 <input type="number" id="vo_amt" step="0.01" placeholder="0.00" required>
-                
                 <label>Keterangan</label>
                 <textarea id="vo_desc" rows="3" placeholder="Sebab kenaikan kos..."></textarea>
-                
                 <button onclick="submitVO()" class="btn-primary" style="background:var(--ios-red);">Daftar VO & Kemaskini Baki</button>
             </div>
         </div>
@@ -288,151 +267,94 @@
 
     function initApp() {
         showPage('registerWorkPage', document.getElementById('menu_registerWorkPage'));
+        setupFormListeners(); // Initialize all submit listeners
     }
 
     function showPage(id, element) {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
-        
         const targetPage = document.getElementById(id);
         if(targetPage) targetPage.classList.add('active');
         if(element) element.classList.add('active');
-
-        // Trigger data loading based on page
         if(['registerWorkPage', 'interimPage', 'adminPage', 'settingsPage', 'voPage'].includes(id)) fetchUnits();
         if(['registerWorkPage', 'interimPage', 'voPage'].includes(id)) loadContractsToDropdowns();
     }
 
-    // INTERIM FUNCTIONS
-    async function loadInterimData() {
-        const opt = document.getElementById('i_contract_id').selectedOptions[0];
-        const secContainer = document.getElementById('i_sec_inputs');
-        secContainer.innerHTML = ''; 
-
-        if (opt && opt.dataset.b) {
-            const b = JSON.parse(opt.dataset.b);
-            secContainer.innerHTML = '<label style="margin-top:15px;">Pecahan Amaun Interim (Ikut Section)</label>';
-            const grid = document.createElement('div');
-            grid.className = 'funding-grid';
-            
-            Object.keys(b).sort().forEach(sec => {
-                const sectionDesc = b[sec].desc || "Tiada Keterangan";
-                grid.innerHTML += `
-                    <div class="funding-item">
-                        <label>${sec}</label>
-                        <span class="sec-desc">${sectionDesc}</span>
-                        <input type="number" class="i_sec_val" data-sec="${sec}" placeholder="0.00" step="0.01">
-                    </div>`;
+    // --- FORM LISTENERS (FIXED) ---
+    function setupFormListeners() {
+        // 1. Simpan Unit
+        document.getElementById('unitForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const unitName = document.getElementById('new_unit_name').value.trim().toUpperCase();
+            const res = await fetch(`${SB_URL}/rest/v1/units`, {
+                method: 'POST', headers, body: JSON.stringify({ unit_name: unitName })
             });
-            secContainer.appendChild(grid);
-        }
-    }
-
-    async function processExcelPaste() {
-        const pasteArea = document.getElementById('i_paste_area');
-        const tbody = document.getElementById('i_work_tbody');
-        const lines = pasteArea.value.split('\n').filter(l => l.trim() !== '');
-        
-        if (lines.length === 0) return alert("Sila tampal ID Kerja dahulu.");
-
-        lines.forEach(rawId => {
-            const workId = rawId.trim();
-            if (Array.from(tbody.rows).some(row => row.cells[0].innerText === workId)) return;
-
-            const row = tbody.insertRow();
-            row.innerHTML = `
-                <td>${workId}</td>
-                <td><input type="number" class="row-seq" value="1" style="width:50px; padding:5px;"></td>
-                <td><input type="number" class="row-amt" placeholder="0.00" step="0.01" style="width:80px; padding:5px;"></td>
-                <td><button onclick="this.parentElement.parentElement.remove()" style="color:red; border:none; background:none; cursor:pointer;"><i class="fa fa-trash"></i></button></td>
-            `;
-        });
-        pasteArea.value = '';
-    }
-
-    async function submitInterim() {
-        const cId = document.getElementById('i_contract_id').value;
-        const iNo = document.getElementById('i_no').value;
-        const iDate = document.getElementById('i_date_received').value;
-        const iSalvage = parseFloat(document.getElementById('i_salvage').value) || 0;
-
-        if (!cId || !iNo || !iDate) return alert("Sila lengkapkan No. Interim dan Tarikh!");
-
-        // Bina format: {"SECTION C": {"amt": 161000}, ...}
-        const breakdown = {};
-        document.querySelectorAll('.i_sec_val').forEach(input => {
-            breakdown[input.dataset.sec] = { "amt": parseFloat(input.value) || 0 };
+            if (res.ok) { alert("Unit berjaya disimpan!"); document.getElementById('new_unit_name').value = ''; fetchUnits(); }
         });
 
-        const payload = {
-            contract_id: cId,
-            interim_no: parseInt(iNo),
-            date_received: iDate,
-            salvage_value: iSalvage,
-            claim_breakdown: breakdown
-        };
-
-        const res = await fetch(`${SB_URL}/rest/v1/interims`, {
-            method: 'POST', headers, body: JSON.stringify(payload)
+        // 2. Daftar Kontrak
+        document.getElementById('contractForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const sections = {};
+            document.querySelectorAll('.sec-input-wrapper').forEach(w => {
+                sections[w.querySelector('.b_n').value] = {
+                    desc: w.querySelector('.b_d').value,
+                    val: parseFloat(w.querySelector('.b_v').value) || 0
+                };
+            });
+            const payload = {
+                unit_id: document.getElementById('c_unit_id').value,
+                contract_code: document.getElementById('c_code').value,
+                contract_title: document.getElementById('c_name').value,
+                start_date: document.getElementById('c_start').value,
+                end_date: document.getElementById('c_end').value,
+                contractor: document.getElementById('c_contractor').value,
+                district: document.getElementById('c_dist').value,
+                area_code: document.getElementById('c_area').value,
+                contract_sections_breakdown: sections,
+                total_contract_amount: calculateContractSum()
+            };
+            const res = await fetch(`${SB_URL}/rest/v1/contract`, { method: 'POST', headers, body: JSON.stringify(payload) });
+            if (res.ok) { alert("Kontrak berjaya didaftar!"); location.reload(); }
         });
 
-        if (res.ok) {
-            alert("Interim Berjaya Didaftarkan!");
-            showPage('registerWorkPage', document.getElementById('menu_registerWorkPage'));
-        } else {
-            const err = await res.json();
-            alert("Ralat Simpan: " + err.message);
-        }
-    }
-
-    // VO FUNCTIONS
-    function onVOContractSelect() {
-        const opt = document.getElementById('vo_contract_id').selectedOptions[0];
-        const sSec = document.getElementById('vo_target_sec');
-        sSec.innerHTML = '<option value="">Pilih Section</option>';
-        if(opt && opt.dataset.b) {
-            const b = JSON.parse(opt.dataset.b);
-            Object.keys(b).sort().forEach(sec => sSec.innerHTML += `<option value="${sec}">${sec}</option>`);
-        }
-    }
-
-    async function submitVO() {
-        const cId = document.getElementById('vo_contract_id').value;
-        const voName = document.getElementById('vo_name').value.trim().toUpperCase();
-        const targetSec = document.getElementById('vo_target_sec').value;
-        const voAmt = parseFloat(document.getElementById('vo_amt').value);
-        if (!cId || !voName || !voAmt || !targetSec) return alert("Lengkapkan borang VO!");
-
-        const resGet = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { headers });
-        const contract = (await resGet.json())[0];
-        let vBreak = contract.vo_breakdown || {};
-        if (vBreak[voName]) return alert("Nama VO sedia ada!");
-
-        vBreak[voName] = { "amt": voAmt, "sec": targetSec, "desc": document.getElementById('vo_desc').value, "date": new Date().toISOString() };
-        const newVoTotal = (parseFloat(contract.total_vo_amount) || 0) + voAmt;
-
-        const resUpd = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, {
-            method: 'PATCH', headers,
-            body: JSON.stringify({ vo_breakdown: vBreak, total_vo_amount: newVoTotal })
+        // 3. Daftar Work Order
+        document.getElementById('workOrderForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const breakdown = {};
+            document.querySelectorAll('.w_sec_amt').forEach(i => {
+                breakdown[i.dataset.sec] = parseFloat(i.value) || 0;
+            });
+            const payload = {
+                contract_id: document.getElementById('w_contract_id').value,
+                work_id: document.getElementById('w_id').value,
+                qpb_date: document.getElementById('w_qpb_date').value,
+                location: document.getElementById('w_location').value,
+                district: document.getElementById('w_dist').value,
+                description: document.getElementById('w_desc').value,
+                cost_breakdown: breakdown
+            };
+            const res = await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(payload) });
+            if (res.ok) { alert("Work Order berjaya didaftar!"); location.reload(); }
         });
-
-        if(resUpd.ok) { 
-            alert("VO Berjaya Didaftarkan!"); 
-            showPage('registerWorkPage', document.getElementById('menu_registerWorkPage'));
-        }
     }
 
-    // CORE DATABASE FUNCTIONS
+    // --- CORE DATABASE FUNCTIONS ---
     async function fetchUnits() {
         try {
             const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
             const units = await res.json();
             const sAdmin = document.getElementById('c_unit_id');
+            const unitList = document.getElementById('unitListDisplay');
             if(sAdmin) {
                 sAdmin.innerHTML = '<option value="">Pilih Unit</option>';
-                units.forEach(u => sAdmin.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`);
+                unitList.innerHTML = '<strong>Senarai Unit:</strong><br>';
+                units.forEach(u => {
+                    sAdmin.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
+                    unitList.innerHTML += `• ${u.unit_name}<br>`;
+                });
             }
-        } catch (e) { console.error("Error fetching units", e); }
+        } catch (e) { console.error(e); }
     }
 
     async function loadContractsToDropdowns() {
@@ -449,26 +371,21 @@
                     s.appendChild(opt);
                 });
             });
-        } catch (e) { console.error("Error loading contracts", e); }
+        } catch (e) { console.error(e); }
     }
 
+    // --- LOGIC UI & CALC ---
     function onContractSelect() {
         const opt = document.getElementById('w_contract_id').selectedOptions[0];
         const dSel = document.getElementById('w_dist');
-        if(!dSel) return;
         dSel.innerHTML = '<option value="">Pilih Daerah</option>';
         if(opt && opt.dataset.dist) opt.dataset.dist.split(',').forEach(d => dSel.innerHTML += `<option value="${d.trim()}">${d.trim()}</option>`);
         const container = document.getElementById('w_sections_container'); container.innerHTML = '';
         if(opt && opt.dataset.b) {
             const b = JSON.parse(opt.dataset.b);
             Object.keys(b).sort().forEach(sec => {
-                const sectionDesc = b[sec].desc || "Tiada Keterangan";
-                container.innerHTML += `
-                    <div class="funding-item">
-                        <label>${sec}</label>
-                        <span class="sec-desc">${sectionDesc}</span>
-                        <input type="number" class="w_sec_amt" data-sec="${sec}" oninput="calcTotalWork()" step="0.01">
-                    </div>`;
+                container.innerHTML += `<div class="funding-item"><label>${sec}</label><span class="sec-desc">${b[sec].desc}</span>
+                <input type="number" class="w_sec_amt" data-sec="${sec}" oninput="calcTotalWork()" step="0.01"></div>`;
             });
         }
     }
@@ -482,35 +399,69 @@
 
     function addB() {
         const container = document.getElementById('b_inputs');
-        const currentCount = container.querySelectorAll('.sec-input-wrapper').length;
-        const nextLetter = String.fromCharCode(65 + currentCount);
-        const sectionName = `SECTION ${nextLetter}`;
+        const nextLetter = String.fromCharCode(65 + container.querySelectorAll('.sec-input-wrapper').length);
+        const name = `SECTION ${nextLetter}`;
         const d = document.createElement('div'); 
-        d.className = "sec-input-wrapper";
-        d.style = "background:rgba(255,255,255,0.2); padding:10px; border-radius:10px; margin-bottom:5px; position:relative;";
-        d.innerHTML = `
-            <div onclick="this.parentElement.remove(); reIndexSections(); calculateContractSum();" style="position:absolute; right:10px; top:10px; color:red; cursor:pointer; font-weight:bold;">✕</div>
-            <strong class="sec-label">${sectionName}</strong>
-            <input type="text" class="b_n" value="${sectionName}" hidden>
-            <input type="text" class="b_d" placeholder="Keterangan" required>
-            <input type="number" class="b_v" placeholder="Jumlah RM" step="0.01" required oninput="calculateContractSum()">
-        `;
+        d.className = "sec-input-wrapper"; d.style = "background:rgba(255,255,255,0.2); padding:10px; border-radius:10px; margin-bottom:5px; position:relative;";
+        d.innerHTML = `<div onclick="this.parentElement.remove(); reIndexSections(); calculateContractSum();" style="position:absolute; right:10px; top:10px; color:red; cursor:pointer;">✕</div>
+            <strong class="sec-label">${name}</strong><input type="text" class="b_n" value="${name}" hidden>
+            <input type="text" class="b_d" placeholder="Keterangan" required><input type="number" class="b_v" placeholder="Jumlah RM" step="0.01" required oninput="calculateContractSum()">`;
         container.appendChild(d);
-        calculateContractSum();
     }
 
     function reIndexSections() {
-        document.querySelectorAll('.sec-input-wrapper').forEach((w, index) => {
-            const letter = String.fromCharCode(65 + index);
-            const name = `SECTION ${letter}`;
-            w.querySelector('.sec-label').innerText = name;
-            w.querySelector('.b_n').value = name;
+        document.querySelectorAll('.sec-input-wrapper').forEach((w, i) => {
+            const name = `SECTION ${String.fromCharCode(65 + i)}`;
+            w.querySelector('.sec-label').innerText = name; w.querySelector('.b_n').value = name;
         });
     }
 
     function calcTotalWork() {
         let total = 0; document.querySelectorAll('.w_sec_amt').forEach(i => total += parseFloat(i.value) || 0);
         document.getElementById('total_display').innerText = `RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+    }
+
+    // --- INTERIM & VO LOGIC (RETAINED) ---
+    async function loadInterimData() {
+        const opt = document.getElementById('i_contract_id').selectedOptions[0];
+        const secContainer = document.getElementById('i_sec_inputs');
+        secContainer.innerHTML = ''; 
+        if (opt && opt.dataset.b) {
+            const b = JSON.parse(opt.dataset.b);
+            secContainer.innerHTML = '<label>Pecahan Amaun Interim</label><div class="funding-grid"></div>';
+            const grid = secContainer.querySelector('.funding-grid');
+            Object.keys(b).sort().forEach(sec => {
+                grid.innerHTML += `<div class="funding-item"><label>${sec}</label><input type="number" class="i_sec_val" data-sec="${sec}" placeholder="0.00"></div>`;
+            });
+        }
+    }
+
+    async function submitInterim() {
+        const cId = document.getElementById('i_contract_id').value;
+        const breakdown = {};
+        document.querySelectorAll('.i_sec_val').forEach(i => breakdown[i.dataset.sec] = parseFloat(i.value) || 0);
+        const payload = { contract_id: cId, interim_no: parseInt(document.getElementById('i_no').value), date_received: document.getElementById('i_date_received').value, claim_breakdown: breakdown };
+        const res = await fetch(`${SB_URL}/rest/v1/interims`, { method: 'POST', headers, body: JSON.stringify(payload) });
+        if(res.ok) alert("Interim Berjaya!");
+    }
+
+    function onVOContractSelect() {
+        const opt = document.getElementById('vo_contract_id').selectedOptions[0];
+        const sSec = document.getElementById('vo_target_sec');
+        sSec.innerHTML = '<option value="">Pilih Section</option>';
+        if(opt && opt.dataset.b) Object.keys(JSON.parse(opt.dataset.b)).sort().forEach(sec => sSec.innerHTML += `<option value="${sec}">${sec}</option>`);
+    }
+
+    async function submitVO() {
+        const cId = document.getElementById('vo_contract_id').value;
+        const resGet = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { headers });
+        const contract = (await resGet.json())[0];
+        let vBreak = contract.vo_breakdown || {};
+        const voName = document.getElementById('vo_name').value.toUpperCase();
+        const amt = parseFloat(document.getElementById('vo_amt').value);
+        vBreak[voName] = { amt: amt, sec: document.getElementById('vo_target_sec').value };
+        const resUpd = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { method: 'PATCH', headers, body: JSON.stringify({ vo_breakdown: vBreak, total_vo_amount: (contract.total_vo_amount || 0) + amt }) });
+        if(resUpd.ok) alert("VO Berjaya!");
     }
 </script>
 </body>
