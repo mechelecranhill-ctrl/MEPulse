@@ -250,229 +250,219 @@
         </div>
     </div>
 
-const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
-const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
+<script>
+    const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
+    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
+    const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
 
-let myChart = null;
-let currentContract = null;
-let currentWO = [];
-let selectedSections = [];
-let virtualUsage = {}; // Simpan total penggunaan virtual
+    let myChart = null;
+    let currentContract = null;
+    let currentWO = [];
+    let selectedSections = [];
 
-Chart.register(ChartDataLabels);
+    Chart.register(ChartDataLabels);
 
-window.onload = () => fetchUnits();
+    window.onload = () => fetchUnits();
 
-function filterContracts() {
-    const query = document.getElementById('contractSearch').value.toLowerCase();
-    const cards = document.querySelectorAll('.c-card');
-    cards.forEach(card => {
-        const code = card.querySelector('h4').innerText.toLowerCase();
-        const name = card.querySelector('.sub-text').innerText.toLowerCase();
-        card.style.display = (code.includes(query) || name.includes(query)) ? 'block' : 'none';
-    });
-}
-
-async function fetchUnits() {
-    try {
-        const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
-        const units = await res.json();
-        const nav = document.getElementById('unitNav');
-        nav.innerHTML = units.map(u => `<button class="unit-pill" id="unit-${u.id}" onclick="fetchContracts(${u.id}, this)">${u.unit_name}</button>`).join('');
-        const instUnit = units.find(u => u.unit_name.toUpperCase() === 'INSTRUMENTASI');
-        if(instUnit) { document.getElementById(`unit-${instUnit.id}`).click(); } 
-        else if(units.length > 0) { document.querySelector('.unit-pill').click(); }
-    } catch (e) { console.error(e); }
-}
-
-async function fetchContracts(unitId, btn) {
-    document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('contractSearch').value = '';
-    try {
-        const res = await fetch(`${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}&order=contract_start.asc`, { headers });
-        const data = await res.json();
-        const list = document.getElementById('contractList');
-        list.innerHTML = data.map(c => `
-            <div class="c-card" id="card-${c.id}" onclick='selectCard(${c.id}); openAnalysis(${JSON.stringify(c)})'>
-                <h4>${c.contract_code}</h4>
-                <div class="sub-text">${c.contract_name}</div>
-            </div>
-        `).join('');
-        if(data.length > 0 && window.innerWidth > 768) { selectCard(data[0].id); openAnalysis(data[0]); }
-    } catch (e) { console.error(e); }
-}
-
-function selectCard(id) {
-    document.querySelectorAll('.c-card').forEach(c => c.classList.remove('active'));
-    if(document.getElementById(`card-${id}`)) document.getElementById(`card-${id}`).classList.add('active');
-}
-
-async function openAnalysis(contract) {
-    document.body.classList.add('analysis-active');
-    document.getElementById('analysis-panel').style.display = 'flex';
-    document.getElementById('panel-title').innerText = contract.contract_code;
-    
-    try {
-        const resC = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${contract.id}&select=*`, { headers });
-        currentContract = (await resC.json())[0];
-
-        const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}`, { headers });
-        currentWO = await resW.json();
-
-        const resI = await fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${currentContract.id}`, { headers });
-        const interims = await resI.json();
-
-        // JALANKAN LOGIK VIRTUAL IKUT TARIKH
-        processVirtualBalance(interims, currentWO);
-
-        selectedSections = (currentContract.selected_sections && currentContract.selected_sections.length > 0) 
-            ? currentContract.selected_sections 
-            : Object.keys(currentContract.contract_sections_breakdown || {});
-            
-        renderUI();
-    } catch (error) { console.error(error); }
-}
-
-function processVirtualBalance(interims, allWOs) {
-    virtualUsage = {}; 
-    const claimedIds = interims.flatMap(i => i.work_order_ids || []);
-    let timeline = [];
-
-    // 1. Masukkan Interim (Guna date_received)
-    interims.forEach(i => {
-        timeline.push({
-            date: new Date(i.date_received || 0),
-            data: i.claim_breakdown || {}
-        });
-    });
-
-    // 2. Masukkan WO Belum Claim (Guna qpb_date)
-    allWOs.forEach(wo => {
-        if (!claimedIds.includes(wo.work_order_no)) {
-            let woBreakdown = {};
-            for (const [sec, val] of Object.entries(wo.section_category || {})) {
-                woBreakdown[sec] = val.amt || 0;
-            }
-            timeline.push({
-                date: new Date(wo.qpb_date || 0),
-                data: woBreakdown
-            });
-        }
-    });
-
-    // 3. Susun Kronologi (Penting untuk Blueform)
-    timeline.sort((a, b) => a.date - b.date);
-
-    // 4. Akumulasi Virtual Usage
-    timeline.forEach(item => {
-        for (const [sec, amt] of Object.entries(item.data)) {
-            virtualUsage[sec] = (virtualUsage[sec] || 0) + parseFloat(amt);
-        }
-    });
-}
-
-function renderUI() {
-    if(!currentContract) return;
-    const sections = currentContract.contract_sections_breakdown || {};
-    
-    document.getElementById('fullSectionList').innerHTML = Object.keys(sections).sort().map(s => `
-        <span class="sel-chip ${selectedSections.includes(s) ? 'active' : ''}" onclick="toggleSection('${s}')">${s}</span>
-    `).join('');
-
-    const mainContainer = document.getElementById('selectedSectionContainer');
-    mainContainer.innerHTML = '';
-
-    selectedSections.sort().forEach(s => {
-        if(!sections[s]) return;
+    function filterContracts() {
+        const query = document.getElementById('contractSearch').value.toLowerCase();
+        const cards = document.querySelectorAll('.c-card');
         
-        const budget = sections[s].amt || 0; // Nilai ini automatik dikira bersama VO jika data DB dikemaskini
-        const used = virtualUsage[s] || 0;
-        const balance = budget - used;
-        const progressPercent = (used / budget) * 100 || 0;
-        const color = balance < 0 ? 'var(--ios-red)' : 'var(--ios-blue)';
-
-        mainContainer.innerHTML += `
-            <div class="section-row">
-                <div style="display:flex; justify-content:space-between; align-items:start;">
-                    <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">${s}: ${sections[s].desc || s}</div>
-                    <div style="font-size:11px; font-weight:800; color:${balance < 0 ? 'red' : '#34C759'};">
-                        BAKI: RM ${balance.toLocaleString()}
-                    </div>
-                </div>
-                <div class="avg-stats">
-                    <div class="avg-item">ALLOCATION (INC. VO): RM ${budget.toLocaleString()}</div>
-                    <div class="avg-item">USED (VIRTUAL): RM ${used.toLocaleString()}</div>
-                </div>
-                <div class="prog-bar-bg">
-                    <div class="prog-bar-fill" data-width="${progressPercent}%" style="background:${color}"></div>
-                </div>
-            </div>
-        `;
-    });
-
-    updateChart();
-    setTimeout(() => {
-        document.querySelectorAll('.prog-bar-fill').forEach(bar => {
-            bar.style.setProperty('width', bar.getAttribute('data-width'), 'important');
-        });
-    }, 100);
-}
-
-function updateChart() {
-    if (!currentContract) return;
-    const sections = currentContract.contract_sections_breakdown || {};
-    let labels = [], targetData = [], actualData = [];
-
-    selectedSections.sort().forEach(s => {
-        labels.push(s); 
-        targetData.push(sections[s]?.amt || 0);
-        actualData.push(virtualUsage[s] || 0);
-    });
-
-    if (myChart) {
-        myChart.data.labels = labels;
-        myChart.data.datasets[0].data = targetData;
-        myChart.data.datasets[1].data = actualData;
-        myChart.update(); 
-    } else {
-        const ctx = document.getElementById('healthChart').getContext('2d');
-        myChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    { label: 'Budget', data: targetData, backgroundColor: 'rgba(200, 200, 205, 0.5)', borderRadius: 5 },
-                    { label: 'Usage (Virtual)', data: actualData, backgroundColor: '#007AFF', borderRadius: 5 }
-                ]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { 
-                    legend: { position: 'top', labels: { font: { size: 10, weight: 'bold' } } },
-                    datalabels: { anchor: 'end', align: 'top', font: { size: 9, weight: 'bold' }, formatter: (v) => v > 0 ? `RM${Math.round(v).toLocaleString()}` : '' }
-                },
-                scales: { y: { beginAtZero: true }, x: { ticks: { font: { size: 10, weight: 'bold' } } } }
+        cards.forEach(card => {
+            const code = card.querySelector('h4').innerText.toLowerCase();
+            const name = card.querySelector('.sub-text').innerText.toLowerCase();
+            if (code.includes(query) || name.includes(query)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
             }
         });
     }
-}
 
-function toggleSelector() {
-    const el = document.getElementById('sectionSelector');
-    el.style.display = el.style.display === 'none' ? 'block' : 'none';
-}
+    async function fetchUnits() {
+        try {
+            const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
+            const units = await res.json();
+            const nav = document.getElementById('unitNav');
+            nav.innerHTML = units.map(u => `<button class="unit-pill" id="unit-${u.id}" onclick="fetchContracts(${u.id}, this)">${u.unit_name}</button>`).join('');
 
-async function toggleSection(s) {
-    if(selectedSections.includes(s)) selectedSections = selectedSections.filter(x => x !== s);
-    else selectedSections.push(s);
-    renderUI();
-    await fetch(`${SB_URL}/rest/v1/contract?id=eq.${currentContract.id}`, {
-        method: 'PATCH',
-        headers: headers,
-        body: JSON.stringify({ selected_sections: selectedSections })
-    });
-}
+            const instUnit = units.find(u => u.unit_name.toUpperCase() === 'INSTRUMENTASI');
+            if(instUnit) { document.getElementById(`unit-${instUnit.id}`).click(); } 
+            else if(units.length > 0) { document.querySelector('.unit-pill').click(); }
+        } catch (e) { console.error("Error units:", e); }
+    }
+
+    async function fetchContracts(unitId, btn) {
+        document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('contractSearch').value = '';
+        
+        try {
+            const res = await fetch(`${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}&order=contract_start.asc`, { headers });
+            const data = await res.json();
+            const list = document.getElementById('contractList');
+
+            list.innerHTML = data.map(c => `
+                <div class="c-card" id="card-${c.id}" onclick='selectCard(${c.id}); openAnalysis(${JSON.stringify(c)})'>
+                    <h4>${c.contract_code}</h4>
+                    <div class="sub-text">${c.contract_name}</div>
+                </div>
+            `).join('');
+
+            if(data.length > 0 && window.innerWidth > 768) {
+                selectCard(data[0].id);
+                openAnalysis(data[0]);
+            }
+        } catch (e) { console.error("Error contracts:", e); }
+    }
+
+    function selectCard(id) {
+        document.querySelectorAll('.c-card').forEach(c => c.classList.remove('active'));
+        const activeCard = document.getElementById(`card-${id}`);
+        if(activeCard) activeCard.classList.add('active');
+    }
+
+    async function openAnalysis(contract) {
+        document.body.classList.add('analysis-active');
+        document.getElementById('analysis-panel').style.display = 'flex';
+        document.getElementById('panel-title').innerText = contract.contract_code;
+        document.getElementById('panel-vendor').innerText = contract.contract_name;
+
+        try {
+            const resC = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${contract.id}&select=*`, { headers });
+            currentContract = (await resC.json())[0];
+            const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}`, { headers });
+            currentWO = await resW.json();
+            selectedSections = (currentContract.selected_sections && currentContract.selected_sections.length > 0) 
+                ? currentContract.selected_sections 
+                : Object.keys(currentContract.contract_sections_breakdown || {});
+            renderUI();
+        } catch (error) { console.error(error); }
+    }
+
+    function renderUI() {
+        if(!currentContract) return;
+        const sections = currentContract.contract_sections_breakdown || {};
+        const start = new Date(currentContract.contract_start);
+        const end = new Date(currentContract.contract_end);
+        const today = new Date();
+
+        // LOGIK PENGIRAAN BULAN
+        const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
+        let monthsElapsed = (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()) + 1;
+        monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
+
+        document.getElementById('fullSectionList').innerHTML = Object.keys(sections).sort().map(s => `
+            <span class="sel-chip ${selectedSections.includes(s) ? 'active' : ''}" onclick="toggleSection('${s}')">${s}</span>
+        `).join('');
+
+        const mainContainer = document.getElementById('selectedSectionContainer');
+        mainContainer.innerHTML = '';
+
+        selectedSections.sort().forEach(s => {
+            if(!sections[s]) return;
+            let used = 0;
+            currentWO.forEach(wo => { if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; });
+
+            const budget = sections[s].amt || 0; 
+            const plannedTotalToDate = (budget / totalMonths) * monthsElapsed;
+            const variance = used - plannedTotalToDate;
+            const variancePercent = (variance / plannedTotalToDate) * 100 || 0;
+            const color = used > plannedTotalToDate ? 'var(--ios-red)' : 'var(--ios-green)';
+            const progressPercent = (used / budget) * 100 || 0;
+
+            mainContainer.innerHTML += `
+                <div class="section-row">
+                    <div style="display:flex; justify-content:space-between; align-items:start;">
+                        <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">${s}: ${sections[s].desc || s}</div>
+                        <i class="fa fa-times-circle" style="color:#ccc; cursor:pointer;" onclick="toggleSection('${s}')"></i>
+                    </div>
+                    <div class="avg-stats">
+                        <div class="avg-item">BUDGET: RM ${budget.toLocaleString()}</div>
+                        <div class="avg-item" style="color: #8e8e93;">PLANNED: RM ${plannedTotalToDate.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
+                    </div>
+                    <div class="avg-stats">
+                        <div class="avg-item">ACTUAL: RM ${used.toLocaleString()}</div>
+                        <div class="avg-item" style="color: ${color};">VARIANCE: ${variancePercent > 0 ? '+' : ''}${variancePercent.toFixed(1)}%</div>
+                    </div>
+                    <div class="prog-bar-bg">
+                        <div class="prog-bar-fill" data-width="${Math.min(100, progressPercent)}%" style="background:${color}"></div>
+                    </div>
+                </div>
+            `;
+        });
+
+        updateChart();
+        setTimeout(() => {
+            document.querySelectorAll('.prog-bar-fill').forEach(bar => {
+                bar.style.setProperty('width', bar.getAttribute('data-width'), 'important');
+            });
+        }, 100);
+    }
+
+    function updateChart() {
+        if (!currentContract) return;
+        const sections = currentContract.contract_sections_breakdown || {};
+        const start = new Date(currentContract.contract_start);
+        const end = new Date(currentContract.contract_end);
+        const today = new Date();
+        
+        const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
+        let monthsElapsed = (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()) + 1;
+        monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
+
+        let labels = [], targetAvgData = [], actualAvgData = [];
+        selectedSections.sort().forEach(s => {
+            labels.push(s); 
+            targetAvgData.push((sections[s]?.amt / totalMonths).toFixed(2));
+            let used = 0;
+            currentWO.forEach(wo => { if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; });
+            actualAvgData.push((used / monthsElapsed).toFixed(2));
+        });
+
+        if (myChart) {
+            myChart.data.labels = labels;
+            myChart.data.datasets[0].data = targetAvgData;
+            myChart.data.datasets[1].data = actualAvgData;
+            myChart.update(); 
+        } else {
+            const ctx = document.getElementById('healthChart').getContext('2d');
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Planned', data: targetAvgData, backgroundColor: 'rgba(200, 200, 205, 0.5)', borderRadius: 5 },
+                        { label: 'Actual', data: actualAvgData, backgroundColor: '#007AFF', borderRadius: 5 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { position: 'top', labels: { font: { size: 10, weight: 'bold' } } },
+                        datalabels: { anchor: 'end', align: 'top', font: { size: 9, weight: 'bold' }, formatter: (v) => v > 0 ? `RM${Math.round(v).toLocaleString()}` : '' }
+                    },
+                    scales: { y: { beginAtZero: true }, x: { ticks: { font: { size: 10, weight: 'bold' }, maxRotation: 45, minRotation: 45 } } }
+                }
+            });
+        }
+    }
+
+    function toggleSelector() {
+        const el = document.getElementById('sectionSelector');
+        el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    async function toggleSection(s) {
+        if(selectedSections.includes(s)) selectedSections = selectedSections.filter(x => x !== s);
+        else selectedSections.push(s);
+        renderUI();
+        await fetch(`${SB_URL}/rest/v1/contract?id=eq.${currentContract.id}`, {
+            method: 'PATCH',
+            headers: headers,
+            body: JSON.stringify({ selected_sections: selectedSections })
+        });
+    }
+</script>
 </body>
 </html>
