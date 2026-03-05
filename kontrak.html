@@ -189,7 +189,14 @@
                     <tbody id="i_work_tbody"></tbody>
                 </table>
                 
-                <div id="i_total_display" style="margin-top:15px; text-align:right; font-weight:bold; color:var(--ios-orange); font-size: 16px;">Jumlah Claim: RM 0.00</div>
+                <div id="i_section_summary" style="margin-top: 15px; padding: 12px; background: rgba(255,255,255,0.3); border: 1px dashed var(--ios-orange); border-radius: 12px; font-size: 12px; display: none;">
+                <strong style="color: #333; display: block; margin-bottom: 5px;"><i class="fa fa-list-ul"></i> Pecahan Kos Mengikut Section:</strong>
+                <div id="summary_list"></div>
+                </div>
+
+                <div id="i_total_display" style="margin-top:15px; text-align:right; font-weight:bold; color:var(--ios-orange); font-size: 18px; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 10px;">
+                Jumlah Claim: RM 0.00
+                </div>
 
                 <button onclick="submitInterim()" id="btn_submit_interim" class="btn-primary" style="background:var(--ios-orange); margin-top:20px;">Hantar & Rekod Interim</button>
             </div>
@@ -479,14 +486,52 @@
 }
 
     function calcInterimGrandTotal() {
-        let grandTotal = 0;
-        document.querySelectorAll('#i_work_tbody tr').forEach(row => {
-            const breakdown = JSON.parse(row.dataset.breakdown);
-            grandTotal += Object.values(breakdown).reduce((a, b) => a + b, 0);
+    let grandTotal = 0;
+    const sectionTotals = {}; // Objek untuk simpan jumlah terkumpul
+    const summaryDiv = document.getElementById('i_section_summary');
+    const summaryList = document.getElementById('summary_list');
+    
+    // 1. Scan setiap baris dalam table
+    const rows = document.querySelectorAll('#i_work_tbody tr');
+    
+    rows.forEach(row => {
+        if (!row.dataset.breakdown) return;
+        const breakdown = JSON.parse(row.dataset.breakdown);
+        
+        for (const [sec, amt] of Object.entries(breakdown)) {
+            const value = parseFloat(amt) || 0;
+            grandTotal += value;
+            
+            // Masukkan ke dalam kategori section masing-masing
+            sectionTotals[sec] = (sectionTotals[sec] || 0) + value;
+        }
+    });
+
+    // 2. Papar rumusan jika ada data
+    if (grandTotal > 0) {
+        summaryDiv.style.display = 'block';
+        summaryList.innerHTML = '';
+        
+        // Susun section A, B, C...
+        Object.keys(sectionTotals).sort().forEach(sec => {
+            if (sectionTotals[sec] > 0) {
+                summaryList.innerHTML += `
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); padding: 4px 0;">
+                        <span>${sec}</span>
+                        <span style="font-weight: 700;">RM ${sectionTotals[sec].toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                    </div>`;
+            }
         });
-        document.getElementById('i_total_display').innerText = `Jumlah Claim: RM ${grandTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+    } else {
+        summaryDiv.style.display = 'none';
     }
 
+    // 3. Kemaskini Grand Total di bawah sekali
+    document.getElementById('i_total_display').innerHTML = `
+        <span style="font-size: 12px; color: #666; font-weight: normal;">Grand Total:</span><br>
+        RM ${grandTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}
+    `;
+}
     async function submitInterim() {
         const cId = document.getElementById('i_contract_id').value;
         const iNo = document.getElementById('i_no').value;
