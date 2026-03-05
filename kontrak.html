@@ -452,23 +452,14 @@
     }
 
     function addWorkOrdersToList() {
-    const area = document.getElementById('i_paste_area');
-    
-    // 1. Pecahkan input berdasarkan baris baru, koma, atau tab
-    const rawIds = area.value.split(/\r?\n|,|\t/);
-    
-    // 2. "Clean" ID: Buang semua jarak (spaces) di tengah atau hujung
-    // Contoh: "C 123 456" akan jadi "C123456"
-    const cleanIds = rawIds
-        .map(id => id.replace(/\s+/g, '').toUpperCase()) // Buang semua space & tukar ke UpperCase
-        .filter(id => id !== "" && !attachedWorkOrders.includes(id));
-    
-    // 3. Masukkan ke dalam senarai global
-    attachedWorkOrders = [...attachedWorkOrders, ...cleanIds];
-    
-    area.value = '';
-    renderIDTags();
-}
+        const area = document.getElementById('i_paste_area');
+        const rawIds = area.value.split(/\r?\n|,|\t/);
+        const cleanIds = rawIds.map(s => s.trim()).filter(s => s !== "" && !attachedWorkOrders.includes(s));
+        
+        attachedWorkOrders = [...attachedWorkOrders, ...cleanIds];
+        area.value = '';
+        renderIDTags();
+    }
 
     function renderIDTags() {
         const container = document.getElementById('i_id_list_tags');
@@ -534,21 +525,33 @@
             throw new Error("Gagal simpan Interim: " + err.message);
         }
 
-        // LANGKAH B: Jika ada ID Kerja dilampirkan, kemaskini table 'work_orders'
+        // LANGKAH B: Kemaskini table 'work_orders'
         if (attachedWorkOrders.length > 0) {
-            // Kita bina query filter: ?work_id=in.(ID1,ID2,ID3)
-            const idFilter = attachedWorkOrders.join(',');
-            
-            const resUpdateWork = await fetch(`${SB_URL}/rest/v1/work_orders?work_id=in.(${idFilter})`, {
-                method: 'PATCH',
-                headers,
-                body: JSON.stringify({ interim_no: parseInt(iNo) }) // Link-kan ke interim_no
-            });
+    
+        // Kita "transform" ID yang ditaip rapat supaya ada jarak ikut format DB
+        // Contoh: "C123456" -> "C 123456"
+        const formattedIds = attachedWorkOrders.map(id => {
+            if (id.startsWith('C') && !id.includes(' ')) {
+               return 'C ' + id.substring(1); // Tambah jarak selepas 'C'
+       }
+        return id;
+       });
 
-            if (!resUpdateWork.ok) {
-                console.warn("Interim disimpan, tetapi gagal mengemaskini Work Orders.");
-            }
-        }
+       // Gabungkan senarai ID untuk query (C123456,C 123456)
+       // Kita cari kedua-dua versi (rapat & jarak) untuk 100% selamat
+       const allVersions = [...attachedWorkOrders, ...formattedIds];
+       const idFilter = allVersions.join(',');
+
+       const resUpdateWork = await fetch(`${SB_URL}/rest/v1/work_orders?work_id=in.(${idFilter})`, {
+         method: 'PATCH',
+         headers,
+         body: JSON.stringify({ interim_no: parseInt(iNo) })
+       });
+
+    if (!resUpdateWork.ok) {
+        console.warn("Gagal kemaskini Work Orders.");
+    }
+}
 
         alert(`Interim No.${iNo} berjaya direkod dan Work Orders telah dikemaskini.`);
         location.reload();
