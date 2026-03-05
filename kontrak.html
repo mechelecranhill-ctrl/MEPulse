@@ -527,32 +527,38 @@
 
             if (!resInterim.ok) throw new Error("Gagal simpan Interim.");
 
-            // 2. Link Work Orders (LOGIK BARU YANG LEBIH SELAMAT)
+            // 2. Link Work Orders (VERSI STABIL & SELAMAT)
 if (attachedWorkOrders.length > 0) {
+    console.log("Memulakan proses kemaskini Work Orders...");
+
     for (let id of attachedWorkOrders) {
-        // Bersihkan ID: Buang ruang kosong sahaja
+        // A. Bersihkan ID daripada sebarang simbol pelik
         const cleanId = id.trim();
         
-        // Gunakan encodeURIComponent supaya simbol % tidak dianggap sebagai kod sistem
-        // Kita gunakan format ilike.*teks* untuk pencarian fleksibel
-        const searchParam = encodeURIComponent(`*${cleanId}*`);
+        // B. Gunakan simbol * sebagai wildcard untuk Supabase (elakkan guna %)
+        // Ini akan mencari ID yang MENGANDUNGI cleanId tersebut
+        const searchPattern = `*${cleanId}*`;
 
         try {
-            const resUpdate = await fetch(
-                `${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=ilike.${searchParam}`, 
-                {
-                    method: 'PATCH',
-                    headers: headers, // Pastikan headers mengandungi API Key & Content-Type
-                    body: JSON.stringify({ interim_no: iNo })
-                }
-            );
+            // C. Bina URL dengan searchPattern yang selamat
+            const updateUrl = `${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=ilike.${encodeURIComponent(searchPattern)}`;
+
+            const resUpdate = await fetch(updateUrl, {
+                method: 'PATCH',
+                headers: headers,
+                body: JSON.stringify({ 
+                    interim_no: iNo 
+                })
+            });
 
             if (!resUpdate.ok) {
-                const errLog = await resUpdate.json();
-                console.warn(`Gagal link ID: ${id}`, errLog);
+                const errorText = await resUpdate.text();
+                console.error(`Gagal kemaskini ID: ${cleanId}. Status: ${resUpdate.status}`, errorText);
+            } else {
+                console.log(`Berjaya kemaskini ID: ${cleanId}`);
             }
         } catch (e) {
-            console.error(`Ralat semasa mengemaskini ID ${id}:`, e);
+            console.error(`Ralat Network untuk ID ${cleanId}:`, e);
         }
     }
 }
