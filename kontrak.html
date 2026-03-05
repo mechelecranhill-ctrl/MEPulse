@@ -502,40 +502,53 @@
         claimBreakdown[input.dataset.sec] = parseFloat(input.value) || 0;
     });
 
-    // Menukar Array [C1, C2] kepada String "C1, C2"
-    const workOrdersString = attachedWorkOrders.join(', ');
-
-    const payload = {
+    // 1. Payload untuk Table Interims (Buang work_id dari sini)
+    const interimPayload = {
         contract_id: cId,
         interim_no: parseInt(iNo),
         date_received: iDate,
         salvage_value: salvage,
-        work_id: workOrdersString,    // PASTIKAN NAMA INI SAMA DENGAN DI SUPABASE
-        claim_breakdown: claimBreakdown, // Kolum ini MESTI jenis jsonb
-        net_amount: calcInterimManualTotal() // PASTIKAN NAMA INI SAMA DENGAN DI SUPABASE
+        claim_breakdown: claimBreakdown,
+        net_amount: calcInterimManualTotal()
     };
 
     try {
-        const res = await fetch(`${SB_URL}/rest/v1/interims`, { 
+        // LANGKAH A: Simpan data ke table 'interims'
+        const resInterim = await fetch(`${SB_URL}/rest/v1/interims`, { 
             method: 'POST', 
             headers, 
-            body: JSON.stringify(payload) 
+            body: JSON.stringify(interimPayload) 
         });
-        
-        if(res.ok) {
-            alert(`Interim No.${iNo} berjaya direkod.`);
-            location.reload();
-        } else {
-            // Ini akan mencetak ralat spesifik dari Supabase di Console F12
-            const errorData = await res.json();
-            console.error("Ralat Supabase:", errorData);
-            alert("Gagal: " + errorData.message);
+
+        if (!resInterim.ok) {
+            const err = await resInterim.json();
+            throw new Error("Gagal simpan Interim: " + err.message);
         }
+
+        // LANGKAH B: Jika ada ID Kerja dilampirkan, kemaskini table 'work_orders'
+        if (attachedWorkOrders.length > 0) {
+            // Kita bina query filter: ?work_id=in.(ID1,ID2,ID3)
+            const idFilter = attachedWorkOrders.join(',');
+            
+            const resUpdateWork = await fetch(`${SB_URL}/rest/v1/work_orders?work_id=in.(${idFilter})`, {
+                method: 'PATCH',
+                headers,
+                body: JSON.stringify({ interim_no: parseInt(iNo) }) // Link-kan ke interim_no
+            });
+
+            if (!resUpdateWork.ok) {
+                console.warn("Interim disimpan, tetapi gagal mengemaskini Work Orders.");
+            }
+        }
+
+        alert(`Interim No.${iNo} berjaya direkod dan Work Orders telah dikemaskini.`);
+        location.reload();
+
     } catch (err) {
-        console.error("Ralat Network:", err);
+        console.error(err);
+        alert(err.message);
     }
 }
-
     // --- VO LOGIC ---
     function onVOContractSelect() {
         const opt = document.getElementById('vo_contract_id').selectedOptions[0];
