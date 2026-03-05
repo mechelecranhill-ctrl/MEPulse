@@ -491,7 +491,7 @@
 
    async function submitInterim() {
     const cId = document.getElementById('i_contract_id').value;
-    const iNo = document.getElementById('i_no').value;
+    const iNo = parseInt(document.getElementById('i_no').value);
     const iDate = document.getElementById('i_date_received').value;
     const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
 
@@ -502,10 +502,9 @@
         claimBreakdown[input.dataset.sec] = parseFloat(input.value) || 0;
     });
 
-    // 1. Payload untuk Table Interims (Buang work_id dari sini)
     const interimPayload = {
         contract_id: cId,
-        interim_no: parseInt(iNo),
+        interim_no: iNo,
         date_received: iDate,
         salvage_value: salvage,
         claim_breakdown: claimBreakdown,
@@ -513,47 +512,36 @@
     };
 
     try {
-        // LANGKAH A: Simpan data ke table 'interims'
+        // 1. Simpan rekod ke table 'interims'
         const resInterim = await fetch(`${SB_URL}/rest/v1/interims`, { 
             method: 'POST', 
-            headers, 
+            headers: { ...headers, 'Prefer': 'resolution=merge-duplicates' }, 
             body: JSON.stringify(interimPayload) 
         });
 
-        if (!resInterim.ok) {
-            const err = await resInterim.json();
-            throw new Error("Gagal simpan Interim: " + err.message);
+        if (!resInterim.ok) throw new Error("Gagal simpan data Interim.");
+
+        // 2. KEMASKINI WORK ORDERS (Bahagian Kritikal)
+        if (attachedWorkOrders.length > 0) {
+            for (let id of attachedWorkOrders) {
+                // Buang jarak untuk carian fleksibel (C123 -> %C%123%)
+                const searchPattern = `%${id.replace(/\s+/g, '')}%`;
+
+                // Kita kemaskini work_orders yang mempunyai ID yang mirip DAN contract_id yang sama
+                const resUpdate = await fetch(
+                    `${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=ilike.${searchPattern}`, 
+                    {
+                        method: 'PATCH',
+                        headers,
+                        body: JSON.stringify({ interim_no: iNo })
+                    }
+                );
+
+                if (!resUpdate.ok) console.warn(`Gagal link ID: ${id}`);
+            }
         }
 
-        // LANGKAH B: Kemaskini table 'work_orders'
-        if (attachedWorkOrders.length > 0) {
-    
-        // Kita "transform" ID yang ditaip rapat supaya ada jarak ikut format DB
-        // Contoh: "C123456" -> "C 123456"
-        const formattedIds = attachedWorkOrders.map(id => {
-            if (id.startsWith('C') && !id.includes(' ')) {
-               return 'C ' + id.substring(1); // Tambah jarak selepas 'C'
-       }
-        return id;
-       });
-
-       // Gabungkan senarai ID untuk query (C123456,C 123456)
-       // Kita cari kedua-dua versi (rapat & jarak) untuk 100% selamat
-       const allVersions = [...attachedWorkOrders, ...formattedIds];
-       const idFilter = allVersions.join(',');
-
-       const resUpdateWork = await fetch(`${SB_URL}/rest/v1/work_orders?work_id=in.(${idFilter})`, {
-         method: 'PATCH',
-         headers,
-         body: JSON.stringify({ interim_no: parseInt(iNo) })
-       });
-
-    if (!resUpdateWork.ok) {
-        console.warn("Gagal kemaskini Work Orders.");
-    }
-}
-
-        alert(`Interim No.${iNo} berjaya direkod dan Work Orders telah dikemaskini.`);
+        alert(`Interim No.${iNo} berjaya. ${attachedWorkOrders.length} ID telah cuba di-link.`);
         location.reload();
 
     } catch (err) {
