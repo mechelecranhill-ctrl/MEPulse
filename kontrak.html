@@ -98,7 +98,7 @@
             color: white;
         }
 
-        .page { display: none; width: 100%; justify-content: center; flex-direction: column; align-items: center; } 
+        .page { display: none; width: 100%; justify-content: center; } 
         .page.active { display: flex; animation: fadeIn 0.4s ease; }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -110,6 +110,8 @@
         .excel-table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; font-size: 11px; margin-top: 10px; }
         .excel-table th { background: #f1f1f1; padding: 8px; text-align: left; }
         .excel-table td { padding: 8px; border-bottom: 1px solid #eee; }
+        
+        .funding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(255,255,255,0.2); padding: 10px; border-radius: 12px; }
         
         .balance-badge {
             display: flex; justify-content: space-between; padding: 10px 12px;
@@ -142,46 +144,6 @@
     </div>
 
     <div class="main-content">
-        
-        <div id="registerWorkPage" class="page">
-            <div class="glass-card">
-                <h3><i class="fa-solid fa-file-pen"></i> Pendaftaran Work Order</h3>
-                <label>Pilih Kontrak</label>
-                <select id="w_contract_id" onchange="loadBQForWO()"><option value="">Pilih Kontrak</option></select>
-                
-                <label>ID Kerja (Contoh: C 123456)</label>
-                <input type="text" id="w_id" placeholder="Masukkan ID Kerja">
-                
-                <div id="wo_sections_input">
-                    </div>
-                
-                <button onclick="saveWorkOrder()" class="btn-primary">Simpan Work Order</button>
-            </div>
-        </div>
-
-        <div id="adminPage" class="page">
-            <div class="glass-card">
-                <h3><i class="fa-solid fa-file-contract"></i> Kontrak Baru</h3>
-                <label>Kod Kontrak</label>
-                <input type="text" id="c_code" placeholder="Contoh: JKR/ME/2024...">
-                
-                <label>Nama Kontrak</label>
-                <textarea id="c_name" rows="2"></textarea>
-
-                <div id="bq_sections_area">
-                    <label>Pecahan BQ (Section)</label>
-                    <div style="display:flex; gap:5px; margin-bottom:10px;">
-                        <input type="text" id="bq_sec_name" placeholder="Nama Sec (cth: A)">
-                        <input type="number" id="bq_sec_val" placeholder="Nilai (RM)">
-                        <button onclick="addBQSection()" style="width:50px; border-radius:10px; border:none; background:var(--ios-green); color:white;">+</button>
-                    </div>
-                    <ul id="bq_list_ui" style="font-size:12px; background:rgba(255,255,255,0.3); border-radius:10px; padding:10px;"></ul>
-                </div>
-
-                <button onclick="saveContract()" class="btn-primary">Daftar Kontrak</button>
-            </div>
-        </div>
-
         <div id="interimPage" class="page">
             <div class="glass-card">
                 <h3><i class="fa-solid fa-file-invoice-dollar"></i> Interim Claim (Virtual)</h3>
@@ -193,8 +155,8 @@
                     <div><label>Tarikh</label><input type="date" id="i_date_received"></div>
                 </div>
 
-                <label>Tampal ID Kerja (Bulk Paste)</label>
-                <textarea id="i_paste_area" rows="3" placeholder="Tampal ID Kerja dari Excel di sini..."></textarea>
+                <label>Tampal ID Kerja (Auto-format C 123456)</label>
+                <textarea id="i_paste_area" rows="3" placeholder="Contoh: C123456 atau C 123456"></textarea>
                 <button type="button" class="btn-primary" onclick="processExcelPaste()">Cari & Masukkan ID</button>
                 
                 <table class="excel-table">
@@ -204,7 +166,9 @@
 
                 <div id="virtual_dashboard" style="margin-top:20px; padding:15px; background:rgba(255,255,255,0.5); border-radius:15px;">
                     <label style="margin-bottom:10px;">Ringkasan Baki Peruntukan (Virtual)</label>
-                    <div id="balance_list"></div>
+                    <div id="balance_list">
+                        <p style="font-size:11px; color:#666;">Pilih kontrak untuk melihat baki...</p>
+                    </div>
                 </div>
                 
                 <div id="i_total_display" style="margin-top:15px; text-align:right; font-weight:bold; color:var(--ios-orange); font-size: 16px;">Jumlah Claim: RM 0.00</div>
@@ -212,33 +176,15 @@
             </div>
         </div>
 
-        <div id="voPage" class="page">
-            <div class="glass-card">
-                <h3><i class="fa-solid fa-triangle-exclamation"></i> Variation Order (VO)</h3>
-                <label>Pilih Kontrak</label>
-                <select id="v_contract_id"><option value="">Pilih Kontrak</option></select>
-                
-                <label>Nama/No. VO</label>
-                <input type="text" id="v_title" placeholder="Contoh: VO No. 1">
-                
-                <label>Pilih Section BQ yang terlibat</label>
-                <select id="v_sec_target"></select>
-
-                <label>Amaun Tambahan (RM)</label>
-                <input type="number" id="v_amt" placeholder="0.00">
-
-                <button onclick="saveVO()" class="btn-primary" style="background:var(--ios-red);">Tambah VO</button>
-            </div>
-        </div>
-
+        <div id="registerWorkPage" class="page"><div class="glass-card"><h3>Pendaftaran Work Order</h3><p>Sila rujuk modul pendaftaran ID Kerja.</p></div></div>
+        <div id="voPage" class="page"><div class="glass-card"><h3>Variation Order (VO)</h3></div></div>
+        <div id="adminPage" class="page"><div class="glass-card"><h3>Pendaftaran Kontrak</h3></div></div>
     </div>
 
 <script>
     const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
     const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
     const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
-
-    let tempBQ = {};
 
     function initApp() {
         showPage('interimPage', document.getElementById('menu_interimPage'));
@@ -250,109 +196,70 @@
         document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
         document.getElementById(id).classList.add('active');
         if(el) el.classList.add('active');
-        if(id === 'voPage') loadVOSections();
     }
 
-    // --- LOGIK KONTRAK ---
-    function addBQSection() {
-        const sec = document.getElementById('bq_sec_name').value.toUpperCase();
-        const val = parseFloat(document.getElementById('bq_sec_val').value);
-        if(!sec || isNaN(val)) return;
-        tempBQ[sec] = { val: val, desc: "Section " + sec };
-        renderBQList();
-    }
-
-    function renderBQList() {
-        const list = document.getElementById('bq_list_ui');
-        list.innerHTML = '';
-        for(let s in tempBQ) list.innerHTML += `<li>Section ${s}: RM ${tempBQ[s].val.toLocaleString()}</li>`;
-    }
-
-    async function saveContract() {
-        const code = document.getElementById('c_code').value;
-        const name = document.getElementById('c_name').value;
-        if(!code || Object.keys(tempBQ).length === 0) return alert("Lengkapkan maklumat kontrak!");
-
-        const res = await fetch(`${SB_URL}/rest/v1/contract`, {
-            method: 'POST', headers,
-            body: JSON.stringify({ contract_code: code, contract_name: name, contract_sections_breakdown: tempBQ })
-        });
-        if(res.ok) { alert("Kontrak Berjaya!"); location.reload(); }
-    }
-
-    // --- LOGIK WORK ORDER ---
-    async function loadBQForWO() {
-        const cId = document.getElementById('w_contract_id').value;
-        const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { headers });
-        const data = await res.json();
-        const bq = data[0].contract_sections_breakdown;
-        const container = document.getElementById('wo_sections_input');
-        container.innerHTML = '<label>Amaun Mengikut Section</label>';
-        for(let s in bq) {
-            container.innerHTML += `<div style="margin-bottom:5px;">${s}: <input type="number" class="wo-sec-input" data-sec="${s}" value="0"></div>`;
-        }
-    }
-
-    async function saveWorkOrder() {
-        const cId = document.getElementById('w_contract_id').value;
-        const wId = document.getElementById('w_id').value;
-        const cost = {};
-        document.querySelectorAll('.wo-sec-input').forEach(i => cost[i.dataset.sec] = parseFloat(i.value) || 0);
-
-        const res = await fetch(`${SB_URL}/rest/v1/work_orders`, {
-            method: 'POST', headers,
-            body: JSON.stringify({ contract_id: cId, work_id: wId, cost_breakdown: cost })
-        });
-        if(res.ok) alert("Work Order Berjaya!");
-    }
-
-    // --- LOGIK INTERIM (Sama seperti sebelum ini) ---
     async function loadContracts() {
         const res = await fetch(`${SB_URL}/rest/v1/contract?select=*`, { headers });
         const data = await res.json();
-        const selectors = ['i_contract_id', 'w_contract_id', 'v_contract_id'];
-        selectors.forEach(s => {
-            const el = document.getElementById(s);
-            el.innerHTML = '<option value="">Pilih Kontrak</option>';
-            data.forEach(c => el.innerHTML += `<option value="${c.id}">${c.contract_code}</option>`);
-        });
+        const drop2 = document.getElementById('i_contract_id');
+        drop2.innerHTML = '<option value="">Pilih Kontrak</option>';
+        data.forEach(c => drop2.innerHTML += `<option value="${c.id}">${c.contract_code}</option>`);
+    }
+
+    function formatWorkID(id) {
+        let clean = id.replace(/\s/g, '').toUpperCase();
+        if (clean.startsWith('C') && !clean.includes(' ')) {
+            return 'C ' + clean.substring(1);
+        }
+        return clean;
     }
 
     async function processExcelPaste() {
         const cId = document.getElementById('i_contract_id').value;
         const rawText = document.getElementById('i_paste_area').value;
-        const rawIDs = rawText.split(/[\n\t, ]+/).map(s => s.trim()).filter(s => s !== "");
-        const formattedIDs = rawIDs.map(id => {
-             let clean = id.replace(/\s/g, '').toUpperCase();
-             return (clean.startsWith('C') && clean.length > 1) ? 'C ' + clean.substring(1) : clean;
-        });
-        const idQuery = `("${formattedIDs.join('","')}")`;
-        const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=in.${idQuery}`, { headers });
-        const data = await res.json();
-        data.forEach(work => {
-            if (document.querySelector(`tr[data-id="${work.work_id}"]`)) return;
-            const total = Object.values(work.cost_breakdown).reduce((a, b) => a + b, 0);
-            const row = document.getElementById('i_work_tbody').insertRow();
-            row.dataset.id = work.work_id;
-            row.dataset.breakdown = JSON.stringify(work.cost_breakdown);
-            row.innerHTML = `<td>${work.work_id}</td><td>✅ Ready</td><td>RM ${total.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
-                             <td><i class="fa fa-trash" style="color:red; cursor:pointer;" onclick="this.parentElement.parentElement.remove(); refreshVirtualBalance();"></i></td>`;
-        });
+        if(!cId) return alert("Pilih kontrak dahulu!");
+
+        const IDs = rawText.split(/[\n, \t]+/).map(s => formatWorkID(s.trim())).filter(s => s !== "");
+        
+        for (const workId of IDs) {
+            const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=eq.${workId}`, { headers });
+            const data = await res.json();
+
+            if (data.length > 0) {
+                const work = data[0];
+                if (document.querySelector(`tr[data-id="${work.work_id}"]`)) continue;
+
+                const total = Object.values(work.cost_breakdown).reduce((a, b) => a + b, 0);
+                const row = document.getElementById('i_work_tbody').insertRow();
+                row.dataset.id = work.work_id;
+                row.dataset.breakdown = JSON.stringify(work.cost_breakdown);
+                row.innerHTML = `<td>${work.work_id}</td><td>✅ Ready</td><td>RM ${total.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+                                 <td><i class="fa fa-trash" style="color:red; cursor:pointer;" onclick="this.parentElement.parentElement.remove(); refreshVirtualBalance();"></i></td>`;
+            }
+        }
+        document.getElementById('i_paste_area').value = '';
         refreshVirtualBalance();
     }
 
     async function refreshVirtualBalance() {
         const cId = document.getElementById('i_contract_id').value;
         if(!cId) return;
+
+        // 1. Ambil Data Kontrak (BQ & VO)
         const resC = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { headers });
         const contract = (await resC.json())[0];
         const bq = contract.contract_sections_breakdown;
         const vo = contract.vo_breakdown || {};
+
+        // 2. Ambil Semua Interim Lepas
         const resI = await fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${cId}`, { headers });
         const pastInterims = await resI.json();
+
+        // 3. Ambil Semua Work Orders (untuk cari yang belum di-claim)
         const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}`, { headers });
         const allWorkOrders = await resW.json();
 
+        // 4. Kenalpasti WO yang ada dalam table Claim Semasa
         const currentClaimIDs = [];
         const currentClaimBreakdown = {};
         document.querySelectorAll('#i_work_tbody tr').forEach(row => {
@@ -361,41 +268,86 @@
             for(let sec in b) currentClaimBreakdown[sec] = (currentClaimBreakdown[sec] || 0) + b[sec];
         });
 
+        // 5. Render Dashboard
         const listDiv = document.getElementById('balance_list');
         listDiv.innerHTML = '';
+        let grandTotalClaim = 0;
+
         for (let sec in bq) {
-            let totalLimit = bq[sec].val + (vo[sec] || 0);
-            let usedInterim = 0;
-            pastInterims.forEach(i => usedInterim += (i.claim_breakdown[sec] || 0));
-            let unclaimed = 0;
-            allWorkOrders.forEach(wo => {
-                if(!pastInterims.some(i => i.work_order_ids.includes(wo.work_id)) && !currentClaimIDs.includes(wo.work_id))
-                    unclaimed += (wo.cost_breakdown[sec] || 0);
+            let totalAsal = bq[sec].val;
+            let totalVO = 0;
+            for(let v in vo) { if(vo[v].sec === sec) totalVO += vo[v].amt; }
+            
+            // A. Tolak Interim Lepas
+            let totalInterimLepas = 0;
+            pastInterims.forEach(interim => {
+                totalInterimLepas += (interim.claim_breakdown[sec] || 0);
             });
-            let skrg = (currentClaimBreakdown[sec] || 0);
-            let baki = totalLimit - usedInterim - unclaimed - skrg;
+
+            // B. Tolak Unclaimed WO (Work Order yang wujud tapi bukan dalam interim lepas & bukan dalam table sekarang)
+            let totalUnclaimedWO = 0;
+            allWorkOrders.forEach(wo => {
+                const isAlreadyInterim = pastInterims.some(i => i.work_order_ids.includes(wo.work_id));
+                const isInCurrentTable = currentClaimIDs.includes(wo.work_id);
+                if(!isAlreadyInterim && !isInCurrentTable) {
+                    totalUnclaimedWO += (wo.cost_breakdown[sec] || 0);
+                }
+            });
+
+            // C. Claim Semasa (Dari UI Table)
+            let claimSkrg = (currentClaimBreakdown[sec] || 0);
+            grandTotalClaim += claimSkrg;
+            
+            // FORMULA: (Asal+VO) - InterimLepas - UnclaimedWO - ClaimSkrg
+            let bakiAkhir = (totalAsal + totalVO) - totalInterimLepas - totalUnclaimedWO - claimSkrg;
+            let warnaBaki = bakiAkhir < 0 ? 'var(--ios-red)' : 'var(--ios-green)';
+
             listDiv.innerHTML += `
                 <div class="balance-badge">
-                    <span><strong>${sec}</strong></span>
-                    <span>Baki Virtual: <b style="color:${baki<0?'red':'green'}">RM ${baki.toLocaleString()}</b></span>
+                    <span>
+                        <strong>${sec}</strong><br>
+                        <small style="color:#666">${bq[sec].desc.substring(0,30)}...</small>
+                    </span>
+                    <span style="text-align:right">
+                        Baki: <b style="color:${warnaBaki}">RM ${bakiAkhir.toLocaleString(undefined,{minimumFractionDigits:2})}</b><br>
+                        <small style="font-size:9px; color:var(--ios-orange)">Terikat (Unclaimed): RM ${totalUnclaimedWO.toFixed(2)}</small>
+                    </span>
                 </div>`;
         }
+        document.getElementById('i_total_display').innerText = `Jumlah Claim Semasa: RM ${grandTotalClaim.toLocaleString(undefined,{minimumFractionDigits:2})}`;
     }
 
     async function submitInterim() {
         const cId = document.getElementById('i_contract_id').value;
+        const iNo = document.getElementById('i_no').value;
+        const iDate = document.getElementById('i_date_received').value;
+        if(!cId || !iNo || !iDate) return alert("Lengkapkan maklumat No. Interim dan Tarikh!");
+
+        const ids = [];
+        const breakdown = {};
         const rows = document.querySelectorAll('#i_work_tbody tr');
-        const ids = []; const breakdown = {};
+        if(rows.length === 0) return alert("Tiada ID Kerja untuk di-claim!");
+
         rows.forEach(row => {
             ids.push(row.dataset.id);
             const b = JSON.parse(row.dataset.breakdown);
             for(let sec in b) breakdown[sec] = (breakdown[sec] || 0) + b[sec];
         });
+
         const res = await fetch(`${SB_URL}/rest/v1/interims`, {
             method: 'POST', headers,
-            body: JSON.stringify({ contract_id: cId, interim_no: document.getElementById('i_no').value, work_order_ids: ids, claim_breakdown: breakdown })
+            body: JSON.stringify({
+                contract_id: cId, interim_no: iNo, date_received: iDate,
+                work_order_ids: ids, claim_breakdown: breakdown
+            })
         });
-        if(res.ok) location.reload();
+
+        if(res.ok) { 
+            alert("Interim Berjaya Dihantar! Baki virtual telah dikemaskini."); 
+            location.reload(); 
+        } else {
+            alert("Gagal menghantar interim. Sila cuba lagi.");
+        }
     }
 </script>
 </body>
