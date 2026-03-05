@@ -208,7 +208,7 @@
 
     function formatWorkID(id) {
         let clean = id.replace(/\s/g, '').toUpperCase();
-        if (clean.startsWith('C') && !clean.includes(' ')) {
+        if (clean.startsWith('C') && clean.length > 1) {
             return 'C ' + clean.substring(1);
         }
         return clean;
@@ -218,25 +218,39 @@
         const cId = document.getElementById('i_contract_id').value;
         const rawText = document.getElementById('i_paste_area').value;
         if(!cId) return alert("Pilih kontrak dahulu!");
+        if(!rawText.trim()) return;
 
-        const IDs = rawText.split(/[\n, \t]+/).map(s => formatWorkID(s.trim())).filter(s => s !== "");
+        // 1. Pecahkan text paste (NewLine, Tab, Space, Koma) kepada Array ID
+        const rawIDs = rawText.split(/[\n\t, ]+/).map(s => s.trim()).filter(s => s !== "");
+        const formattedIDs = rawIDs.map(id => formatWorkID(id));
+
+        // 2. Buat Bulk Search menggunakan operator .in() untuk kelajuan (satu request sahaja)
+        // Format query: in.("C 123","C 456")
+        const idQuery = `("${formattedIDs.join('","')}")`;
         
-        for (const workId of IDs) {
-            const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=eq.${workId}`, { headers });
+        try {
+            const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=in.${idQuery}`, { headers });
             const data = await res.json();
 
             if (data.length > 0) {
-                const work = data[0];
-                if (document.querySelector(`tr[data-id="${work.work_id}"]`)) continue;
+                data.forEach(work => {
+                    // Elakkan duplikasi dalam senarai table UI
+                    if (document.querySelector(`tr[data-id="${work.work_id}"]`)) return;
 
-                const total = Object.values(work.cost_breakdown).reduce((a, b) => a + b, 0);
-                const row = document.getElementById('i_work_tbody').insertRow();
-                row.dataset.id = work.work_id;
-                row.dataset.breakdown = JSON.stringify(work.cost_breakdown);
-                row.innerHTML = `<td>${work.work_id}</td><td>✅ Ready</td><td>RM ${total.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
-                                 <td><i class="fa fa-trash" style="color:red; cursor:pointer;" onclick="this.parentElement.parentElement.remove(); refreshVirtualBalance();"></i></td>`;
+                    const total = Object.values(work.cost_breakdown).reduce((a, b) => a + b, 0);
+                    const row = document.getElementById('i_work_tbody').insertRow();
+                    row.dataset.id = work.work_id;
+                    row.dataset.breakdown = JSON.stringify(work.cost_breakdown);
+                    row.innerHTML = `<td>${work.work_id}</td><td>✅ Ready</td><td>RM ${total.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+                                     <td><i class="fa fa-trash" style="color:red; cursor:pointer;" onclick="this.parentElement.parentElement.remove(); refreshVirtualBalance();"></i></td>`;
+                });
+            } else {
+                alert("Tiada ID padan ditemui dalam rekod kontrak ini.");
             }
+        } catch (e) {
+            console.error("Ralat bulk search:", e);
         }
+
         document.getElementById('i_paste_area').value = '';
         refreshVirtualBalance();
     }
@@ -284,7 +298,7 @@
                 totalInterimLepas += (interim.claim_breakdown[sec] || 0);
             });
 
-            // B. Tolak Unclaimed WO (Work Order yang wujud tapi bukan dalam interim lepas & bukan dalam table sekarang)
+            // B. Tolak Unclaimed WO
             let totalUnclaimedWO = 0;
             allWorkOrders.forEach(wo => {
                 const isAlreadyInterim = pastInterims.some(i => i.work_order_ids.includes(wo.work_id));
@@ -294,11 +308,10 @@
                 }
             });
 
-            // C. Claim Semasa (Dari UI Table)
+            // C. Claim Semasa
             let claimSkrg = (currentClaimBreakdown[sec] || 0);
             grandTotalClaim += claimSkrg;
             
-            // FORMULA: (Asal+VO) - InterimLepas - UnclaimedWO - ClaimSkrg
             let bakiAkhir = (totalAsal + totalVO) - totalInterimLepas - totalUnclaimedWO - claimSkrg;
             let warnaBaki = bakiAkhir < 0 ? 'var(--ios-red)' : 'var(--ios-green)';
 
