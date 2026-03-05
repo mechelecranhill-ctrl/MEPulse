@@ -527,38 +527,31 @@
 
             if (!resInterim.ok) throw new Error("Gagal simpan Interim.");
 
-            // 2. Link Work Orders (VERSI STABIL & SELAMAT)
-if (attachedWorkOrders.length > 0) {
-    console.log("Memulakan proses kemaskini Work Orders...");
+            // 2. Link Work Orders
+            if (attachedWorkOrders.length > 0) {
+                for (let id of attachedWorkOrders) {
+                    const cleanId = id.trim();
+                    const searchPattern = `*${cleanId}*`;
+                    const updateUrl = `${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=ilike.${encodeURIComponent(searchPattern)}`;
 
-    for (let id of attachedWorkOrders) {
-        // A. Bersihkan ID daripada sebarang simbol pelik
-        const cleanId = id.trim();
-        
-        // B. Gunakan simbol * sebagai wildcard untuk Supabase (elakkan guna %)
-        // Ini akan mencari ID yang MENGANDUNGI cleanId tersebut
-        const searchPattern = `*${cleanId}*`;
-
-        try {
-            // C. Bina URL dengan searchPattern yang selamat
-            const updateUrl = `${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=ilike.${encodeURIComponent(searchPattern)}`;
-
-            const resUpdate = await fetch(updateUrl, {
-                method: 'PATCH',
-                headers: headers,
-                body: JSON.stringify({ 
-                    interim_no: iNo 
-                })
-            });
-
-            if (!resUpdate.ok) {
-                const errorText = await resUpdate.text();
-                console.error(`Gagal kemaskini ID: ${cleanId}. Status: ${resUpdate.status}`, errorText);
-            } else {
-                console.log(`Berjaya kemaskini ID: ${cleanId}`);
+                    try {
+                        await fetch(updateUrl, {
+                            method: 'PATCH',
+                            headers: headers,
+                            body: JSON.stringify({ interim_no: iNo })
+                        });
+                    } catch (e) {
+                        console.error(`Ralat update ID ${cleanId}:`, e);
+                    }
+                }
             }
-        } catch (e) {
-            console.error(`Ralat Network untuk ID ${cleanId}:`, e);
+            
+            alert("Interim berjaya direkodkan!");
+            location.reload();
+
+        } catch (err) {
+            console.error(err);
+            alert("Ralat simpan interim: " + err.message);
         }
     }
 
@@ -602,7 +595,6 @@ if (attachedWorkOrders.length > 0) {
             console.error(e);
         }
     }
- }
 </script>
 </body>
 </html>
