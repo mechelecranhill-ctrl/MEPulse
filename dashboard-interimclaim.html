@@ -140,8 +140,8 @@
             display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); 
             z-index: 3000; align-items: center; justify-content: center;
         }
-        .modal-box { background: white; width: 500px; padding: 25px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
-        .modal-row { margin-bottom: 15px; display: grid; grid-template-columns: 30px 1fr 1fr; gap: 10px; align-items: center; }
+        .modal-box { background: white; width: 600px; padding: 25px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); max-height: 80vh; overflow-y: auto; }
+        .modal-row { margin-bottom: 10px; display: grid; grid-template-columns: 1fr 1fr 40px; gap: 10px; align-items: center; }
         .modal-row input { padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; }
 
         #blueformPage {
@@ -165,9 +165,9 @@
             padding: 1.5cm 2cm; 
             position: relative; 
             box-shadow: 0 0 50px rgba(0,0,0,0.5); 
-            font-size: 11.5px; 
+            font-size: 11px; 
             color: black; 
-            line-height: 1.35;
+            line-height: 1.3;
             overflow: hidden;
             box-sizing: border-box;
         }
@@ -197,10 +197,10 @@
         .print-tools { position: fixed; top: 20px; right: 40px; display: flex; gap: 10px; }
         .btn-action { padding: 10px 20px; border-radius: 10px; border: none; cursor: pointer; font-weight: 600; color: white; }
 
-        .bf-row { display: flex; margin-bottom: 5px; align-items: flex-start; }
-        .bf-label { width: 180px; font-weight: bold; text-transform: uppercase; font-size: 10.5px; }
+        .bf-row { display: flex; margin-bottom: 4px; align-items: flex-start; }
+        .bf-label { width: 220px; font-weight: bold; text-transform: uppercase; font-size: 10px; }
         .bf-colon { width: 15px; }
-        .bf-value { flex: 1; border-bottom: none; min-height: 15px; }
+        .bf-value { flex: 1; border-bottom: none; min-height: 14px; font-size: 10px; }
 
         .bf-logo {
             position: absolute;
@@ -211,7 +211,6 @@
             z-index: 10;
         }
 
-        /* Group Control CSS */
         .bf-visibility-panel {
             background: rgba(255,255,255,0.1);
             width: 210mm;
@@ -219,10 +218,11 @@
             padding: 10px;
             border-radius: 10px;
             display: flex;
+            flex-wrap: wrap;
             justify-content: center;
-            gap: 20px;
+            gap: 15px;
             color: white;
-            font-size: 12px;
+            font-size: 11px;
         }
         .bf-visibility-panel label { cursor: pointer; display: flex; align-items: center; gap: 5px; }
         .hide-group { display: none !important; }
@@ -240,13 +240,21 @@
 
     <div id="templateModal" class="no-print">
         <div class="modal-box">
-            <h3 style="margin-top:0;">Konfigurasi Baris 6 - 11</h3>
-            <p style="font-size: 11px; color: #666;">Tentukan Label Paparan dan Nama Kolum dalam Database.</p>
-            <div id="templateInputs">
-                <div class="modal-row"><span>6,7</span><input type="text" id="lbl_A" placeholder="Contoh: SECTION A"> <input type="text" id="key_A" placeholder="Key (Contoh: SECTION A)"></div>
-                <div class="modal-row"><span>8,9</span><input type="text" id="lbl_B" placeholder="Contoh: SECTION B"> <input type="text" id="key_B" placeholder="Key (Contoh: SECTION B)"></div>
-                <div class="modal-row"><span>10,11</span><input type="text" id="lbl_C" placeholder="Contoh: SECTION C"> <input type="text" id="key_C" placeholder="Key (Contoh: SECTION C)"></div>
+            <h3 style="margin-top:0;">Konfigurasi Section Blueform</h3>
+            <p style="font-size: 11px; color: #666;">Tambah label paparan dan key yang sepadan dengan JSON dalam database.</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr 40px; gap: 10px; font-weight: bold; margin-bottom: 10px; font-size: 12px;">
+                <span>Label (Borang)</span>
+                <span>Key (Database JSON)</span>
+                <span></span>
             </div>
+
+            <div id="dynamicRowsContainer"></div>
+
+            <button class="btn-action" style="background: var(--ios-green); width: 100%; margin-top: 10px;" onclick="addTemplateRow()">
+                <i class="fa fa-plus"></i> Tambah Section
+            </button>
+
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
                 <button class="btn-action" style="background:#eee; color:#333;" onclick="closeTemplate()">Batal</button>
                 <button class="btn-action" style="background:var(--ios-blue);" onclick="saveTemplate()">Simpan Template</button>
@@ -275,7 +283,7 @@
                 <h1 id="viewTitle" style="margin:0; font-size: 24px;">Selamat Datang</h1>
                 <p id="viewSubtitle" style="margin:5px 0 0 0; color: #666;">Sila pilih kontrak untuk maklumat terperinci.</p>
             </div>
-            <button class="btn-action" style="background: var(--dark-bg, #333);" onclick="openTemplate()">
+            <button class="btn-action" style="background: #333;" onclick="openTemplate()">
                 <i class="fa-solid fa-sliders"></i> Urus Template BF
             </button>
         </div>
@@ -309,28 +317,22 @@
             <button class="btn-action" style="background: var(--ios-green);" onclick="window.print()">Cetak / Simpan PDF</button>
         </div>
 
-        <div class="bf-visibility-panel no-print" id="visibilityPanel">
-            </div>
+        <div class="bf-visibility-panel no-print" id="visibilityPanel"></div>
 
         <div class="a4-container" id="bf_area">
             <img src="RSAJ.png" class="bf-logo" alt="RSAJ Logo" onerror="this.src='https://upload.wikimedia.org/wikipedia/en/thumb/3/3d/Ranhill_SAJ_logo.svg/1200px-Ranhill_SAJ_logo.svg.png'">
-
-            <div style="text-align: center; font-weight: bold; text-decoration: underline; margin: 25px 0 20px 0; padding: 0 50px;">
+            <div style="text-align: center; font-weight: bold; text-decoration: underline; margin: 25px 0 15px 0; padding: 0 50px; font-size: 13px;">
                 PERMOHONAN KERJA-KERJA S.O.R / TAMBAHAN DALAM KONTRAK PENYELENGGARAAN
             </div>
-
             <div id="bf_content"></div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 30px; text-align: center; font-size: 11px;">
-                <div><div style="border-top: 1px dotted #000; width: 80%; margin: 45px auto 5px auto;"></div><strong>Disediakan Oleh</strong><br><small>Eksekutif Instrumentasi</small></div>
-                <div><div style="border-top: 1px dotted #000; width: 80%; margin: 45px auto 5px auto;"></div><strong>Disemak Oleh</strong><br><small>Ketua Seksyen Selenggara</small></div>
-                <div><div style="border-top: 1px dotted #000; width: 80%; margin: 45px auto 5px auto;"></div><strong>Disahkan Oleh</strong><br><small>Ketua M&E</small></div>
-                <div><div style="border-top: 1px dotted #000; width: 80%; margin: 45px auto 5px auto;"></div><strong>Diluluskan Oleh</strong><br><small>Ketua Bahagian Operasi</small></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 25px; text-align: center; font-size: 10px;">
+                <div><div style="border-top: 1px dotted #000; width: 80%; margin: 35px auto 5px auto;"></div><strong>Disediakan Oleh</strong><br><small>Eksekutif Instrumentasi</small></div>
+                <div><div style="border-top: 1px dotted #000; width: 80%; margin: 35px auto 5px auto;"></div><strong>Disemak Oleh</strong><br><small>Ketua Seksyen Selenggara</small></div>
+                <div><div style="border-top: 1px dotted #000; width: 80%; margin: 35px auto 5px auto;"></div><strong>Disahkan Oleh</strong><br><small>Ketua M&E</small></div>
+                <div><div style="border-top: 1px dotted #000; width: 80%; margin: 35px auto 5px auto;"></div><strong>Diluluskan Oleh</strong><br><small>Ketua Bahagian Operasi</small></div>
             </div>
-
-            <div class="bf-footer-note">
-                * Sebutharga dan Work Order telah disemak sepenuhnya oleh Pihak Daerah
-            </div>
+            <div class="bf-footer-note">* Sebutharga dan Work Order telah disemak sepenuhnya oleh Pihak Daerah</div>
         </div>
     </div>
 
@@ -340,38 +342,51 @@
     const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
 
     let allWorks = [];
-
-    // Konfigurasi Default
-    let bfTemplate = JSON.parse(localStorage.getItem('bf_config')) || {
-        A: { label: "Labour Charges", key: "LABOUR CHARGES" },
-        B: { label: "Supply Spare Part", key: "SUPPLY SPARE PART" },
-        C: { label: "Provisional Sum", key: "PROVISIONAL SUM" }
-    };
+    
+    // Konfigurasi Dinamik (Senarai Section)
+    let bfSections = JSON.parse(localStorage.getItem('bf_sections_v2')) || [
+        { label: "Labour Charges", key: "LABOUR CHARGES" },
+        { label: "Supply Spare Part", key: "SUPPLY SPARE PART" },
+        { label: "Provisional Sum", key: "PROVISIONAL SUM" }
+    ];
 
     window.onload = loadContracts;
 
     function openTemplate() {
-        document.getElementById('lbl_A').value = bfTemplate.A.label;
-        document.getElementById('key_A').value = bfTemplate.A.key;
-        document.getElementById('lbl_B').value = bfTemplate.B.label;
-        document.getElementById('key_B').value = bfTemplate.B.key;
-        document.getElementById('lbl_C').value = bfTemplate.C.label;
-        document.getElementById('key_C').value = bfTemplate.C.key;
+        const container = document.getElementById('dynamicRowsContainer');
+        container.innerHTML = '';
+        bfSections.forEach((sec, index) => addTemplateRow(sec.label, sec.key));
         document.getElementById('templateModal').style.display = 'flex';
     }
 
-    function closeTemplate() { document.getElementById('templateModal').style.display = 'none'; }
+    function addTemplateRow(label = '', key = '') {
+        const container = document.getElementById('dynamicRowsContainer');
+        const div = document.createElement('div');
+        div.className = 'modal-row';
+        div.innerHTML = `
+            <input type="text" class="tpl-label" value="${label}" placeholder="Label Borang">
+            <input type="text" class="tpl-key" value="${key}" placeholder="Key Database">
+            <button onclick="this.parentElement.remove()" style="background:none; border:none; color:red; cursor:pointer;"><i class="fa fa-trash"></i></button>
+        `;
+        container.appendChild(div);
+    }
 
     function saveTemplate() {
-        bfTemplate = {
-            A: { label: document.getElementById('lbl_A').value, key: document.getElementById('key_A').value },
-            B: { label: document.getElementById('lbl_B').value, key: document.getElementById('key_B').value },
-            C: { label: document.getElementById('lbl_C').value, key: document.getElementById('key_C').value }
-        };
-        localStorage.setItem('bf_config', JSON.stringify(bfTemplate));
+        const labels = document.querySelectorAll('.tpl-label');
+        const keys = document.querySelectorAll('.tpl-key');
+        let newSections = [];
+        labels.forEach((l, i) => {
+            if(l.value && keys[i].value) {
+                newSections.push({ label: l.value, key: keys[i].value });
+            }
+        });
+        bfSections = newSections;
+        localStorage.setItem('bf_sections_v2', JSON.stringify(bfSections));
         alert("Template berjaya disimpan!");
         closeTemplate();
     }
+
+    function closeTemplate() { document.getElementById('templateModal').style.display = 'none'; }
 
     async function loadContracts() {
         try {
@@ -388,7 +403,7 @@
                     <small style="color: #666;"><i class="fa-solid fa-location-dot"></i> ${c.district}</small>
                 </div>
             `).join('');
-        } catch (e) { console.error("Ralat Load Contracts:", e); }
+        } catch (e) { console.error(e); }
     }
 
     async function selectContract(id, code, name) {
@@ -398,43 +413,25 @@
         document.getElementById('viewTitle').innerText = code;
         document.getElementById('viewSubtitle').innerText = name;
         document.getElementById('tableWrapper').style.display = 'block';
-        const tbody = document.getElementById('workOrderTbody');
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px;">Memuatkan rekod...</td></tr>';
         try {
             const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}&order=sequence_no.asc`, { headers });
-            const data = await res.json();
-            allWorks = Array.isArray(data) ? data : [];
+            allWorks = await res.json();
             renderTable(allWorks);
-        } catch (e) { tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red; padding: 20px;">Ralat: ${e.message}</td></tr>`; }
+        } catch (e) { console.error(e); }
     }
 
     function renderTable(data) {
         const tbody = document.getElementById('workOrderTbody');
-        if(data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px;">Tiada rekod ditemui.</td></tr>';
-            return;
-        }
-        tbody.innerHTML = data.map(w => {
-            const isClaimed = w.status === 'Claimed';
-            return `
+        tbody.innerHTML = data.map(w => `
             <tr>
-                <td><span class="tag" style="background:${isClaimed ? 'var(--ios-green)' : 'var(--ios-blue)'}">${w.status || 'PENDING'}</span></td>
+                <td><span class="tag" style="background:${w.status === 'Claimed' ? 'var(--ios-green)' : 'var(--ios-blue)'}">${w.status || 'PENDING'}</span></td>
                 <td><div style="font-weight:bold;">${w.work_id}</div><div style="font-size:11px; color:var(--ios-blue); font-weight:700;">SEKSYEN ${w.section || '-'}</div></td>
                 <td><div style="font-weight:500;">${w.description}</div><div style="font-size:11px; color:var(--ios-orange);"><i class="fa-solid fa-map-pin"></i> ${w.location || 'N/A'}</div></td>
-                <td><div style="font-weight:bold; color: #444;">${w.interim_no ? 'INT-' + w.interim_no : '-'}</div></td>
-                <td style="color:#666;">RM ${(w.amount_spent || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                <td style="font-weight:bold; color:${isClaimed ? 'var(--ios-green)' : '#ccc'};">RM ${(isClaimed ? w.amount_spent : 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                <td><div style="font-weight:bold;">${w.interim_no ? 'INT-' + w.interim_no : '-'}</div></td>
+                <td>RM ${(w.amount_spent || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                <td style="font-weight:bold; color:var(--ios-green);">RM ${(w.status === 'Claimed' ? w.amount_spent : 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
                 <td><button class="btn-action" style="background: var(--ios-orange); padding: 5px 12px; font-size: 11px;" onclick="openBlueform(${w.id})"><i class="fa-solid fa-print"></i> Blueform</button></td>
-            </tr>`;
-        }).join('');
-    }
-
-    function toggleBfGroup(className, isVisible) {
-        const elements = document.getElementsByClassName(className);
-        for (let el of elements) {
-            if (isVisible) el.classList.remove('hide-group');
-            else el.classList.add('hide-group');
-        }
+            </tr>`).join('');
     }
 
     async function openBlueform(id) {
@@ -443,16 +440,40 @@
             const result = await res.json();
             const data = result[0];
             const c = data.contract;
-            const b = c.contract_sections_breakdown || {};
-            const s = data.section_category || {};
+            const b = c.contract_sections_breakdown || {}; // JSONB dari table contract
+            const s = data.section_category || {};          // JSONB dari table work_order
 
-            // Kemaskini Panel Visibiliti dengan Label Dinamik
-            document.getElementById('visibilityPanel').innerHTML = `
-                <label><input type="checkbox" checked onchange="toggleBfGroup('grp-A', this.checked)"> Papar ${bfTemplate.A.label} (6-7)</label>
-                <label><input type="checkbox" checked onchange="toggleBfGroup('grp-B', this.checked)"> Papar ${bfTemplate.B.label} (8-9)</label>
-                <label><input type="checkbox" checked onchange="toggleBfGroup('grp-C', this.checked)"> Papar ${bfTemplate.C.label} (10-12)</label>
-            `;
+            // Bina Konten Baris 6 ke Bawah secara Dinamik
+            let dynamicHtml = '';
+            let currentRow = 6;
+            
+            // Panel Visibiliti
+            document.getElementById('visibilityPanel').innerHTML = bfSections.map((sec, idx) => 
+                `<label><input type="checkbox" checked onchange="toggleBfGroup('grp-dyn-${idx}', this.checked)"> Papar ${sec.label}</label>`
+            ).join('');
 
+            bfSections.forEach((sec, idx) => {
+                const sumValue = (b[sec.key]?.amt || 0);
+                const workValue = (s[sec.key]?.amt || 0);
+
+                dynamicHtml += `
+                    <div class="grp-dyn-${idx}">
+                        <hr style="border: 0.5px solid #000; margin: 8px 0;">
+                        <div class="bf-row">
+                            <div class="bf-label">${currentRow++}   ${sec.label} Sum</div>
+                            <div class="bf-colon">:</div>
+                            <div class="bf-value">RM ${sumValue.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+                        </div>
+                        <div class="bf-row">
+                            <div class="bf-label">${currentRow++}   Anggaran Kerja (${sec.label})</div>
+                            <div class="bf-colon">:</div>
+                            <div class="bf-value">RM ${workValue.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Cantumkan semua
             let html = `
                 <div class="bf-row"><div class="bf-label">1    No. Rujukan</div><div class="bf-colon">:</div><div class="bf-value">RSAJ/M&E/IP/11-57/24 - ${data.sequence_no}</div></div>
                 <div class="bf-row"><div class="bf-label">2    No. Work Order</div><div class="bf-colon">:</div><div class="bf-value">${data.work_id}</div></div>
@@ -460,59 +481,44 @@
                 <div class="bf-row"><div class="bf-label">4    Nama Kontraktor</div><div class="bf-colon">:</div><div class="bf-value">${c.contractor}</div></div>
                 <div class="bf-row"><div class="bf-label">5    Tempoh Kontrak</div><div class="bf-colon">:</div><div class="bf-value">${c.contract_start} sehingga ${c.contract_end}</div></div>
                 
-                <div class="grp-A"><hr style="border: 0.5px solid #000; margin: 10px 0;"></div>
-                <div class="bf-row grp-A"><div class="bf-label">6    ${bfTemplate.A.label} Sum</div><div class="bf-colon">:</div><div class="bf-value">RM ${(b[bfTemplate.A.key]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
-                <div class="bf-row grp-A"><div class="bf-label">7    Anggaran Kerja (${bfTemplate.A.label})</div><div class="bf-colon">:</div><div class="bf-value">RM ${(s[bfTemplate.A.key]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+                ${dynamicHtml}
+
+                <hr style="border: 0.5px solid #000; margin: 8px 0;">
+                <div class="bf-row"><div class="bf-label">${currentRow++}   Anggaran Kerja (Tambahan)</div><div class="bf-colon">:</div><div class="bf-value" style="font-weight:bold;">${data.description.toUpperCase()}</div></div>
+                <div class="bf-row"><div class="bf-label">${currentRow++}   Lokasi / Seksyen</div><div class="bf-colon">:</div><div class="bf-value">${data.location} (SEKSYEN: ${data.section || '-'})</div></div>
                 
-                <div class="grp-B"><hr style="border: 0.5px solid #000; margin: 10px 0;"></div>
-                <div class="bf-row grp-B" style="margin-top:6px;"><div class="bf-label">8    ${bfTemplate.B.label} Sum</div><div class="bf-colon">:</div><div class="bf-value">RM ${(b[bfTemplate.B.key]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
-                <div class="bf-row grp-B"><div class="bf-label">9    Anggaran Kerja (${bfTemplate.B.label})</div><div class="bf-colon">:</div><div class="bf-value">RM ${(s[bfTemplate.B.key]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
-                
-                <div class="grp-C"><hr style="border: 0.5px solid #000; margin: 10px 0;"></div>
-                <div class="bf-row grp-C" style="margin-top:6px;"><div class="bf-label">10   ${bfTemplate.C.label} Sum</div><div class="bf-colon">:</div><div class="bf-value">RM ${(b[bfTemplate.C.key]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
-                <div class="bf-row grp-C"><div class="bf-label">11   Anggaran Kerja (${bfTemplate.C.label})</div><div class="bf-colon">:</div><div class="bf-value">RM ${(s[bfTemplate.C.key]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
-                <div class="bf-row grp-C"><div class="bf-label">12   Anggaran Kerja (Tambahan)</div><div class="bf-colon">:</div><div class="bf-value" style="font-weight:bold; font-size:10px;">${data.description.toUpperCase()}</div></div>
-                
-                <hr style="border: 0.5px solid #000; margin: 10px 0;">
-                <div class="bf-row"><div class="bf-label">13   Lokasi / Seksyen</div><div class="bf-colon">:</div><div class="bf-value">${data.location} (SEKSYEN: ${data.section || '-'})</div></div>
-                <div style="margin-top: 10px;">
-                    <strong style="font-size:10.5px;">14   Baki:</strong>
-                    <div style="margin-top:5px; padding: 6px; border: 1px solid #000;">
+                <div style="margin-top: 8px;">
+                    <strong style="font-size:10px;">${currentRow++}   Baki Mengikut Seksyen:</strong>
+                    <div style="margin-top:5px; padding: 5px; border: 1px solid #000;">
                         ${Object.keys(b).map(sec => {
-                            const isThisSection = (data.section && sec.includes(data.section));
-                            return `<div style="display:flex; justify-content:space-between; margin-bottom:2px; font-size:9.5px; ${isThisSection ? 'background:#f0f7ff; font-weight:bold;' : ''}">
-                                <span>${sec} ${isThisSection ? '◀' : ''}</span>
+                            const isMatch = (data.section && sec.includes(data.section));
+                            return `<div style="display:flex; justify-content:space-between; margin-bottom:2px; font-size:9px; ${isMatch ? 'background:#f0f7ff; font-weight:bold;' : ''}">
+                                <span>${sec} ${isMatch ? '◀' : ''}</span>
                                 <span>RM ${b[sec].amt.toLocaleString(undefined, {minimumFractionDigits:2})}</span>
                             </div>`;
                         }).join('')}
-                        <div style="border-top: 1px solid #000; margin-top:4px; padding-top:3px; display:flex; justify-content:space-between; font-weight:bold; font-size:9.5px;">
+                        <div style="border-top: 1px solid #000; margin-top:3px; padding-top:2px; display:flex; justify-content:space-between; font-weight:bold; font-size:9px;">
                             <span>BAKI KESELURUHAN (RM)</span>
                             <span>RM ${(data.remaining_balance || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</span>
                         </div>
                     </div>
                 </div>
-                <div class="bf-row" style="margin-top:10px;"><div class="bf-label">15   Baki Harga Kontrak</div><div class="bf-colon">:</div><div class="bf-value" style="font-weight:bold;">RM ${data.amount_spent.toLocaleString(undefined, {minimumFractionDigits:2})}</div></div>
-                <hr style="border: 0.5px solid #000; margin: 10px 0;">
-                <div class="bf-row"><div class="bf-label">16   Tajuk Kerja</div><div class="bf-colon">:</div><div class="bf-value">${data.description.toUpperCase()} (RM ${data.amount_spent.toLocaleString(undefined, {minimumFractionDigits:2})})</div></div>
+                <div class="bf-row" style="margin-top:8px;"><div class="bf-label">${currentRow++}   Baki Harga Kontrak</div><div class="bf-colon">:</div><div class="bf-value" style="font-weight:bold;">RM ${data.amount_spent.toLocaleString(undefined, {minimumFractionDigits:2})}</div></div>
+                <hr style="border: 0.5px solid #000; margin: 8px 0;">
+                <div class="bf-row"><div class="bf-label">${currentRow++}   Tajuk Kerja</div><div class="bf-colon">:</div><div class="bf-value">${data.description.toUpperCase()} (RM ${data.amount_spent.toLocaleString(undefined, {minimumFractionDigits:2})})</div></div>
             `;
 
             document.getElementById('bf_content').innerHTML = html;
             document.getElementById('blueformPage').classList.add('active');
-        } catch (e) { 
-            console.error(e);
-            alert("Ralat memaparkan borang."); 
-        }
+        } catch (e) { alert("Ralat memaparkan borang."); }
     }
-    function closeBlueform() { document.getElementById('blueformPage').classList.remove('active'); }
 
-    document.getElementById('tableSearch').addEventListener('input', function(e) {
-        const term = e.target.value.toLowerCase();
-        const filtered = allWorks.filter(w => 
-            w.work_id.toLowerCase().includes(term) || w.description.toLowerCase().includes(term) ||
-            w.location.toLowerCase().includes(term) || (w.section && w.section.toLowerCase().includes(term))
-        );
-        renderTable(filtered);
-    });
+    function toggleBfGroup(className, isVisible) {
+        const elements = document.getElementsByClassName(className);
+        for (let el of elements) isVisible ? el.classList.remove('hide-group') : el.classList.add('hide-group');
+    }
+
+    function closeBlueform() { document.getElementById('blueformPage').classList.remove('active'); }
 </script>
 </body>
 </html>
