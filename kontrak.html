@@ -421,54 +421,62 @@
 
     // --- INTERIM LOGIC (UPDATED FOR BULK PASTE) ---
     async function processExcelPaste() {
-        const pasteArea = document.getElementById('i_paste_area');
-        const contractId = document.getElementById('i_contract_id').value;
-        const tbody = document.getElementById('i_work_tbody');
+    const pasteArea = document.getElementById('i_paste_area');
+    const contractId = document.getElementById('i_contract_id').value;
+    const tbody = document.getElementById('i_work_tbody');
 
-        if (!contractId) return alert("Sila pilih kontrak dahulu!");
-        
-        // Pecahkan input berdasarkan baris baru, koma, atau tab (Excel format)
-        const rawLines = pasteArea.value.split(/\r?\n|,|\t/);
-        // Bersihkan setiap ID dan pastikan tiada ID kosong atau pendua
-        const workOrderIds = [...new Set(rawLines.map(s => s.trim()).filter(s => s !== ""))];
-        
-        if (workOrderIds.length === 0) return;
+    if (!contractId) return alert("Sila pilih kontrak dahulu!");
+    
+    const rawLines = pasteArea.value.split(/\r?\n|,|\t/);
+    const workOrderIds = [...new Set(rawLines.map(s => s.trim()).filter(s => s !== ""))];
+    
+    if (workOrderIds.length === 0) return;
 
-        for (const workId of workOrderIds) {
-            try {
-                // Carian tepat dalam Supabase
-                const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${workId}&select=*`, { headers });
-                const data = await res.json();
+    for (const workId of workOrderIds) {
+        try {
+            const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${workId}&select=*`, { headers });
+            const data = await res.json();
 
-                if (data && data.length > 0) {
-                    const work = data[0];
-                    const breakdown = work.cost_breakdown || {};
-                    const totalAmt = Object.values(breakdown).reduce((a, b) => a + b, 0);
+            if (data && data.length > 0) {
+                const work = data[0];
+                const breakdown = work.cost_breakdown || {};
+                const totalAmt = Object.values(breakdown).reduce((a, b) => a + b, 0);
 
-                    // Elakkan masuk ID yang sama dua kali dalam jadual
-                    if (document.querySelector(`tr[data-work-id="${work.work_id}"]`)) continue;
+                if (document.querySelector(`tr[data-work-id="${work.work_id}"]`)) continue;
 
-                    const row = tbody.insertRow();
-                    row.dataset.workId = work.work_id;
-                    row.dataset.breakdown = JSON.stringify(breakdown);
-
-                    row.innerHTML = `
-                        <td style="font-weight:bold;">${work.work_id}</td>
-                        <td style="color:green; text-align:center;"><i class="fa fa-check-circle"></i></td>
-                        <td class="row-amt">RM ${totalAmt.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                        <td style="text-align:center;"><button onclick="this.parentElement.parentElement.remove(); calcInterimGrandTotal();" style="border:none; background:none; color:red; cursor:pointer;"><i class="fa fa-trash"></i></button></td>
-                    `;
-                } else {
-                    alert(`ID Kerja "${workId}" tidak dijumpai dalam kontrak ini! Pastikan jarak/format sama.`);
+                // Bina string HTML untuk pecahan section
+                let sectionDetails = '<div style="font-size: 9px; color: #666; margin-top: 4px;">';
+                for (const [sec, val] of Object.entries(breakdown)) {
+                    if (val > 0) {
+                        sectionDetails += `• ${sec}: RM ${val.toLocaleString()}<br>`;
+                    }
                 }
-            } catch (e) { 
-                console.error(`Ralat carian untuk ${workId}:`, e); 
+                sectionDetails += '</div>';
+
+                const row = tbody.insertRow();
+                row.dataset.workId = work.work_id;
+                row.dataset.breakdown = JSON.stringify(breakdown);
+
+                row.innerHTML = `
+                    <td style="vertical-align: top;">
+                        <div style="font-weight:bold;">${work.work_id}</div>
+                        ${sectionDetails}
+                    </td>
+                    <td style="color:green; text-align:center; vertical-align: top;"><i class="fa fa-check-circle"></i></td>
+                    <td class="row-amt" style="vertical-align: top; font-weight: bold;">RM ${totalAmt.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td style="text-align:center; vertical-align: top;"><button onclick="this.parentElement.parentElement.remove(); calcInterimGrandTotal();" style="border:none; background:none; color:red; cursor:pointer;"><i class="fa fa-trash"></i></button></td>
+                `;
+            } else {
+                alert(`ID Kerja "${workId}" tidak dijumpai!`);
             }
+        } catch (e) { 
+            console.error(`Ralat:`, e); 
         }
-        
-        pasteArea.value = ''; // Kosongkan kotak selepas proses
-        calcInterimGrandTotal(); // Kemaskini jumlah besar
     }
+    
+    pasteArea.value = ''; 
+    calcInterimGrandTotal(); 
+}
 
     function calcInterimGrandTotal() {
         let grandTotal = 0;
@@ -491,15 +499,17 @@
         if (workRows.length === 0) return alert("Sila masukkan ID Kerja!");
 
         const workOrderIds = [];
+        // ... di dalam submitInterim() ...
         const currentClaimBreakdown = {};
 
         workRows.forEach(row => {
             workOrderIds.push(row.dataset.workId);
             const breakdown = JSON.parse(row.dataset.breakdown);
-            for (const [sec, amt] of Object.entries(breakdown)) {
-                currentClaimBreakdown[sec] = (currentClaimBreakdown[sec] || 0) + amt;
-            }
-        });
+        // Logik ini penting untuk menggabungkan kos semua ID mengikut Section (A+A, B+B)
+           for (const [sec, amt] of Object.entries(breakdown)) {
+             currentClaimBreakdown[sec] = (currentClaimBreakdown[sec] || 0) + amt;
+    }
+});
 
         const payload = {
             contract_id: cId,
