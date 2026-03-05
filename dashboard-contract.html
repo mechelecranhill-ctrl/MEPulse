@@ -23,14 +23,33 @@
             overflow: hidden; 
         }
 
+        /* --- SEARCH BOX STYLE --- */
+        .search-container {
+            padding: 5px 10px 10px 0;
+            flex-shrink: 0;
+        }
+        .search-box {
+            width: 100%;
+            padding: 10px 15px;
+            border-radius: 12px;
+            border: 1px solid #d1d1d6;
+            background: white;
+            font-size: 13px;
+            outline: none;
+            box-sizing: border-box;
+            transition: 0.2s;
+        }
+        .search-box:focus {
+            border-color: var(--ios-blue);
+            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+        }
+
         /* --- LOGIK MOBILE SLIDE-IN & USAGE BUTTON --- */
         .mobile-usage-btn { display: none; } 
 
         @media (max-width: 768px) {
-            /* Sembunyikan Nama Kontrak & Butang Bawah Kanan di mobile */
             #panel-vendor, .next-container { display: none !important; }
 
-            /* Tunjukkan butang usage dalam panel sahaja */
             .mobile-usage-btn {
                 display: flex;
                 background: var(--ios-blue);
@@ -70,7 +89,6 @@
             .health-grid { grid-template-columns: 1fr !important; overflow-y: auto !important; }
             .chart-box { min-height: 250px; flex-shrink: 0; }
         }
-        /* --- TAMAT LOGIK MOBILE --- */
 
         .glass-header { 
             width: 100%; height: 60px; 
@@ -142,7 +160,9 @@
         }
 
         .main-wrapper { display: flex; flex: 1; overflow: hidden; padding: 10px; gap: 15px; }
-        .contract-sidebar { width: 220px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex-shrink: 0; padding-right: 5px; }
+        .contract-sidebar { width: 220px; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+        #contractList { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 5px; }
+        
         .c-card { background: var(--card-bg); border-radius: 12px; padding: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); transition: 0.2s; cursor: pointer; border: 1px solid rgba(0,0,0,0.05); }
         .c-card.active { border-color: var(--ios-blue); background: #f0f7ff; }
         .c-card h4 { margin: 0; font-size: 11px; color: #1c1c1e; overflow: hidden; text-overflow: ellipsis; }
@@ -184,7 +204,12 @@
     </div>
 
     <div class="main-wrapper">
-        <div id="contractList" class="contract-sidebar"></div>
+        <div class="contract-sidebar">
+            <div class="search-container">
+                <input type="text" id="contractSearch" class="search-box" placeholder="Cari Kod/Kontrak..." onkeyup="filterContracts()">
+            </div>
+            <div id="contractList"></div>
+        </div>
 
         <div class="analysis-container">
             <div id="analysis-panel">
@@ -239,6 +264,22 @@
 
     window.onload = () => fetchUnits();
 
+    // FUNGSI SEARCH
+    function filterContracts() {
+        const query = document.getElementById('contractSearch').value.toLowerCase();
+        const cards = document.querySelectorAll('.c-card');
+        
+        cards.forEach(card => {
+            const code = card.querySelector('h4').innerText.toLowerCase();
+            const name = card.querySelector('.sub-text').innerText.toLowerCase();
+            if (code.includes(query) || name.includes(query)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+
     async function fetchUnits() {
         try {
             const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
@@ -255,6 +296,8 @@
     async function fetchContracts(unitId, btn) {
         document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
         btn.classList.add('active');
+        document.getElementById('contractSearch').value = ''; // Reset search bila tukar unit
+        
         try {
             const res = await fetch(`${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}&order=contract_start.asc`, { headers });
             const data = await res.json();
