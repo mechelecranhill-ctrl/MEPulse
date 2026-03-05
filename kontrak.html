@@ -277,7 +277,7 @@
     const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
     const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
 
-    let attachedWorkOrders = []; // Simpan ID Kerja yang dilampirkan
+    let attachedWorkOrders = []; 
 
     function initApp() {
         showPage('registerWorkPage', document.getElementById('menu_registerWorkPage'));
@@ -295,6 +295,7 @@
     }
 
     function setupFormListeners() {
+        // Unit Form
         document.getElementById('unitForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const unitName = document.getElementById('new_unit_name').value.trim().toUpperCase();
@@ -304,6 +305,7 @@
             if (res.ok) { alert("Unit berjaya disimpan!"); document.getElementById('new_unit_name').value = ''; fetchUnits(); }
         });
 
+        // Contract Form
         document.getElementById('contractForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const sections = {};
@@ -329,6 +331,7 @@
             if (res.ok) { alert("Kontrak berjaya didaftar!"); location.reload(); }
         });
 
+        // Work Order Form
         document.getElementById('workOrderForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const breakdown = {};
@@ -429,7 +432,7 @@
         document.getElementById('total_display').innerText = `RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
     }
 
-    // --- INTERIM LOGIC (UPDATED: MANUAL SECTION VALUE + ATTACHED ID) ---
+    // --- INTERIM LOGIC ---
     function onInterimContractSelect() {
         const opt = document.getElementById('i_contract_id').selectedOptions[0];
         const container = document.getElementById('i_section_inputs_container');
@@ -455,7 +458,6 @@
         const area = document.getElementById('i_paste_area');
         const rawIds = area.value.split(/\r?\n|,|\t/);
         const cleanIds = rawIds.map(s => s.trim()).filter(s => s !== "" && !attachedWorkOrders.includes(s));
-        
         attachedWorkOrders = [...attachedWorkOrders, ...cleanIds];
         area.value = '';
         renderIDTags();
@@ -478,90 +480,76 @@
     }
 
     function calcInterimManualTotal() {
-    let total = 0;
-    document.querySelectorAll('.i_sec_claim_val').forEach(input => {
-        total += parseFloat(input.value) || 0;
-    });
+        let total = 0;
+        document.querySelectorAll('.i_sec_claim_val').forEach(input => {
+            total += parseFloat(input.value) || 0;
+        });
+        document.getElementById('i_total_display').innerHTML = `
+            <span style="font-size: 12px; color: #666; font-weight: normal;">Jumlah Claim Kasar:</span><br>
+            RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}
+        `;
+        return total;
+    }
 
-    // Paparkan jumlah kasar (sebelum tolak salvage) pada UI
-    document.getElementById('i_total_display').innerHTML = `
-        <span style="font-size: 12px; color: #666; font-weight: normal;">Jumlah Claim Kasar:</span><br>
-        RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}
-    `;
-    return total; // Penting: Return nilai untuk kegunaan submitInterim
-}
+    async function submitInterim() {
+        const cId = document.getElementById('i_contract_id').value;
+        const iNo = parseInt(document.getElementById('i_no').value);
+        const iDate = document.getElementById('i_date_received').value;
+        const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
+        
+        const totalClaim = calcInterimManualTotal(); 
+        const netAmt = totalClaim - salvage;
 
-   async function submitInterim() {
-    const cId = document.getElementById('i_contract_id').value;
-    const iNo = parseInt(document.getElementById('i_no').value);
-    const iDate = document.getElementById('i_date_received').value;
-    const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
-    
-    // Kira total dari input pecahan section
-    const totalClaim = calcInterimManualTotal(); 
-    // Net amount = Total Claim - Salvage (atau ikut logik bisnes anda)
-    const netAmt = totalClaim - salvage;
+        if (!cId || !iNo || !iDate) return alert("Sila lengkapkan maklumat utama!");
 
-    if (!cId || !iNo || !iDate) return alert("Sila lengkapkan maklumat utama!");
-
-    const claimBreakdown = {};
-    document.querySelectorAll('.i_sec_claim_val').forEach(input => {
-        claimBreakdown[input.dataset.sec] = parseFloat(input.value) || 0;
-    });
-
-    // Sesuaikan dengan nama kolum table anda: claim_amount & net_amount
-    const interimPayload = {
-        contract_id: cId,
-        interim_no: iNo,
-        date_received: iDate,
-        salvage_value: salvage,
-        claim_breakdown: claimBreakdown,
-        claim_amount: totalClaim, 
-        net_amount: netAmt
-    };
-
-    try {
-        // 1. Simpan/Kemaskini rekod ke table 'interims'
-        const resInterim = await fetch(`${SB_URL}/rest/v1/interims`, { 
-            method: 'POST', 
-            headers: { ...headers, 'Prefer': 'resolution=merge-duplicates' }, 
-            body: JSON.stringify(interimPayload) 
+        const claimBreakdown = {};
+        document.querySelectorAll('.i_sec_claim_val').forEach(input => {
+            claimBreakdown[input.dataset.sec] = parseFloat(input.value) || 0;
         });
 
-        if (!resInterim.ok) {
-            const err = await resInterim.json();
-            throw new Error("Gagal simpan Interim: " + err.message);
-        }
+        const interimPayload = {
+            contract_id: cId,
+            interim_no: iNo,
+            date_received: iDate,
+            salvage_value: salvage,
+            claim_breakdown: claimBreakdown,
+            claim_amount: totalClaim, 
+            net_amount: netAmt
+        };
 
-        // 2. KEMASKINI WORK ORDERS (Proses 'Linking')
-        if (attachedWorkOrders.length > 0) {
-            for (let id of attachedWorkOrders) {
-                // Trik: Buang semua space dari input user (C123456) 
-                // dan cari guna ILIKE dengan wildcard % supaya jumpa "C 123456"
-                const cleanId = id.replace(/\s+/g, '');
-                const searchPattern = `%${cleanId.split('').join('%')}%`; // Jadi: %C%1%2%3%...
+        try {
+            // 1. Simpan Interim
+            const resInterim = await fetch(`${SB_URL}/rest/v1/interims`, { 
+                method: 'POST', 
+                headers: { ...headers, 'Prefer': 'resolution=merge-duplicates' }, 
+                body: JSON.stringify(interimPayload) 
+            });
 
-                const resUpdate = await fetch(
-                    `${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=ilike.${searchPattern}`, 
-                    {
-                        method: 'PATCH',
-                        headers,
-                        body: JSON.stringify({ interim_no: iNo })
-                    }
-                );
+            if (!resInterim.ok) throw new Error("Gagal simpan Interim.");
 
-                if (!resUpdate.ok) console.warn(`Gagal link ID: ${id}`);
+            // 2. Link Work Orders
+            if (attachedWorkOrders.length > 0) {
+                for (let id of attachedWorkOrders) {
+                    const cleanId = id.replace(/\s+/g, '');
+                    // Guna query param yang betul untuk filter ID Kerja
+                    await fetch(
+                        `${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=ilike.%${cleanId}%`, 
+                        {
+                            method: 'PATCH',
+                            headers,
+                            body: JSON.stringify({ interim_no: iNo })
+                        }
+                    );
+                }
             }
+
+            alert(`Interim No.${iNo} berjaya.`);
+            location.reload();
+        } catch (err) {
+            alert(err.message);
         }
-
-        alert(`Interim No.${iNo} berjaya direkod.\nClaim: RM ${totalClaim}\nNet: RM ${netAmt}`);
-        location.reload();
-
-    } catch (err) {
-        console.error(err);
-        alert(err.message);
     }
-}
+
     // --- VO LOGIC ---
     function onVOContractSelect() {
         const opt = document.getElementById('vo_contract_id').selectedOptions[0];
@@ -571,15 +559,36 @@
     }
 
     async function submitVO() {
-        const cId = document.getElementById('vo_contract_id').value;
-        const resGet = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { headers });
-        const contract = (await resGet.json())[0];
-        let vBreak = contract.vo_breakdown || {};
-        const voName = document.getElementById('vo_name').value.toUpperCase();
-        const amt = parseFloat(document.getElementById('vo_amt').value);
-        vBreak[voName] = { amt: amt, sec: document.getElementById('vo_target_sec').value };
-        const resUpd = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { method: 'PATCH', headers, body: JSON.stringify({ vo_breakdown: vBreak, total_vo_amount: (contract.total_vo_amount || 0) + amt }) });
-        if(resUpd.ok) alert("VO Berjaya!");
+        try {
+            const cId = document.getElementById('vo_contract_id').value;
+            if(!cId) return alert("Pilih kontrak!");
+
+            const resGet = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { headers });
+            const data = await resGet.json();
+            const contract = data[0];
+            
+            let vBreak = contract.vo_breakdown || {};
+            const voName = document.getElementById('vo_name').value.toUpperCase();
+            const amt = parseFloat(document.getElementById('vo_amt').value);
+            
+            vBreak[voName] = { amt: amt, sec: document.getElementById('vo_target_sec').value };
+            
+            const resUpd = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { 
+                method: 'PATCH', 
+                headers, 
+                body: JSON.stringify({ 
+                    vo_breakdown: vBreak, 
+                    total_vo_amount: (contract.total_vo_amount || 0) + amt 
+                }) 
+            });
+            
+            if(resUpd.ok) {
+                alert("VO Berjaya!");
+                location.reload();
+            }
+        } catch (e) {
+            console.error(e);
+        }
     }
 </script>
 </body>
