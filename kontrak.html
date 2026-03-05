@@ -419,7 +419,7 @@
         document.getElementById('total_display').innerText = `RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
     }
 
-    // --- INTERIM LOGIC ---
+    // --- INTERIM LOGIC (UPDATED FOR BULK PASTE) ---
     async function processExcelPaste() {
         const pasteArea = document.getElementById('i_paste_area');
         const contractId = document.getElementById('i_contract_id').value;
@@ -427,19 +427,25 @@
 
         if (!contractId) return alert("Sila pilih kontrak dahulu!");
         
-        const lines = pasteArea.value.split(/[\n, \t]+/).map(s => s.trim()).filter(s => s !== "");
-        if (lines.length === 0) return;
+        // Pecahkan input berdasarkan baris baru, koma, atau tab (Excel format)
+        const rawLines = pasteArea.value.split(/\r?\n|,|\t/);
+        // Bersihkan setiap ID dan pastikan tiada ID kosong atau pendua
+        const workOrderIds = [...new Set(rawLines.map(s => s.trim()).filter(s => s !== ""))];
+        
+        if (workOrderIds.length === 0) return;
 
-        for (const workId of lines) {
+        for (const workId of workOrderIds) {
             try {
+                // Carian tepat dalam Supabase
                 const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${workId}&select=*`, { headers });
                 const data = await res.json();
 
-                if (data.length > 0) {
+                if (data && data.length > 0) {
                     const work = data[0];
                     const breakdown = work.cost_breakdown || {};
                     const totalAmt = Object.values(breakdown).reduce((a, b) => a + b, 0);
 
+                    // Elakkan masuk ID yang sama dua kali dalam jadual
                     if (document.querySelector(`tr[data-work-id="${work.work_id}"]`)) continue;
 
                     const row = tbody.insertRow();
@@ -448,17 +454,20 @@
 
                     row.innerHTML = `
                         <td style="font-weight:bold;">${work.work_id}</td>
-                        <td style="color:green;"><i class="fa fa-check-circle"></i></td>
+                        <td style="color:green; text-align:center;"><i class="fa fa-check-circle"></i></td>
                         <td class="row-amt">RM ${totalAmt.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                        <td><button onclick="this.parentElement.parentElement.remove(); calcInterimGrandTotal();" style="border:none; background:none; color:red; cursor:pointer;"><i class="fa fa-trash"></i></button></td>
+                        <td style="text-align:center;"><button onclick="this.parentElement.parentElement.remove(); calcInterimGrandTotal();" style="border:none; background:none; color:red; cursor:pointer;"><i class="fa fa-trash"></i></button></td>
                     `;
                 } else {
-                    alert(`ID Kerja ${workId} tidak wujud dalam kontrak ini!`);
+                    alert(`ID Kerja "${workId}" tidak dijumpai dalam kontrak ini! Pastikan jarak/format sama.`);
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) { 
+                console.error(`Ralat carian untuk ${workId}:`, e); 
+            }
         }
-        pasteArea.value = ''; 
-        calcInterimGrandTotal();
+        
+        pasteArea.value = ''; // Kosongkan kotak selepas proses
+        calcInterimGrandTotal(); // Kemaskini jumlah besar
     }
 
     function calcInterimGrandTotal() {
