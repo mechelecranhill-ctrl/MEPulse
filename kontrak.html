@@ -489,39 +489,52 @@
         return total;
     }
 
-    async function submitInterim() {
-        const cId = document.getElementById('i_contract_id').value;
-        const iNo = document.getElementById('i_no').value;
-        const iDate = document.getElementById('i_date_received').value;
-        const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
+   async function submitInterim() {
+    const cId = document.getElementById('i_contract_id').value;
+    const iNo = document.getElementById('i_no').value;
+    const iDate = document.getElementById('i_date_received').value;
+    const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
 
-        if (!cId || !iNo || !iDate) return alert("Sila lengkapkan maklumat utama!");
+    if (!cId || !iNo || !iDate) return alert("Sila lengkapkan maklumat utama!");
 
-        const claimBreakdown = {};
-        document.querySelectorAll('.i_sec_claim_val').forEach(input => {
-            claimBreakdown[input.dataset.sec] = parseFloat(input.value) || 0;
+    const claimBreakdown = {};
+    document.querySelectorAll('.i_sec_claim_val').forEach(input => {
+        claimBreakdown[input.dataset.sec] = parseFloat(input.value) || 0;
+    });
+
+    // Menukar Array [C1, C2] kepada String "C1, C2"
+    const workOrdersString = attachedWorkOrders.join(', ');
+
+    const payload = {
+        contract_id: cId,
+        interim_no: parseInt(iNo),
+        date_received: iDate,
+        salvage_value: salvage,
+        work_id: workOrdersString,    // PASTIKAN NAMA INI SAMA DENGAN DI SUPABASE
+        claim_breakdown: claimBreakdown, // Kolum ini MESTI jenis jsonb
+        net_amount: calcInterimManualTotal() // PASTIKAN NAMA INI SAMA DENGAN DI SUPABASE
+    };
+
+    try {
+        const res = await fetch(`${SB_URL}/rest/v1/interims`, { 
+            method: 'POST', 
+            headers, 
+            body: JSON.stringify(payload) 
         });
-
-        const workOrdersString = attachedWorkOrders.join(', ');
-        const payload = {
-            contract_id: cId,
-            interim_no: parseInt(iNo),
-            date_received: iDate,
-            salvage_value: salvage,
-            work_id: workOrdersString, 
-            claim_breakdown: claimBreakdown,
-            net_amount: calcInterimManualTotal()
-        };
-
-        const res = await fetch(`${SB_URL}/rest/v1/interims`, { method: 'POST', headers, body: JSON.stringify(payload) });
         
         if(res.ok) {
             alert(`Interim No.${iNo} berjaya direkod.`);
             location.reload();
         } else {
-            alert("Gagal menghantar interim.");
+            // Ini akan mencetak ralat spesifik dari Supabase di Console F12
+            const errorData = await res.json();
+            console.error("Ralat Supabase:", errorData);
+            alert("Gagal: " + errorData.message);
         }
+    } catch (err) {
+        console.error("Ralat Network:", err);
     }
+}
 
     // --- VO LOGIC ---
     function onVOContractSelect() {
