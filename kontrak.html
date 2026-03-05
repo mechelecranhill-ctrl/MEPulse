@@ -163,7 +163,7 @@
                     <div style="margin-top:15px; padding:10px; background:rgba(0,122,255,0.1); border-radius:10px; display:flex; justify-content:space-between;">
                         <strong>Jumlah:</strong><span id="total_display" style="color:var(--ios-blue); font-weight:bold;">RM 0.00</span>
                     </div>
-                    <button type="submit" class="btn-primary" style="background:var(--ios-green);">Daftar & Tolak Baki</button>
+                    <button type="submit" class="btn-primary" style="background:var(--ios-green);">Daftar & Rekod Kos</button>
                 </form>
             </div>
         </div>
@@ -178,18 +178,25 @@
                     <div><label>Tarikh Terima</label><input type="date" id="i_date_received"></div>
                 </div>
                 <label>Salvage Value (RM)</label>
-                <input type="number" id="i_salvage" placeholder="0.00" step="0.01">
+                <input type="number" id="i_salvage" value="0" step="0.01">
                 
                 <label>Tampal ID Kerja</label>
-                <textarea id="i_paste_area" rows="3" placeholder="Tampal ID di sini..."></textarea>
+                <textarea id="i_paste_area" rows="3" placeholder="Tampal ID di sini (contoh: C1234, C1235)..."></textarea>
                 <button type="button" class="btn-primary" onclick="processExcelPaste()">Cari ID & Ambil Amaun</button>
                 
                 <table class="excel-table">
                     <thead><tr><th>ID Kerja</th><th>Status</th><th>Amaun (RM)</th><th>Hapus</th></tr></thead>
                     <tbody id="i_work_tbody"></tbody>
                 </table>
-                <div id="i_total_display" style="margin-top:10px; text-align:right; font-weight:bold; color:var(--ios-orange);">Jumlah Claim: RM 0.00</div>
-                <button onclick="submitInterim()" class="btn-primary" style="background:var(--ios-orange); margin-top:20px;">Hantar & Selaras Baki</button>
+                
+                <div id="i_total_display" style="margin-top:15px; text-align:right; font-weight:bold; color:var(--ios-orange); font-size: 16px;">Jumlah Claim: RM 0.00</div>
+                
+                <div id="virtual_balance_preview" style="margin-top:15px; padding:12px; background:rgba(0,0,0,0.03); border-radius:10px; font-size:12px; display:none;">
+                    <strong>Anggaran Baki Selepas Bayaran:</strong>
+                    <div id="preview_list"></div>
+                </div>
+
+                <button onclick="submitInterim()" id="btn_submit_interim" class="btn-primary" style="background:var(--ios-orange); margin-top:20px;">Hantar & Potong Baki (Virtual)</button>
             </div>
         </div>
 
@@ -417,7 +424,7 @@
         document.getElementById('total_display').innerText = `RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
     }
 
-    // --- KOD INTERIM (DIKEMASKINI: AUTOMATIK AMAUN DARI WORK ORDER) ---
+    // --- INTERIM LOGIC (VIRTUAL DEDUCTION) ---
     async function processExcelPaste() {
         const pasteArea = document.getElementById('i_paste_area');
         const contractId = document.getElementById('i_contract_id').value;
@@ -446,12 +453,12 @@
 
                     row.innerHTML = `
                         <td style="font-weight:bold;">${work.work_id}</td>
-                        <td style="color:green;">Ditemui</td>
+                        <td style="color:green;"><i class="fa fa-check-circle"></i></td>
                         <td class="row-amt">RM ${totalAmt.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                         <td><button onclick="this.parentElement.parentElement.remove(); calcInterimGrandTotal();" style="border:none; background:none; color:red; cursor:pointer;"><i class="fa fa-trash"></i></button></td>
                     `;
                 } else {
-                    alert(`ID Kerja ${workId} tidak dijumpai dalam kontrak ini!`);
+                    alert(`ID Kerja ${workId} tidak wujud atau bukan dari kontrak ini!`);
                 }
             } catch (e) { console.error(e); }
         }
@@ -477,36 +484,41 @@
         if (!cId || !iNo || !iDate) return alert("Sila lengkapkan maklumat utama interim!");
 
         const workRows = document.querySelectorAll('#i_work_tbody tr');
-        if (workRows.length === 0) return alert("Sila masukkan sekurang-kurangnya satu ID Kerja!");
+        if (workRows.length === 0) return alert("Sila masukkan ID Kerja!");
 
+        // 1. Ambil semua maklumat dari baris jadual
         const workOrderIds = [];
-        const totalClaimBreakdown = {};
+        const currentClaimBreakdown = {};
 
         workRows.forEach(row => {
             workOrderIds.push(row.dataset.workId);
             const breakdown = JSON.parse(row.dataset.breakdown);
             for (const [sec, amt] of Object.entries(breakdown)) {
-                totalClaimBreakdown[sec] = (totalClaimBreakdown[sec] || 0) + amt;
+                currentClaimBreakdown[sec] = (currentClaimBreakdown[sec] || 0) + amt;
             }
         });
 
+        // 2. Submit ke table 'interims'
         const payload = {
             contract_id: cId,
             interim_no: parseInt(iNo),
             date_received: iDate,
             salvage_value: salvage,
             work_order_ids: workOrderIds,
-            claim_breakdown: totalClaimBreakdown
+            claim_breakdown: currentClaimBreakdown
         };
 
         const res = await fetch(`${SB_URL}/rest/v1/interims`, { method: 'POST', headers, body: JSON.stringify(payload) });
+        
         if(res.ok) {
-            alert("Interim Berjaya Dihantar!");
+            alert(`Interim No.${iNo} berjaya direkodkan. Baki virtual telah dikemaskini.`);
             location.reload();
+        } else {
+            alert("Gagal menghantar interim. Sila semak pangkalan data.");
         }
     }
 
-    // --- KOD VO ---
+    // --- VO LOGIC ---
     function onVOContractSelect() {
         const opt = document.getElementById('vo_contract_id').selectedOptions[0];
         const sSec = document.getElementById('vo_target_sec');
