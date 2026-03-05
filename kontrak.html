@@ -491,19 +491,19 @@
         return total;
     }
 
-    async function submitInterim() {
+        async function submitInterim() {
         const cId = document.getElementById('i_contract_id').value;
         const iNoStr = document.getElementById('i_no').value;
         const iNo = parseInt(iNoStr);
         const iDate = document.getElementById('i_date_received').value;
         const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
-        
+
         const totalClaim = calcInterimManualTotal(); 
         const netAmt = totalClaim - salvage;
 
         if (!cId || !iNo || !iDate) return alert("Sila lengkapkan maklumat utama!");
 
-        // BINA FORMAT JSON: {"SECTION B": {"amt": 1400}, ...}
+        // 1. BINA FORMAT JSON BREAKDOWN
         const claimBreakdown = {};
         document.querySelectorAll('.i_sec_claim_val').forEach(input => {
             const val = parseFloat(input.value) || 0;
@@ -523,7 +523,7 @@
         };
 
         try {
-            // 1. Simpan Interim
+            // 2. SIMPAN DATA INTERIM
             const resInterim = await fetch(`${SB_URL}/rest/v1/interims`, { 
                 method: 'POST', 
                 headers: { ...headers, 'Prefer': 'resolution=merge-duplicates' }, 
@@ -535,26 +535,26 @@
                 throw new Error(errorData.message || "Gagal simpan Interim.");
             }
 
-            // 2. Link Work Orders
+            // 3. UPDATE WORK ORDERS (MASUKKAN NO INTERIM & TUKAR STATUS KE 'CLAIMED')
             if (attachedWorkOrders.length > 0) {
                 for (let id of attachedWorkOrders) {
                     const cleanId = id.trim();
-                    const searchPattern = `*${cleanId}*`;
+                    // Menggunakan ilike untuk mencari ID yang mengandungi teks tersebut (case-insensitive)
+                    const searchPattern = `%${cleanId}%`; 
                     const updateUrl = `${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=ilike.${encodeURIComponent(searchPattern)}`;
 
-                    try {
-                        await fetch(updateUrl, {
-                            method: 'PATCH',
-                            headers: headers,
-                            body: JSON.stringify({ interim_no: iNo })
-                        });
-                    } catch (e) {
-                        console.error(`Ralat update ID ${cleanId}:`, e);
-                    }
+                    await fetch(updateUrl, {
+                        method: 'PATCH',
+                        headers: headers,
+                        body: JSON.stringify({ 
+                            interim_no: iNo,
+                            status: 'Claimed' // <--- STATUS BERTUKAR DI SINI
+                        })
+                    });
                 }
             }
-            
-            alert("Interim berjaya direkodkan!");
+
+            alert("Interim berjaya direkodkan dan status Work Order telah dikemaskini ke 'Claimed'!");
             location.reload();
 
         } catch (err) {
@@ -562,6 +562,7 @@
             alert("Ralat simpan interim: " + err.message);
         }
     }
+
 
     // --- VO LOGIC ---
     function onVOContractSelect() {
