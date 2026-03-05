@@ -258,6 +258,7 @@
     let myChart = null;
     let currentContract = null;
     let currentWO = [];
+    let currentInterims = [];
     let selectedSections = [];
 
     Chart.register(ChartDataLabels);
@@ -331,8 +332,13 @@
         try {
             const resC = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${contract.id}&select=*`, { headers });
             currentContract = (await resC.json())[0];
+            
             const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}`, { headers });
             currentWO = await resW.json();
+
+            const resI = await fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${currentContract.id}`, { headers });
+            currentInterims = await resI.json();
+
             selectedSections = (currentContract.selected_sections && currentContract.selected_sections.length > 0) 
                 ? currentContract.selected_sections 
                 : Object.keys(currentContract.contract_sections_breakdown || {});
@@ -347,7 +353,6 @@
         const end = new Date(currentContract.contract_end);
         const today = new Date();
 
-        // LOGIK PENGIRAAN BULAN
         const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
         let monthsElapsed = (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()) + 1;
         monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
@@ -361,10 +366,25 @@
 
         selectedSections.sort().forEach(s => {
             if(!sections[s]) return;
-            let used = 0;
-            currentWO.forEach(wo => { if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; });
 
+            // KIRAAN VIRTUAL:
+            // 1. Ambil net_amount dari table interims bagi section ini
+            let interimUsed = currentInterims.reduce((sum, interim) => {
+                return sum + (interim.section_category?.[s]?.net_amount || 0);
+            }, 0);
+
+            // 2. Ambil amt dari table work_orders yang TIADA interim_no bagi section ini
+            let woPending = currentWO.reduce((sum, wo) => {
+                if(!wo.interim_no && wo.section_category?.[s]) {
+                    return sum + (wo.section_category[s].amt || 0);
+                }
+                return sum;
+            }, 0);
+
+            let used = interimUsed + woPending;
             const budget = sections[s].amt || 0; 
+            const balance = budget - used;
+
             const plannedTotalToDate = (budget / totalMonths) * monthsElapsed;
             const variance = used - plannedTotalToDate;
             const variancePercent = (variance / plannedTotalToDate) * 100 || 0;
@@ -379,7 +399,7 @@
                     </div>
                     <div class="avg-stats">
                         <div class="avg-item">BUDGET: RM ${budget.toLocaleString()}</div>
-                        <div class="avg-item" style="color: #8e8e93;">PLANNED: RM ${plannedTotalToDate.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
+                        <div class="avg-item" style="color: var(--ios-orange); font-weight: 800;">BAKI: RM ${balance.toLocaleString()}</div>
                     </div>
                     <div class="avg-stats">
                         <div class="avg-item">ACTUAL: RM ${used.toLocaleString()}</div>
@@ -415,8 +435,11 @@
         selectedSections.sort().forEach(s => {
             labels.push(s); 
             targetAvgData.push((sections[s]?.amt / totalMonths).toFixed(2));
-            let used = 0;
-            currentWO.forEach(wo => { if(wo.section_category?.[s]) used += wo.section_category[s].amt || 0; });
+            
+            let interimUsed = currentInterims.reduce((sum, interim) => sum + (interim.section_category?.[s]?.net_amount || 0), 0);
+            let woPending = currentWO.reduce((sum, wo) => (!wo.interim_no && wo.section_category?.[s]) ? sum + (wo.section_category[s].amt || 0) : sum, 0);
+            let used = interimUsed + woPending;
+            
             actualAvgData.push((used / monthsElapsed).toFixed(2));
         });
 
