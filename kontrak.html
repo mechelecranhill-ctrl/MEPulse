@@ -171,34 +171,35 @@
         <div id="interimPage" class="page">
             <div class="glass-card">
                 <h3 style="margin-top:0;"><i class="fa-solid fa-file-invoice-dollar"></i> Kemaskini Interim Claim</h3>
+                
                 <label>Pilih Kontrak</label>
-                <select id="i_contract_id"><option value="">Pilih Kontrak</option></select>
+                <select id="i_contract_id" onchange="onInterimContractSelect()"><option value="">Pilih Kontrak</option></select>
+                
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div><label>No. Interim</label><input type="number" id="i_no"></div>
                     <div><label>Tarikh Terima</label><input type="date" id="i_date_received"></div>
                 </div>
+
                 <label>Salvage Value (RM)</label>
                 <input type="number" id="i_salvage" value="0" step="0.01">
+
+                <div id="i_section_inputs_container" style="margin-top:15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                </div>
+
+                <hr style="margin: 20px 0; border: 0; border-top: 1px solid rgba(0,0,0,0.1);">
+
+                <label>Lampirkan ID Kerja (Untuk Clearkan Baki Kontrak)</label>
+                <textarea id="i_paste_area" rows="3" placeholder="Tampal ID Kerja di sini (C123, C456)..."></textarea>
+                <button type="button" class="btn-primary" onclick="addWorkOrdersToList()" style="background:#8e8e93;">Tambah ID ke Senarai</button>
                 
-                <label>Tampal ID Kerja</label>
-                <textarea id="i_paste_area" rows="3" placeholder="Tampal ID di sini (contoh: C1234, C1235)..."></textarea>
-                <button type="button" class="btn-primary" onclick="processExcelPaste()">Cari ID & Ambil Amaun</button>
-                
-                <table class="excel-table">
-                    <thead><tr><th>ID Kerja</th><th>Status</th><th>Amaun (RM)</th><th>Hapus</th></tr></thead>
-                    <tbody id="i_work_tbody"></tbody>
-                </table>
-                
-                <div id="i_section_summary" style="margin-top: 15px; padding: 12px; background: rgba(255,255,255,0.3); border: 1px dashed var(--ios-orange); border-radius: 12px; font-size: 12px; display: none;">
-                <strong style="color: #333; display: block; margin-bottom: 5px;"><i class="fa fa-list-ul"></i> Pecahan Kos Mengikut Section:</strong>
-                <div id="summary_list"></div>
+                <div id="i_id_list_tags" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:5px;">
                 </div>
 
                 <div id="i_total_display" style="margin-top:15px; text-align:right; font-weight:bold; color:var(--ios-orange); font-size: 18px; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 10px;">
-                Jumlah Claim: RM 0.00
+                    Jumlah Claim Interim: RM 0.00
                 </div>
 
-                <button onclick="submitInterim()" id="btn_submit_interim" class="btn-primary" style="background:var(--ios-orange); margin-top:20px;">Hantar & Rekod Interim</button>
+                <button onclick="submitInterim()" class="btn-primary" style="background:var(--ios-orange); margin-top:20px;">Hantar & Rekod Interim</button>
             </div>
         </div>
 
@@ -275,6 +276,8 @@
     const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
     const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
     const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+
+    let attachedWorkOrders = []; // Simpan ID Kerja yang dilampirkan
 
     function initApp() {
         showPage('registerWorkPage', document.getElementById('menu_registerWorkPage'));
@@ -426,149 +429,93 @@
         document.getElementById('total_display').innerText = `RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
     }
 
-    // --- INTERIM LOGIC (UPDATED FOR BULK PASTE) ---
-    async function processExcelPaste() {
-    const pasteArea = document.getElementById('i_paste_area');
-    const contractId = document.getElementById('i_contract_id').value;
-    const tbody = document.getElementById('i_work_tbody');
+    // --- INTERIM LOGIC (UPDATED: MANUAL SECTION VALUE + ATTACHED ID) ---
+    function onInterimContractSelect() {
+        const opt = document.getElementById('i_contract_id').selectedOptions[0];
+        const container = document.getElementById('i_section_inputs_container');
+        container.innerHTML = '';
+        attachedWorkOrders = []; 
+        renderIDTags();
+        calcInterimManualTotal();
 
-    if (!contractId) return alert("Sila pilih kontrak dahulu!");
-    
-    const rawLines = pasteArea.value.split(/\r?\n|,|\t/);
-    const workOrderIds = [...new Set(rawLines.map(s => s.trim()).filter(s => s !== ""))];
-    
-    if (workOrderIds.length === 0) return;
-
-    for (const workId of workOrderIds) {
-        try {
-            const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${workId}&select=*`, { headers });
-            const data = await res.json();
-
-            if (data && data.length > 0) {
-                const work = data[0];
-                const breakdown = work.cost_breakdown || {};
-                const totalAmt = Object.values(breakdown).reduce((a, b) => a + b, 0);
-
-                if (document.querySelector(`tr[data-work-id="${work.work_id}"]`)) continue;
-
-                // Bina string HTML untuk pecahan section
-                let sectionDetails = '<div style="font-size: 9px; color: #666; margin-top: 4px;">';
-                for (const [sec, val] of Object.entries(breakdown)) {
-                    if (val > 0) {
-                        sectionDetails += `• ${sec}: RM ${val.toLocaleString()}<br>`;
-                    }
-                }
-                sectionDetails += '</div>';
-
-                const row = tbody.insertRow();
-                row.dataset.workId = work.work_id;
-                row.dataset.breakdown = JSON.stringify(breakdown);
-
-                row.innerHTML = `
-                    <td style="vertical-align: top;">
-                        <div style="font-weight:bold;">${work.work_id}</div>
-                        ${sectionDetails}
-                    </td>
-                    <td style="color:green; text-align:center; vertical-align: top;"><i class="fa fa-check-circle"></i></td>
-                    <td class="row-amt" style="vertical-align: top; font-weight: bold;">RM ${totalAmt.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td style="text-align:center; vertical-align: top;"><button onclick="this.parentElement.parentElement.remove(); calcInterimGrandTotal();" style="border:none; background:none; color:red; cursor:pointer;"><i class="fa fa-trash"></i></button></td>
+        if(opt && opt.dataset.b) {
+            const sections = JSON.parse(opt.dataset.b);
+            Object.keys(sections).sort().forEach(sec => {
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <label style="font-size:9px;">Nilai Claim ${sec}</label>
+                    <input type="number" class="i_sec_claim_val" data-sec="${sec}" placeholder="RM 0.00" step="0.01" oninput="calcInterimManualTotal()">
                 `;
-            } else {
-                alert(`ID Kerja "${workId}" tidak dijumpai!`);
-            }
-        } catch (e) { 
-            console.error(`Ralat:`, e); 
+                container.appendChild(div);
+            });
         }
     }
-    
-    pasteArea.value = ''; 
-    calcInterimGrandTotal(); 
-}
 
-    function calcInterimGrandTotal() {
-    let grandTotal = 0;
-    const sectionTotals = {}; // Objek untuk simpan jumlah terkumpul
-    const summaryDiv = document.getElementById('i_section_summary');
-    const summaryList = document.getElementById('summary_list');
-    
-    // 1. Scan setiap baris dalam table
-    const rows = document.querySelectorAll('#i_work_tbody tr');
-    
-    rows.forEach(row => {
-        if (!row.dataset.breakdown) return;
-        const breakdown = JSON.parse(row.dataset.breakdown);
+    function addWorkOrdersToList() {
+        const area = document.getElementById('i_paste_area');
+        const rawIds = area.value.split(/\r?\n|,|\t/);
+        const cleanIds = rawIds.map(s => s.trim()).filter(s => s !== "" && !attachedWorkOrders.includes(s));
         
-        for (const [sec, amt] of Object.entries(breakdown)) {
-            const value = parseFloat(amt) || 0;
-            grandTotal += value;
-            
-            // Masukkan ke dalam kategori section masing-masing
-            sectionTotals[sec] = (sectionTotals[sec] || 0) + value;
-        }
-    });
+        attachedWorkOrders = [...attachedWorkOrders, ...cleanIds];
+        area.value = '';
+        renderIDTags();
+    }
 
-    // 2. Papar rumusan jika ada data
-    if (grandTotal > 0) {
-        summaryDiv.style.display = 'block';
-        summaryList.innerHTML = '';
-        
-        // Susun section A, B, C...
-        Object.keys(sectionTotals).sort().forEach(sec => {
-            if (sectionTotals[sec] > 0) {
-                summaryList.innerHTML += `
-                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); padding: 4px 0;">
-                        <span>${sec}</span>
-                        <span style="font-weight: 700;">RM ${sectionTotals[sec].toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
-                    </div>`;
-            }
+    function renderIDTags() {
+        const container = document.getElementById('i_id_list_tags');
+        container.innerHTML = '';
+        attachedWorkOrders.forEach(id => {
+            const span = document.createElement('span');
+            span.style = "background:#e5e5ea; padding:4px 10px; border-radius:15px; font-size:11px; display:flex; align-items:center; gap:5px;";
+            span.innerHTML = `${id} <i class="fa fa-times" onclick="removeID('${id}')" style="cursor:pointer; color:red;"></i>`;
+            container.appendChild(span);
         });
-    } else {
-        summaryDiv.style.display = 'none';
     }
 
-    // 3. Kemaskini Grand Total di bawah sekali
-    document.getElementById('i_total_display').innerHTML = `
-        <span style="font-size: 12px; color: #666; font-weight: normal;">Grand Total:</span><br>
-        RM ${grandTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}
-    `;
-}
+    function removeID(id) {
+        attachedWorkOrders = attachedWorkOrders.filter(item => item !== id);
+        renderIDTags();
+    }
+
+    function calcInterimManualTotal() {
+        let total = 0;
+        document.querySelectorAll('.i_sec_claim_val').forEach(input => {
+            total += parseFloat(input.value) || 0;
+        });
+        document.getElementById('i_total_display').innerHTML = `
+            <span style="font-size: 12px; color: #666; font-weight: normal;">Jumlah Claim Interim:</span><br>
+            RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}
+        `;
+        return total;
+    }
+
     async function submitInterim() {
         const cId = document.getElementById('i_contract_id').value;
         const iNo = document.getElementById('i_no').value;
         const iDate = document.getElementById('i_date_received').value;
         const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
 
-        if (!cId || !iNo || !iDate) return alert("Sila lengkapkan maklumat utama interim!");
+        if (!cId || !iNo || !iDate) return alert("Sila lengkapkan maklumat utama!");
 
-        const workRows = document.querySelectorAll('#i_work_tbody tr');
-        if (workRows.length === 0) return alert("Sila masukkan ID Kerja!");
-
-        const workOrderIds = [];
-        // ... di dalam submitInterim() ...
-        const currentClaimBreakdown = {};
-
-        workRows.forEach(row => {
-            workOrderIds.push(row.dataset.workId);
-            const breakdown = JSON.parse(row.dataset.breakdown);
-        // Logik ini penting untuk menggabungkan kos semua ID mengikut Section (A+A, B+B)
-           for (const [sec, amt] of Object.entries(breakdown)) {
-             currentClaimBreakdown[sec] = (currentClaimBreakdown[sec] || 0) + amt;
-    }
-});
+        const claimBreakdown = {};
+        document.querySelectorAll('.i_sec_claim_val').forEach(input => {
+            claimBreakdown[input.dataset.sec] = parseFloat(input.value) || 0;
+        });
 
         const payload = {
             contract_id: cId,
             interim_no: parseInt(iNo),
             date_received: iDate,
             salvage_value: salvage,
-            work_order_ids: workOrderIds,
-            claim_breakdown: currentClaimBreakdown
+            work_order_ids: attachedWorkOrders, 
+            claim_breakdown: claimBreakdown,
+            total_claim: calcInterimManualTotal()
         };
 
         const res = await fetch(`${SB_URL}/rest/v1/interims`, { method: 'POST', headers, body: JSON.stringify(payload) });
         
         if(res.ok) {
-            alert(`Interim No.${iNo} berjaya direkodkan.`);
+            alert(`Interim No.${iNo} berjaya direkod.`);
             location.reload();
         } else {
             alert("Gagal menghantar interim.");
