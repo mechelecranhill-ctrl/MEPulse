@@ -527,28 +527,35 @@
 
             if (!resInterim.ok) throw new Error("Gagal simpan Interim.");
 
-            // 2. Link Work Orders
-            if (attachedWorkOrders.length > 0) {
-                for (let id of attachedWorkOrders) {
-                    const cleanId = id.replace(/\s+/g, '');
-                    // Guna query param yang betul untuk filter ID Kerja
-                    await fetch(
-                        `${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=ilike.%${cleanId}%`, 
-                        {
-                            method: 'PATCH',
-                            headers,
-                            body: JSON.stringify({ interim_no: iNo })
-                        }
-                    );
-                }
-            }
+            // 2. Link Work Orders (LOGIK BARU YANG LEBIH SELAMAT)
+if (attachedWorkOrders.length > 0) {
+    for (let id of attachedWorkOrders) {
+        // Bersihkan ID: Buang ruang kosong sahaja
+        const cleanId = id.trim();
+        
+        // Gunakan encodeURIComponent supaya simbol % tidak dianggap sebagai kod sistem
+        // Kita gunakan format ilike.*teks* untuk pencarian fleksibel
+        const searchParam = encodeURIComponent(`*${cleanId}*`);
 
-            alert(`Interim No.${iNo} berjaya.`);
-            location.reload();
-        } catch (err) {
-            alert(err.message);
+        try {
+            const resUpdate = await fetch(
+                `${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=ilike.${searchParam}`, 
+                {
+                    method: 'PATCH',
+                    headers: headers, // Pastikan headers mengandungi API Key & Content-Type
+                    body: JSON.stringify({ interim_no: iNo })
+                }
+            );
+
+            if (!resUpdate.ok) {
+                const errLog = await resUpdate.json();
+                console.warn(`Gagal link ID: ${id}`, errLog);
+            }
+        } catch (e) {
+            console.error(`Ralat semasa mengemaskini ID ${id}:`, e);
         }
     }
+}
 
     // --- VO LOGIC ---
     function onVOContractSelect() {
