@@ -190,13 +190,8 @@
                 </table>
                 
                 <div id="i_total_display" style="margin-top:15px; text-align:right; font-weight:bold; color:var(--ios-orange); font-size: 16px;">Jumlah Claim: RM 0.00</div>
-                
-                <div id="virtual_balance_preview" style="margin-top:15px; padding:12px; background:rgba(0,0,0,0.03); border-radius:10px; font-size:12px; display:none;">
-                    <strong>Anggaran Baki Selepas Bayaran:</strong>
-                    <div id="preview_list"></div>
-                </div>
 
-                <button onclick="submitInterim()" id="btn_submit_interim" class="btn-primary" style="background:var(--ios-orange); margin-top:20px;">Hantar & Potong Baki (Virtual)</button>
+                <button onclick="submitInterim()" id="btn_submit_interim" class="btn-primary" style="background:var(--ios-orange); margin-top:20px;">Hantar & Rekod Interim</button>
             </div>
         </div>
 
@@ -424,7 +419,7 @@
         document.getElementById('total_display').innerText = `RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
     }
 
-    // --- INTERIM LOGIC (VIRTUAL DEDUCTION) ---
+    // --- INTERIM LOGIC ---
     async function processExcelPaste() {
         const pasteArea = document.getElementById('i_paste_area');
         const contractId = document.getElementById('i_contract_id').value;
@@ -458,7 +453,7 @@
                         <td><button onclick="this.parentElement.parentElement.remove(); calcInterimGrandTotal();" style="border:none; background:none; color:red; cursor:pointer;"><i class="fa fa-trash"></i></button></td>
                     `;
                 } else {
-                    alert(`ID Kerja ${workId} tidak wujud atau bukan dari kontrak ini!`);
+                    alert(`ID Kerja ${workId} tidak wujud dalam kontrak ini!`);
                 }
             } catch (e) { console.error(e); }
         }
@@ -486,7 +481,6 @@
         const workRows = document.querySelectorAll('#i_work_tbody tr');
         if (workRows.length === 0) return alert("Sila masukkan ID Kerja!");
 
-        // 1. Ambil semua maklumat dari baris jadual
         const workOrderIds = [];
         const currentClaimBreakdown = {};
 
@@ -498,7 +492,6 @@
             }
         });
 
-        // 2. Submit ke table 'interims'
         const payload = {
             contract_id: cId,
             interim_no: parseInt(iNo),
@@ -511,10 +504,10 @@
         const res = await fetch(`${SB_URL}/rest/v1/interims`, { method: 'POST', headers, body: JSON.stringify(payload) });
         
         if(res.ok) {
-            alert(`Interim No.${iNo} berjaya direkodkan. Baki virtual telah dikemaskini.`);
+            alert(`Interim No.${iNo} berjaya direkodkan.`);
             location.reload();
         } else {
-            alert("Gagal menghantar interim. Sila semak pangkalan data.");
+            alert("Gagal menghantar interim.");
         }
     }
 
