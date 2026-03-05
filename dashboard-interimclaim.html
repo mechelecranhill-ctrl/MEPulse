@@ -14,7 +14,7 @@
             --sidebar-width: 300px;
         }
         * { box-sizing: border-box; font-family: -apple-system, system-ui, sans-serif; }
-        
+
         body { 
             background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); 
             background-attachment: fixed; 
@@ -135,6 +135,15 @@
             color: white;
         }
 
+        /* Modal Template Manager */
+        #templateModal {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); 
+            z-index: 3000; align-items: center; justify-content: center;
+        }
+        .modal-box { background: white; width: 500px; padding: 25px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+        .modal-row { margin-bottom: 15px; display: grid; grid-template-columns: 30px 1fr 1fr; gap: 10px; align-items: center; }
+        .modal-row input { padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; }
+
         #blueformPage {
             display: none;
             position: fixed;
@@ -146,7 +155,7 @@
             padding: 40px 0;
         }
         #blueformPage.active { display: block; }
-        
+
         /* A4 Container */
         .a4-container { 
             width: 210mm; 
@@ -219,30 +228,31 @@
         .hide-group { display: none !important; }
 
         @media print {
-            @page {
-                size: A4;
-                margin: 0;
-            }
+            @page { size: A4; margin: 0; }
             body { background: white; margin: 0; padding: 0; }
             .no-print { display: none !important; }
-            #blueformPage { 
-                position: static; 
-                display: block; 
-                background: white; 
-                padding: 0; 
-                overflow: visible;
-            }
-            .a4-container { 
-                box-shadow: none; 
-                margin: 0; 
-                width: 210mm; 
-                height: 297mm; 
-                page-break-after: always;
-            }
+            #blueformPage { position: static; display: block; background: white; padding: 0; overflow: visible; }
+            .a4-container { box-shadow: none; margin: 0; width: 210mm; height: 297mm; page-break-after: always; }
         }
     </style>
 </head>
 <body>
+
+    <div id="templateModal" class="no-print">
+        <div class="modal-box">
+            <h3 style="margin-top:0;">Konfigurasi Baris 6 - 11</h3>
+            <p style="font-size: 11px; color: #666;">Tentukan Label Paparan dan Nama Kolum dalam Database.</p>
+            <div id="templateInputs">
+                <div class="modal-row"><span>6,7</span><input type="text" id="lbl_A" placeholder="Contoh: SECTION A"> <input type="text" id="key_A" placeholder="Key (Contoh: SECTION A)"></div>
+                <div class="modal-row"><span>8,9</span><input type="text" id="lbl_B" placeholder="Contoh: SECTION B"> <input type="text" id="key_B" placeholder="Key (Contoh: SECTION B)"></div>
+                <div class="modal-row"><span>10,11</span><input type="text" id="lbl_C" placeholder="Contoh: SECTION C"> <input type="text" id="key_C" placeholder="Key (Contoh: SECTION C)"></div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button class="btn-action" style="background:#eee; color:#333;" onclick="closeTemplate()">Batal</button>
+                <button class="btn-action" style="background:var(--ios-blue);" onclick="saveTemplate()">Simpan Template</button>
+            </div>
+        </div>
+    </div>
 
     <div class="sidebar no-print">
         <div class="sidebar-header">
@@ -265,6 +275,9 @@
                 <h1 id="viewTitle" style="margin:0; font-size: 24px;">Selamat Datang</h1>
                 <p id="viewSubtitle" style="margin:5px 0 0 0; color: #666;">Sila pilih kontrak untuk maklumat terperinci.</p>
             </div>
+            <button class="btn-action" style="background: var(--dark-bg, #333);" onclick="openTemplate()">
+                <i class="fa-solid fa-sliders"></i> Urus Template BF
+            </button>
         </div>
 
         <div class="glass-card" id="tableWrapper" style="display: none;">
@@ -272,7 +285,7 @@
                 <h3 style="margin:0;"><i class="fa-solid fa-list-check" style="margin-right: 10px; color: var(--ios-blue);"></i> Senarai Work Order & Tuntutan</h3>
                 <input type="text" id="tableSearch" placeholder="Cari ID Kerja atau Lokasi..." style="padding: 10px; border-radius: 10px; border: 1px solid #ddd; width: 250px;">
             </div>
-            
+
             <table class="desktop-table">
                 <thead>
                     <tr>
@@ -296,19 +309,16 @@
             <button class="btn-action" style="background: var(--ios-green);" onclick="window.print()">Cetak / Simpan PDF</button>
         </div>
 
-        <div class="bf-visibility-panel no-print">
-            <label><input type="checkbox" checked onchange="toggleBfGroup('grp-lc', this.checked)"> Papar Labour Charges (6-7)</label>
-            <label><input type="checkbox" checked onchange="toggleBfGroup('grp-ssp', this.checked)"> Papar Spare Part (8-9)</label>
-            <label><input type="checkbox" checked onchange="toggleBfGroup('grp-sor', this.checked)"> Papar SOR/Provisional (10-12)</label>
-        </div>
-        
+        <div class="bf-visibility-panel no-print" id="visibilityPanel">
+            </div>
+
         <div class="a4-container" id="bf_area">
             <img src="RSAJ.png" class="bf-logo" alt="RSAJ Logo" onerror="this.src='https://upload.wikimedia.org/wikipedia/en/thumb/3/3d/Ranhill_SAJ_logo.svg/1200px-Ranhill_SAJ_logo.svg.png'">
-            
+
             <div style="text-align: center; font-weight: bold; text-decoration: underline; margin: 25px 0 20px 0; padding: 0 50px;">
                 PERMOHONAN KERJA-KERJA S.O.R / TAMBAHAN DALAM KONTRAK PENYELENGGARAAN
             </div>
-            
+
             <div id="bf_content"></div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 30px; text-align: center; font-size: 11px;">
@@ -331,11 +341,40 @@
 
     let allWorks = [];
 
+    // Konfigurasi Default
+    let bfTemplate = JSON.parse(localStorage.getItem('bf_config')) || {
+        A: { label: "Labour Charges", key: "LABOUR CHARGES" },
+        B: { label: "Supply Spare Part", key: "SUPPLY SPARE PART" },
+        C: { label: "Provisional Sum", key: "PROVISIONAL SUM" }
+    };
+
     window.onload = loadContracts;
+
+    function openTemplate() {
+        document.getElementById('lbl_A').value = bfTemplate.A.label;
+        document.getElementById('key_A').value = bfTemplate.A.key;
+        document.getElementById('lbl_B').value = bfTemplate.B.label;
+        document.getElementById('key_B').value = bfTemplate.B.key;
+        document.getElementById('lbl_C').value = bfTemplate.C.label;
+        document.getElementById('key_C').value = bfTemplate.C.key;
+        document.getElementById('templateModal').style.display = 'flex';
+    }
+
+    function closeTemplate() { document.getElementById('templateModal').style.display = 'none'; }
+
+    function saveTemplate() {
+        bfTemplate = {
+            A: { label: document.getElementById('lbl_A').value, key: document.getElementById('key_A').value },
+            B: { label: document.getElementById('lbl_B').value, key: document.getElementById('key_B').value },
+            C: { label: document.getElementById('lbl_C').value, key: document.getElementById('key_C').value }
+        };
+        localStorage.setItem('bf_config', JSON.stringify(bfTemplate));
+        alert("Template berjaya disimpan!");
+        closeTemplate();
+    }
 
     async function loadContracts() {
         try {
-            // Disusun mengikut contract_start secara menaik (ASC)
             const res = await fetch(`${SB_URL}/rest/v1/contract?select=*,units(unit_name)&order=contract_start.asc`, { headers });
             const data = await res.json();
             if (!Array.isArray(data)) return;
@@ -362,7 +401,6 @@
         const tbody = document.getElementById('workOrderTbody');
         tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 40px;">Memuatkan rekod...</td></tr>';
         try {
-            // Disusun mengikut sequence_no secara menaik (ASC)
             const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}&order=sequence_no.asc`, { headers });
             const data = await res.json();
             allWorks = Array.isArray(data) ? data : [];
@@ -408,6 +446,13 @@
             const b = c.contract_sections_breakdown || {};
             const s = data.section_category || {};
 
+            // Kemaskini Panel Visibiliti dengan Label Dinamik
+            document.getElementById('visibilityPanel').innerHTML = `
+                <label><input type="checkbox" checked onchange="toggleBfGroup('grp-A', this.checked)"> Papar ${bfTemplate.A.label} (6-7)</label>
+                <label><input type="checkbox" checked onchange="toggleBfGroup('grp-B', this.checked)"> Papar ${bfTemplate.B.label} (8-9)</label>
+                <label><input type="checkbox" checked onchange="toggleBfGroup('grp-C', this.checked)"> Papar ${bfTemplate.C.label} (10-12)</label>
+            `;
+
             let html = `
                 <div class="bf-row"><div class="bf-label">1    No. Rujukan</div><div class="bf-colon">:</div><div class="bf-value">RSAJ/M&E/IP/11-57/24 - ${data.sequence_no}</div></div>
                 <div class="bf-row"><div class="bf-label">2    No. Work Order</div><div class="bf-colon">:</div><div class="bf-value">${data.work_id}</div></div>
@@ -415,18 +460,18 @@
                 <div class="bf-row"><div class="bf-label">4    Nama Kontraktor</div><div class="bf-colon">:</div><div class="bf-value">${c.contractor}</div></div>
                 <div class="bf-row"><div class="bf-label">5    Tempoh Kontrak</div><div class="bf-colon">:</div><div class="bf-value">${c.contract_start} sehingga ${c.contract_end}</div></div>
                 
-                <div class="grp-lc"><hr style="border: 0.5px solid #000; margin: 10px 0;"></div>
-                <div class="bf-row grp-lc"><div class="bf-label">6    Labour Charges Sum</div><div class="bf-colon">:</div><div class="bf-value">RM ${(b["LABOUR CHARGES"]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
-                <div class="bf-row grp-lc"><div class="bf-label">7    Anggaran Kerja (L.C)</div><div class="bf-colon">:</div><div class="bf-value">RM ${(s["LABOUR CHARGES"]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+                <div class="grp-A"><hr style="border: 0.5px solid #000; margin: 10px 0;"></div>
+                <div class="bf-row grp-A"><div class="bf-label">6    ${bfTemplate.A.label} Sum</div><div class="bf-colon">:</div><div class="bf-value">RM ${(b[bfTemplate.A.key]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+                <div class="bf-row grp-A"><div class="bf-label">7    Anggaran Kerja (${bfTemplate.A.label})</div><div class="bf-colon">:</div><div class="bf-value">RM ${(s[bfTemplate.A.key]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
                 
-                <div class="grp-ssp"><hr style="border: 0.5px solid #000; margin: 10px 0;"></div>
-                <div class="bf-row grp-ssp" style="margin-top:6px;"><div class="bf-label">8    Supply Spare Part Sum</div><div class="bf-colon">:</div><div class="bf-value">RM ${(b["SUPPLY SPARE PART"]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
-                <div class="bf-row grp-ssp"><div class="bf-label">9    Anggaran Kerja (S.S.P)</div><div class="bf-colon">:</div><div class="bf-value">RM ${(s["SUPPLY SPARE PART"]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+                <div class="grp-B"><hr style="border: 0.5px solid #000; margin: 10px 0;"></div>
+                <div class="bf-row grp-B" style="margin-top:6px;"><div class="bf-label">8    ${bfTemplate.B.label} Sum</div><div class="bf-colon">:</div><div class="bf-value">RM ${(b[bfTemplate.B.key]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+                <div class="bf-row grp-B"><div class="bf-label">9    Anggaran Kerja (${bfTemplate.B.label})</div><div class="bf-colon">:</div><div class="bf-value">RM ${(s[bfTemplate.B.key]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
                 
-                <div class="grp-sor"><hr style="border: 0.5px solid #000; margin: 10px 0;"></div>
-                <div class="bf-row grp-sor" style="margin-top:6px;"><div class="bf-label">10   Provisional Sum</div><div class="bf-colon">:</div><div class="bf-value">RM ${(b["PROVISIONAL SUM"]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
-                <div class="bf-row grp-sor"><div class="bf-label">11   Anggaran Kerja (S.O.R)</div><div class="bf-colon">:</div><div class="bf-value">RM ${(s["PROVISIONAL SUM"]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
-                <div class="bf-row grp-sor"><div class="bf-label">12   Anggaran Kerja (Tambahan)</div><div class="bf-colon">:</div><div class="bf-value" style="font-weight:bold; font-size:10px;">${data.description.toUpperCase()}</div></div>
+                <div class="grp-C"><hr style="border: 0.5px solid #000; margin: 10px 0;"></div>
+                <div class="bf-row grp-C" style="margin-top:6px;"><div class="bf-label">10   ${bfTemplate.C.label} Sum</div><div class="bf-colon">:</div><div class="bf-value">RM ${(b[bfTemplate.C.key]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+                <div class="bf-row grp-C"><div class="bf-label">11   Anggaran Kerja (${bfTemplate.C.label})</div><div class="bf-colon">:</div><div class="bf-value">RM ${(s[bfTemplate.C.key]?.amt || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+                <div class="bf-row grp-C"><div class="bf-label">12   Anggaran Kerja (Tambahan)</div><div class="bf-colon">:</div><div class="bf-value" style="font-weight:bold; font-size:10px;">${data.description.toUpperCase()}</div></div>
                 
                 <hr style="border: 0.5px solid #000; margin: 10px 0;">
                 <div class="bf-row"><div class="bf-label">13   Lokasi / Seksyen</div><div class="bf-colon">:</div><div class="bf-value">${data.location} (SEKSYEN: ${data.section || '-'})</div></div>
@@ -450,7 +495,7 @@
                 <hr style="border: 0.5px solid #000; margin: 10px 0;">
                 <div class="bf-row"><div class="bf-label">16   Tajuk Kerja</div><div class="bf-colon">:</div><div class="bf-value">${data.description.toUpperCase()} (RM ${data.amount_spent.toLocaleString(undefined, {minimumFractionDigits:2})})</div></div>
             `;
-            
+
             document.getElementById('bf_content').innerHTML = html;
             document.getElementById('blueformPage').classList.add('active');
         } catch (e) { 
