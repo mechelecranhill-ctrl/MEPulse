@@ -34,6 +34,7 @@
             display: flex;
             flex-direction: column;
             z-index: 100;
+            transition: transform 0.3s ease;
         }
 
         .sidebar-header {
@@ -85,6 +86,7 @@
             padding: 30px;
             overflow-y: auto;
             position: relative;
+            transition: all 0.3s ease;
         }
 
         .dashboard-header {
@@ -218,6 +220,41 @@
         .bf-visibility-panel label { cursor: pointer; display: flex; align-items: center; gap: 5px; }
         .hide-group { display: none !important; }
 
+        /* --- MOBILE MODE UPDATES --- */
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+                overflow: auto;
+            }
+            /* Bila kontrak dipilih, sembunyikan sidebar */
+            body.contract-selected .sidebar {
+                display: none;
+            }
+            .sidebar {
+                width: 100%;
+                height: 100vh;
+                border-right: none;
+            }
+            .main-panel {
+                width: 100%;
+                padding: 15px;
+                overflow-x: auto; /* Fit horizontal scroll */
+            }
+            .glass-card {
+                min-width: 800px; /* Kekalkan lebar supaya table tak hancur bila scroll horizontal */
+                padding: 15px;
+            }
+            .dashboard-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+            .print-tools {
+                right: 10px;
+                top: 10px;
+            }
+        }
+
         @media print {
             @page { size: A4; margin: 0; }
             body { background: white; margin: 0; padding: 0; }
@@ -233,7 +270,7 @@
         <div class="modal-box">
             <h3 style="margin-top:0;">Konfigurasi Section Blueform</h3>
             <p style="font-size: 11px; color: #666;">Tambah label paparan dan key yang sepadan dengan JSON dalam database.</p>
-            
+
             <div style="display: grid; grid-template-columns: 1fr 1fr 40px; gap: 10px; font-weight: bold; margin-bottom: 10px; font-size: 12px;">
                 <span>Label (Borang)</span>
                 <span>Key (Database JSON)</span>
@@ -267,6 +304,10 @@
             </div>
         </div>
     </div>
+
+    <button class="btn-action no-print" id="mobileBackBtn" style="display:none; position:fixed; bottom:20px; left:20px; z-index:500; background:var(--ios-blue); border-radius:50px; width:50px; height:50px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);" onclick="toggleMobileSidebar()">
+        <i class="fa fa-list"></i>
+    </button>
 
     <div class="main-panel no-print">
         <div class="dashboard-header">
@@ -333,8 +374,7 @@
     const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
 
     let allWorks = [];
-    
-    // Default Sections for Blueform
+
     let bfSections = JSON.parse(localStorage.getItem('bf_sections_v2')) || [
         { label: "Labour Charges", key: "LABOUR CHARGES" },
         { label: "Supply Spare Part", key: "SUPPLY SPARE PART" },
@@ -343,16 +383,21 @@
 
     window.onload = loadContracts;
 
-    // Tambah ini supaya sistem mula memerhati kotak carian sebaik sahaja page dibuka
-document.getElementById('tableSearch').addEventListener('keyup', function(e) {
-    const term = e.target.value.toLowerCase();
-    const filteredWorks = allWorks.filter(w => 
-        w.work_id.toLowerCase().includes(term) || 
-        (w.location && w.location.toLowerCase().includes(term)) ||
-        (w.description && w.description.toLowerCase().includes(term))
-    );
-    renderTable(filteredWorks);
-});
+    document.getElementById('tableSearch').addEventListener('keyup', function(e) {
+        const term = e.target.value.toLowerCase();
+        const filteredWorks = allWorks.filter(w => 
+            w.work_id.toLowerCase().includes(term) || 
+            (w.location && w.location.toLowerCase().includes(term)) ||
+            (w.description && w.description.toLowerCase().includes(term))
+        );
+        renderTable(filteredWorks);
+    });
+
+    // --- MOBILE HELPER ---
+    function toggleMobileSidebar() {
+        document.body.classList.remove('contract-selected');
+        document.getElementById('mobileBackBtn').style.display = 'none';
+    }
 
     // --- TEMPLATE MANAGER LOGIC ---
     function openTemplate() {
@@ -410,6 +455,12 @@ document.getElementById('tableSearch').addEventListener('keyup', function(e) {
     }
 
     async function selectContract(id, code, name) {
+        // Trigger Mobile Hiding
+        if (window.innerWidth <= 768) {
+            document.body.classList.add('contract-selected');
+            document.getElementById('mobileBackBtn').style.display = 'flex';
+        }
+
         document.querySelectorAll('.contract-item').forEach(el => el.classList.remove('active'));
         document.getElementById(`c_card_${id}`).classList.add('active');
         document.getElementById('viewTitle').innerText = code;
@@ -448,13 +499,11 @@ document.getElementById('tableSearch').addEventListener('keyup', function(e) {
 
             let dynamicHtml = '';
             let currentRow = 6;
-            
-            // Generate visibility toggles
+
             document.getElementById('visibilityPanel').innerHTML = bfSections.map((sec, idx) => 
                 `<label><input type="checkbox" checked onchange="toggleBfGroup('grp-dyn-${idx}', this.checked)"> Papar ${sec.label}</label>`
             ).join('');
 
-            // Generate dynamic rows based on Template
             bfSections.forEach((sec, idx) => {
                 const sumValue = (b[sec.key]?.amt || 0);
                 const workValue = (s[sec.key]?.amt || 0);
