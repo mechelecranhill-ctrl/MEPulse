@@ -333,43 +333,46 @@
 
         // Work Order Form
         document.getElementById('workOrderForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const breakdown = {};
-            let totalAmount = 0;
-            
-            document.querySelectorAll('.w_sec_amt').forEach(i => {
-                const val = parseFloat(i.value) || 0;
-                breakdown[i.dataset.sec] = val;
-                totalAmount += val;
-            });
-            const payload = {
-                contract_id: document.getElementById('w_contract_id').value,
-                work_id: document.getElementById('w_id').value,
-                qpb_date: document.getElementById('w_qpb_date').value,
-                location: document.getElementById('w_location').value,
-                district: document.getElementById('w_dist').value,
-                description: document.getElementById('w_desc').value,
-                section_category: breakdown,
-                amount_spent: totalAmount
-try {
-                const res = await fetch(`${SB_URL}/rest/v1/work_orders`, { 
-                    method: 'POST', 
-                    headers: headers, 
-                    body: JSON.stringify(payload) 
-                });
+    e.preventDefault();
+    const breakdown = {};
+    let totalAmount = 0;
+    
+    document.querySelectorAll('.w_sec_amt').forEach(i => {
+        const val = parseFloat(i.value) || 0;
+        breakdown[i.dataset.sec] = val;
+        totalAmount += val;
+    });
 
-                if (res.ok) { 
-                    alert("Work Order berjaya didaftar!"); 
-                    location.reload(); 
-                } else {
-                    const err = await res.json();
-                    alert("Ralat Supabase: " + err.message);
-                }
-            } catch (error) {
-                console.error("Network Error:", error);
-                alert("Gagal menghubungi server.");
-            }
-        })
+    const payload = {
+        contract_id: document.getElementById('w_contract_id').value,
+        work_id: document.getElementById('w_id').value,
+        qpb_date: document.getElementById('w_qpb_date').value,
+        location: document.getElementById('w_location').value,
+        district: document.getElementById('w_dist').value,
+        description: document.getElementById('w_desc').value,
+        section_category: breakdown,
+        amount_spent: totalAmount
+    }; // <--- Pastikan ada penutup objek di sini
+
+    try {
+        const res = await fetch(`${SB_URL}/rest/v1/work_orders`, { 
+            method: 'POST', 
+            headers: headers, 
+            body: JSON.stringify(payload) 
+        });
+
+        if (res.ok) { 
+            alert("Work Order berjaya didaftar!"); 
+            location.reload(); 
+        } else {
+            const err = await res.json();
+            alert("Ralat Supabase: " + err.message);
+        }
+    } catch (error) {
+        console.error("Network Error:", error);
+        alert("Gagal menghubungi server.");
+    }
+});
 
     async function fetchUnits() {
         try {
