@@ -333,47 +333,47 @@
 
         // Work Order Form
         document.getElementById('workOrderForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const breakdown = {};
-    let totalAmount = 0;
-    
-    document.querySelectorAll('.w_sec_amt').forEach(i => {
-        const val = parseFloat(i.value) || 0;
-        breakdown[i.dataset.sec] = val;
-        totalAmount += val;
-    });
+            e.preventDefault();
+            const breakdown = {};
+            let totalAmount = 0;
+            
+            document.querySelectorAll('.w_sec_amt').forEach(i => {
+                const val = parseFloat(i.value) || 0;
+                breakdown[i.dataset.sec] = val;
+                totalAmount += val;
+            });
 
-    const payload = {
-        contract_id: document.getElementById('w_contract_id').value,
-        work_id: document.getElementById('w_id').value,
-        qpb_date: document.getElementById('w_qpb_date').value,
-        location: document.getElementById('w_location').value,
-        district: document.getElementById('w_dist').value,
-        description: document.getElementById('w_desc').value,
-        section_category: breakdown,
-        amount_spent: totalAmount
-    };
+            const payload = {
+                contract_id: document.getElementById('w_contract_id').value,
+                work_id: document.getElementById('w_id').value,
+                qpb_date: document.getElementById('w_qpb_date').value,
+                location: document.getElementById('w_location').value,
+                district: document.getElementById('w_dist').value,
+                description: document.getElementById('w_desc').value,
+                section_category: breakdown,
+                amount_spent: totalAmount
+            };
 
-    try {
-        const res = await fetch(`${SB_URL}/rest/v1/work_orders`, { 
-            method: 'POST', 
-            headers: headers, 
-            body: JSON.stringify(payload) 
+            try {
+                const res = await fetch(`${SB_URL}/rest/v1/work_orders`, { 
+                    method: 'POST', 
+                    headers: headers, 
+                    body: JSON.stringify(payload) 
+                });
+
+                if (res.ok) { 
+                    alert("Work Order berjaya didaftar!"); 
+                    location.reload(); 
+                } else {
+                    const err = await res.json();
+                    alert("Ralat Supabase: " + err.message);
+                }
+            } catch (error) {
+                console.error("Network Error:", error);
+                alert("Gagal menghubungi server.");
+            }
         });
-
-        if (res.ok) { 
-            alert("Work Order berjaya didaftar!"); 
-            location.reload(); 
-        } else {
-            const err = await res.json();
-            alert("Ralat Supabase: " + err.message);
-        }
-    } catch (error) {
-        console.error("Network Error:", error);
-        alert("Gagal menghubungi server.");
     }
-});
-}
 
     async function fetchUnits() {
         try {
@@ -455,7 +455,7 @@
         document.getElementById('total_display').innerText = `RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
     }
 
-    // --- INTERIM LOGIC (KEMASKINI FORMAT JSON) ---
+    // --- INTERIM LOGIC ---
     function onInterimContractSelect() {
         const opt = document.getElementById('i_contract_id').selectedOptions[0];
         const container = document.getElementById('i_section_inputs_container');
@@ -514,7 +514,7 @@
         return total;
     }
 
-        async function submitInterim() {
+    async function submitInterim() {
         const cId = document.getElementById('i_contract_id').value;
         const iNoStr = document.getElementById('i_no').value;
         const iNo = parseInt(iNoStr);
@@ -526,7 +526,6 @@
 
         if (!cId || !iNo || !iDate) return alert("Sila lengkapkan maklumat utama!");
 
-        // 1. BINA FORMAT JSON BREAKDOWN
         const claimBreakdown = {};
         document.querySelectorAll('.i_sec_claim_val').forEach(input => {
             const val = parseFloat(input.value) || 0;
@@ -546,7 +545,6 @@
         };
 
         try {
-            // 2. SIMPAN DATA INTERIM
             const resInterim = await fetch(`${SB_URL}/rest/v1/interims`, { 
                 method: 'POST', 
                 headers: { ...headers, 'Prefer': 'resolution=merge-duplicates' }, 
@@ -558,11 +556,9 @@
                 throw new Error(errorData.message || "Gagal simpan Interim.");
             }
 
-            // 3. UPDATE WORK ORDERS (MASUKKAN NO INTERIM & TUKAR STATUS KE 'CLAIMED')
             if (attachedWorkOrders.length > 0) {
                 for (let id of attachedWorkOrders) {
                     const cleanId = id.trim();
-                    // Menggunakan ilike untuk mencari ID yang mengandungi teks tersebut (case-insensitive)
                     const searchPattern = `%${cleanId}%`; 
                     const updateUrl = `${SB_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=ilike.${encodeURIComponent(searchPattern)}`;
 
@@ -571,7 +567,7 @@
                         headers: headers,
                         body: JSON.stringify({ 
                             interim_no: iNo,
-                            status: 'Claimed' // <--- STATUS BERTUKAR DI SINI
+                            status: 'Claimed'
                         })
                     });
                 }
@@ -585,7 +581,6 @@
             alert("Ralat simpan interim: " + err.message);
         }
     }
-
 
     // --- VO LOGIC ---
     function onVOContractSelect() {
