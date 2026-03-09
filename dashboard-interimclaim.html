@@ -573,18 +573,55 @@ document.getElementById('refPrefixInput').value = savedPrefix;
         const b = c.contract_sections_breakdown || {};
         const s = data.section_category || {};
 
+        // ambil semua interim ikut kronologi
+const interimRes = await fetch(
+`${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=date_received.asc`,
+{ headers }
+);
+
+const allInterims = await interimRes.json();
+        
         const woRes = await fetch(
-`${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}&select=section_category`,
+`${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}&order=qpb_date.asc`,
 { headers }
 );
 
 const allWO = await woRes.json();
+        // tolak work order yang belum claim
+allWO
+.filter(w => w.status !== 'Claimed' && !w.interim_no)
+.forEach(wo => {
+
+    const cat = wo.section_category || {};
+
+    Object.keys(cat).forEach(sec => {
+
+        const base = Number(cat[sec]?.base || 0);
+        const extra = Number(cat[sec]?.extra || 0);
+
+        if(!sectionUsed[sec]) sectionUsed[sec] = 0;
+
+        sectionUsed[sec] += base + extra;
+
+    });
+
+});
 
         let sectionUsed = {};
 
-allWO.forEach(wo => {
+let sectionUsed = {};
 
-    const cat = wo.section_category || {};
+// tolak interim dahulu
+allInterims.forEach(int => {
+
+    const sec = int.section;
+    const amt = Number(int.amount || 0);
+
+    if(!sectionUsed[sec]) sectionUsed[sec] = 0;
+
+    sectionUsed[sec] += amt;
+
+});
 
     Object.keys(cat).forEach(sec => {
 
@@ -697,7 +734,6 @@ ${Object.keys(b).map(sec => {
     </div>`;
 
 }).join('')}
-})
                 <div class="bf-row" style="margin-top:8px;"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Baki Harga Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value" style="font-weight:bold;">RM ${bakiKontrak.toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
                 <hr style="border: 0.5px solid #000; margin: 8px 0;">
                 <div class="bf-row"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Tajuk Kerja</span></div><div class="bf-colon">:</div><div class="bf-value">${data.description.toUpperCase()} (RM ${data.amount_spent.toLocaleString(undefined,{minimumFractionDigits:2})})</div></div>
