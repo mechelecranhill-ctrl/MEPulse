@@ -365,9 +365,20 @@ document.getElementById('workOrderForm').addEventListener('submit', async (e) =>
         const breakdown = {};
         let totalAmount = 0;
         document.querySelectorAll('.w_sec_amt').forEach(i => {
-            const val = parseFloat(i.value) || 0;
-            breakdown[i.dataset.sec] = val;
-            totalAmount += val;
+
+    const base = parseFloat(i.value) || 0;
+
+    const extraInput = document.querySelector(
+        `.w_sec_extra[data-sec="${i.dataset.sec}"]`
+    );
+
+    const extra = parseFloat(extraInput?.value) || 0;
+
+    breakdown[i.dataset.sec] = base + extra;
+
+    totalAmount += base + extra;
+
+});
         });
 
         const payload = {
@@ -446,8 +457,33 @@ document.getElementById('workOrderForm').addEventListener('submit', async (e) =>
         if(opt && opt.dataset.b) {
             const b = JSON.parse(opt.dataset.b);
             Object.keys(b).sort().forEach(sec => {
-                container.innerHTML += `<div class="funding-item"><label>${sec}</label><span class="sec-desc">${b[sec].desc}</span>
-                <input type="number" class="w_sec_amt" data-sec="${sec}" oninput="calcTotalWork()" step="0.01"></div>`;
+                const desc = (b[sec].desc || '').toUpperCase();
+const isProvisional = desc.includes('PROVISIONAL');
+
+container.innerHTML += `
+<div class="funding-item">
+
+<label>${sec}</label>
+<span class="sec-desc">${b[sec].desc}</span>
+
+<input type="number"
+class="w_sec_amt"
+data-sec="${sec}"
+placeholder="Kos Kerja"
+oninput="calcTotalWork()"
+step="0.01">
+
+${isProvisional ? `
+<input type="number"
+class="w_sec_extra"
+data-sec="${sec}"
+placeholder="Kerja Tambahan"
+oninput="calcTotalWork()"
+step="0.01">
+` : ``}
+
+</div>
+`;
             });
         }
     }
@@ -479,8 +515,19 @@ document.getElementById('workOrderForm').addEventListener('submit', async (e) =>
     }
 
     function calcTotalWork() {
-        let total = 0; document.querySelectorAll('.w_sec_amt').forEach(i => total += parseFloat(i.value) || 0);
-        document.getElementById('total_display').innerText = `RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+
+let total = 0;
+
+document.querySelectorAll('.w_sec_amt').forEach(i=>{
+    total += parseFloat(i.value) || 0;
+});
+
+document.querySelectorAll('.w_sec_extra').forEach(i=>{
+    total += parseFloat(i.value) || 0;
+});
+
+document.getElementById('total_display').innerText =
+`RM ${total.toLocaleString(undefined,{minimumFractionDigits:2})}`;
     }
 
     // --- INTERIM LOGIC ---
