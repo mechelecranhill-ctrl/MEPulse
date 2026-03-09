@@ -476,17 +476,6 @@
     closeTemplate();
 }
 
-    });
-
-    bfSections = newSections;
-
-    localStorage.setItem('bf_sections_v2', JSON.stringify(bfSections));
-
-    alert("Template berjaya disimpan!");
-
-    closeTemplate();
-}
-
     function closeTemplate() { document.getElementById('templateModal').style.display = 'none'; }
 
     // --- DATA FETCHING LOGIC ---
@@ -555,30 +544,41 @@
 
             const tpl = JSON.parse(localStorage.getItem('bf_sections_v2') || '{}');
             
-            Object.keys(b).forEach(key => {
-                const label = tpl[key]?.label || key;
-                const active = tpl[key]?.active ?? true;
-                
-                if(!active) return;
-                const sumValue = (b[key]?.amt || 0);
-                const workValue = (s[key]?.amt || 0);
+            Object.keys(b).sort().forEach((key, idx) => {
 
-                dynamicHtml += `
-                    <div class="grp-dyn-${idx}">
-                        <hr style="border: 0.5px solid #000; margin: 8px 0;">
-                        <div class="bf-row">
-                            <div class="bf-label">${currentRow++}   ${sec.label} Sum</div>
-                            <div class="bf-colon">:</div>
-                            <div class="bf-value">RM ${sumValue.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
-                        </div>
-                        <div class="bf-row">
-                            <div class="bf-label">${currentRow++}   Anggaran Kerja (${sec.label})</div>
-                            <div class="bf-colon">:</div>
-                            <div class="bf-value">RM ${workValue.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
-                        </div>
-                    </div>
-                `;
-            });
+    const label = tpl[key]?.label || key;
+    const active = tpl[key]?.active ?? true;
+
+    if(!active) return;
+
+    const sumValue = (b[key]?.amt || 0);
+
+    const isMatch = (data.section && key.includes(data.section));
+    const workValue = isMatch ? (data.amount_spent || 0) : 0;
+
+    dynamicHtml += `
+        <div class="grp-dyn-${idx}">
+            <hr style="border: 0.5px solid #000; margin: 8px 0;">
+            
+            <div class="bf-row">
+                <div class="bf-label">${currentRow++}   ${label} Sum</div>
+                <div class="bf-colon">:</div>
+                <div class="bf-value">
+                    RM ${sumValue.toLocaleString(undefined,{minimumFractionDigits:2})}
+                </div>
+            </div>
+
+            <div class="bf-row">
+                <div class="bf-label">${currentRow++}   Anggaran Kerja (${label})</div>
+                <div class="bf-colon">:</div>
+                <div class="bf-value">
+                    RM ${workValue.toLocaleString(undefined,{minimumFractionDigits:2})}
+                </div>
+            </div>
+
+        </div>
+    `;
+});
 
             let html = `
                 <div class="bf-row"><div class="bf-label">1   No. Rujukan</div><div class="bf-colon">:</div><div class="bf-value">RSAJ/M&E/IP/11-57/24 - ${data.sequence_no}</div></div>
