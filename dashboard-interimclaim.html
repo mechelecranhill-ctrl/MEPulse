@@ -573,10 +573,30 @@ document.getElementById('refPrefixInput').value = savedPrefix;
         const b = c.contract_sections_breakdown || {};
         const s = data.section_category || {};
 
+        const woRes = await fetch(
+`${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}&select=section_category`,
+{ headers }
+);
+
+const allWO = await woRes.json();
+
         let sectionUsed = {};
 
-Object.keys(s).forEach(sec => {
-    sectionUsed[sec] = Number(s[sec]?.amt || 0);
+allWO.forEach(wo => {
+
+    const cat = wo.section_category || {};
+
+    Object.keys(cat).forEach(sec => {
+
+        const base = Number(cat[sec]?.base || 0);
+        const extra = Number(cat[sec]?.extra || 0);
+
+        if(!sectionUsed[sec]) sectionUsed[sec] = 0;
+
+        sectionUsed[sec] += base + extra;
+
+    });
+
 });
         
 let baseTotal = 0;
