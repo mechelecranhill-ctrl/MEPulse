@@ -349,20 +349,22 @@
                 location: document.getElementById('w_location').value,
                 district: document.getElementById('w_dist').value,
                 description: document.getElementById('w_desc').value,
-                section_category: breakdown
+                section_category: breakdown,
                 amount_spent: totalAmount
             };
             const res = await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(payload) });
 
-if (!res.ok) {
-    const ralatDetail = await res.json();
-    console.error("Ralat Penuh:", ralatDetail); 
-    // Lihat console: ralatDetail.message dan ralatDetail.hint akan beritahu column mana yang bermasalah.
-    alert("Gagal Simpan: " + ralatDetail.message);
-} else {
-    alert("Work Order berjaya didaftar!");
-    location.reload();
-}
+if (res.ok) { 
+            alert("Work Order berjaya didaftar!"); 
+            location.reload(); 
+        } else {
+            const err = await res.json();
+            alert("Ralat Supabase: " + err.message);
+        }
+    } catch (error) {
+        console.error("Network Error:", error);
+        alert("Gagal menghubungi server.");
+    }
         });
     }
 
