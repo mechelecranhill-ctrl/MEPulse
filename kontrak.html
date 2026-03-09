@@ -451,44 +451,61 @@ document.querySelectorAll('.w_sec_amt').forEach(i => {
     }
 
     function onContractSelect() {
-        const opt = document.getElementById('w_contract_id').selectedOptions[0];
-        const dSel = document.getElementById('w_dist');
-        dSel.innerHTML = '<option value="">Pilih Daerah</option>';
-        if(opt && opt.dataset.dist) opt.dataset.dist.split(',').forEach(d => dSel.innerHTML += `<option value="${d.trim()}">${d.trim()}</option>`);
-        const container = document.getElementById('w_sections_container'); container.innerHTML = '';
-        if(opt && opt.dataset.b) {
-            const b = JSON.parse(opt.dataset.b);
-            Object.keys(b).sort().forEach(sec => {
-                const desc = (b[sec].desc || '').toUpperCase();
-const desc = (b[sec].desc || '').trim().toUpperCase();
 
-container.innerHTML += `
-<div class="funding-item">
+    const opt = document.getElementById('w_contract_id').selectedOptions[0];
 
-<label>${sec}</label>
-<span class="sec-desc">${b[sec].desc}</span>
+    const dSel = document.getElementById('w_dist');
+    dSel.innerHTML = '<option value="">Pilih Daerah</option>';
 
-<input type="number"
-class="w_sec_amt"
-data-sec="${sec}"
-placeholder="Kos Kerja"
-oninput="calcTotalWork()"
-step="0.01">
-
-${isProvisional ? `
-<input type="number"
-class="w_sec_extra"
-data-sec="${sec}"
-placeholder="Kerja Tambahan"
-oninput="calcTotalWork()"
-step="0.01">
-` : ``}
-
-</div>
-`;
-            });
-        }
+    if(opt && opt.dataset.dist){
+        opt.dataset.dist.split(',').forEach(d=>{
+            dSel.innerHTML += `<option value="${d.trim()}">${d.trim()}</option>`;
+        });
     }
+
+    const container = document.getElementById('w_sections_container');
+    container.innerHTML = '';
+
+    if(opt && opt.dataset.b){
+
+        const b = JSON.parse(opt.dataset.b);
+
+        Object.keys(b).sort().forEach(sec=>{
+
+            const desc = (b[sec].desc || '').trim().toUpperCase();
+
+            const isProvisional = desc.includes('PROVISIONAL');
+
+            container.innerHTML += `
+            <div class="funding-item">
+
+                <label>${sec}</label>
+                <span class="sec-desc">${b[sec].desc}</span>
+
+                <input type="number"
+                class="w_sec_amt"
+                data-sec="${sec}"
+                placeholder="Kos Kerja"
+                oninput="calcTotalWork()"
+                step="0.01">
+
+                ${isProvisional ? `
+                <input type="number"
+                class="w_sec_extra"
+                data-sec="${sec}"
+                placeholder="Kerja Tambahan"
+                oninput="calcTotalWork()"
+                step="0.01">
+                ` : ``}
+
+            </div>
+            `;
+
+        });
+
+    }
+
+}
 
     function calculateContractSum() {
         let total = 0;
