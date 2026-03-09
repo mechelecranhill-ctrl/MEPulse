@@ -572,6 +572,13 @@ document.getElementById('refPrefixInput').value = savedPrefix;
         const c = data.contract;
         const b = c.contract_sections_breakdown || {};
         const s = data.section_category || {};
+
+        let sectionUsed = {};
+
+Object.keys(s).forEach(sec => {
+    sectionUsed[sec] = Number(s[sec]?.amt || 0);
+});
+        
 let baseTotal = 0;
 let extraTotal = 0;
 
@@ -643,13 +650,21 @@ Object.keys(b).forEach(key => {
                 <div style="margin-top: 8px;">
                     <strong style="font-size:10px;">${currentRow++}   BAKI:</strong>
                     <div style="margin-top:5px; padding: 5px; border: 1px solid #000;">
-                        ${Object.keys(b).map(sec => {
-                            const isMatch = (data.section && sec.includes(data.section));
-                            return `<div style="display:flex; justify-content:space-between; margin-bottom:2px; font-size:9px; ${isMatch ? 'background:#f0f7ff; font-weight:bold;' : ''}">
-                                <span>${b[sec].desc} ${isMatch ? '◀' : ''}</span>
-                                <span>RM ${b[sec].amt.toLocaleString(undefined, {minimumFractionDigits:2})}</span>
-                            </div>`;
-                        }).join('')}
+                        Object.keys(b).map(sec => {
+
+    const isMatch = (data.section && sec.includes(data.section));
+
+    const contractAmt = Number(b[sec].amt || 0);
+    const usedAmt = Number(sectionUsed[sec] || 0);
+
+    const baki = contractAmt - usedAmt;
+
+    return `<div style="display:flex; justify-content:space-between; margin-bottom:2px; font-size:9px; ${isMatch ? 'background:#f0f7ff; font-weight:bold;' : ''}">
+        <span>${b[sec].desc} ${isMatch ? '◀' : ''}</span>
+        <span>RM ${baki.toLocaleString(undefined, {minimumFractionDigits:2})}</span>
+    </div>`;
+})
+             .join('')}
                         <div style="border-top: 1px solid #000; margin-top:3px; padding-top:2px; display:flex; justify-content:space-between; font-weight:bold; font-size:9px;">
                             <span>BAKI KESELURUHAN</span>
                             <span>RM ${(data.remaining_balance || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</span>
