@@ -332,29 +332,54 @@
         });
 
         // Work Order Form
-        document.getElementById('workOrderForm').addEventListener('submit', async (e) => {
+document.getElementById('workOrderForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const breakdown = {};
-            let totalAmount = 0;
             
-            document.querySelectorAll('.w_sec_amt').forEach(i => {
-                const val = parseFloat(i.value) || 0;
-                breakdown[i.dataset.sec] = val;
-                totalAmount += val;
-            });
-
-            const payload = {
-                contract_id: document.getElementById('w_contract_id').value,
-                work_id: document.getElementById('w_id').value,
-                qpb_date: document.getElementById('w_qpb_date').value,
-                location: document.getElementById('w_location').value,
-                district: document.getElementById('w_dist').value,
-                description: document.getElementById('w_desc').value,
-                section_category: breakdown,
-                amount_spent: totalAmount
-            };
+            const contractId = document.getElementById('w_contract_id').value;
+            const districtSelected = document.getElementById('w_dist').value; // Ambil daerah yang dipilih
 
             try {
+                // 1. Dapatkan Area Code daripada dropdown kontrak (kita simpan area_code dalam dataset semasa load)
+                const contractOpt = document.getElementById('w_contract_id').selectedOptions[0];
+                
+                // Kita perlu pastikan area_code ada. Jika anda belum simpan area_code dalam dataset, 
+                // kod di bawah akan cuba cari mapping daripada string 'Segamat:SGT, Muar:MR'
+                const areaMapping = contractOpt.dataset.area || ""; 
+                let areaCode = "WO"; // Default jika tak jumpa
+                
+                areaMapping.split(',').forEach(pair => {
+                    const [d, c] = pair.split(':');
+                    if(d.trim() === districtSelected.trim()) areaCode = c.trim();
+                });
+
+                // 2. Kira berapa banyak Work Order sedia ada untuk daerah ini dalam kontrak ini
+                const seqRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&district=eq.${districtSelected}&select=id`, { headers });
+                const existingWorks = await seqRes.json();
+                
+                // 3. Bina format SGT001 (padStart digunakan untuk pastikan ada 3 digit: 001)
+                const nextNum = (existingWorks.length + 1).toString().padStart(3, '0');
+                const customSequence = `${areaCode}${nextNum}`;
+
+                const breakdown = {};
+                let totalAmount = 0;
+                document.querySelectorAll('.w_sec_amt').forEach(i => {
+                    const val = parseFloat(i.value) || 0;
+                    breakdown[i.dataset.sec] = val;
+                    totalAmount += val;
+                });
+
+                const payload = {
+                    contract_id: contractId,
+                    work_id: document.getElementById('w_id').value,
+                    sequence_no: customSequence, // Sekarang hantar SGT001, MR001 dsb
+                    qpb_date: document.getElementById('w_qpb_date').value,
+                    location: document.getElementById('w_location').value,
+                    district: districtSelected,
+                    description: document.getElementById('w_desc').value,
+                    section_category: breakdown,
+                    amount_spent: totalAmount
+                };
+
                 const res = await fetch(`${SB_URL}/rest/v1/work_orders`, { 
                     method: 'POST', 
                     headers: headers, 
@@ -362,15 +387,15 @@
                 });
 
                 if (res.ok) { 
-                    alert("Work Order berjaya didaftar!"); 
+                    alert(`Berjaya! No. Rujukan: ${customSequence}`); 
                     location.reload(); 
                 } else {
                     const err = await res.json();
-                    alert("Ralat Supabase: " + err.message);
+                    alert("Ralat: " + err.message);
                 }
             } catch (error) {
-                console.error("Network Error:", error);
-                alert("Gagal menghubungi server.");
+                console.error(error);
+                alert("Gagal memproses nombor turutan.");
             }
         });
     }
@@ -403,6 +428,7 @@
                     const opt = document.createElement('option'); opt.value = c.id; opt.text = c.contract_code;
                     opt.dataset.b = JSON.stringify(c.contract_sections_breakdown); 
                     opt.dataset.dist = c.district;
+                    opt.dataset.area = c.area_code;
                     s.appendChild(opt);
                 });
             });
