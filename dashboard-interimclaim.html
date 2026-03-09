@@ -586,8 +586,21 @@ const allInterims = await interimRes.json();
 { headers }
 );
 
-const allWO = await woRes.json();
-        // tolak work order yang belum claim
+let sectionUsed = {};
+
+// 1️⃣ Tolak INTERIM dahulu
+allInterims.forEach(int => {
+
+    const sec = int.section;
+    const amt = Number(int.amount || 0);
+
+    if(!sectionUsed[sec]) sectionUsed[sec] = 0;
+
+    sectionUsed[sec] += amt;
+
+});
+
+// 2️⃣ Tolak WORK ORDER yang belum claim
 allWO
 .filter(w => w.status !== 'Claimed' && !w.interim_no)
 .forEach(wo => {
@@ -606,24 +619,6 @@ allWO
     });
 
 });
-
-        let sectionUsed = {};
-
-let sectionUsed = {};
-
-// tolak interim dahulu
-allInterims.forEach(int => {
-
-    const sec = int.section;
-    const amt = Number(int.amount || 0);
-
-    if(!sectionUsed[sec]) sectionUsed[sec] = 0;
-
-    sectionUsed[sec] += amt;
-
-});
-
-    Object.keys(cat).forEach(sec => {
 
         const base = Number(cat[sec]?.base || 0);
         const extra = Number(cat[sec]?.extra || 0);
