@@ -348,9 +348,7 @@
             <button class="btn-action" style="background: #666;" onclick="closeBlueform()">Tutup</button>
             <button class="btn-action" style="background: var(--ios-green);" onclick="window.print()">Cetak / Simpan PDF</button>
         </div>
-
-        <div class="bf-visibility-panel no-print" id="visibilityPanel"></div>
-
+        
         <div class="a4-container" id="bf_area">
             <img src="RSAJ.png" class="bf-logo" alt="RSAJ Logo" onerror="this.src='https://upload.wikimedia.org/wikipedia/en/thumb/3/3d/Ranhill_SAJ_logo.svg/1200px-Ranhill_SAJ_logo.svg.png'">
             <div style="text-align: center; font-weight: bold; text-decoration: underline; margin: 25px 0 15px 0; padding: 0 50px; font-size: 13px;">
@@ -403,36 +401,60 @@
     function openTemplate() {
         const container = document.getElementById('dynamicRowsContainer');
         container.innerHTML = '';
-        bfSections.forEach((sec, index) => addTemplateRow(sec.label, sec.key));
+        bfSections.forEach((sec, index) =>
+            addTemplateRow(sec.label, sec.key, sec.active !== false));
         document.getElementById('templateModal').style.display = 'flex';
     }
 
-    function addTemplateRow(label = '', key = '') {
-        const container = document.getElementById('dynamicRowsContainer');
-        const div = document.createElement('div');
-        div.className = 'modal-row';
-        div.innerHTML = `
-            <input type="text" class="tpl-label" value="${label}" placeholder="Label Borang">
-            <input type="text" class="tpl-key" value="${key}" placeholder="Key Database">
-            <button onclick="this.parentElement.remove()" style="background:none; border:none; color:red; cursor:pointer;"><i class="fa fa-trash"></i></button>
-        `;
-        container.appendChild(div);
-    }
+    function addTemplateRow(label = '', key = '', active = true) {
+    const container = document.getElementById('dynamicRowsContainer');
 
+    const div = document.createElement('div');
+    div.className = 'modal-row';
+
+    div.innerHTML = `
+        <input type="text" class="tpl-label" value="${label}" placeholder="Label Borang">
+        <input type="text" class="tpl-key" value="${key}" placeholder="Key Database">
+        <label style="display:flex;align-items:center;font-size:11px;">
+            <input type="checkbox" class="tpl-active" ${active ? 'checked' : ''}>
+            Papar
+        </label>
+        <button onclick="this.parentElement.remove()" style="background:none;border:none;color:red;cursor:pointer;">
+            <i class="fa fa-trash"></i>
+        </button>`;
+
+    container.appendChild(div);
+}
     function saveTemplate() {
-        const labels = document.querySelectorAll('.tpl-label');
-        const keys = document.querySelectorAll('.tpl-key');
-        let newSections = [];
-        labels.forEach((l, i) => {
-            if(l.value && keys[i].value) {
-                newSections.push({ label: l.value, key: keys[i].value });
-            }
-        });
-        bfSections = newSections;
-        localStorage.setItem('bf_sections_v2', JSON.stringify(bfSections));
-        alert("Template berjaya disimpan!");
-        closeTemplate();
-    }
+
+    const labels = document.querySelectorAll('.tpl-label');
+    const keys = document.querySelectorAll('.tpl-key');
+    const actives = document.querySelectorAll('.tpl-active');
+
+    let newSections = [];
+
+    labels.forEach((l, i) => {
+
+        if(l.value && keys[i].value){
+
+            newSections.push({
+                label: l.value,
+                key: keys[i].value,
+                active: actives[i].checked
+            });
+
+        }
+
+    });
+
+    bfSections = newSections;
+
+    localStorage.setItem('bf_sections_v2', JSON.stringify(bfSections));
+
+    alert("Template berjaya disimpan!");
+
+    closeTemplate();
+}
 
     function closeTemplate() { document.getElementById('templateModal').style.display = 'none'; }
 
@@ -500,11 +522,7 @@
             let dynamicHtml = '';
             let currentRow = 6;
 
-            document.getElementById('visibilityPanel').innerHTML = bfSections.map((sec, idx) => 
-                `<label><input type="checkbox" checked onchange="toggleBfGroup('grp-dyn-${idx}', this.checked)"> Papar ${sec.label}</label>`
-            ).join('');
-
-            bfSections.forEach((sec, idx) => {
+            bfSections.filter(sec => sec.active !== false).forEach((sec, idx) => {
                 const sumValue = (b[sec.key]?.amt || 0);
                 const workValue = (s[sec.key]?.amt || 0);
 
