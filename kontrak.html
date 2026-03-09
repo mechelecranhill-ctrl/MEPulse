@@ -613,25 +613,49 @@ document.getElementById('workOrderForm').addEventListener('submit', async (e) =>
     function onVOContractSelect() {
         const opt = document.getElementById('vo_contract_id').selectedOptions[0];
         const sSec = document.getElementById('vo_target_sec');
+        
+        // Reset dropdown section
         sSec.innerHTML = '<option value="">Pilih Section</option>';
-        if(opt && opt.dataset.b) Object.keys(JSON.parse(opt.dataset.b)).sort().forEach(sec => sSec.innerHTML += `<option value="${sec}">${sec}</option>`);
+        
+        if(opt && opt.dataset.b) {
+            try {
+                const sections = JSON.parse(opt.dataset.b);
+                Object.keys(sections).sort().forEach(sec => {
+                    sSec.innerHTML += `<option value="${sec}">${sec}</option>`;
+                });
+            } catch (e) {
+                console.error("Ralat parsing JSON:", e);
+            }
+        }
     }
 
     async function submitVO() {
         try {
             const cId = document.getElementById('vo_contract_id').value;
-            if(!cId) return alert("Pilih kontrak!");
+            const voName = document.getElementById('vo_name').value.trim().toUpperCase();
+            const amt = parseFloat(document.getElementById('vo_amt').value);
+            const targetSec = document.getElementById('vo_target_sec').value;
 
+            if(!cId) return alert("Sila pilih kontrak!");
+            if(!voName || isNaN(amt) || !targetSec) return alert("Sila isi Nama VO, Section dan Amaun!");
+
+            // 1. Ambil data kontrak terkini
             const resGet = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { headers });
             const data = await resGet.json();
+            
+            if (!data || data.length === 0) throw new Error("Data kontrak tidak dijumpai.");
+            
             const contract = data[0];
-            
             let vBreak = contract.vo_breakdown || {};
-            const voName = document.getElementById('vo_name').value.toUpperCase();
-            const amt = parseFloat(document.getElementById('vo_amt').value);
             
-            vBreak[voName] = { amt: amt, sec: document.getElementById('vo_target_sec').value };
+            // 2. Tambah rekod VO baru ke dalam breakdown
+            vBreak[voName] = { 
+                amt: amt, 
+                sec: targetSec,
+                desc: document.getElementById('vo_desc').value 
+            };
             
+            // 3. Kemaskini (PATCH) data ke Supabase
             const resUpd = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { 
                 method: 'PATCH', 
                 headers, 
@@ -642,11 +666,15 @@ document.getElementById('workOrderForm').addEventListener('submit', async (e) =>
             });
             
             if(resUpd.ok) {
-                alert("VO Berjaya!");
+                alert("Variation Order (VO) Berjaya Direkodkan!");
                 location.reload();
+            } else {
+                const err = await resUpd.json();
+                alert("Gagal simpan: " + err.message);
             }
         } catch (e) {
-            console.error(e);
+            console.error("Ralat VO:", e);
+            alert("Ralat sistem berlaku.");
         }
     }
 </script>
