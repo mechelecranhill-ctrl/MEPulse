@@ -272,8 +272,8 @@
             <p style="font-size: 11px; color: #666;">Tambah label paparan dan key yang sepadan dengan JSON dalam database.</p>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr 40px; gap: 10px; font-weight: bold; margin-bottom: 10px; font-size: 12px;">
-                <span>Label (Borang)</span>
-                <span>Key (Database JSON)</span>
+                <span>Section (Auto)</span>
+                <span>Label Borang</span>
                 <span></span>
             </div>
 
@@ -398,52 +398,83 @@
     }
 
     // --- TEMPLATE MANAGER LOGIC ---
-    function openTemplate() {
-        const container = document.getElementById('dynamicRowsContainer');
-        container.innerHTML = '';
-        bfSections.forEach((sec, index) =>
-            addTemplateRow(sec.label, sec.key, sec.active !== false));
-        document.getElementById('templateModal').style.display = 'flex';
+    async function openTemplate() {
+
+    const activeCard = document.querySelector('.contract-item.active');
+    if(!activeCard){
+        alert("Sila pilih kontrak dahulu.");
+        return;
     }
 
-    function addTemplateRow(label = '', key = '', active = true) {
+    const id = activeCard.id.replace('c_card_','');
+
+    const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, { headers });
+    const data = await res.json();
+
+    const contract = data[0];
+    const sections = contract.contract_sections_breakdown || {};
+
+    const saved = JSON.parse(localStorage.getItem('bf_sections_v2') || '{}');
+
+    const container = document.getElementById('dynamicRowsContainer');
+    container.innerHTML = '';
+
+    Object.keys(sections).forEach(key => {
+
+        const label = saved[key]?.label || '';
+        const active = saved[key]?.active ?? true;
+
+        addTemplateRow(key, label, active);
+
+    });
+
+    document.getElementById('templateModal').style.display = 'flex';
+}
+
+    function addTemplateRow(key = '', label = '', active = true) {
+
     const container = document.getElementById('dynamicRowsContainer');
 
     const div = document.createElement('div');
     div.className = 'modal-row';
 
     div.innerHTML = `
-        <input type="text" class="tpl-label" value="${label}" placeholder="Label Borang">
-        <input type="text" class="tpl-key" value="${key}" placeholder="Key Database">
+        <input type="text" value="${key}" readonly style="background:#f5f5f5;font-weight:bold;">
+        <input type="text" class="tpl-label" value="${label}" placeholder="Label untuk borang (optional)">
         <label style="display:flex;align-items:center;font-size:11px;">
             <input type="checkbox" class="tpl-active" ${active ? 'checked' : ''}>
-            Papar
         </label>
-        <button onclick="this.parentElement.remove()" style="background:none;border:none;color:red;cursor:pointer;">
-            <i class="fa fa-trash"></i>
-        </button>`;
+    `;
+
+    div.dataset.key = key;
 
     container.appendChild(div);
 }
     function saveTemplate() {
 
-    const labels = document.querySelectorAll('.tpl-label');
-    const keys = document.querySelectorAll('.tpl-key');
-    const actives = document.querySelectorAll('.tpl-active');
+    const rows = document.querySelectorAll('#dynamicRowsContainer .modal-row');
 
-    let newSections = [];
+    let obj = {};
 
-    labels.forEach((l, i) => {
+    rows.forEach(r => {
 
-        if(l.value && keys[i].value){
+        const key = r.dataset.key;
+        const label = r.querySelector('.tpl-label').value;
+        const active = r.querySelector('.tpl-active').checked;
 
-            newSections.push({
-                label: l.value,
-                key: keys[i].value,
-                active: actives[i].checked
-            });
+        obj[key] = {
+            label: label || key,
+            active: active
+        };
 
-        }
+    });
+
+    localStorage.setItem('bf_sections_v2', JSON.stringify(obj));
+
+    alert("Template berjaya disimpan!");
+
+    closeTemplate();
+}
 
     });
 
@@ -522,9 +553,15 @@
             let dynamicHtml = '';
             let currentRow = 6;
 
-            bfSections.filter(sec => sec.active !== false).forEach((sec, idx) => {
-                const sumValue = (b[sec.key]?.amt || 0);
-                const workValue = (s[sec.key]?.amt || 0);
+            const tpl = JSON.parse(localStorage.getItem('bf_sections_v2') || '{}');
+            
+            Object.keys(b).forEach(key => {
+                const label = tpl[key]?.label || key;
+                const active = tpl[key]?.active ?? true;
+                
+                if(!active) return;
+                const sumValue = (b[key]?.amt || 0);
+                const workValue = (s[key]?.amt || 0);
 
                 dynamicHtml += `
                     <div class="grp-dyn-${idx}">
