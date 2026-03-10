@@ -599,10 +599,8 @@ document.getElementById('refPrefixInput').value = savedPrefix;
             const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}`, { headers });
 allWorks = await res.json();
 
-/* urutan kawasan */
-/* ambil area order dari database */
 const areaRes = await fetch(
-`${SB_URL}/rest/v1/contract?contract_id=eq.${id}&order=priority.asc`,
+`${SB_URL}/rest/v1/contract?id=eq.${id}&select=area_code`,
 { headers }
 );
 
@@ -610,9 +608,12 @@ const areaRows = await areaRes.json();
 
 const areaPriority = {};
 
-/* isi ranking dari database */
-areaRows.forEach(a=>{
-    areaPriority[(a.area_code || '').toUpperCase()] = a.priority;
+const areaList = (areaRows[0]?.area_code || '')
+    .split(',')
+    .map(a => a.trim().toUpperCase());
+
+areaList.forEach((a,i)=>{
+    areaPriority[a] = i + 1;
 });
 
 /* jika ada area baru dalam WO tapi tiada dalam table */
