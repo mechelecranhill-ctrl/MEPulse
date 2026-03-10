@@ -596,9 +596,46 @@ document.getElementById('refPrefixInput').value = savedPrefix;
         document.getElementById('viewSubtitle').innerText = name;
         document.getElementById('tableWrapper').style.display = 'block';
         try {
-            const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}&order=sequence_no.asc`, { headers });
-            allWorks = await res.json();
-            renderTable(allWorks);
+            const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}`, { headers });
+allWorks = await res.json();
+
+/* urutan kawasan */
+const defaultAreaOrder = ["SGT","MR","BP","KLG","MRS"];
+
+const areaPriority = {};
+defaultAreaOrder.forEach((a,i)=> areaPriority[a] = i+1);
+
+/* tambah area lain jika ada */
+allWorks.forEach(w=>{
+    const a = (w.area_code || '').toUpperCase();
+    if(a && !areaPriority[a]){
+        areaPriority[a] = Object.keys(areaPriority).length + 1;
+    }
+});
+
+/* sort sama macam Blueform */
+allWorks.sort((a,b)=>{
+
+    const aArea = (a.area_code || '').toUpperCase();
+    const bArea = (b.area_code || '').toUpperCase();
+
+    const aRank = areaPriority[aArea] || 99;
+    const bRank = areaPriority[bArea] || 99;
+
+    if(aRank < bRank) return -1;
+    if(aRank > bRank) return 1;
+
+    const d1 = new Date(a.qpb_date);
+    const d2 = new Date(b.qpb_date);
+
+    if(d1 < d2) return -1;
+    if(d1 > d2) return 1;
+
+    return (a.sequence_no || '').localeCompare(b.sequence_no || '');
+});
+
+renderTable(allWorks);
+            
         } catch (e) { console.error(e); }
     }
 
