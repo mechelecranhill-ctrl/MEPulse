@@ -682,16 +682,34 @@ let allWO = await woRes.json();
 
 let sectionUsed = {}; // 🔴 TAMBAH INI
 
+        const areaList = [...new Set(allWO.map(w => (w.area_code || '').toUpperCase()))];
+        const areaPriority = {};
+
+areaList.sort().forEach((a,i)=>{
+    areaPriority[a] = i+1;
+});
+
 // sort ikut kronologi
 allWO.sort((a,b)=>{
 
     const d1 = new Date(a.qpb_date);
     const d2 = new Date(b.qpb_date);
 
+    /* 1️⃣ Tarikh */
     if(d1 < d2) return -1;
     if(d1 > d2) return 1;
 
-    // kalau tarikh sama → guna sequence
+    /* 2️⃣ Area */
+    const aArea = (a.area_code || '').toUpperCase();
+    const bArea = (b.area_code || '').toUpperCase();
+
+    const aRank = areaPriority[aArea] || 99;
+    const bRank = areaPriority[bArea] || 99;
+
+    if(aRank < bRank) return -1;
+    if(aRank > bRank) return 1;
+
+    /* 3️⃣ Sequence */
     return (a.sequence_no || '').localeCompare(b.sequence_no || '');
 
 });
