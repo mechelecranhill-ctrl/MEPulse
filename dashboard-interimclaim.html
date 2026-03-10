@@ -730,17 +730,22 @@ let allWO = await woRes.json();
 
 let sectionUsed = {}; // 🔴 TAMBAH INI
 
-/* urutan standard */
-const defaultAreaOrder = ["SGT","MR","BP","KLG","MRS"];
+/* ambil area order dari database */
+const areaRes = await fetch(
+`${SB_URL}/rest/v1/contract_areas?contract_id=eq.${c.id}&order=priority.asc`,
+{ headers }
+);
+
+const areaRows = await areaRes.json();
 
 const areaPriority = {};
 
-/* isi ranking ikut order standard */
-defaultAreaOrder.forEach((a,i)=>{
-    areaPriority[a] = i+1;
+/* isi ranking dari database */
+areaRows.forEach(a=>{
+    areaPriority[(a.area_code || '').toUpperCase()] = a.priority;
 });
 
-/* jika ada area lain dalam kontrak, tambah di belakang */
+/* jika ada area baru dalam WO */
 allWO.forEach(w=>{
     const a = (w.area_code || '').toUpperCase();
     if(a && !areaPriority[a]){
