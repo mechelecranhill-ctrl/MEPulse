@@ -809,7 +809,7 @@ return txt;
             `;
 
             document.getElementById('bf_executive_unit').innerText =unitName ? `Eksekutif ${unitName}` : 'Eksekutif';
-            document.getElementById('bf_content').innerHTML = html;smartBlueformLayout();
+            document.getElementById('bf_content').innerHTML = html; setTimeout(blueformLayoutEngine, 50);
             document.getElementById('blueformPage').classList.add('active');
         
         } catch (e) { alert("Ralat memaparkan borang."); }
@@ -822,20 +822,39 @@ return txt;
 
     function closeBlueform() { document.getElementById('blueformPage').classList.remove('active'); }
 
-    function smartBlueformLayout(){
+    function blueformLayoutEngine(){
+
         const page = document.getElementById('bf_area');
         const rows = page.querySelectorAll('.bf-row');
+
+        if(rows.length === 0) return;
+
+        /* tinggi sebenar A4 container */
         const pageHeight = page.clientHeight;
-        let rowsHeight = 0;rows.forEach(r=>{rowsHeight += r.offsetHeight;});
-       
-        /* kira ruang kosong */const freeSpace = pageHeight - rowsHeight - 220;/*220 = anggaran ruangtitle + signature + padding*/
-        let gap = 4;
-        
-        if(freeSpace > 200){gap = 12;}
-        else if(freeSpace > 120){gap = 8;}
-        else if(freeSpace > 60){gap = 6;}
-        else if(freeSpace > 20){gap = 4;}
-        else{gap = 2;}/* set spacing */page.style.setProperty('--row-gap', gap + 'px');}
+
+        /* kira tinggi semua row */
+        let rowsHeight = 0;
+
+        rows.forEach(r=>{
+    rowsHeight += r.offsetHeight;
+});
+
+        /* ruang untuk title + signature */
+        const reserved = 240;
+
+        /* ruang kosong sebenar */
+        let freeSpace = pageHeight - rowsHeight - reserved;
+
+        if(freeSpace < 0) freeSpace = 0;
+
+        /* kira gap ideal */
+        let gap = Math.floor(freeSpace / rows.length);
+
+        /* hadkan gap supaya tak pelik */
+        if(gap > 14) gap = 14;
+        if(gap < 2) gap = 2;
+        /* set spacing */
+        page.style.setProperty('--row-gap', gap + 'px');}
     
 </script>
 </body>
