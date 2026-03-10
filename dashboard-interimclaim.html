@@ -582,12 +582,25 @@ const interimRes = await fetch(
 const allInterims = await interimRes.json();
         
         const woRes = await fetch(
-`${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}&order=qpb_date.asc`,
+`${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}`,
 { headers }
 );
 
-const allWO = await woRes.json();
-let sectionUsed = {};
+let allWO = await woRes.json();
+
+// sort ikut kronologi
+allWO.sort((a,b)=>{
+
+    const d1 = new Date(a.qpb_date);
+    const d2 = new Date(b.qpb_date);
+
+    if(d1 < d2) return -1;
+    if(d1 > d2) return 1;
+
+    // kalau tarikh sama → guna sequence
+    return (a.sequence_no || '').localeCompare(b.sequence_no || '');
+
+});
 
 // 1️⃣ Tolak INTERIM dahulu (ikut date_received)
 allInterims.forEach(int => {
@@ -608,7 +621,24 @@ allInterims.forEach(int => {
 
 // 2️⃣ Tolak WORK ORDER pending sahaja (ikut qpb_date)
 allWO
-.filter(w => w.status !== 'Claimed' && !w.interim_no)
+.filter(w => {
+
+    if(!w.qpb_date) return false;
+
+    const woDate = new Date(w.qpb_date);
+    const curDate = new Date(data.qpb_date);
+
+    // hanya tolak jika sebelum atau sama
+    if(woDate > curDate) return false;
+
+    // jika hari sama → guna sequence
+    if(woDate.getTime() === curDate.getTime()){
+        if((w.sequence_no || '') > (data.sequence_no || '')) return false;
+    }
+
+    return true;
+
+})
 .forEach(wo => {
 
     const cat = wo.section_category || {};
