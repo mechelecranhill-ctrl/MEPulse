@@ -735,7 +735,7 @@ let sectionUsed = {}; // 🔴 TAMBAH INI
 
 /* ambil area order dari database */
 const areaRes = await fetch(
-`${SB_URL}/rest/v1/contract?id=eq.${c.id}&select=area_code&order=priority.asc`,
+`${SB_URL}/rest/v1/contract?id=eq.${c.id}&select=area_code`,
 { headers }
 );
 
@@ -743,19 +743,15 @@ const areaRows = await areaRes.json();
 
 const areaPriority = {};
 
-/* isi ranking dari database */
-areaRows.forEach(a=>{
-    areaPriority[(a.area_code || '').toUpperCase()] = a.priority;
-});
+const areaList = (areaRows[0]?.area_code || '')
+.split(',')
+.map(a => a.trim().toUpperCase())
+.filter(a => a.length > 0);
 
-/* jika ada area baru dalam WO */
-allWO.forEach(w=>{
-    const a = (w.area_code || '').toUpperCase();
-    if(a && !areaPriority[a]){
-        areaPriority[a] = Object.keys(areaPriority).length + 1;
-    }
+areaList.forEach((a,i)=>{
+    areaPriority[a] = i + 1;
 });
-
+        
 // sort ikut kronologi
 allWO.sort((a,b)=>{
 
@@ -827,7 +823,11 @@ if(woDate.getTime() === curDate.getTime()){
 
     // jika area sama baru guna sequence
     if(wRank === curRank){
-        if((w.sequence_no || '') > (data.sequence_no || '')) return false;
+        const wSeq = parseInt((w.sequence_no || '').match(/\d+/)?.[0] || 0);
+const curSeq = parseInt((data.sequence_no || '').match(/\d+/)?.[0] || 0);
+
+if(wSeq > curSeq) return false;
+        
     }
 
 }
