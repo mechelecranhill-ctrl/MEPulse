@@ -683,19 +683,22 @@ let allWO = await woRes.json();
 
 let sectionUsed = {}; // 🔴 TAMBAH INI
 
-const areaList = [];
-
-allWO.forEach(w=>{
-    const a = (w.area_code || '').toUpperCase();
-    if(a && !areaList.includes(a)){
-        areaList.push(a);
-    }
-});
+/* urutan standard */
+const defaultAreaOrder = ["SGT","MR","BP","KLG","MRS"];
 
 const areaPriority = {};
 
-areaList.forEach((a,i)=>{
+/* isi ranking ikut order standard */
+defaultAreaOrder.forEach((a,i)=>{
     areaPriority[a] = i+1;
+});
+
+/* jika ada area lain dalam kontrak, tambah di belakang */
+allWO.forEach(w=>{
+    const a = (w.area_code || '').toUpperCase();
+    if(a && !areaPriority[a]){
+        areaPriority[a] = Object.keys(areaPriority).length + 1;
+    }
 });
 
 // sort ikut kronologi
