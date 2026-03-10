@@ -993,35 +993,41 @@ return txt;
 
     function blueformLayoutEngine(){
 
-        const page = document.getElementById('bf_area');
-        const rows = page.querySelectorAll('.bf-row');
+    const page = document.querySelector('.bf-page');
+    const signature = page.querySelector('.bf-signature-grid');
 
-        if(rows.length === 0) return;
+    if(!page || !signature) return;
 
-        /* tinggi sebenar A4 container */
-        const pageHeight = page.clientHeight;
+    /* buang spacer lama */
+    page.querySelectorAll('.bf-spacer').forEach(e=>e.remove());
 
-        /* kira tinggi semua row */
-        let rowsHeight = 0;
+    const pageHeight = page.clientHeight;
 
-        rows.forEach(r=>{
-    rowsHeight += r.offsetHeight;
-});
+    const signatureHeight = signature.offsetHeight;
 
-        const signature = page.querySelector('.bf-signature-grid');
-        const reserved = signature ? signature.offsetHeight + 80 : 80;
-        let freeSpace = pageHeight - rowsHeight - reserved;
+    const reserved = signatureHeight + 120;
 
-        if(freeSpace < 0) freeSpace = 0;
+    /* kira tinggi content tanpa signature */
+    let contentHeight = 0;
 
-        /* kira gap ideal */
-        let gap = Math.floor(freeSpace / rows.length);
+    [...page.children].forEach(el=>{
+        if(!el.classList.contains('bf-signature-grid')){
+            contentHeight += el.offsetHeight;
+        }
+    });
 
-        /* hadkan gap supaya tak pelik */
-        if(gap > 14) gap = 14;
-        if(gap < 2) gap = 2;
-        /* set spacing */
-        page.style.setProperty('--row-gap', gap + 'px');}
+    const free = pageHeight - reserved - contentHeight;
+
+    if(free > 0){
+
+        const spacer = document.createElement('div');
+        spacer.className = 'bf-spacer';
+        spacer.style.height = free + 'px';
+
+        page.insertBefore(spacer, signature);
+
+    }
+}
     
 </script>
 </body>
