@@ -651,24 +651,35 @@ allWorks.forEach(w=>{
 
 allWorks.sort((a,b)=>{
 
-    const aArea = (a.area_code || '').toUpperCase();
-    const bArea = (b.area_code || '').toUpperCase();
+    /* AREA CODE */
+    const aArea = (a.area_code || '').toUpperCase().trim();
+    const bArea = (b.area_code || '').toUpperCase().trim();
 
     const aRank = areaPriority[aArea] ?? 999;
     const bRank = areaPriority[bArea] ?? 999;
 
-    /* 1️⃣ ikut area_code dahulu */
+    /* 1️⃣ SORT AREA */
     if(aRank !== bRank){
         return aRank - bRank;
     }
 
-    /* 2️⃣ jika area sama → guna sequence_no penuh */
-    const aSeq = (a.sequence_no || '').toUpperCase();
-    const bSeq = (b.sequence_no || '').toUpperCase();
+    /* 2️⃣ EXTRACT NUMBER FROM SEQUENCE */
+    const getSeqNum = (seq)=>{
+        const match = (seq || '').match(/(\d+)$/);
+        return match ? parseInt(match[1],10) : 0;
+    };
 
-    return aSeq.localeCompare(bSeq, undefined, { numeric:true });
+    const aNum = getSeqNum(a.sequence_no);
+    const bNum = getSeqNum(b.sequence_no);
 
-});;
+    if(aNum !== bNum){
+        return aNum - bNum;
+    }
+
+    /* 3️⃣ FINAL FALLBACK */
+    return (a.sequence_no || '').localeCompare(b.sequence_no || '');
+
+});
 
 renderTable(allWorks);
             
