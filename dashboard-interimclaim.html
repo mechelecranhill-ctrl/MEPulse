@@ -614,11 +614,26 @@ function sortWorkOrders(data, areaPriority){
 
 return data.sort((a,b)=>{
 
+const aArea = (a.area_code || '').toUpperCase().trim();
+const bArea = (b.area_code || '').toUpperCase().trim();
+
+const aRank = areaPriority[aArea] ?? 999;
+const bRank = areaPriority[bArea] ?? 999;
+
+/* 1️⃣ AREA ORDER */
+if(aRank !== bRank){
+return aRank - bRank;
 }
 
-// --- DATA FETCHING LOGIC ---
-async function loadContracts() {
-    
+/* 2️⃣ SEQUENCE NUMBER */
+const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
+const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
+
+return aSeq - bSeq;
+
+});
+
+}
     // --- DATA FETCHING LOGIC ---
     async function loadContracts() {
         try {
@@ -676,27 +691,6 @@ allWorks.forEach(w=>{
     if(a && !areaPriority[a]){
         areaPriority[a] = Object.keys(areaPriority).length + 1;
     }
-});
-
-allWorks = sortWorkOrders(allWorks, areaPriority);
-
-    const aArea = (a.area_code || '').toUpperCase().trim();
-    const bArea = (b.area_code || '').toUpperCase().trim();
-
-    const aRank = areaPriority[aArea] ?? 999;
-    const bRank = areaPriority[bArea] ?? 999;
-
-    /* 1️⃣ SORT AREA IKUT CONTRACT */
-    if(aRank !== bRank){
-        return aRank - bRank;
-    }
-
-    /* 2️⃣ SORT SEQUENCE DALAM AREA */
-    const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
-    const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
-
-    return aSeq - bSeq;
-
 });
 
             function generateDistrictTabs(data){
