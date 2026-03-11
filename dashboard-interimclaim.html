@@ -147,6 +147,22 @@
         .bf-baki-table .bf-row{
             margin-bottom:2px !important;}
 
+        .district-tab{
+padding:7px 14px;
+border-radius:20px;
+font-size:11px;
+font-weight:700;
+background:#f1f1f1;
+border:1px solid #ddd;
+cursor:pointer;
+}
+
+.district-tab.active{
+background:var(--ios-blue);
+color:white;
+}
+        
+
         /* Modal Template Manager */
         #templateModal {
             display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); 
@@ -385,6 +401,7 @@ flex-shrink:0;
 
         <div class="glass-card" id="tableWrapper" style="display: none;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div id="districtTabs" style="margin-top:10px;margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;"></div>
                 <h3 style="margin:0;"><i class="fa-solid fa-list-check" style="margin-right: 10px; color: var(--ios-blue);"></i> Senarai Work Order & Tuntutan</h3>
                 <input type="text" id="tableSearch" placeholder="Cari ID Kerja atau Lokasi..."style="padding:10px;border-radius:10px;border:1px solid #ddd;width:250px;max-width:100%;">
             </div>
@@ -669,6 +686,38 @@ allWorks.sort((a,b)=>{
     return aSeq.localeCompare(bSeq, undefined, { numeric:true });
 
 });
+
+            function generateDistrictTabs(data){
+
+const container = document.getElementById("districtTabs");
+
+let districts = [...new Set(data.map(w => w.district || "LAIN"))];
+
+let html = `<div class="district-tab active" onclick="filterDistrict('ALL',this)">SEMUA</div>`;
+
+districts.forEach(d=>{
+html += `<div class="district-tab" onclick="filterDistrict('${d}',this)">${d}</div>`;
+});
+
+container.innerHTML = html;
+
+}
+            function filterDistrict(district,el){
+
+document.querySelectorAll('.district-tab').forEach(t=>t.classList.remove('active'));
+el.classList.add('active');
+
+if(district === "ALL"){
+    generateDistrictTabs(allWorks);
+renderTable(allWorks);
+return;
+}
+
+const filtered = allWorks.filter(w=> (w.district || '') === district);
+
+renderTable(filtered);
+
+}
             
 renderTable(allWorks);
             
