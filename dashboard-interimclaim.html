@@ -644,13 +644,18 @@ closeTemplate();
         document.getElementById('tableWrapper').style.display = 'block';
         try {
             const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}`, { headers });
-            allWorks = await res.json();
-            
-            const areaRes = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}&select=area_code,district`,{ headers });
-            const areaRows = await areaRes.json();
-            const districtList = (areaRows[0]?.district || '').split(',').map(d => d.trim());
-            const areaPriority = {};
-            const areaList = (areaRows[0]?.area_code || '')
+allWorks = await res.json();
+
+const areaRes = await fetch(
+`${SB_URL}/rest/v1/contract?id=eq.${id}&select=area_code`,
+{ headers }
+);
+
+const areaRows = await areaRes.json();
+
+const areaPriority = {};
+
+const areaList = (areaRows[0]?.area_code || '')
     .split(',')
     .map(a => a.trim().toUpperCase());
 
@@ -687,32 +692,18 @@ allWorks.sort((a,b)=>{
 
 });
  
-            generateDistrictTabs(districtList);
+            generateDistrictTabs(allWorks);
 
-            function generateDistrictTabs(districts){
+            function generateDistrictTabs(data){
 
 const container = document.getElementById("districtTabs");
 
-let totalWO = allWorks.length;
+let districts = [...new Set(data.map(w => w.district || "LAIN"))];
 
-let html = `
-<div class="district-tab active"
-onclick="filterDistrict('ALL',this)">
-SEMUA (${totalWO})
-</div>
-`;
+let html = `<div class="district-tab active" onclick="filterDistrict('ALL',this)">SEMUA</div>`;
 
 districts.forEach(d=>{
-
-let count = allWorks.filter(w => (w.district || '') === d).length;
-
-html += `
-<div class="district-tab"
-onclick="filterDistrict('${d}',this)">
-${d} (${count})
-</div>
-`;
-
+html += `<div class="district-tab" onclick="filterDistrict('${d}',this)">${d}</div>`;
 });
 
 container.innerHTML = html;
