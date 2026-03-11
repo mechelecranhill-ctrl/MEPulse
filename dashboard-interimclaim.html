@@ -724,6 +724,26 @@ return `${hari} ${bulanText} ${tahun}`;
         const b = c.contract_sections_breakdown || {};
         const s = data.section_category ?? {};
 
+        // =============================
+// KIRAAN NILAI KERJA
+// =============================
+
+// jumlah kerja dari section_category
+let totalSection = 0;
+
+Object.values(s).forEach(sec => {
+    totalSection += Number(sec?.amt || 0);
+});
+
+// kerja tambahan (PROVISIONAL)
+let provisionalExtra = Number(data.additional || 0);
+
+// jumlah sebenar work order
+let totalWorkValue = totalSection + provisionalExtra;
+
+// tentukan sama ada row tambahan perlu dipaparkan
+let hasProvisional = provisionalExtra > 0;
+
         // ambil semua interim ikut kronologi
 const interimRes = await fetch(
 `${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=date_received.asc`,
@@ -968,7 +988,7 @@ return txt;
 
                 <div class="bf-row" style="margin-top:8px;"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Baki Harga Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value" style="font-weight:bold;">RM ${bakiKontrak.toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
                 <hr style="border: 0.5px solid #000; margin: 8px 0;">
-                <div class="bf-row"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Tajuk Kerja</span></div><div class="bf-colon">:</div><div class="bf-value">${data.description.toUpperCase()} DI ${locationText} (RM ${data.amount_spent.toLocaleString(undefined,{minimumFractionDigits:2})})</div></div>
+                <div class="bf-row"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Tajuk Kerja</span></div><div class="bf-colon">:</div><div class="bf-value">${data.description.toUpperCase()} DI ${locationText} (RM ${totalWorkValue.toLocaleString(undefined,{minimumFractionDigits:2})})</div></div>
             `;
 
             document.getElementById('bf_executive_unit').innerText =unitName ? `Eksekutif ${unitName}` : 'Eksekutif';
