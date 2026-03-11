@@ -364,6 +364,7 @@ document.getElementById('workOrderForm').addEventListener('submit', async (e) =>
         // 4. PROSES KOS & PAYLOAD
 const breakdown = {};
 let totalAmount = 0;
+let additionalTotal = 0;
 
 document.querySelectorAll('.w_sec_amt').forEach(i => {
 
@@ -375,29 +376,28 @@ document.querySelectorAll('.w_sec_amt').forEach(i => {
 
     const extra = parseFloat(extraInput?.value) || 0;
 
-    const total = base + extra;
-
+    // section_category hanya simpan amt
     breakdown[i.dataset.sec] = {
-        base: base,
-        extra: extra,
-        amt: total
+        amt: base
     };
 
-    totalAmount += total;
+    totalAmount += base;
+    additionalTotal += extra;
 
 });
 
         const payload = {
-            contract_id: contractId,
-            work_id: document.getElementById('w_id').value,
-            sequence_no: customSequence, 
-            qpb_date: document.getElementById('w_qpb_date').value,
-            location: document.getElementById('w_location').value,
-            district: districtSelected,
-            description: document.getElementById('w_desc').value,
-            section_category: breakdown,
-            amount_spent: totalAmount
-        };
+    contract_id: contractId,
+    work_id: document.getElementById('w_id').value,
+    sequence_no: customSequence, 
+    qpb_date: document.getElementById('w_qpb_date').value,
+    location: document.getElementById('w_location').value,
+    district: districtSelected,
+    description: document.getElementById('w_desc').value,
+    section_category: breakdown,
+    additional: additionalTotal,
+    amount_spent: totalAmount + additionalTotal
+};
 
         const res = await fetch(`${SB_URL}/rest/v1/work_orders`, { 
             method: 'POST', 
@@ -446,7 +446,7 @@ document.querySelectorAll('.w_sec_amt').forEach(i => {
                 data.forEach(c => {
                     const opt = document.createElement('option'); opt.value = c.id; opt.text = c.contract_code;
                     opt.dataset.b = JSON.stringify(c.contract_sections_breakdown); 
-                    opt.dataset.dist = c.district;
+                    opt.dataset.dist = (c.district || '').toUpperCase();
                     opt.dataset.area = c.area_code;
                     s.appendChild(opt);
                 });
