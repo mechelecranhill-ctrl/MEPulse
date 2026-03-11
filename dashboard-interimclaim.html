@@ -646,16 +646,11 @@ closeTemplate();
             const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}`, { headers });
 allWorks = await res.json();
 
-const areaRes = await fetch(
-`${SB_URL}/rest/v1/contract?id=eq.${id}&select=area_code`,
-{ headers }
-);
-
-const areaRows = await areaRes.json();
-
-const areaPriority = {};
-
-const areaList = (areaRows[0]?.area_code || '')
+            const areaRes = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}&select=area_code,district`,{ headers });
+            const areaRows = await areaRes.json();
+            const districtList = (areaRows[0]?.district || '').split(',').map(d => d.trim());
+            const areaPriority = {};
+            const areaList = (areaRows[0]?.area_code || '')
     .split(',')
     .map(a => a.trim().toUpperCase());
 
@@ -692,13 +687,11 @@ allWorks.sort((a,b)=>{
 
 });
  
-            generateDistrictTabs(allWorks);
+            generateDistrictTabs(districtList);
 
-            function generateDistrictTabs(data){
+            function generateDistrictTabs(districts){
 
 const container = document.getElementById("districtTabs");
-
-let districts = [...new Set(data.map(w => w.district || "LAIN"))];
 
 let html = `<div class="district-tab active" onclick="filterDistrict('ALL',this)">SEMUA</div>`;
 
