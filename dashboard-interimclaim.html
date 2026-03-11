@@ -651,35 +651,24 @@ allWorks.forEach(w=>{
 
 allWorks.sort((a,b)=>{
 
-    /* AREA */
     const aArea = (a.area_code || '').toUpperCase();
     const bArea = (b.area_code || '').toUpperCase();
 
     const aRank = areaPriority[aArea] ?? 999;
     const bRank = areaPriority[bArea] ?? 999;
 
-    /* 1️⃣ AREA PRIORITY DARI KONTRAK */
+    /* 1️⃣ ikut area_code dahulu */
     if(aRank !== bRank){
         return aRank - bRank;
     }
 
-    /* 2️⃣ SEQUENCE NUMBER */
-    const getSeq = (seq)=>{
-        const m = (seq || '').match(/\d+/);
-        return m ? parseInt(m[0],10) : 0;
-    };
+    /* 2️⃣ jika area sama → guna sequence_no penuh */
+    const aSeq = (a.sequence_no || '').toUpperCase();
+    const bSeq = (b.sequence_no || '').toUpperCase();
 
-    const aSeq = getSeq(a.sequence_no);
-    const bSeq = getSeq(b.sequence_no);
+    return aSeq.localeCompare(bSeq, undefined, { numeric:true });
 
-    if(aSeq !== bSeq){
-        return aSeq - bSeq;
-    }
-
-    /* 3️⃣ fallback supaya stabil */
-    return (a.sequence_no || '').localeCompare(b.sequence_no || '');
-
-});
+});;
 
 renderTable(allWorks);
             
@@ -691,7 +680,7 @@ renderTable(allWorks);
         tbody.innerHTML = data.map(w => `
             <tr>
                 <td><span class="tag" style="background:${w.status === 'Claimed' ? 'var(--ios-green)' : 'var(--ios-blue)'}">${w.status || 'PENDING'}</span></td>
-                <td><div style="font-weight:bold;">${w.sequence_no || w.work_id}</div></td>
+                <td><div style="font-weight:bold;">${w.work_id}</div></td>
                 <td><div style="font-weight:500;">${w.description}</div><div style="font-size:11px; color:var(--ios-orange);"><i class="fa-solid fa-map-pin"></i> ${w.location || 'N/A'}</div></td>
                 <td><div style="font-weight:bold;">${w.interim_no ? 'INT-' + w.interim_no : '-'}</div></td>
                 <td>RM ${(w.amount_spent || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
