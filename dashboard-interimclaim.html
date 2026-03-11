@@ -649,28 +649,38 @@ allWorks.forEach(w=>{
     }
 });
 
-/* sort sama macam Blueform */
 allWorks.sort((a,b)=>{
 
+    /* 1️⃣ AREA CODE */
     const aArea = (a.area_code || '').toUpperCase();
     const bArea = (b.area_code || '').toUpperCase();
 
-    const aRank = areaPriority[aArea] || 99;
-    const bRank = areaPriority[bArea] || 99;
+    if(aArea < bArea) return -1;
+    if(aArea > bArea) return 1;
 
-    if(aRank < bRank) return -1;
-    if(aRank > bRank) return 1;
+    /* 2️⃣ SEQUENCE PREFIX (SGT / MR / dll) */
+    const aPrefix = (a.sequence_no || '').replace(/[0-9]/g,'');
+    const bPrefix = (b.sequence_no || '').replace(/[0-9]/g,'');
 
+    if(aPrefix < bPrefix) return -1;
+    if(aPrefix > bPrefix) return 1;
+
+    /* 3️⃣ SEQUENCE NUMBER */
+    const aNum = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
+    const bNum = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
+
+    if(aNum < bNum) return -1;
+    if(aNum > bNum) return 1;
+
+    /* 4️⃣ QPB DATE */
     const d1 = new Date(a.qpb_date);
     const d2 = new Date(b.qpb_date);
 
     if(d1 < d2) return -1;
     if(d1 > d2) return 1;
 
-    const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
-const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
+    return 0;
 
-return aSeq - bSeq;
 });
 
 renderTable(allWorks);
