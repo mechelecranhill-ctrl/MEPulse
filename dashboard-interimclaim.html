@@ -651,22 +651,33 @@ allWorks.forEach(w=>{
 
 allWorks.sort((a,b)=>{
 
+    /* AREA */
     const aArea = (a.area_code || '').toUpperCase();
     const bArea = (b.area_code || '').toUpperCase();
 
-    const aRank = areaPriority[aArea] || 99;
-    const bRank = areaPriority[bArea] || 99;
+    const aRank = areaPriority[aArea] ?? 999;
+    const bRank = areaPriority[bArea] ?? 999;
 
-    /* 1️⃣ ikut area priority dari contract */
+    /* 1️⃣ AREA PRIORITY DARI KONTRAK */
     if(aRank !== bRank){
         return aRank - bRank;
     }
 
-    /* 2️⃣ jika area sama → guna sequence penuh */
-    const aSeq = (a.sequence_no || '').toUpperCase();
-    const bSeq = (b.sequence_no || '').toUpperCase();
+    /* 2️⃣ SEQUENCE NUMBER */
+    const getSeq = (seq)=>{
+        const m = (seq || '').match(/\d+/);
+        return m ? parseInt(m[0],10) : 0;
+    };
 
-    return aSeq.localeCompare(bSeq, undefined, { numeric:true });
+    const aSeq = getSeq(a.sequence_no);
+    const bSeq = getSeq(b.sequence_no);
+
+    if(aSeq !== bSeq){
+        return aSeq - bSeq;
+    }
+
+    /* 3️⃣ fallback supaya stabil */
+    return (a.sequence_no || '').localeCompare(b.sequence_no || '');
 
 });
 
