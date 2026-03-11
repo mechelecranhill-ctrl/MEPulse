@@ -238,7 +238,7 @@
                     <label>Kontraktor</label>
                     <input type="text" id="c_contractor" placeholder="NAMA SYARIKAT" required>
                     <label>Daerah</label>
-                    <input type="text" id="c_dist" oninput="this.value=this.value.toUpperCase()">" placeholder="SEGAMAT, MUAR" required>
+                    <input type="text" id="c_dist" oninput="this.value=this.value.toUpperCase()" placeholder="SEGAMAT, MUAR" required>
                     <label>Kod Kawasan</label>
                     <input type="text" id="c_area" placeholder="SGT,MR,BP,KLG,MRS" required>
                     <label>Pecahan Section BQ</label>
@@ -355,9 +355,13 @@ document.getElementById('workOrderForm').addEventListener('submit', async (e) =>
         let areaCode = (index !== -1 && areaCodes[index]) ? areaCodes[index] : "WO";
 
         // 2. KIRA SEQUENCE: Cari jumlah rekod sedia ada bagi daerah ini dalam kontrak ini
-        const seqRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&district=eq.${encodeURIComponent(districtSelected)}&select=sequence_no`,{ headers });
+        const seqRes = await fetch(
+`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&district=eq.${encodeURIComponent(districtSelected)}&select=sequence_no`,
+{ headers });
 
-        let maxSeq = 0;
+const existingWorks = await seqRes.json();
+
+let maxSeq = 0;
 
 existingWorks.forEach(w=>{
     const num = parseInt((w.sequence_no || '').replace(/\D/g,'')) || 0;
@@ -366,10 +370,7 @@ existingWorks.forEach(w=>{
 
 const nextNum = (maxSeq + 1).toString().padStart(3,'0');
         
-        const existingWorks = await seqRes.json();
-        
         // 3. BINA FORMAT: Contoh SGT + 001 = SGT001
-        const nextNum = (existingWorks.length + 1).toString().padStart(3, '0');
         const customSequence = `${areaCode}${nextNum}`;
 
         // 4. PROSES KOS & PAYLOAD
@@ -468,7 +469,7 @@ document.querySelectorAll('.w_sec_amt').forEach(i => {
                 data.forEach(c => {
                     const opt = document.createElement('option'); opt.value = c.id; opt.text = c.contract_code;
                     opt.dataset.b = JSON.stringify(c.contract_sections_breakdown); 
-                    opt.dataset.dist = (c.district || '').toUpperCase();
+                    opt.dataset.dist = (c.district || '').toUpperCase().replace(/\s+/g,'');
                     opt.dataset.area = c.area_code;
                     s.appendChild(opt);
                 });
@@ -501,7 +502,7 @@ document.querySelectorAll('.w_sec_amt').forEach(i => {
             opt.text = c.contract_code;
 
             opt.dataset.b = JSON.stringify(c.contract_sections_breakdown);
-            opt.dataset.dist = (c.district || '').toUpperCase();
+            opt.dataset.dist = (c.district || '').toUpperCase().replace(/\s+/g,'');
             opt.dataset.area = c.area_code;
 
             contractSelect.appendChild(opt);
