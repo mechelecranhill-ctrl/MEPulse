@@ -502,8 +502,8 @@ flex-shrink:0;
    const saved = JSON.parse(localStorage.getItem(`bf_sections_${id}`) || '{}');
 
     const container = document.getElementById('dynamicRowsContainer');
-        const savedPrefix = localStorage.getItem('bf_ref_prefix') || 'RSAJ/M&E/IP/11-';
-document.getElementById('refPrefixInput').value = savedPrefix;
+    const savedPrefix = contract.reference || 'RSAJ/M&E/IP/11-';
+        document.getElementById('refPrefixInput').value = savedPrefix;
     container.innerHTML = '';
 
     Object.keys(sections).forEach(key => {
@@ -540,34 +540,46 @@ document.getElementById('refPrefixInput').value = savedPrefix;
 
     container.appendChild(div);
 }
-    function saveTemplate() {
+    async function saveTemplate() {
 
-    const rows = document.querySelectorAll('#dynamicRowsContainer .modal-row');
-    let obj = {};
+const rows = document.querySelectorAll('#dynamicRowsContainer .modal-row');
+let obj = {};
 
-    rows.forEach(r => {
+rows.forEach(r => {
 
-        const key = r.dataset.key;
-        const label = r.querySelector('.tpl-label').value;
-        const active = r.querySelector('.tpl-active').checked;
+    const key = r.dataset.key;
+    const label = r.querySelector('.tpl-label').value;
+    const active = r.querySelector('.tpl-active').checked;
 
-        obj[key] = {
-            label: label || key,
-            active: active
-        };
+    obj[key] = {
+        label: label || key,
+        active: active
+    };
 
-    });
+});
 
-    const activeCard = document.querySelector('.contract-item.active');
-        const id = activeCard.id.replace('c_card_','');
-        localStorage.setItem(`bf_sections_${id}`, JSON.stringify(obj));
+const activeCard = document.querySelector('.contract-item.active');
+const id = activeCard.id.replace('c_card_','');
 
-    const prefix = document.getElementById('refPrefixInput').value;
-    localStorage.setItem('bf_ref_prefix', prefix);
+/* simpan template section */
+localStorage.setItem(`bf_sections_${id}`, JSON.stringify(obj));
 
-    alert("Template berjaya disimpan!");
+/* ambil prefix */
+const prefix = document.getElementById('refPrefixInput').value;
 
-    closeTemplate();
+/* hantar ke database contract.reference */
+await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, {
+    method:'PATCH',
+    headers,
+    body: JSON.stringify({
+        reference: prefix
+    })
+});
+
+alert("Template berjaya disimpan!");
+
+closeTemplate();
+
 }
 
     function closeTemplate() { document.getElementById('templateModal').style.display = 'none'; }
@@ -716,7 +728,7 @@ return `${hari} ${bulanText} ${tahun}`;
 
         const seq = data.sequence_no || '';
         
-        const refPrefix = localStorage.getItem('bf_ref_prefix') || 'RSAJ/M&E/IP/11-';
+        const refPrefix = c.reference || 'RSAJ/M&E/IP/11-';
         let formattedRef = seq.replace(/([A-Z]{2,4}\d+)$/i, ' - $1');
 
         const c = data.contract;
