@@ -236,9 +236,9 @@
                         <div><label>Tarikh Tamat</label><input type="date" id="c_end" required></div>
                     </div>
                     <label>Kontraktor</label>
-                    <input type="text" id="c_contractor" placeholder="Nama Syarikat" required>
+                    <input type="text" id="c_contractor" placeholder="NAMA SYARIKAT" required>
                     <label>Daerah</label>
-                    <input type="text" id="c_dist" placeholder="SEGAMAT, MUAR" required>
+                    <input type="text" id="c_dist" oninput="this.value=this.value.toUpperCase()">" placeholder="SEGAMAT, MUAR" required>
                     <label>Kod Kawasan</label>
                     <input type="text" id="c_area" placeholder="SGT,MR,BP,KLG,MRS" required>
                     <label>Pecahan Section BQ</label>
@@ -292,7 +292,7 @@
         if(targetPage) targetPage.classList.add('active');
         if(element) element.classList.add('active');
         if(['registerWorkPage', 'interimPage', 'adminPage', 'settingsPage', 'voPage'].includes(id)) fetchUnits();
-        if(['registerWorkPage', 'interimPage', 'voPage'].includes(id)) loadContractsToDropdowns();
+        if(id === 'voPage') loadContractsToDropdowns();
     }
 
     function setupFormListeners() {
@@ -355,7 +355,17 @@ document.getElementById('workOrderForm').addEventListener('submit', async (e) =>
         let areaCode = (index !== -1 && areaCodes[index]) ? areaCodes[index] : "WO";
 
         // 2. KIRA SEQUENCE: Cari jumlah rekod sedia ada bagi daerah ini dalam kontrak ini
-        const seqRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&district=eq.${encodeURIComponent(districtSelected)}&select=id`, { headers });
+        const seqRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&district=eq.${encodeURIComponent(districtSelected)}&select=sequence_no`,{ headers });
+
+        let maxSeq = 0;
+
+existingWorks.forEach(w=>{
+    const num = parseInt((w.sequence_no || '').replace(/\D/g,'')) || 0;
+    if(num > maxSeq) maxSeq = num;
+});
+
+const nextNum = (maxSeq + 1).toString().padStart(3,'0');
+        
         const existingWorks = await seqRes.json();
         
         // 3. BINA FORMAT: Contoh SGT + 001 = SGT001
