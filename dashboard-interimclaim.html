@@ -651,21 +651,21 @@ allWorks.forEach(w=>{
 
 allWorks.sort((a,b)=>{
 
-    /* 1️⃣ AREA CODE */
-    const areaCompare = (a.area_code || '').localeCompare(
-        (b.area_code || ''),
-        undefined,
-        { sensitivity: 'base' }
-    );
+    const aArea = (a.area_code || '').toUpperCase();
+    const bArea = (b.area_code || '').toUpperCase();
 
-    if(areaCompare !== 0) return areaCompare;
+    const aRank = areaPriority[aArea] || 99;
+    const bRank = areaPriority[bArea] || 99;
 
-    /* 2️⃣ SEQUENCE NO (SMART NUMERIC SORT) */
-    return (a.sequence_no || '').localeCompare(
-        (b.sequence_no || ''),
-        undefined,
-        { numeric: true, sensitivity: 'base' }
-    );
+    /* 1️⃣ AREA PRIORITY */
+    if(aRank < bRank) return -1;
+    if(aRank > bRank) return 1;
+
+    /* 2️⃣ SEQUENCE NUMBER */
+    const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
+    const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
+
+    return aSeq - bSeq;
 
 });
 
@@ -732,9 +732,8 @@ return `${hari} ${bulanText} ${tahun}`;
 
         const c = data.contract;
         const refPrefix = c.reference || 'RSAJ/M&E/IP/11-';
+        
         let formattedRef = seq.replace(/([A-Z]{2,4}\d+)$/i, ' - $1');
-
-        const c = data.contract;
         const unitName = (c.units?.unit_name || '').toUpperCase();
         const b = c.contract_sections_breakdown || {};
         const s = data.section_category ?? {};
