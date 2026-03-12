@@ -872,6 +872,8 @@ let allWO = await woRes.json();
 
 let sectionUsed = {}; // 🔴 TAMBAH INI
 
+let sectionSalvage = {};
+
 /* ambil area order dari database */
 const areaRes = await fetch(
 `${SB_URL}/rest/v1/contract?id=eq.${c.id}&select=area_code`,
@@ -928,10 +930,13 @@ allInterims.forEach(int => {
     Object.keys(cat).forEach(sec => {
 
         const amt = Number(cat[sec]?.amt || 0);
+        const salvage = Number(cat[sec]?.salvage || 0);
 
         if(!sectionUsed[sec]) sectionUsed[sec] = 0;
+        if(!sectionSalvage[sec]) sectionSalvage[sec] = 0;
 
         sectionUsed[sec] += amt;
+        sectionSalvage[sec] += salvage;
 
     });
 
@@ -1028,7 +1033,7 @@ let totalUsed = 0;
 Object.keys(b).forEach(sec => {
 
     totalContract += Number(b[sec]?.amt || 0);
-    totalUsed += Number(sectionUsed[sec] || 0);
+    totalUsed += Number(sectionUsed[sec] || 0) - Number(sectionSalvage[sec] || 0);
 
 });
 
@@ -1076,20 +1081,52 @@ return txt;
                     <div class="bf-row"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>BAKI</span></div><div class="bf-colon">:</div><div class="bf-value"></div></div>
                     <div class="bf-baki-table">
                     ${Object.keys(b).map(sec => {
-                        let label = (b[sec].desc || '').toUpperCase();
-                        // Tukar nama section
-                        if(label.includes('GENERAL') || label.includes('PRELIMINARIES')){label = 'G&P';}
-                        else if(label.includes('PREVENTIVE')){label = 'PREVENTIVE MAINTENANCE';}
-                        else if(label.includes('PROACTIVE')){label = 'PROACTIVE MAINTENANCE';}
-                        // buang perkataan CHARGES
-                        label = label.replace(/CHARGES/g,'').trim();
-                        
-                        const contractAmt = Number(b[sec]?.amt || 0);
-                        const usedAmt = Number(sectionUsed[sec] || 0);
-                        const baki = contractAmt - usedAmt;
-                        return `
-                        <div class="bf-row" style="font-size:9px;"><div class="bf-label" style="width:220px;"><span style="margin-left:25px;">${label}</span></div><div class="bf-colon">:</div><div class="bf-value">
-                        RM ${baki.toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>`;}).join('')}</div></div>
+
+let label = (b[sec].desc || '').toUpperCase();
+
+if(label.includes('GENERAL') || label.includes('PRELIMINARIES')){
+label = 'G&P';
+}
+else if(label.includes('PREVENTIVE')){
+label = 'PREVENTIVE MAINTENANCE';
+}
+else if(label.includes('PROACTIVE')){
+label = 'PROACTIVE MAINTENANCE';
+}
+
+label = label.replace(/CHARGES/g,'').trim();
+
+const contractAmt = Number(b[sec]?.amt || 0);
+const usedAmt = Number(sectionUsed[sec] || 0);
+const salvageAmt = Number(sectionSalvage[sec] || 0);
+
+const baki = contractAmt - usedAmt + salvageAmt;
+
+return `
+
+<div class="bf-row" style="font-size:9px;">
+<div class="bf-label" style="width:220px;">
+<span style="margin-left:25px;">${label}</span>
+</div>
+<div class="bf-colon">:</div>
+<div class="bf-value">
+RM ${baki.toLocaleString(undefined,{minimumFractionDigits:2})}
+</div>
+</div>
+
+<div class="bf-row" style="font-size:9px;">
+<div class="bf-label" style="width:220px;">
+<span style="margin-left:40px;">Salvage Value</span>
+</div>
+<div class="bf-colon">:</div>
+<div class="bf-value" style="color:#444;">
+RM ${salvageAmt.toLocaleString(undefined,{minimumFractionDigits:2})}
+</div>
+</div>
+
+`;
+
+}).join('')}</div></div>
 
                 <div class="bf-row" style="margin-top:8px;"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Baki Harga Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value" style="font-weight:bold;">RM ${bakiKontrak.toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
                 <hr style="border: 0.5px solid #000; margin: 8px 0;">
