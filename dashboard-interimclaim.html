@@ -932,6 +932,11 @@ if(intDate.getTime() === curDate.getTime()){
 // interim hari sama tetap kira dahulu
 }
 
+const intDate = new Date(int.date_received);
+const curDate = new Date(data.qpb_date);
+
+if(intDate > curDate) return;
+
 const salvage = Number(int.salvage_value || 0);
 totalSalvage += salvage;
 
@@ -1007,12 +1012,12 @@ if(wSeq > curSeq) return false;
 timeline.push({
 type:'WORKORDER',
 date:wo.qpb_date,
-seq:parseInt((wo.sequence_no || '').match(/\d+/)?.[0] || 0)
+seq:parseInt((wo.sequence_no || '').match(/\d+/)?.[0] || 0),
 amount:
 Object.values(wo.section_category || {})
 .reduce((a,b)=>a + Number(b?.amt || 0),0)
-+ Number(wo.additional || 0)
-,salvage:0
++ Number(wo.additional || 0),
+salvage:0
 });
     
     const cat = wo.section_category || {};
@@ -1060,12 +1065,11 @@ Object.values(wo.section_category || {})
     `;
 });
 
-        let totalContract = Number(c.contract_sum || 0);
+let totalContract = Number(c.contract_sum || 0);
 let totalUsed = 0;
 
 Object.keys(b).forEach(sec => {
 
-    totalContract += Number(b[sec]?.amt || 0);
     totalUsed += Number(sectionUsed[sec] || 0);
 
 });
@@ -1094,28 +1098,12 @@ return 0;
         
 let bakiKontrak = totalContract;
 
-const curDate = new Date(data.qpb_date);
+timeline.forEach(t=>{
 
-allInterims.forEach(int=>{
-
-const intDate = new Date(int.date_received);
-
-/* interim selepas WO jangan kira */
-if(intDate > curDate) return;
-
-/* interim hari sama dikira dahulu */
-const salvage = Number(int.salvage_value || 0);
-
-const cat = int.section_category || {};
-
-let amt = 0;
-
-Object.values(cat).forEach(s=>{
-amt += Number(s?.amt || 0);
-});
-
-bakiKontrak -= amt;
-bakiKontrak -= salvage;
+if(t.type === 'INTERIM'){
+bakiKontrak -= t.amount;
+bakiKontrak -= t.salvage;
+}
 
 });
         
