@@ -871,6 +871,7 @@ const allInterims = await interimRes.json();
 let allWO = await woRes.json();
 let sectionUsed = {};
 let totalSalvage = 0;
+let timeline = [];
 
 /* ambil area order dari database */
 const areaRes = await fetch(
@@ -923,25 +924,38 @@ allWO.sort((a,b)=>{
 // 1️⃣ Tolak INTERIM dahulu (ikut date_received)
 allInterims.forEach(int => {
 
-    totalSalvage += Number(int.salvage_value || 0);
+    const salvage = Number(int.salvage_value || 0);
+    totalSalvage += salvage;
 
     const cat = int.section_category || {};
 
+    let amt = 0;
+
+    Object.values(cat).forEach(s=>{
+        amt += Number(s?.amt || 0);
+    });
+
+    timeline.push({
+        type:'INTERIM',
+        date:int.date_received,
+        amount:amt,
+        salvage:salvage
+    });
+
     Object.keys(cat).forEach(sec => {
 
-        const amt = Number(cat[sec]?.amt || 0);
+        const val = Number(cat[sec]?.amt || 0);
 
         if(!sectionUsed[sec]) sectionUsed[sec] = 0;
 
-        sectionUsed[sec] += amt;
+        sectionUsed[sec] += val;
 
     });
 
 });
 
 // 2️⃣ Tolak WORK ORDER pending sahaja (ikut qpb_date)
-allWO
-.filter(w => {
+allWO.filter(w => {
 
     if(!w.qpb_date) return false;
 
@@ -977,8 +991,16 @@ if(wSeq > curSeq) return false;
     return true;
 
 })
+    
 .forEach(wo => {
 
+timeline.push({
+type:'WORKORDER',
+date:wo.qpb_date,
+amount:Object.values(wo.section_category || {})
+.reduce((a,b)=>a + Number(b?.amt || 0),0),
+salvage:0
+});
     const cat = wo.section_category || {};
 
     Object.keys(cat).forEach(sec => {
@@ -1034,7 +1056,21 @@ Object.keys(b).forEach(sec => {
 
 });
 
-const bakiKontrak = totalContract - totalUsed - totalSalvage;
+timeline.sort((a,b)=> new Date(a.date) - new Date(b.date));
+let bakiKontrak = totalContract;
+
+timeline.forEach(t=>{
+
+if(t.type === 'WORKORDER'){
+bakiKontrak -= t.amount;
+}
+
+if(t.type === 'INTERIM'){
+bakiKontrak -= t.amount;
+bakiKontrak -= t.salvage;
+}
+
+});
             
 let locationText = formatLocation(data.location);
 
