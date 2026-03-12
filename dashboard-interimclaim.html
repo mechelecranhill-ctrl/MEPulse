@@ -869,10 +869,8 @@ const allInterims = await interimRes.json();
 );
 
 let allWO = await woRes.json();
-
-let sectionUsed = {}; // 🔴 TAMBAH INI
-
-let sectionSalvage = {};
+let sectionUsed = {};
+let totalSalvage = 0;
 
 /* ambil area order dari database */
 const areaRes = await fetch(
@@ -925,20 +923,17 @@ allWO.sort((a,b)=>{
 // 1️⃣ Tolak INTERIM dahulu (ikut date_received)
 allInterims.forEach(int => {
 
+    totalSalvage += Number(int.salvage_value || 0);
+
     const cat = int.section_category || {};
 
     Object.keys(cat).forEach(sec => {
 
         const amt = Number(cat[sec]?.amt || 0);
-        const salvage = Number(cat[sec]?.salvage || 0);
 
         if(!sectionUsed[sec]) sectionUsed[sec] = 0;
-        if(!sectionSalvage[sec]) sectionSalvage[sec] = 0;
 
         sectionUsed[sec] += amt;
-        sectionSalvage[sec] += salvage;
-
-        totalSalvage += salvage; // tambah ini
 
     });
 
@@ -1039,7 +1034,6 @@ Object.keys(b).forEach(sec => {
 
 });
 
-let totalSalvage = 0;
 const bakiKontrak = totalContract - totalUsed - totalSalvage;
 let locationText = formatLocation(data.location);
 
