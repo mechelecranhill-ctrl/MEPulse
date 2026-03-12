@@ -438,11 +438,38 @@ document.querySelectorAll('.w_sec_amt').forEach(i => {
     amount_spent: totalAmount + additionalTotal
 };
 
-        const res = await fetch(`${SB_URL}/rest/v1/work_orders`, { 
-            method: 'POST', 
-            headers: headers, 
-            body: JSON.stringify(payload) 
-        });
+        // SEMAK jika work order sudah wujud
+const checkRes = await fetch(
+`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(payload.work_id)}`,
+{ headers });
+
+const existing = await checkRes.json();
+
+let res;
+
+if(existing.length > 0){
+
+// UPDATE
+res = await fetch(
+`${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`,
+{
+method: 'PATCH',
+headers: headers,
+body: JSON.stringify(payload)
+});
+
+}else{
+
+// INSERT
+res = await fetch(
+`${SB_URL}/rest/v1/work_orders`,
+{
+method: 'POST',
+headers: headers,
+body: JSON.stringify(payload)
+});
+
+}
 
         if (res.ok) { 
             alert(`Berjaya didaftar! No. Rujukan: ${customSequence}`); 
