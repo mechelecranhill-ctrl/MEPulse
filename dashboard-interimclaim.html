@@ -938,6 +938,7 @@ allInterims.forEach(int => {
     timeline.push({
         type:'INTERIM',
         date:int.date_received,
+        seq:Number(int.sequence_no ?? 0),
         amount:amt,
         salvage:salvage
     });
@@ -997,10 +998,12 @@ if(wSeq > curSeq) return false;
 timeline.push({
 type:'WORKORDER',
 date:wo.qpb_date,
+seq:Number(wo.sequence_no ?? 0),
 amount:Object.values(wo.section_category || {})
 .reduce((a,b)=>a + Number(b?.amt || 0),0),
 salvage:0
 });
+    
     const cat = wo.section_category || {};
 
     Object.keys(cat).forEach(sec => {
@@ -1056,7 +1059,25 @@ Object.keys(b).forEach(sec => {
 
 });
 
-timeline.sort((a,b)=> new Date(a.date) - new Date(b.date));
+timeline.sort((a,b)=>{
+
+const d1 = new Date(a.date);
+const d2 = new Date(b.date);
+
+if(d1.getTime() !== d2.getTime()){
+return d1 - d2;
+}
+
+// jika tarikh sama → interim dahulu
+if(a.type !== b.type){
+return a.type === 'INTERIM' ? -1 : 1;
+}
+
+// jika jenis sama → ikut sequence
+return (a.seq || 0) - (b.seq || 0);
+
+});
+        
 let bakiKontrak = totalContract;
 
 timeline.forEach(t=>{
