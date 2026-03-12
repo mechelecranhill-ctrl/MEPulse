@@ -1007,7 +1007,7 @@ if(wSeq > curSeq) return false;
 timeline.push({
 type:'WORKORDER',
 date:wo.qpb_date,
-seq:Number(wo.sequence_no ?? 0),
+seq:parseInt((wo.sequence_no || '').match(/\d+/)?.[0] || 0)
 amount:
 Object.values(wo.section_category || {})
 .reduce((a,b)=>a + Number(b?.amt || 0),0)
@@ -1060,7 +1060,7 @@ Object.values(wo.section_category || {})
     `;
 });
 
-        let totalContract = 0;
+        let totalContract = Number(c.contract_sum || 0);
 let totalUsed = 0;
 
 Object.keys(b).forEach(sec => {
@@ -1100,10 +1100,10 @@ allInterims.forEach(int=>{
 
 const intDate = new Date(int.date_received);
 
-/* hanya interim sebelum atau hari sama */
-if(intDate.getTime() === curDate.getTime()){
-}
+/* interim selepas WO jangan kira */
+if(intDate > curDate) return;
 
+/* interim hari sama dikira dahulu */
 const salvage = Number(int.salvage_value || 0);
 
 const cat = int.section_category || {};
