@@ -930,12 +930,7 @@ const curDate = new Date(data.qpb_date);
 
 if(intDate > curDate) return;
 
-/* TAMBAH BARIS INI */
 const salvage = Number(int.salvage_value || 0);
-
-totalSalvage += salvage;
-
-    const salvage = Number(int.salvage_value || 0);
 const pg = Number(int.performance_guarantee_sum || 0);
 
 totalSalvage += salvage;
@@ -953,8 +948,10 @@ timeline.push({
     type:'INTERIM',
     date:int.date_received,
     amount:amt,
-    salvage:salvage
+    salvage:salvage,
+    pg:pg
 });
+    
     Object.keys(cat).forEach(sec => {
 
         const val = Number(cat[sec]?.amt || 0);
@@ -1085,8 +1082,11 @@ let bakiKontrak = totalContract;
 timeline.forEach(t => {
 
 if(t.type === 'INTERIM'){
-    bakiKontrak -= (t.amount + t.salvage);
+    bakiKontrak -= t.amount;
+    bakiKontrak += (t.salvage || 0);
+    bakiKontrak += (t.pg || 0);
 }
+
 else if(t.type === 'WORKORDER'){
     bakiKontrak -= t.amount;
 }
