@@ -152,7 +152,7 @@
                     <label>Pilih Unit</label><select id="w_unit_id" onchange="loadContractsByUnit('w')" required><option value="">Pilih Unit</option></select>
                     <label>Pilih Kontrak</label><select id="w_contract_id" onchange="onContractSelect()" required><option value="">Pilih Unit Dahulu</option></select>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div><label>ID Kerja</label><input type="text" id="w_id" placeholder="C 123456" required></div>
+                        <div><label>ID Kerja</label><input type="text" id="w_id" placeholder="C 123456" required><button type="button" onclick="checkExistingWork()" style="margin-top:5px;font-size:12px;background:#8e8e93;color:white;border:none;padding:6px 10px;border-radius:8px;cursor:pointer;">Check Existing</button></div>
                         <div><label>Proceed Blueform</label><input type="date" id="w_qpb_date" required></div>
                     </div>
                     <input type="text" id="w_location" placeholder="Lokasi (Cth: JEMENTAH)">
@@ -809,6 +809,71 @@ document.getElementById('total_display').innerText =
             alert("Ralat sistem berlaku.");
         }
     }
+        
+    // CHECK EXISTING WORK ORDER
+async function checkExistingWork(){
+
+const contractId = document.getElementById('w_contract_id').value;
+const workId = document.getElementById('w_id').value.trim();
+
+if(!contractId || !workId){
+alert("Pilih kontrak dan masukkan ID kerja dahulu");
+return;
+}
+
+try{
+
+const res = await fetch(
+`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${workId}&select=*`,
+{ headers });
+
+const data = await res.json();
+
+if(data.length === 0){
+alert("Work Order belum wujud.");
+return;
+}
+
+const w = data[0];
+
+document.getElementById('w_qpb_date').value = w.qpb_date || '';
+document.getElementById('w_location').value = w.location || '';
+document.getElementById('w_desc').value = w.description || '';
+const distSelect = document.getElementById('w_dist');
+
+setTimeout(()=>{
+distSelect.value = w.district || '';
+},100);
+
+if(w.section_category){
+
+Object.keys(w.section_category).forEach(sec=>{
+
+const input = document.querySelector(`.w_sec_amt[data-sec="${sec}"]`);
+const extraInput = document.querySelector(`.w_sec_extra[data-sec="${sec}"]`);
+
+if(input){
+input.value = w.section_category[sec].amt || 0;
+}
+
+if(extraInput){
+extraInput.value = w.section_category[sec].extra || 0;
+}
+
+});
+
+}
+
+calcTotalWork();
+
+alert("Work Order dijumpai. Data telah dimuatkan.");
+
+}catch(e){
+console.error(e);
+alert("Ralat semak Work Order");
+}
+
+}
 </script>
 </body>
 </html>
