@@ -152,7 +152,7 @@
                     <label>Pilih Unit</label><select id="w_unit_id" onchange="loadContractsByUnit('w')" required><option value="">Pilih Unit</option></select>
                     <label>Pilih Kontrak</label><select id="w_contract_id" onchange="onContractSelect()" required><option value="">Pilih Unit Dahulu</option></select>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div><label>ID Kerja</label><input type="text" id="w_id" placeholder="C 123456" required></div>
+                        <input type="text" id="w_id" placeholder="C 123456" required oninput="autoDetectWork()">
                         <div><label>Proceed Blueform</label><input type="date" id="w_qpb_date" required></div>
                     </div>
                     <input type="text" id="w_location" placeholder="Lokasi (Cth: JEMENTAH)">
@@ -809,6 +809,73 @@ document.getElementById('total_display').innerText =
             alert("Ralat sistem berlaku.");
         }
     }
+
+    let detectTimer = null;
+
+function autoDetectWork(){
+
+clearTimeout(detectTimer);
+
+detectTimer = setTimeout(async ()=>{
+
+const contractId = document.getElementById('w_contract_id').value;
+const workId = document.getElementById('w_id').value.trim();
+
+if(!contractId || workId.length < 3) return;
+
+try{
+
+const res = await fetch(
+`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${workId}&select=*`,
+{ headers }
+);
+
+const data = await res.json();
+
+if(data.length === 0){
+
+console.log("Work Order baru");
+return;
+
+}
+
+const w = data[0];
+
+document.getElementById('w_qpb_date').value = w.qpb_date || '';
+document.getElementById('w_location').value = w.location || '';
+document.getElementById('w_desc').value = w.description || '';
+
+setTimeout(()=>{
+document.getElementById('w_dist').value = w.district || '';
+},100);
+
+if(w.section_category){
+
+Object.keys(w.section_category).forEach(sec=>{
+
+const amt = document.querySelector(`.w_sec_amt[data-sec="${sec}"]`);
+const extra = document.querySelector(`.w_sec_extra[data-sec="${sec}"]`);
+
+if(amt) amt.value = w.section_category[sec].amt || 0;
+if(extra) extra.value = w.additional || 0;
+
+});
+
+}
+
+calcTotalWork();
+
+console.log("Existing Work Order loaded");
+
+}catch(e){
+
+console.error("Auto detect error:", e);
+
+}
+
+},500);
+
+}
 </script>
 </body>
 </html>
