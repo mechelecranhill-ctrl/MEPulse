@@ -499,39 +499,44 @@ document.querySelectorAll('.w_sec_amt').forEach(i => {
 
     async function loadContractsByUnit(prefix){
 
-    const unitId = document.getElementById(`${prefix}_unit_id`).value;
-    const contractSelect = document.getElementById(`${prefix}_contract_id`);
+const unitId = document.getElementById(`${prefix}_unit_id`).value;
+const contractSelect = document.getElementById(`${prefix}_contract_id`);
 
-    contractSelect.innerHTML = '<option value="">Loading...</option>';
+if(!unitId){
+contractSelect.innerHTML = '<option value="">Pilih Unit Dahulu</option>';
+return;
+}
 
-    try{
+contractSelect.innerHTML = '<option value="">Loading...</option>';
 
-        const res = await fetch(
-        `${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}&select=*`,
-        { headers });
+try{
 
-        const data = await res.json();
+const res = await fetch(
+`${SB_URL}/rest/v1/contract?select=*&unit_id=eq.${unitId}`,
+{ headers });
 
-        contractSelect.innerHTML = '<option value="">Pilih Kontrak</option>';
+const data = await res.json();
 
-        data.forEach(c=>{
+contractSelect.innerHTML = '<option value="">Pilih Kontrak</option>';
 
-            const opt = document.createElement('option');
+data.forEach(c=>{
 
-            opt.value = c.id;
-            opt.text = c.contract_code;
+const opt = document.createElement('option');
 
-            opt.dataset.b = JSON.stringify(c.contract_sections_breakdown);
-            opt.dataset.dist = (c.district || '').toUpperCase();
-            opt.dataset.area = c.area_code;
+opt.value = c.id;
+opt.text = c.contract_code;
 
-            contractSelect.appendChild(opt);
+opt.dataset.b = JSON.stringify(c.contract_sections_breakdown);
+opt.dataset.dist = (c.district || '').toUpperCase();
+opt.dataset.area = c.area_code;
 
-        });
+contractSelect.appendChild(opt);
 
-    }catch(e){
-        console.error(e);
-    }
+});
+
+}catch(e){
+console.error(e);
+}
 
 }
 
