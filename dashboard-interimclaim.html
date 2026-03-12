@@ -999,8 +999,10 @@ timeline.push({
 type:'WORKORDER',
 date:wo.qpb_date,
 seq:Number(wo.sequence_no ?? 0),
-amount:Object.values(wo.section_category || {})
-.reduce((a,b)=>a + Number(b?.amt || 0),0),
+amount:
+Object.values(wo.section_category || {})
+.reduce((a,b)=>a + Number(b?.amt || 0),0)
++ Number(wo.additional || 0)
 salvage:0
 });
     
@@ -1064,17 +1066,20 @@ timeline.sort((a,b)=>{
 const d1 = new Date(a.date);
 const d2 = new Date(b.date);
 
-if(d1.getTime() !== d2.getTime()){
-return d1 - d2;
-}
+if(d1 < d2) return -1;
+if(d1 > d2) return 1;
 
-// jika tarikh sama → interim dahulu
+/* jika hari sama → INTERIM dahulu */
 if(a.type !== b.type){
 return a.type === 'INTERIM' ? -1 : 1;
 }
 
-// jika jenis sama → ikut sequence
+/* jika kedua-dua WORKORDER → ikut sequence */
+if(a.type === 'WORKORDER'){
 return (a.seq || 0) - (b.seq || 0);
+}
+
+return 0;
 
 });
         
