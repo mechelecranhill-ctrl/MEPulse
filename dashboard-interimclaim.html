@@ -924,24 +924,33 @@ allWO.sort((a,b)=>{
 // 1️⃣ Tolak INTERIM dahulu (ikut date_received)
 allInterims.forEach(int => {
 
-    const salvage = Number(int.salvage_value || 0);
-    totalSalvage += salvage;
+const intDate = new Date(int.date_received);
+const curDate = new Date(data.qpb_date);
 
-    const cat = int.section_category || {};
+if(intDate > curDate) return;
+if(intDate.getTime() === curDate.getTime()){
+// interim hari sama tetap kira dahulu
+}
 
-    let amt = 0;
+const salvage = Number(int.salvage_value || 0);
+totalSalvage += salvage;
 
-    Object.values(cat).forEach(s=>{
-        amt += Number(s?.amt || 0);
-    });
+const cat = int.section_category || {};
 
-    timeline.push({
-        type:'INTERIM',
-        date:int.date_received,
-        seq:Number(int.sequence_no ?? 0),
-        amount:amt,
-        salvage:salvage
-    });
+let amt = 0;
+
+Object.values(cat).forEach(s=>{
+    amt += Number(s?.amt || 0);
+});
+
+timeline.push({
+    type:'INTERIM',
+    date:int.date_received,
+    amount:amt,
+    salvage:salvage
+});
+
+});
 
     Object.keys(cat).forEach(sec => {
 
