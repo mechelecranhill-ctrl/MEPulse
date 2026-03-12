@@ -196,10 +196,10 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
                 </div>
 
                 <label>Salvage Value (RM)</label>
-                <input type="number" id="i_salvage" value="0" step="0.01">
+                <input type="number" id="i_salvage" value="0" step="0.01" oninput="calcInterimManualTotal()">
               
                 <label>Performance Guarantee Sum (RM)</label>
-                <input type="number" id="i_pg_sum" value="0" step="0.01">
+                <input type="number" id="i_pg_sum" value="0" step="0.01" oninput="calcInterimManualTotal()">
 
                 <div id="i_section_inputs_container" style="margin-top:15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 </div>
@@ -737,17 +737,35 @@ document.getElementById('total_display').innerText =
     }
 
     function calcInterimManualTotal() {
-        let total = 0;
-        document.querySelectorAll('.i_sec_claim_val').forEach(input => {
-            total += parseFloat(input.value) || 0;
-        });
-        document.getElementById('i_total_display').innerHTML = `
-            <span style="font-size: 12px; color: #666; font-weight: normal;">Jumlah Claim Kasar:</span><br>
-            RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}
-        `;
-        return total;
-    }
 
+let total = 0;
+
+document.querySelectorAll('.i_sec_claim_val').forEach(input => {
+    total += parseFloat(input.value) || 0;
+});
+
+const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
+const pg = parseFloat(document.getElementById('i_pg_sum').value) || 0;
+
+const net = total - salvage - pg;
+
+document.getElementById('i_total_display').innerHTML = `
+<span style="font-size:12px; color:#666;">Jumlah Claim Kasar</span><br>
+<span style="font-size:20px; color:var(--ios-orange); font-weight:800;">
+RM ${total.toLocaleString(undefined,{minimumFractionDigits:2})}
+</span>
+
+<br><br>
+
+<span style="font-size:12px; color:#666;">Nilai Bersih Selepas Tolakan</span><br>
+<span style="font-size:20px; color:var(--ios-blue); font-weight:800;">
+RM ${net.toLocaleString(undefined,{minimumFractionDigits:2})}
+</span>
+`;
+
+return total;
+
+}
     async function submitInterim() {
         const cId = document.getElementById('i_contract_id').value;
         const iNoStr = document.getElementById('i_no').value;
