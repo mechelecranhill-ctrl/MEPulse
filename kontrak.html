@@ -425,51 +425,56 @@ document.querySelectorAll('.w_sec_amt').forEach(i => {
 
 });
 
-        // SEMAK jika work order sudah wujud
+// SEMAK jika work order sudah wujud
+const workIdValue = "C " + document.getElementById('w_id_num').value.trim();
+
 const checkRes = await fetch(
-`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(payload.work_id)}`,
+`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}`,
 { headers });
 
 const existing = await checkRes.json();
 
 let sequenceToUse = customSequence;
 let res;
+
 if(existing.length > 0){
-sequenceToUse = existing[0].sequence_no;
+    sequenceToUse = existing[0].sequence_no;
 }
 
 const payload = {
-contract_id: contractId,
-work_id: "C " + document.getElementById('w_id_num').value.trim(),
-sequence_no: sequenceToUse,
-qpb_date: document.getElementById('w_qpb_date').value,
-location: document.getElementById('w_location').value,
-district: districtSelected,
-description: document.getElementById('w_desc').value,
-section_category: breakdown,
-additional: additionalTotal,
-amount_spent: totalAmount + additionalTotal
+    contract_id: contractId,
+    work_id: workIdValue,
+    sequence_no: sequenceToUse,
+    qpb_date: document.getElementById('w_qpb_date').value,
+    location: document.getElementById('w_location').value,
+    district: districtSelected,
+    description: document.getElementById('w_desc').value,
+    section_category: breakdown,
+    additional: additionalTotal,
+    amount_spent: totalAmount + additionalTotal
 };
 
-// UPDATE
-res = await fetch(
-`${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`,
-{
-method: 'PATCH',
-headers: headers,
-body: JSON.stringify(payload)
-});
+if(existing.length > 0){
+
+    // UPDATE
+    res = await fetch(
+    `${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`,
+    {
+        method: 'PATCH',
+        headers: headers,
+        body: JSON.stringify(payload)
+    });
 
 }else{
 
-// INSERT
-res = await fetch(
-`${SB_URL}/rest/v1/work_orders`,
-{
-method: 'POST',
-headers: headers,
-body: JSON.stringify(payload)
-});
+    // INSERT
+    res = await fetch(
+    `${SB_URL}/rest/v1/work_orders`,
+    {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(payload)
+    });
 
 }
 
