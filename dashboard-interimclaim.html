@@ -497,6 +497,7 @@ flex-shrink:0;
     const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
     const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
 
+    let currentView = "AREA";
     let allWorks = [];
 
     let bfSections = JSON.parse(localStorage.getItem('bf_sections_v2')) || {
@@ -509,7 +510,25 @@ flex-shrink:0;
 
     document.getElementById('tableSearch').addEventListener('keyup', function(e) {
         const term = e.target.value.toLowerCase();
-        const filteredWorks = allWorks.filter(w => 
+        let filteredWorks = allWorks.filter(w => 
+            if(currentView === "DATE"){
+
+filteredWorks = filteredWorks.sort((a,b)=>{
+
+const d1 = new Date(a.qpb_date || "1900-01-01");
+const d2 = new Date(b.qpb_date || "1900-01-01");
+
+return d1 - d2;
+
+});
+
+renderTable(filteredWorks,false);
+
+}else{
+
+renderTable(filteredWorks,true);
+
+}
             (w.work_id || '').toLowerCase().includes(term) || 
             (w.location && w.location.toLowerCase().includes(term)) ||
             (w.description && w.description.toLowerCase().includes(term))
@@ -791,20 +810,20 @@ function filterDistrict(district,el){
 document.querySelectorAll('.district-tab').forEach(t=>t.classList.remove('active'));
 el.classList.add('active');
 
-/* TAB SEMUA → IKUT TARIKH SAHAJA */
+/* TAB SEMUA → IKUT TARIKH */
 if(district === "ALL"){
+
+currentView = "DATE";
 
 const sorted = [...allWorks].sort((a,b)=>{
 
 const d1 = new Date(a.qpb_date || "1900-01-01");
 const d2 = new Date(b.qpb_date || "1900-01-01");
 
-/* 1️⃣ TARIKH */
 if(d1.getTime() !== d2.getTime()){
 return d1 - d2;
 }
 
-/* 2️⃣ jika tarikh sama → guna sequence sahaja */
 const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
 const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
 
@@ -812,14 +831,14 @@ return aSeq - bSeq;
 
 });
 
-/* disable area grouping */
-renderTable([...sorted],false);
-
+renderTable(sorted,false);
 return;
 
 }
 
-/* TAB DISTRICT KEKAL SORT AREA + SEQUENCE */
+/* DISTRICT */
+currentView = "AREA";
+
 const filtered = allWorks.filter(w => (w.district || '') === district);
 
 renderTable(filtered,true);
