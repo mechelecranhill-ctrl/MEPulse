@@ -781,7 +781,7 @@ const contractRes = await fetch(
 const contractData = await contractRes.json();
 
 /* bina dashboard */
-buildDashboard(contractData[0], interims, allWorks);
+
             buildInterimMatrix(contractData[0], interims, allWorks);
 const areaRes = await fetch(
 `${SB_URL}/rest/v1/contract?id=eq.${id}&select=area_code`,
@@ -1470,94 +1470,6 @@ RM ${totalPG.toLocaleString(undefined,{minimumFractionDigits:2})}
     }
 
     function closeBlueform() { document.getElementById('blueformPage').classList.remove('active'); }
-
-    function buildDashboard(contract, interims, workorders){
-
-const sections={};
-
-/* ambil section dari contract */
-Object.entries(contract.contract_sections_breakdown || {}).forEach(([name,v])=>{
-sections[name]={
-contract:Number(v?.amt||0),
-claimed:0,
-ongoing:0
-};
-});
-
-
-/* kira interim */
-interims.forEach(i=>{
-
-const cat=i.claim_breakdown||{};
-
-Object.entries(cat).forEach(([name,v])=>{
-
-if(!sections[name]){
-sections[name]={contract:0,claimed:0,ongoing:0};
-}
-
-sections[name].claimed+=Number(v?.amt||0);
-
-});
-
-});
-
-
-/* kira pending work order */
-workorders
-.filter(w=>w.status!=='Claimed')
-.forEach(w=>{
-
-const cat=w.section_category||{};
-
-Object.entries(cat).forEach(([name,v])=>{
-
-if(!sections[name]){
-sections[name]={contract:0,claimed:0,ongoing:0};
-}
-
-sections[name].ongoing+=Number(v?.amt||0);
-
-});
-
-});
-
-
-let html='';
-let totalContract=0;
-let totalUsed=0;
-
-Object.entries(sections).forEach(([name,s])=>{
-
-const balance=s.contract-s.claimed;
-const afterWO=balance-s.ongoing;
-
-totalContract+=s.contract;
-totalUsed+=s.claimed+s.ongoing;
-
-html+=`
-<tr>
-
-<td>${name}</td>
-
-<td style="text-align:right;">${formatRM(s.contract)}</td>
-
-<td style="text-align:right;">${formatRM(s.claimed)}</td>
-
-<td style="text-align:right;">${formatRM(balance)}</td>
-
-<td style="text-align:right;">${formatRM(s.ongoing)}</td>
-
-<td style="text-align:right;color:${afterWO<50000?'red':'black'};">
-${formatRM(afterWO)}
-</td>
-
-</tr>
-`;
-
-});
-}
-
 
 function formatRM(v){
 return Number(v).toLocaleString(undefined,{
