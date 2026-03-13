@@ -800,7 +800,15 @@ ${w.interim_no ? 'INT-' + w.interim_no : '-'}
 </div>
 </td>
 
-<td>RM ${(w.amount_spent || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+<td>
+
+<div style="font-weight:bold;">
+RM ${(w.amount_spent || 0).toLocaleString(undefined,{minimumFractionDigits:2})}
+</div>
+
+${buildSectionBreakdown(w)}
+
+</td>
 <td style="font-weight:bold;color:var(--ios-green);">RM ${(w.status === 'Claimed' ? w.amount_spent : 0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
 <td><div style="font-weight:500;">${formatTarikhBM(w.qpb_date)}</div></td>
 <td><button class="btn-action"style="background:var(--ios-orange);padding:8px 14px;font-size:12px;"onclick="openBlueform(${w.id})"><i class="fa-solid fa-print"></i> Blueform</button></td></tr>`;
@@ -877,6 +885,42 @@ return text
 
 }
 
+    function buildSectionBreakdown(work){
+
+const s = work.section_category || {};
+
+let html = '';
+
+Object.keys(s).forEach(sec=>{
+
+const amt = Number(s[sec]?.amt || 0);
+if(amt <= 0) return;
+
+html += `
+<div style="display:flex;justify-content:space-between;font-size:11px;color:#666;">
+<span>${sec}</span>
+<span>RM ${amt.toLocaleString(undefined,{minimumFractionDigits:2})}</span>
+</div>
+`;
+
+});
+
+/* tambahan provisional */
+const add = Number(work.additional || 0);
+
+if(add > 0){
+html += `
+<div style="display:flex;justify-content:space-between;font-size:11px;color:#666;">
+<span>PROVISIONAL SUM</span>
+<span>RM ${add.toLocaleString(undefined,{minimumFractionDigits:2})}</span>
+</div>
+`;
+}
+
+return html;
+
+}
+    
 function formatTarikhBM(dateStr){
 
 if(!dateStr) return '';
