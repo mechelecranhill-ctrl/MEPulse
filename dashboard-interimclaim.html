@@ -1161,12 +1161,6 @@ salvage:0
 
 let totalContract = Number(c.contract_sum || 0);
 
-        let sectionBaki = {};
-
-Object.keys(b).forEach(sec => {
-    sectionBaki[sec] = Number(b[sec]?.amt || 0);
-});
-
 timeline.sort((a,b)=>{
 
 const d1 = new Date(a.date);
@@ -1194,35 +1188,13 @@ let bakiKontrak = totalContract;
 timeline.forEach(t => {
 
 if(t.type === 'INTERIM'){
-
     bakiKontrak -= t.amount;
     bakiKontrak += (t.salvage || 0);
     bakiKontrak += (t.pg || 0);
-
-    const cat = t.section_category || {};
-
-    Object.keys(cat).forEach(sec=>{
-        const amt = Number(cat[sec]?.amt || 0);
-        if(sectionBaki[sec] !== undefined){
-            sectionBaki[sec] -= amt;
-        }
-    });
-
 }
 
 else if(t.type === 'WORKORDER'){
-
     bakiKontrak -= t.amount;
-
-    const cat = t.section_category || {};
-
-    Object.keys(cat).forEach(sec=>{
-        const amt = Number(cat[sec]?.amt || 0);
-        if(sectionBaki[sec] !== undefined){
-            sectionBaki[sec] -= amt;
-        }
-    });
-
 }
 
 });
@@ -1285,7 +1257,9 @@ label = 'PROACTIVE MAINTENANCE';
 label = label.replace(/CHARGES/g,'').trim();
 
 const contractAmt = Number(b[sec]?.amt || 0);
-const baki = Number(sectionBaki[sec] || 0);
+const usedAmt = Number(sectionUsed[sec] || 0);
+
+const baki = contractAmt - usedAmt;
 
 return `
 
