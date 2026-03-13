@@ -508,17 +508,33 @@ flex-shrink:0;
 
     window.onload = loadContracts;
 
-    document.getElementById('tableSearch').addEventListener('keyup', function(e) {
-        const term = e.target.value.toLowerCase();
-        let filteredWorks = allWorks.filter(w => 
-            if(currentView === "DATE"){
+    document.getElementById('tableSearch').addEventListener('keyup', function(e){
 
-filteredWorks = filteredWorks.sort((a,b)=>{
+const term = e.target.value.toLowerCase();
+
+/* tapis data dahulu */
+let filteredWorks = allWorks.filter(w =>
+(w.work_id || '').toLowerCase().includes(term) ||
+(w.location || '').toLowerCase().includes(term) ||
+(w.description || '').toLowerCase().includes(term)
+);
+
+/* jika mode SEMUA → sort tarikh */
+if(currentView === "DATE"){
+
+filteredWorks.sort((a,b)=>{
 
 const d1 = new Date(a.qpb_date || "1900-01-01");
 const d2 = new Date(b.qpb_date || "1900-01-01");
 
+if(d1.getTime() !== d2.getTime()){
 return d1 - d2;
+}
+
+const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
+const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
+
+return aSeq - bSeq;
 
 });
 
@@ -529,12 +545,8 @@ renderTable(filteredWorks,false);
 renderTable(filteredWorks,true);
 
 }
-            (w.work_id || '').toLowerCase().includes(term) || 
-            (w.location && w.location.toLowerCase().includes(term)) ||
-            (w.description && w.description.toLowerCase().includes(term))
-        );
-        renderTable(filteredWorks);
-    });
+
+});
 
     // --- MOBILE HELPER ---
     function toggleMobileSidebar() {
