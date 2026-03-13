@@ -1069,32 +1069,32 @@ timeline.push({
 // 2️⃣ Tolak WORK ORDER pending sahaja (ikut qpb_date)
 allWO.filter(w => {
 
-    if(!w.qpb_date) return false;
+if(!w.qpb_date) return false;
 
-    const woDate = new Date(w.qpb_date);
-    const curDate = new Date(data.qpb_date);
+const woDate = new Date(w.qpb_date);
+const curDate = cutoffDate;
 
-    // hanya tolak jika sebelum atau sama
-    if(woDate > curDate) return false;
+/* 1️⃣ jika tarikh lebih awal → kira */
+if(woDate < curDate) return true;
 
-    const wArea = (w.area_code || '').toUpperCase();
-    const curArea = (data.area_code || '').toUpperCase();
+/* 2️⃣ jika tarikh lebih lewat → jangan kira */
+if(woDate > curDate) return false;
 
-    const wRank = areaPriority[wArea] || 99;
-    const curRank = areaPriority[curArea] || 99;
+/* 3️⃣ jika tarikh sama → ikut AREA */
+const wArea = (w.area_code || '').toUpperCase();
+const curArea = (data.area_code || '').toUpperCase();
 
-    if(wRank > curRank) return false;
+const wRank = areaPriority[wArea] || 99;
+const curRank = areaPriority[curArea] || 99;
 
-    // jika area sama baru guna sequence
-    if(wRank === curRank){
+if(wRank < curRank) return true;
+if(wRank > curRank) return false;
 
-        const wSeq = parseInt((w.sequence_no || '').match(/\d+/)?.[0] || 0);
-        const curSeq = parseInt((data.sequence_no || '').match(/\d+/)?.[0] || 0);
+/* 4️⃣ jika area sama → ikut sequence */
+const wSeq = parseInt((w.sequence_no || '').match(/\d+/)?.[0] || 0);
+const curSeq = parseInt((data.sequence_no || '').match(/\d+/)?.[0] || 0);
 
-        if(wSeq > curSeq) return false;
-    }
-
-    return true;
+return wSeq <= curSeq;
 
 })
 .forEach(wo => {
