@@ -416,6 +416,7 @@ flex-shrink:0;
                         <th>Interim No</th>
                         <th>Amaun Kerja (RM)</th>
                         <th>Amaun Claim (RM)</th>
+                        <th>Tarikh</th>
                         <th>Tindakan</th>
                     </tr>
                 </thead>
@@ -748,6 +749,7 @@ ${w.interim_no ? 'INT-' + w.interim_no : '-'}
 <td>
 RM ${(w.amount_spent || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
 <td style="font-weight:bold;color:var(--ios-green);">RM ${(w.status === 'Claimed' ? w.amount_spent : 0).toLocaleString(undefined,{minimumFractionDigits:2})}</td><td>
+<td><div style="font-weight:500;">${formatTarikhBM(w.qpb_date)}</div></td>
 <button class="btn-action"style="background:var(--ios-orange);padding:8px 14px;font-size:12px;"onclick="openBlueform(${w.id})"><i class="fa-solid fa-print"></i> Blueform</button></td></tr>`;
     
 });
@@ -774,17 +776,36 @@ function filterDistrict(district,el){
 document.querySelectorAll('.district-tab').forEach(t=>t.classList.remove('active'));
 el.classList.add('active');
 
+/* TAB SEMUA → SORT IKUT TARIKH */
 if(district === "ALL"){
-renderTable(allWorks);
+
+const sorted = [...allWorks].sort((a,b)=>{
+
+const d1 = new Date(a.qpb_date || 0);
+const d2 = new Date(b.qpb_date || 0);
+
+if(d1 < d2) return -1;
+if(d1 > d2) return 1;
+
+/* jika tarikh sama guna sequence */
+const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
+const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
+
+return aSeq - bSeq;
+
+});
+
+renderTable(sorted);
 return;
+
 }
 
+/* TAB DISTRICT KEKAL SORT ASAL */
 const filtered = allWorks.filter(w=> (w.district || '') === district);
 
 renderTable(filtered);
 
 }
-
     function getInitials(text){
 
 const ignore = ['AND','OF','THE','&','DAN'];
