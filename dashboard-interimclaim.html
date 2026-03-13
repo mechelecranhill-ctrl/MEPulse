@@ -940,6 +940,30 @@ const interimRes = await fetch(
 );
 
 const allInterims = await interimRes.json();
+
+        let cutoffDate = new Date(data.qpb_date);
+
+/* jika work order sudah claimed */
+if(data.status === "Claimed"){
+
+for(const int of allInterims){
+
+const cat = int.section_category || {};
+
+const found = Object.values(cat).some(sec =>
+Number(sec?.work_order_id) === Number(data.id)
+);
+
+if(found){
+
+cutoffDate = new Date(int.date_received);
+break;
+
+}
+
+}
+
+}
         
         const woRes = await fetch(
 `${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}`,
@@ -1004,7 +1028,7 @@ allWO.sort((a,b)=>{
 allInterims.forEach(int => {
 
 const intDate = new Date(int.date_received);
-const curDate = new Date(data.qpb_date);
+const curDate = cutoffDate;
 
 if(intDate > curDate) return;
 
