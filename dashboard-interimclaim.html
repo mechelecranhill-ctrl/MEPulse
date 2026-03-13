@@ -415,6 +415,50 @@ flex-shrink:0;
         </div>
 
         <div class="glass-card" id="tableWrapper" style="display: none;">
+            <!-- CONTRACT DASHBOARD -->
+<div id="contractDashboard" style="margin-bottom:20px;">
+
+<div style="background:white;border-radius:15px;padding:15px;margin-bottom:15px;box-shadow:0 3px 8px rgba(0,0,0,0.08);">
+
+<div style="font-size:11px;font-weight:bold;margin-bottom:6px;">
+CONTRACT UTILISATION
+</div>
+
+<div style="height:16px;background:#eee;border-radius:10px;overflow:hidden;">
+<div id="utilBar" style="height:100%;width:0%;background:#007AFF;"></div>
+</div>
+
+<div id="utilPercent" style="font-size:11px;margin-top:5px;color:#555;"></div>
+
+</div>
+
+
+<div style="background:white;border-radius:15px;padding:15px;box-shadow:0 3px 8px rgba(0,0,0,0.08);">
+
+<div style="font-weight:bold;font-size:13px;margin-bottom:10px;">
+Section Financial Summary
+</div>
+
+<table style="width:100%;border-collapse:collapse;font-size:12px;">
+
+<thead>
+<tr style="background:#f4f4f4;">
+<th style="padding:6px;text-align:left;">Section</th>
+<th style="padding:6px;text-align:right;">Contract</th>
+<th style="padding:6px;text-align:right;">Claimed</th>
+<th style="padding:6px;text-align:right;">Balance</th>
+<th style="padding:6px;text-align:right;">Pending WO</th>
+<th style="padding:6px;text-align:right;">After WO</th>
+</tr>
+</thead>
+
+<tbody id="sectionSummaryBody"></tbody>
+
+</table>
+
+</div>
+
+</div>
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div id="districtTabs" style="margin-top:10px;margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;"></div>
                 <h3 style="margin:0;"><i class="fa-solid fa-list-check" style="margin-right: 10px; color: var(--ios-blue);"></i> Senarai Work Order & Tuntutan</h3>
@@ -717,7 +761,24 @@ return aSeq - bSeq;
         try {
             const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}`, { headers });
 allWorks = await res.json();
+/* ambil interims */
+const intRes = await fetch(
+`${SB_URL}/rest/v1/interims?contract_id=eq.${id}`,
+{ headers }
+);
 
+const interims = await intRes.json();
+
+/* ambil contract detail */
+const contractRes = await fetch(
+`${SB_URL}/rest/v1/contract?id=eq.${id}`,
+{ headers }
+);
+
+const contractData = await contractRes.json();
+
+/* bina dashboard */
+buildDashboard(contractData[0], interims, allWorks);
 const areaRes = await fetch(
 `${SB_URL}/rest/v1/contract?id=eq.${id}&select=area_code`,
 { headers }
@@ -1366,6 +1427,127 @@ RM ${totalPG.toLocaleString(undefined,{minimumFractionDigits:2})}
 
     function closeBlueform() { document.getElementById('blueformPage').classList.remove('active'); }
 
+    function buildDashboard(contract, interims, workorders){
+
+const sections={};
+
+/* ambil section dari contract */
+Object.entries(contract.contract_sections_breakdown || {}).forEach(([name,v])=>{
+sections[name]={
+contract:Number(v?.amt||0),
+claimed:0,
+ongoing:0
+};
+});
+
+
+/* kira interim */
+interims.forEach(i=>{
+
+const cat=i.section_category||{};
+
+Object.entries(cat).forEach(([name,v])=>{
+
+if(!sections[name]){
+sections[name]={contract:0,claimed:0,ongoing:0};
+}
+
+sections[name].claimed+=Number(v?.amt||0);
+
+});
+
+});
+
+
+/* kira pending work order */
+workorders
+.filter(w=>w.status!=='Claimed')
+.forEach(w=>{
+
+const cat=w.section_category||{};
+
+Object.entries(cat).forEach(([name,v])=>{
+
+if(!sections[name]){
+sections[name]={contract:0,claimed:0,ongoing:0};
+}
+
+sections[name].ongoing+=Number(v?.amt||0);
+
+});
+
+});
+
+
+let html='';
+let totalContract=0;
+let totalUsed=0;
+
+Object.entries(sections).forEach(([name,s])=>{
+
+const balance=s.contract-s.claimed;
+const afterWO=balance-s.ongoing;
+
+totalContract+=s.contract;
+totalUsed+=s.claimed+s.ongoing;
+
+html+=`
+<tr>
+
+<td>${name}</td>
+
+<td style="text-align:right;">${formatRM(s.contract)}</td>
+
+<td style="text-align:right;">${formatRM(s.claimed)}</td>
+
+<td style="text-align:right;">${formatRM(balance)}</td>
+
+<td style="text-align:right;">${formatRM(s.ongoing)}</td>
+
+<td style="text-align:right;color:${afterWO<50000?'red':'black'};">
+${formatRM(afterWO)}
+</td>
+
+</tr>
+`;
+
+});
+
+document.getElementById("sectionSummaryBody").innerHTML=html;
+
+
+/* utilisation bar */
+
+const percent=(totalUsed/totalContract)*100;
+
+document.getElementById("utilBar").style.width=percent+"%";
+
+let msg='Contract Healthy';
+let color='#007AFF';
+
+if(percent>95){
+msg='CRITICAL: Contract Almost Exhausted';
+color='red';
+}
+else if(percent>85){
+msg='WARNING: Contract Nearly Fully Utilised';
+color='orange';
+}
+
+document.getElementById("utilBar").style.background=color;
+
+document.getElementById("utilPercent").innerHTML=
+percent.toFixed(1)+"% utilised - "+msg;
+
+}
+
+
+function formatRM(v){
+return Number(v).toLocaleString(undefined,{
+minimumFractionDigits:2,
+maximumFractionDigits:2
+});
+}
 </script>
 </body>
 </html>
