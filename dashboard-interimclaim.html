@@ -1672,7 +1672,70 @@ body+=row;
 
 });
 
-/* TOTAL ROW */
+        /* ==============================
+SALVAGE VALUE ROW
+============================== */
+
+let salvageRow = `
+<tr>
+<td></td>
+<td>SALVAGE VALUE</td>
+<td style="text-align:right;">-</td>
+`;
+
+let salvageTotal = 0;
+
+interims.forEach(int=>{
+
+const val = Number(int.salvage_value || 0);
+salvageTotal += val;
+
+salvageRow += `<td style="text-align:right;">${val?formatRM(val):'-'}</td>`;
+
+});
+
+salvageRow += `
+<td style="text-align:right;">${formatRM(salvageTotal)}</td>
+<td colspan="3"></td>
+</tr>
+`;
+
+body += salvageRow;
+
+
+/* ==============================
+PERFORMANCE GUARANTEE ROW
+============================== */
+
+let pgRow = `
+<tr>
+<td></td>
+<td>PERFORMANCE GUARANTEE SUM</td>
+<td style="text-align:right;">-</td>
+`;
+
+let pgTotal = 0;
+
+interims.forEach(int=>{
+
+const val = Number(int.performance_guarantee_sum || 0);
+pgTotal += val;
+
+pgRow += `<td style="text-align:right;">${val?formatRM(val):'-'}</td>`;
+
+});
+
+pgRow += `
+<td style="text-align:right;">${formatRM(pgTotal)}</td>
+<td colspan="3"></td>
+</tr>
+`;
+
+body += pgRow;
+        
+/* ==============================
+TOTAL ROW
+============================== */
 
 let totalRow=`<tr style="font-weight:bold;background:#f5f5f5;">
 <td colspan="2">TOTAL</td>`;
@@ -1683,6 +1746,22 @@ sectionNames.forEach(sec=>{
 totalContract+=Number(sections[sec]?.amt||0);
 });
 
+        /* kira total claim termasuk salvage + pg */
+
+let totalClaim = 0;
+
+interims.forEach(int=>{
+
+const cat = int.claim_breakdown || {};
+
+Object.values(cat).forEach(v=>{
+totalClaim += Number(v?.amt || 0);
+});
+
+totalClaim -= Number(int.salvage_value || 0);
+totalClaim -= Number(int.performance_guarantee_sum || 0);
+
+});
 totalRow+=`<td style="text-align:right;">${formatRM(totalContract)}</td>`;
 
 let interimTotals=new Array(interimCount).fill(0);
@@ -1701,10 +1780,64 @@ interimTotals.forEach(v=>{
 totalRow+=`<td style="text-align:right;">${formatRM(v)}</td>`;
 });
 
-totalRow+=`<td colspan="4"></td></tr>`;
+/* TOTAL CLAIM */
+totalRow += `<td style="text-align:right;">${formatRM(totalClaim)}</td>`;
 
-body+=totalRow;
+/* CONTRACT BALANCE kosong */
+totalRow += `<td></td>`;
 
+/* ONGOING WORK kosong */
+totalRow += `<td></td>`;
+
+/* ONGOING CONTRACT BALANCE */
+totalRow += `
+<td style="text-align:right;font-weight:bold;">
+${formatRM(totalOngoingBalance)}
+</td>
+</tr>`;
+
+body += totalRow;
+
+        /* ==============================
+TOTAL ONGOING CONTRACT BALANCE
+============================== */
+
+let totalOngoingBalance = 0;
+
+sectionNames.forEach(sec=>{
+
+const contractAmt = Number(sections[sec]?.amt || 0);
+
+let claimed = 0;
+
+interims.forEach(int=>{
+claimed += Number(int.claim_breakdown?.[sec]?.amt || 0);
+});
+
+let ongoing = 0;
+
+workorders
+.filter(w=>w.status!=='Claimed')
+.forEach(w=>{
+
+const cat = w.section_category || {};
+ongoing += Number(cat[sec]?.amt || 0);
+
+if(sec === "PROVISIONAL SUM"){
+ongoing += Number(w.additional || 0);
+}
+
+});
+
+totalOngoingBalance += contractAmt - claimed - ongoing;
+
+});
+
+/* tambah salvage + pg */
+
+totalOngoingBalance += salvageTotal;
+totalOngoingBalance += pgTotal;
+        
 document.getElementById("interimBody").innerHTML=body;
 
 }
