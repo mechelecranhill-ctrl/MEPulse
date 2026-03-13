@@ -791,30 +791,37 @@ function filterDistrict(district,el){
 document.querySelectorAll('.district-tab').forEach(t=>t.classList.remove('active'));
 el.classList.add('active');
 
-/* TAB SEMUA → SORT IKUT TARIKH */
+/* TAB SEMUA → IKUT TARIKH SAHAJA */
 if(district === "ALL"){
 
 const sorted = [...allWorks].sort((a,b)=>{
 
-const d1 = new Date(a.qpb_date || 0);
-const d2 = new Date(b.qpb_date || 0);
+const d1 = new Date(a.qpb_date || "1900-01-01");
+const d2 = new Date(b.qpb_date || "1900-01-01");
 
+/* 1️⃣ TARIKH */
 if(d1 < d2) return -1;
 if(d1 > d2) return 1;
 
-return 0;
+/* 2️⃣ jika tarikh sama guna sequence */
+const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
+const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
+
+return aSeq - bSeq;
 
 });
 
-renderTable(sorted,false);   // disable area grouping
+/* disable area grouping */
+renderTable(sorted,false);
+
 return;
 
 }
 
-/* TAB DISTRICT */
+/* TAB DISTRICT KEKAL SORT AREA + SEQUENCE */
 const filtered = allWorks.filter(w => (w.district || '') === district);
 
-renderTable(filtered);
+renderTable(filtered,true);
 
 }
     function getInitials(text){
