@@ -971,6 +971,7 @@ break;
 );
 
 let allWO = await woRes.json();
+        allWO = sortWorkOrders(allWO, areaPriority);
 let sectionUsed = {};
 let totalSalvage = 0;
 let totalPG = 0;
@@ -1066,12 +1067,13 @@ timeline.push({
 
 });
 
-// 2️⃣ Tolak WORK ORDER pending sahaja (ikut qpb_date)
 allWO.filter(w => {
 
-/* skip work order yang sudah claimed */
+/* skip claimed */
 if(w.status === "Claimed") return false;
 
+/* skip work order semasa */
+if(Number(w.id) === Number(data.id)) return false;
 
 if(!w.qpb_date) return false;
 
@@ -1107,10 +1109,7 @@ timeline.push({
 type:'WORKORDER',
 date:wo.qpb_date,
 seq:parseInt((wo.sequence_no || '').match(/\d+/)?.[0] || 0),
-amount:
-Object.values(wo.section_category || {})
-.reduce((a,b)=>a + Number(b?.amt || 0),0)
-+ Number(wo.additional || 0),
+amount:Number(wo.amount_spent || 0),
 salvage:0
 });
     
