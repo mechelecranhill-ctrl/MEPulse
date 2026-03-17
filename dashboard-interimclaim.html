@@ -360,13 +360,20 @@
                 top: 10px;
             }
         }
-       @media print {
+ @media print {
 
     @page { 
         size: A4;
         margin: 0;
     }
 
+    html, body {
+        margin: 0;
+        padding: 0;
+        background: white;
+    }
+
+    /* 🔥 JANGAN guna display:none */
     body * {
         visibility: hidden;
     }
@@ -376,11 +383,13 @@
     }
 
     #blueformPage {
-        position: absolute;
+        position: fixed !important;   /* 🔥 penting */
         inset: 0;
         width: 100%;
         height: auto;
+        display: block !important;    /* 🔥 critical */
         background: white !important;
+        backdrop-filter: none !important;
     }
 
     .a4-container {
@@ -388,8 +397,10 @@
         min-height: 297mm !important;
         margin: 0 auto !important;
         padding: 1.5cm 2cm 1.6cm 2cm !important;
+
         display: flex !important;
         flex-direction: column;
+
         box-shadow: none !important;
     }
 
@@ -1433,8 +1444,17 @@ RM ${totalPG.toLocaleString(undefined,{minimumFractionDigits:2})}
             `;
 
             document.getElementById('bf_executive_unit').innerText =unitName ? `Eksekutif ${unitName}` : 'Eksekutif';
-            document.getElementById('bf_content').innerHTML = html;
-            document.getElementById('blueformPage').classList.add('active');
+            const bf = document.getElementById('blueformPage');
+
+document.getElementById('bf_content').innerHTML = html;
+
+bf.classList.add('active');
+
+/* 🔥 paksa visible */
+bf.style.display = 'block';
+
+/* 🔥 force reflow (WAJIB) */
+bf.offsetHeight;
         
         } catch (e) { 
     console.error(e);
@@ -1712,16 +1732,8 @@ body += totalRow;
 document.getElementById("interimBody").innerHTML=body;
 
 }
-    function printBlueform() {
+function printBlueform() {
 
-    const blueform = document.getElementById('blueformPage');
-
-    if (!blueform.classList.contains('active')) {
-        alert("Blueform belum dibuka.");
-        return;
-    }
-
-    // 🔥 ambil ID current work order
     const currentId = window.currentBFId;
 
     if (!currentId) {
@@ -1729,15 +1741,13 @@ document.getElementById("interimBody").innerHTML=body;
         return;
     }
 
-    const isPWA = window.matchMedia('(display-mode: standalone)').matches;
-
     const url = window.location.origin + window.location.pathname 
               + '?print=true&id=' + currentId;
 
-    if (isPWA) {
-        window.open(url, '_blank');
-    } else {
-        window.open(url, '_blank'); // lebih stabil dari print terus
+    const win = window.open(url, '_blank');
+
+    if (!win) {
+        alert("Popup blocked. Sila benarkan popup.");
     }
 }
     window.addEventListener('load', async () => {
@@ -1755,11 +1765,13 @@ document.getElementById("interimBody").innerHTML=body;
 
         // 🔥 buka balik blueform dengan data
         await openBlueform(id);
-requestAnimationFrame(() => {
+setTimeout(() => {
     requestAnimationFrame(() => {
-        window.print();
+        requestAnimationFrame(() => {
+            window.print();
+        });
     });
-});
+}, 300);
 
         // 🔥 optional: buang query supaya tak repeat print
         window.history.replaceState({}, document.title, window.location.pathname);
