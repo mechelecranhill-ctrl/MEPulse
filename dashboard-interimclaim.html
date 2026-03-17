@@ -23,7 +23,14 @@
             display: flex;
             overflow: hidden;
         }
-
+#unitHeader{
+    font-size: 11px;
+    font-weight: 700;
+    color: #8e8e93;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 3px;
+}
         /* Sidebar Styling */
         .sidebar {
             width: var(--sidebar-width);
@@ -69,9 +76,9 @@
 
         .contract-item {
     background: white;
-    padding: 8px 10px;              /* 🔥 kecilkan */
-    border-radius: 10px;
-    margin-bottom: 6px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    margin-bottom: 8px;
     cursor: pointer;
     transition: 0.2s;
     border: 1px solid rgba(0,0,0,0.05);
@@ -80,11 +87,13 @@
     flex-direction: column;
     justify-content: center;
 
-    min-height: 55px;               /* 🔥 kawal tinggi */
+    min-height: 60px;
+
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
 }
-.contract-item:hover { 
-    transform: translateX(3px); 
-    box-shadow: 0 3px 10px rgba(0,0,0,0.08); 
+.contract-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08);
 }
 
 .contract-item.active { 
@@ -546,8 +555,9 @@
     <div class="main-panel">    
         <div class="dashboard-header">
             <div>
-                <h1 id="viewTitle" style="margin:0; font-size: 24px;">Selamat Datang</h1>
-                <p id="viewSubtitle" style="margin:5px 0 0 0; color: #666;">Sila pilih kontrak untuk maklumat terperinci.</p>
+                <div id="unitHeader"></div>
+                <h1 id="viewTitle" style="margin:0; font-size: 24px;"></h1>    
+                <p id="viewSubtitle" style="margin:5px 0 0 0; color: #666;"></p>
             </div>
             <button class="btn-action" style="background: #333;" onclick="openTemplate()">
                 <i class="fa-solid fa-sliders"></i> Urus Template BF
@@ -786,14 +796,15 @@
             const container = document.getElementById('contractListContainer');
             container.innerHTML = data.map(c => `
     <div class="contract-item" id="c_card_${c.id}" onclick="selectContract(${c.id}, '${c.contract_code}', '${c.contract_name.replace(/'/g, "\\'")}')">
-        <div style="font-size: 9px; background: var(--ios-orange); color: white; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 5px;">
-            ${c.units?.unit_name || 'UNIT'}
+        <div style="font-size:10px; font-weight:700; color:var(--ios-orange); margin-bottom:4px;">
+    ${c.units?.unit_name || 'UNIT'}
+</div>
         </div>
-        <div style="font-weight: 700; font-size: 12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+        <div style="font-weight: 700; font-size: 13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
     ${c.contract_code}
 </div>
 
-<small style="color: #777; font-size:10px; display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden;">
+<small style="color: #8e8e93; font-size:11px; display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden;">
     ${c.contract_name}
 </small>
 `).join('');
@@ -824,8 +835,9 @@
             const interims = await intRes.json();          
             /* ambil contract detail */
             const contractRes = await fetch(
-                `${SB_URL}/rest/v1/contract?id=eq.${id}`,
-                { headers }
+    `${SB_URL}/rest/v1/contract?id=eq.${id}&select=*,units(unit_name)`,
+    { headers }
+);
             );
             const contractData = await contractRes.json();
             
