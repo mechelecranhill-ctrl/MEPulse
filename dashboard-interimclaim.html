@@ -1734,50 +1734,26 @@ document.getElementById("interimBody").innerHTML=body;
 }
 function printBlueform() {
 
-    const currentId = window.currentBFId;
+    const bf = document.getElementById('blueformPage');
 
-    if (!currentId) {
-        alert("Work Order tidak dijumpai.");
+    if (!bf.classList.contains('active')) {
+        alert("Blueform belum dibuka.");
         return;
     }
 
-    const url = window.location.origin + window.location.pathname 
-              + '?print=true&id=' + currentId;
+    // 🔥 force render dulu
+    bf.style.display = 'block';
+    bf.offsetHeight;
 
-    const win = window.open(url, '_blank');
-
-    if (!win) {
-        alert("Popup blocked. Sila benarkan popup.");
-    }
-}
-    window.addEventListener('load', async () => {
-
-    const params = new URLSearchParams(window.location.search);
-
-    if (params.get('print') === 'true') {
-
-        const id = params.get('id');
-
-        if (!id) {
-            alert("Tiada ID untuk print.");
-            return;
-        }
-
-        // 🔥 buka balik blueform dengan data
-        await openBlueform(id);
-setTimeout(() => {
-    requestAnimationFrame(() => {
+    // 🔥 tunggu render + paint
+    setTimeout(() => {
         requestAnimationFrame(() => {
-            window.print();
+            requestAnimationFrame(() => {
+                window.print();
+            });
         });
-    });
-}, 300);
-
-        // 🔥 optional: buang query supaya tak repeat print
-        window.history.replaceState({}, document.title, window.location.pathname);
-    }
-
-});
+    }, 200);
+}
 </script>
 </body>
 </html>
