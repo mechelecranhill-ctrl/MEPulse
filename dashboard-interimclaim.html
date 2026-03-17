@@ -1746,7 +1746,6 @@ function printBlueform() {
         return;
     }
 
-    // 🔥 clone supaya tak ganggu layout asal
     const clone = element.cloneNode(true);
     clone.style.width = "210mm";
     clone.style.height = "297mm";
@@ -1756,37 +1755,31 @@ function printBlueform() {
 
     document.body.appendChild(clone);
 
-    const opt = {
+    // 🔥 AUTO SCALE FIX
+    const actualHeight = clone.scrollHeight;
+    const maxHeight = clone.clientHeight;
 
+    if (actualHeight > maxHeight) {
+        const scale = maxHeight / actualHeight;
+        clone.style.transform = `scale(${scale})`;
+        clone.style.transformOrigin = "top center";
+    }
+
+    const opt = {
         margin: 0,
         filename: 'Blueform.pdf',
+        image: { type: 'jpeg', quality: 1 },
+        html2canvas: { scale: 3, useCORS: true, scrollY: 0 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all'] }
+    };
 
-        image: { 
-            type: 'jpeg', 
-            quality: 1 
-        },
-
-        html2canvas: { 
-            scale: 3,              // 🔥 HD
-            useCORS: true,
-            scrollY: 0
-        },
-        jsPDF: { 
-            unit: 'mm',
-            format: 'a4',
-            orientation: 'portrait'
-        },
-        pagebreak: {
-        mode: ['avoid-all'] 
-    }
-};
     html2pdf()
         .set(opt)
         .from(clone)
         .save()
         .then(() => {
             document.body.removeChild(clone);
-            
         });
 }
 
