@@ -1007,7 +1007,7 @@ return `${hari} ${bulanText} ${tahun}`;
         
     // --- BLUEFORM GENERATION LOGIC ---
     async function openBlueform(id) {
-
+        window.currentBFId = id;
         console.log("OPEN BF:", id);  // 🔥 test
     try {
 
@@ -1749,36 +1749,47 @@ document.getElementById("interimBody").innerHTML=body;
         return;
     }
 
+    // 🔥 ambil ID current work order
+    const currentId = window.currentBFId;
+
+    if (!currentId) {
+        alert("Work Order tidak dijumpai.");
+        return;
+    }
+
     const isPWA = window.matchMedia('(display-mode: standalone)').matches;
 
+    const url = window.location.origin + window.location.pathname 
+              + '?print=true&id=' + currentId;
+
     if (isPWA) {
-        // 🔥 PWA → buka dalam browser sebenar
-        const url = window.location.origin + window.location.pathname + '?print=true';
         window.open(url, '_blank');
     } else {
-        // 🌐 browser biasa → terus print
-        setTimeout(() => {
-            window.print();
-        }, 200);
+        window.open(url, '_blank'); // lebih stabil dari print terus
     }
 }
-    window.addEventListener('load', () => {
+    window.addEventListener('load', async () => {
 
     const params = new URLSearchParams(window.location.search);
 
     if (params.get('print') === 'true') {
 
-        // 🔥 pastikan blueform buka dulu
-        const blueform = document.getElementById('blueformPage');
+        const id = params.get('id');
 
-        if (!blueform.classList.contains('active')) {
-            blueform.classList.add('active');
+        if (!id) {
+            alert("Tiada ID untuk print.");
+            return;
         }
+
+        // 🔥 buka balik blueform dengan data
+        await openBlueform(id);
 
         setTimeout(() => {
             window.print();
-        }, 400);
+        }, 500);
 
+        // 🔥 optional: buang query supaya tak repeat print
+        window.history.replaceState({}, document.title, window.location.pathname);
     }
 
 });
