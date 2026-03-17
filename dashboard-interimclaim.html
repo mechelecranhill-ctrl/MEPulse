@@ -151,23 +151,18 @@
     background:var(--ios-blue);
     color:white;
 }
-        .unit-container::-webkit-scrollbar{
-    display:none;
-}
 .unit-container{
     -ms-overflow-style:none;
     scrollbar-width:none;
 }
 
         /* Main Panel Styling */
-        .main-panel {
-            flex: 1;
-            width: calc(100% - var(--sidebar-width));
-            padding: 25px 30px;
-            overflow-y: auto;
-            position: relative;
-            transition: all 0.3s ease;
-        }
+.main-panel {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 25px 30px;
+}
 
         .dashboard-header {
             display: flex;
@@ -413,10 +408,6 @@
                 flex-direction: column;
                 overflow: auto;
             }
-            /* Bila kontrak dipilih, sembunyikan sidebar */
-            body.contract-selected .sidebar {
-                display: none;
-            }
             .sidebar {
                 width: 100%;
                 height: 100vh;
@@ -428,7 +419,8 @@
                 overflow-x: auto; /* Fit horizontal scroll */
             }
             .glass-card {
-                min-width: 1400px;
+                min-width: unset;
+                width: 100%;
                 padding: 15px;
                 margin: 0 auto;
             }
@@ -586,32 +578,8 @@
         </div>   
     </div>
 
-    <div class="sidebar no-print">
-        
-        <div class="sidebar-header">
-            <button class="back-btn" onclick="window.location.href='dashboard-contract.html'">
-                <i class="fa fa-chevron-left"></i>
-            </button>
-            <div style="font-weight: 800; font-size: 18px; margin-left:10px;">DIREKTORI</div>
-        </div>
-        
-        <div class="sidebar-content">
-            
-            <div class="sidebar-title">Senarai Kontrak Aktif</div>
-            <div id="contractListContainer">
-                <p style="font-size: 12px; color: #888;">Memuatkan data...</p>
-            </div>
-        </div>
-    </div>
-
-    <button class="btn-action no-print" id="mobileBackBtn" style="display:none; position:fixed; bottom:20px; left:20px; z-index:500; background:var(--ios-blue); border-radius:50px; width:50px; height:50px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);" onclick="toggleMobileSidebar()">
-        <i class="fa fa-list"></i>
-    </button>
-
     <div class="main-panel">    
-        <div class="glass-header">
-    <div class="unit-container" id="unitNav"></div>
-</div>
+
         <div class="dashboard-header">
             <div>
                 <h1 id="viewTitle" style="margin:0; font-size: 24px;"></h1>    
@@ -723,8 +691,13 @@
     };
 
     window.onload = () => {
-    loadContracts();
-    loadUnits();
+    const urlParams = new URLSearchParams(window.location.search);
+    const contractId = urlParams.get('id');
+
+    if(contractId){
+        loadSingleContract(contractId);
+    }
+};
 };
     document.getElementById('tableSearch').addEventListener('keyup', function(e){
         const term = e.target.value.toLowerCase();
@@ -751,11 +724,6 @@
             renderTable(filteredWorks,true);
         }
     });
-    // --- MOBILE HELPER ---
-    function toggleMobileSidebar() {
-        document.body.classList.remove('contract-selected');
-        document.getElementById('mobileBackBtn').style.display = 'none';
-    }
 
     // --- TEMPLATE MANAGER LOGIC ---
     async function openTemplate() {
@@ -849,41 +817,38 @@
             return aSeq - bSeq;
         });
     }
-    // --- DATA FETCHING LOGIC ---   
-    async function loadContracts() {
-    try {
-        const res = await fetch(`${SB_URL}/rest/v1/contract?select=*,units(unit_name)&order=contract_start.asc`, { headers });
+
+    async function loadSingleContract(id){
+    try{
+        const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, { headers });
         const data = await res.json();
-        const container = document.getElementById('contractListContainer');
+        const c = data[0];
 
-        container.innerHTML = data.map(c => `
-<div class="contract-item" id="c_card_${c.id}" onclick="selectContract(${c.id}, '${c.contract_code}', '${c.contract_name.replace(/'/g, "\\'")}')">
+        document.getElementById('viewTitle').innerText = c.contract_code;
+        document.getElementById('viewSubtitle').innerText = c.contract_name;
 
-    <div style="font-size:9px; font-weight:700; color:var(--ios-orange); margin-bottom:4px;">
-        ${c.units?.unit_name || 'UNIT'}
-    </div>
+        document.getElementById('tableWrapper').style.display = 'block';
 
-    <div style="font-weight:700; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-        ${c.contract_code}
-    </div>
+        const woRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}`, { headers });
+        allWorks = await woRes.json();
 
-    <small style="color:#8e8e93; font-size:10px; display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden;">
-        ${c.contract_name}
-    </small>
+        const intRes = await fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${id}&order=date_received.asc`, { headers });
+        const interims = await intRes.json();
 
-</div>
-`).join('');
+        buildInterimMatrix(c, interims, allWorks);
 
-    } catch (e) { 
-        console.error(e); 
+        generateDistrictTabs(allWorks);
+        filterDistrict('ALL', document.querySelector('.district-tab'));
+
+    }catch(e){
+        console.error(e);
     }
 }
 
     async function selectContract(id, code, name) {
         // Trigger Mobile Hiding
         if (window.innerWidth <= 768) {
-            document.body.classList.add('contract-selected');
-            document.getElementById('mobileBackBtn').style.display = 'flex';
+            document.body.classList.add('contract-selected');;
         }
 
         document.querySelectorAll('.contract-item').forEach(el => el.classList.remove('active'));
@@ -1882,41 +1847,6 @@ function printBlueform() {
             });
         });
     }, 200);
-}
-    function filterUnit(unit, el){
-    document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
-    el.classList.add('active');
-
-    const cards = document.querySelectorAll('.contract-item');
-
-    cards.forEach(c=>{
-        const text = c.innerText.toUpperCase();
-
-        if(unit === 'ALL' || text.includes(unit.toUpperCase())){
-            c.style.display = 'block';
-        }else{
-            c.style.display = 'none';
-        }
-    });
-}
-    async function loadUnits(){
-    try{
-        const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
-        const data = await res.json();
-
-        const container = document.getElementById('unitNav');
-
-        container.innerHTML = `
-            <div class="unit-pill active" onclick="filterUnit('ALL', this)">ALL</div>
-            ${data.map(u => `
-                <div class="unit-pill" onclick="filterUnit('${u.unit_name}', this)">
-                    ${u.unit_name}
-                </div>
-            `).join('')}
-        `;
-    }catch(e){
-        console.error(e);
-    }
 }
 </script>
 </body>
