@@ -1736,53 +1736,48 @@ body += totalRow;
 document.getElementById("interimBody").innerHTML=body;
 
 }
+    function printBlueform() {
 
-function printBlueform() {
+    const blueform = document.getElementById('blueformPage');
 
-    const element = document.querySelector('.a4-container');
-
-    if (!element) {
+    if (!blueform.classList.contains('active')) {
         alert("Blueform belum dibuka.");
         return;
     }
 
-    const clone = element.cloneNode(true);
-    clone.style.width = "210mm";
-    clone.style.height = "297mm";
-    clone.style.margin = "0 auto";
-    clone.style.boxShadow = "none";
-    clone.style.position = "relative";
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches;
 
-    document.body.appendChild(clone);
+    if (isPWA) {
+        // 🔥 PWA → buka dalam browser sebenar
+        const url = window.location.origin + window.location.pathname + '?print=true';
+        window.open(url, '_blank');
+    } else {
+        // 🌐 browser biasa → terus print
+        setTimeout(() => {
+            window.print();
+        }, 200);
+    }
+}
+    window.addEventListener('load', () => {
 
-    // 🔥 AUTO SCALE FIX
-    const actualHeight = clone.scrollHeight;
-    const maxHeight = clone.clientHeight;
+    const params = new URLSearchParams(window.location.search);
 
-    if (actualHeight > maxHeight) {
-        const scale = maxHeight / actualHeight;
-        clone.style.transform = `scale(${scale})`;
-        clone.style.transformOrigin = "top center";
+    if (params.get('print') === 'true') {
+
+        // 🔥 pastikan blueform buka dulu
+        const blueform = document.getElementById('blueformPage');
+
+        if (!blueform.classList.contains('active')) {
+            blueform.classList.add('active');
+        }
+
+        setTimeout(() => {
+            window.print();
+        }, 400);
+
     }
 
-    const opt = {
-        margin: 0,
-        filename: 'Blueform.pdf',
-        image: { type: 'jpeg', quality: 1 },
-        html2canvas: { scale: 3, useCORS: true, scrollY: 0 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all'] }
-    };
-
-    html2pdf()
-        .set(opt)
-        .from(clone)
-        .save()
-        .then(() => {
-            document.body.removeChild(clone);
-        });
-}
-
+});
 </script>
 </body>
 </html>
