@@ -190,7 +190,6 @@ color:white;
         /* Blueform Page Overlay */
         #blueformPage {
             display: none;
-            position: fixed;
             inset: 0;
             background: rgba(0,0,0,0.8);
             backdrop-filter: blur(10px);
@@ -1786,16 +1785,52 @@ document.getElementById("interimBody").innerHTML=body;
 }
 
 function printBlueform() {
-    // Pastikan kandungan blueform ada sebelum cetak
-    const container = document.getElementById('blueformPage');
-    if (!container.classList.contains('active')) {
-        alert("Sila buka Blueform terlebih dahulu.");
+
+    const element = document.querySelector('.a4-container');
+
+    if (!element) {
+        alert("Blueform belum dibuka.");
         return;
     }
 
-    // Cetak halaman semasa
-    // CSS @media print dalam <style> akan mengawal apa yang nampak/hilang
-    window.print();
+    // 🔥 clone supaya tak ganggu layout asal
+    const clone = element.cloneNode(true);
+
+    clone.style.margin = "0 auto";
+    clone.style.boxShadow = "none";
+    clone.style.position = "relative";
+
+    document.body.appendChild(clone);
+
+    const opt = {
+        margin: 0,
+        filename: 'Blueform.pdf',
+
+        image: { 
+            type: 'jpeg', 
+            quality: 1 
+        },
+
+        html2canvas: { 
+            scale: 3,              // 🔥 HD
+            useCORS: true,
+            scrollY: 0
+        },
+
+        jsPDF: { 
+            unit: 'mm',
+            format: 'a4',
+            orientation: 'portrait'
+        }
+    };
+
+    html2pdf()
+        .set(opt)
+        .from(clone)
+        .save()
+        .then(() => {
+            document.body.removeChild(clone);
+        });
 }
 
 </script>
