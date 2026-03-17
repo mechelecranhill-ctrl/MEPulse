@@ -684,6 +684,7 @@
     let currentView = "AREA";
     let allWorks = [];
     let currentTableData = [];
+    let currentContractId = null;
     let bfSections = JSON.parse(localStorage.getItem('bf_sections_v2')) || {
         "LABOUR CHARGES": { label: "Labour Charges", active: true },
         "SUPPLY SPARE PART": { label: "Supply Spare Part", active: true },
@@ -697,7 +698,6 @@
     if(contractId){
         loadSingleContract(contractId);
     }
-};
 };
     document.getElementById('tableSearch').addEventListener('keyup', function(e){
         const term = e.target.value.toLowerCase();
@@ -728,12 +728,12 @@
     // --- TEMPLATE MANAGER LOGIC ---
     async function openTemplate() {
 
-    const activeCard = document.querySelector('.contract-item.active');
-    if(!activeCard){
-        alert("Sila pilih kontrak dahulu.");
-        return;
-    }
-    const id = activeCard.id.replace('c_card_','');
+    const id = currentContractId;
+
+if(!id){
+    alert("Tiada kontrak dipilih.");
+    return;
+}
     const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, { headers });
     const data = await res.json();
     const contract = data[0];
@@ -779,8 +779,7 @@
     };
 
 });
-        const activeCard = document.querySelector('.contract-item.active');
-        const id = activeCard.id.replace('c_card_','');
+        const id = currentContractId;
         /* simpan template section */
         localStorage.setItem(`bf_sections_${id}`, JSON.stringify(obj));        
         /* ambil prefix */
@@ -819,6 +818,7 @@
     }
 
     async function loadSingleContract(id){
+        currentContractId = id;
     try{
         const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, { headers });
         const data = await res.json();
@@ -845,65 +845,6 @@
     }
 }
 
-    async function selectContract(id, code, name) {
-        // Trigger Mobile Hiding
-        if (window.innerWidth <= 768) {
-            document.body.classList.add('contract-selected');;
-        }
-
-        document.querySelectorAll('.contract-item').forEach(el => el.classList.remove('active'));
-        document.getElementById(`c_card_${id}`).classList.add('active');
-        document.getElementById('viewTitle').innerText = code;
-        document.getElementById('viewSubtitle').innerText = name;
-        document.getElementById('tableWrapper').style.display = 'block';
-        try {
-            const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}`, { headers });
-            allWorks = await res.json();
-            
-            /* ambil interims */
-            const intRes = await fetch(
-                `${SB_URL}/rest/v1/interims?contract_id=eq.${id}&order=date_received.asc`,
-                { headers }
-            );
-            const interims = await intRes.json();          
-            /* ambil contract detail */
-            const contractRes = await fetch(
-    `${SB_URL}/rest/v1/contract?id=eq.${id}&select=*,units(unit_name)`,
-    { headers }
-            );
-            const contractData = await contractRes.json();
-            
-            /* bina dashboard */         
-            buildInterimMatrix(contractData[0], interims, allWorks);
-            const areaRes = await fetch(
-                `${SB_URL}/rest/v1/contract?id=eq.${id}&select=area_code`,
-                { headers }
-            );
-            const areaRows = await areaRes.json();
-            const areaPriority = {};
-            const areaList = (areaRows[0]?.area_code || '')
-                .split(',')
-                .map(a => a.trim().toUpperCase());
-            areaList.forEach((a,i)=>{
-                areaPriority[a] = i + 1;
-            });
-            
-            /* jika ada area baru dalam WO tapi tiada dalam table */
-            allWorks.forEach(w=>{
-                const a = (w.area_code || '').toUpperCase();
-                if(a && !areaPriority[a]){
-                    areaPriority[a] = Object.keys(areaPriority).length + 1; 
-                }
-            });
-            allWorks = sortWorkOrders(allWorks, areaPriority);
-            generateDistrictTabs(allWorks);
-            
-            /* default buka tab SEMUA */      
-            setTimeout(()=>{
-                document.querySelector('.district-tab').click();
-            },50);       
-        } catch (e) { console.error(e); }
-    }  
     function renderTable(data, showArea=true){
         currentTableData = data;   // simpan data table semasa
         const tbody = document.getElementById('workOrderTbody');
