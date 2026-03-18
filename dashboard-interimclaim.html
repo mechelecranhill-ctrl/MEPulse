@@ -700,6 +700,7 @@
 
     let currentView = "AREA";
     let allWorks = [];
+    let areaPriority = {};
     let currentTableData = [];
     let currentContractId = null;
     let bfSections = JSON.parse(localStorage.getItem('bf_sections_v2')) || {
@@ -873,6 +874,18 @@ if(!id){
         const data = await res.json();
         const c = data[0];
 
+        /* 🔥 BUILD AREA PRIORITY GLOBAL */
+areaPriority = {};
+
+const areaList = (c.area_code || '')
+    .split(',')
+    .map(a => a.trim().toUpperCase())
+    .filter(a => a.length > 0);
+
+areaList.forEach((a,i)=>{
+    areaPriority[a] = i + 1;
+});
+
         document.getElementById('viewTitle').innerText = c.contract_code;
         document.getElementById('viewSubtitle').innerText = c.contract_name;
 
@@ -997,7 +1010,10 @@ currentView = "AREA";
 
 const filtered = allWorks.filter(w => (w.district || '') === district);
 
-renderTable(filtered,true);
+/* 🔥 APPLY SORT DI SINI */
+const sorted = sortWorkOrders(filtered, areaPriority || {});
+
+renderTable(sorted,true);
 
 }
     function getInitials(text){
