@@ -132,7 +132,7 @@
             box-shadow: 0 8px 32px 0 rgba(31,38,135,0.05);
             width: 100%;
         }     
-        .desktop-table {
+        .desktop-table table {
             width: 100%;
             min-width: 100%;
             border-collapse: separate;   /* penting untuk sticky */
@@ -401,6 +401,53 @@
                 top: 10px;
             }
         }
+/* ================= MOBILE CARD ================= */
+#mobileCardContainer{
+    display:none;
+}
+
+.mobile-card{
+    background: white;
+    border-radius: 16px;
+    padding: 15px;
+    margin-bottom: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.mobile-card-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:8px;
+}
+
+.mobile-card-title{
+    font-weight:700;
+    font-size:14px;
+}
+
+.mobile-row{
+    display:flex;
+    justify-content:space-between;
+    font-size:12px;
+    margin:4px 0;
+}
+
+.mobile-actions{
+    margin-top:10px;
+}
+
+/* SWITCH */
+@media (max-width:768px){
+
+    .desktop-table{
+        display:none;
+    }
+
+    #mobileCardContainer{
+        display:block;
+    }
+}
  @media print {
 
      html, body {
@@ -584,8 +631,12 @@
                 <input type="text" id="tableSearch" placeholder="Cari ID Kerja atau Lokasi..."style="padding:10px;border-radius:10px;border:1px solid #ddd;width:250px;max-width:100%;">
             </div>
             
-            <div style="flex:1; overflow:auto;">
-                <table class="desktop-table">
+            <div style="flex:1; overflow:auto;" class="desktop-table">
+    <table>
+        </div>
+
+<!-- ✅ MOBILE CARD -->
+<div id="mobileCardContainer"></div>
                 <thead>
                     <tr>
                         <th>Status</th>
@@ -920,6 +971,7 @@ onclick="openBlueform(${w.id})">
     });
 
     tbody.innerHTML = html;
+    renderMobileCards(data);
 }
 
     function generateDistrictTabs(data){
@@ -1804,6 +1856,68 @@ function printBlueform() {
             });
         });
     }, 200);
+}
+    function renderMobileCards(data){
+
+    const container = document.getElementById('mobileCardContainer');
+
+    let html = '';
+
+    data.forEach(w => {
+
+        html += `
+<div class="mobile-card">
+
+    <div class="mobile-card-header">
+        <div class="mobile-card-title">${w.work_id}</div>
+        <span class="tag ${w.status === 'Claimed' ? 'claimed' : 'pending'}">
+            ${w.status || 'PENDING'}
+        </span>
+    </div>
+
+    <div style="font-size:12px;color:#555;margin-bottom:6px;">
+        ${w.description}
+    </div>
+
+    <div style="font-size:11px;color:#888;margin-bottom:6px;">
+        📍 ${w.location || '-'}
+    </div>
+
+    <div class="mobile-row">
+        <span>Interim</span>
+        <span>${w.interim_no ? 'INT-'+w.interim_no : '-'}</span>
+    </div>
+
+    <div class="mobile-row">
+        <span>Amaun</span>
+        <span>RM ${(w.amount_spent||0).toLocaleString(undefined,{minimumFractionDigits:2})}</span>
+    </div>
+
+    <div class="mobile-row">
+        <span>Claim</span>
+        <span style="color:green;">
+        RM ${(w.status==='Claimed'?w.amount_spent:0).toLocaleString(undefined,{minimumFractionDigits:2})}
+        </span>
+    </div>
+
+    <div class="mobile-row">
+        <span>Tarikh</span>
+        <span>${formatTarikhBM(w.qpb_date)}</span>
+    </div>
+
+    <div class="mobile-actions">
+        <button class="btn-action"
+        style="background:var(--ios-orange);font-size:12px;width:100%;"
+        onclick="openBlueform(${w.id})">
+        Blueform
+        </button>
+    </div>
+
+</div>
+`;
+    });
+
+    container.innerHTML = html;
 }
 </script>
 </body>
