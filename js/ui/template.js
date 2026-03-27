@@ -1,6 +1,5 @@
-// template.js
-import { state } from './state.js';
-import { patchContract } from './api.js';
+import { state } from '../state.js';
+import { fetchContract } from '../api.js';
 
 export function openTemplate(contract){
     const container = document.getElementById('dynamicRowsContainer');
