@@ -1,11 +1,13 @@
 // main.js
 import { fetchContract, fetchWorkOrders, fetchInterims } from './api.js';
 import { state } from './state.js';
-import { renderTable } from './table.js';
-import { renderMobileCards } from './mobile.js';
-import { generateDistrictTabs } from './district.js';
-import { openTemplate } from './template.js';
-import { generateBlueform } from './generator.js';
+import { renderDistrictTabs } from './ui/district.js';
+import { renderMobileCards } from './ui/mobile.js';
+import { renderTable } from './ui/table.js';
+import { renderTemplateModal } from './ui/template.js';
+import { calculateBlueform } from './blueform/calculator.js';
+import { generateBlueform } from './blueform/generator.js';
+import { printBlueform } from './blueform/print.js';
 
 window.onload = async () => {
     const urlParams = new URLSearchParams(window.location.search);
