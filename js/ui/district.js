@@ -1,33 +1,29 @@
-function generateDistrictTabs(data){
+// district.js
+import { state } from './state.js';
+import { renderTable } from './table.js';
 
-    const container = document.getElementById("districtTabs");
+export function generateDistrictTabs(works){
+    const container = document.getElementById('districtTabs');
+    container.innerHTML = '';
+    const districts = ['ALL', ...new Set(works.map(w => w.area_code).filter(Boolean))];
 
-    let districts = [...new Set(data.map(w => w.district || "LAIN"))];
-
-    let html = `<div onclick="filterDistrict('ALL',this)">SEMUA</div>`;
-
-    districts.forEach(d=>{
-        html += `<div onclick="filterDistrict('${d}',this)">${d}</div>`;
+    districts.forEach(d => {
+        const btn = document.createElement('div');
+        btn.className = 'district-tab' + (d === 'ALL' ? ' active' : '');
+        btn.innerText = d;
+        btn.onclick = () => filterDistrict(d, btn);
+        container.appendChild(btn);
     });
-
-    container.innerHTML = html;
 }
 
-function filterDistrict(district,el){
+export function filterDistrict(district, btn){
+    document.querySelectorAll('.district-tab').forEach(t => t.classList.remove('active'));
+    if(btn) btn.classList.add('active');
 
-    document.querySelectorAll('#districtTabs div')
-        .forEach(t=>t.classList.remove('active'));
-
-    el.classList.add('active');
-
-    if(district === "ALL"){
-        renderTable(allWorks,false);
-        return;
+    let filtered = state.allWorks;
+    if(district !== 'ALL'){
+        filtered = filtered.filter(w => w.area_code === district);
     }
 
-    const filtered = allWorks.filter(w => (w.district || '') === district);
-
-    const sorted = sortWorkOrders(filtered, areaPriority || {});
-
-    renderTable(sorted,true);
+    renderTable(filtered, true);
 }
