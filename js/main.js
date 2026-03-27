@@ -1,4 +1,3 @@
-// main.js
 import { fetchContract, fetchWorkOrders, fetchInterims } from './api.js';
 import { state } from './state.js';
 import { generateDistrictTabs } from './ui/district.js';
