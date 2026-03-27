@@ -37,7 +37,7 @@ if(!id){
         div.dataset.key = realKey;
         container.appendChild(div);
 } 
-export function saveTemplate(){     async function saveTemplate() {
+export function saveTemplate(){ 
         const rows = document.querySelectorAll('#dynamicRowsContainer .modal-row');
         let obj = {};        
         rows.forEach(r => {
