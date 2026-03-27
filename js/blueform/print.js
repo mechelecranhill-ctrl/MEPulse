@@ -1,16 +1,10 @@
-function printBlueform(){
-
-    const bf = document.getElementById('blueformPage');
-
-    if(!bf) return;
-
-    bf.style.display = 'block';
-
-    setTimeout(()=>{
-        window.print();
-    },200);
+// print.js
+export function printBlueform(){
+    const el = document.getElementById('blueformPage');
+    el.classList.add('active');
+    window.print();
 }
-
-function closeBlueform(){
-    document.getElementById('blueformPage').style.display = 'none';
+export function closeBlueform(){
+    const el = document.getElementById('blueformPage');
+    el.classList.remove('active');
 }
