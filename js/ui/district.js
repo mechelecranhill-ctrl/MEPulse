@@ -1,4 +1,4 @@
-import { state } from '../state.js';
+ import { state } from '../state.js';
 import { renderTable } from './table.js';
 
 export function generateDistrictTabs(works){
