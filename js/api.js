@@ -1,16 +1,19 @@
+// app.js (entry point)
+import { openTemplate, saveTemplate } from './template.js';
+import { fetchContract, fetchWorkOrders, fetchInterims } from './api.js';
 import { SB_URL, headers } from './config.js';
+import './state.js';
+import './table.js';
+import './blueform.js';
+import './utils.js';
 
-export async function fetchContract(id) {
-  const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, { headers });
-  return (await res.json())[0];
+// Panggil fungsi bila button diklik
+document.getElementById('openBtn').addEventListener('click', openTemplate);
+
+// Contoh: load kontrak bila halaman ready
+async function init() {
+    const contract = await fetchContract(currentContractId);
+    console.log(contract);
 }
 
-export async function fetchWorkOrders(contractId) {
-  const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}`, { headers });
-  return await res.json();
-}
-
-export async function fetchInterims(contractId) {
-  const res = await fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=date_received.asc`, { headers });
-  return await res.json();
-}
+init();
