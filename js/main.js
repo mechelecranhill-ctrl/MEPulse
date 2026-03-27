@@ -1,22 +1,30 @@
+// main.js
+import { fetchContract, fetchWorkOrders, fetchInterims } from './api.js';
+import { state } from './state.js';
+import { renderTable } from './table.js';
+import { renderMobileCards } from './mobile.js';
+import { generateDistrictTabs } from './district.js';
+import { openTemplate } from './template.js';
+import { generateBlueform } from './generator.js';
+
 window.onload = async () => {
-
     const urlParams = new URLSearchParams(window.location.search);
-    const contractId = urlParams.get('id');
+    const id = urlParams.get('id');
+    if(!id) return;
 
-    if(!contractId) return;
+    state.currentContractId = id;
+    const contract = await fetchContract(id);
+    state.allWorks = await fetchWorkOrders(id);
 
-    currentContractId = contractId;
+    document.getElementById('viewTitle').innerText = contract.contract_code;
+    document.getElementById('viewSubtitle').innerText = contract.contract_name;
 
-    const contract = await fetchContract(contractId);
-    allWorks = await fetchWorkOrders(contractId);
-    const interims = await fetchInterims(contractId);
+    renderTable(state.allWorks, true);
+    renderMobileCards(state.allWorks);
+    generateDistrictTabs(state.allWorks);
 
-    setupAreaPriority(contract);
-    renderHeader(contract);
-
-    renderTable(allWorks);
-    renderMobileCards(allWorks);
-
-    buildInterimMatrix(contract, interims, allWorks);
-    generateDistrictTabs(allWorks);
+    const interims = await fetchInterims(id);
+    generateBlueform(contract, state.allWorks);
+    
+    document.getElementById('tableWrapper').style.display = 'block';
 };
