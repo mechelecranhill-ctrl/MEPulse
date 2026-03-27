@@ -1,4 +1,4 @@
-// district.js
+
 import { state } from './state.js';
 import { renderTable } from './table.js';
 
