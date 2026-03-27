@@ -1,9 +1,7 @@
 export async function openBlueform(id){
-  console.log("OPEN BF:", id);
-     // --- BLUEFORM GENERATION LOGIC ---
-    async function openBlueform(id) {
-        window.currentBFId = id;
-        console.log("OPEN BF:", id);  // 🔥 test
+    console.log("OPEN BF:", id);  // 🔥 test
+    window.currentBFId = id;
+  
     try {
 
         const res = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}&select=*,contract(*,units(unit_name))`, { headers });
