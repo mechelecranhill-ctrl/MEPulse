@@ -774,6 +774,8 @@
                 <tbody id="workOrderTbody"></tbody>
             </table>
 
+            </table>
+
 <!-- ✅ MOBILE CARD VIEW -->
 <div id="mobileCardContainer" class="mobile-cards"></div>
             
@@ -824,6 +826,1255 @@
             </div>
         </div>
     </div>
-<script type="module" src="./js/app.js"></script>
+
+<script>
+    const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
+    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
+    const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
+
+    let currentView = "AREA";
+    let allWorks = [];
+    let areaPriority = {};
+    let currentTableData = [];
+    let currentContractId = null;
+    let bfSections = JSON.parse(localStorage.getItem('bf_sections_v2')) || {
+        "LABOUR CHARGES": { label: "Labour Charges", active: true },
+        "SUPPLY SPARE PART": { label: "Supply Spare Part", active: true },
+        "PROVISIONAL SUM": { label: "Provisional Sum", active: true }
+    };
+
+    window.onload = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const contractId = urlParams.get('id');
+
+    if(contractId){
+        loadSingleContract(contractId);
+    }
+};
+    document.getElementById('tableSearch').addEventListener('keyup', function(e){
+
+    const term = e.target.value.toLowerCase().trim();
+
+    // 🔥 KALAU INPUT KOSONG → RESET TABLE
+    if(term === ""){
+        
+        if(currentView === "DATE"){
+            const sorted = [...allWorks].sort((a,b)=>{
+                const d1 = new Date(a.qpb_date || "1900-01-01");
+                const d2 = new Date(b.qpb_date || "1900-01-01");
+
+                if(d1.getTime() !== d2.getTime()){
+                    return d1 - d2;
+                }
+
+                const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
+                const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
+
+                return aSeq - bSeq;
+            });
+
+            renderTable(sorted,false);
+        } else {
+            renderTable(allWorks,true);
+        }
+
+        return; // 🔥 STOP sini
+    }
+
+    // 🔥 SEARCH NORMAL
+    let filteredWorks = allWorks.filter(w =>
+        (w.work_id || '').toLowerCase().includes(term) ||
+        (w.location || '').toLowerCase().includes(term) ||
+        (w.description || '').toLowerCase().includes(term)
+    );
+
+    if(currentView === "DATE"){
+        filteredWorks.sort((a,b)=>{
+            const d1 = new Date(a.qpb_date || "1900-01-01");
+            const d2 = new Date(b.qpb_date || "1900-01-01");
+
+            if(d1.getTime() !== d2.getTime()){
+                return d1 - d2;
+            }
+
+            const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
+            const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
+
+            return aSeq - bSeq;
+        });
+
+        renderTable(filteredWorks,false);
+    } else {
+        renderTable(filteredWorks,true);
+    }
+});
+
+    // --- TEMPLATE MANAGER LOGIC ---
+    async function openTemplate() {
+
+    const id = currentContractId;
+
+if(!id){
+    alert("Tiada kontrak dipilih.");
+    return;
+}
+    const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, { headers });
+    const data = await res.json();
+    const contract = data[0];
+    const sections = contract.contract_sections_breakdown || {};
+        const saved = JSON.parse(localStorage.getItem(`bf_sections_${id}`) || '{}');
+    const container = document.getElementById('dynamicRowsContainer');
+    const savedPrefix = contract.reference || 'RSAJ/M&E/IP/11-';
+        document.getElementById('refPrefixInput').value = savedPrefix;
+    container.innerHTML = '';
+    Object.keys(sections).forEach(key => {
+    const desc = sections[key]?.desc || '';
+    const display = `${key} — ${desc}`;
+    const label = saved[key]?.label || desc;
+    const active = saved[key]?.active ?? true;
+    addTemplateRow(display, label, active, key);
+    });
+    document.getElementById('templateModal').style.display = 'flex';
+}
+    function addTemplateRow(display, label, active, realKey) {
+    const container = document.getElementById('dynamicRowsContainer');
+    const div = document.createElement('div');
+    div.className = 'modal-row';
+    div.innerHTML = `
+<input type="text" value="${display}" readonly style="background:#f5f5f5;font-weight:bold;">
+<input type="text" class="tpl-label" value="${label}" placeholder="Label untuk borang (optional)">
+<label style="display:flex;align-items:center;font-size:11px;">
+<input type="checkbox" class="tpl-active" ${active ? 'checked' : ''}>
+</label>
+`;
+        div.dataset.key = realKey;
+        container.appendChild(div);
+} 
+    async function saveTemplate() {
+        const rows = document.querySelectorAll('#dynamicRowsContainer .modal-row');
+        let obj = {};        
+        rows.forEach(r => {
+            const key = r.dataset.key;
+            const label = r.querySelector('.tpl-label').value;
+            const active = r.querySelector('.tpl-active').checked;
+    obj[key] = {
+        label: label || key,
+        active: active
+    };
+
+});
+        const id = currentContractId;
+        /* simpan template section */
+        localStorage.setItem(`bf_sections_${id}`, JSON.stringify(obj));        
+        /* ambil prefix */
+        const prefix = document.getElementById('refPrefixInput').value;
+        /* hantar ke database contract.reference */
+        await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, {
+            method:'PATCH',
+            headers,
+            body: JSON.stringify({  
+                reference: prefix
+            })
+        });
+        alert("Template berjaya disimpan!");        
+        closeTemplate();       
+    }
+    function closeTemplate() { document.getElementById('templateModal').style.display = 'none'; }
+    // ============================
+    // SORT WORK ORDER BY AREA + SEQUENCE
+    // ============================
+    function sortWorkOrders(data, areaPriority){
+        return data.sort((a,b)=>{
+            const aArea = (a.area_code || '').toUpperCase().trim();
+            const bArea = (b.area_code || '').toUpperCase().trim();
+            const aRank = areaPriority[aArea] ?? 999;
+            const bRank = areaPriority[bArea] ?? 999;
+            
+            /* 1️⃣ AREA ORDER */
+            if(aRank !== bRank){
+                return aRank - bRank;
+            }
+            /* 2️⃣ SEQUENCE NUMBER */
+            const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
+            const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
+            return aSeq - bSeq;
+        });
+    }
+    async function loadSingleContract(id){
+        currentContractId = id;
+    try{
+        const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, { headers });
+        const data = await res.json();
+        const c = data[0];
+
+        /* 🔥 BUILD AREA PRIORITY GLOBAL */
+areaPriority = {};
+
+const areaList = (c.area_code || '')
+    .split(',')
+    .map(a => a.trim().toUpperCase())
+    .filter(a => a.length > 0);
+
+areaList.forEach((a,i)=>{
+    areaPriority[a] = i + 1;
+});
+
+        document.getElementById('viewTitle').innerText = c.contract_code;
+        document.getElementById('viewSubtitle').innerText = c.contract_name;
+
+        document.getElementById('tableWrapper').style.display = 'block';
+
+        const woRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}`, { headers });
+        allWorks = await woRes.json();
+
+renderTable(allWorks, true);
+
+renderMobileCards(allWorks);
+
+        const intRes = await fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${id}&order=date_received.asc`, { headers });
+        const interims = await intRes.json();
+
+        buildInterimMatrix(c, interims, allWorks);
+
+        generateDistrictTabs(allWorks);
+        filterDistrict('ALL', document.querySelector('.district-tab'));
+
+    }catch(e){
+        console.error(e);
+    }
+}
+
+function renderTable(data, showArea = true){
+
+    currentTableData = data;
+
+    const tbody = document.getElementById('workOrderTbody');
+
+    let html = '';
+    let currentArea = '';
+
+    data.forEach(w => {
+
+        const area = (w.area_code || 'LAIN').toUpperCase();
+
+        if(showArea && area !== currentArea){
+            html += `
+            <tr class="area-header">
+                <td colspan="9" style="padding:10px;">
+                    <i class="fa fa-layer-group"></i> ${area}
+                </td>
+            </tr>`;
+            currentArea = area;
+        }
+
+        html += `
+        <tr>
+            <td>
+                <span class="tag ${w.status === 'Claimed' ? 'claimed' : 'pending'}">
+                    ${w.status || 'PENDING'}
+                </span>
+            </td>
+
+            <td><strong>${w.sequence_no || '-'}</strong></td>
+            <td><strong>${w.work_id}</strong></td>
+
+            <td>
+                <div style="font-weight:500;">${w.description}</div>
+                <div style="font-size:11px;color:var(--ios-orange);">
+                    <i class="fa-solid fa-map-pin"></i> ${w.location || 'N/A'}
+                </div>
+            </td>
+
+            <td><strong>${w.interim_no ? 'INT-' + w.interim_no : '-'}</strong></td>
+
+            <td>
+                <strong>
+                    RM ${(w.amount_spent || 0).toLocaleString(undefined,{minimumFractionDigits:2})}
+                </strong>
+                ${buildSectionBreakdown(w)}
+            </td>
+
+            <td style="font-weight:bold;color:var(--ios-green);">
+                RM ${(w.status === 'Claimed' ? w.amount_spent : 0)
+                    .toLocaleString(undefined,{minimumFractionDigits:2})}
+            </td>
+
+            <td>${formatTarikhBM(w.qpb_date)}</td>
+
+            <td>
+                <button class="btn-action"
+                    style="background:var(--ios-orange);padding:8px 14px;font-size:12px;"
+                    onclick="openBlueform(${w.id})">
+                    <i class="fa-solid fa-print"></i> Blueform
+                </button>
+            </td>
+        </tr>`;
+    });
+
+    tbody.innerHTML = html;
+
+    renderMobileCards(data);
+}
+
+function renderMobileCards(data){
+
+    const container = document.getElementById('mobileCardContainer');
+    if(!container) return;
+
+    let html = '';
+
+    data.forEach(w => {
+
+        html += `
+        <div class="mobile-card">
+
+            <div class="mobile-card-header">
+                <div class="mobile-title">
+    ${w.sequence_no ? w.sequence_no + ' — ' : ''}${w.work_id || '-'}
+</div>
+
+                <span class="tag ${w.status === 'Claimed' ? 'claimed' : 'pending'}">
+                    ${w.status || 'PENDING'}
+                </span>
+            </div>
+
+            <div class="mobile-sub">${w.description || '-'}</div>
+            <div class="mobile-sub">
+                <i class="fa fa-map-pin"></i> ${w.location || 'N/A'}
+            </div>
+
+            <div class="mobile-row">
+                <span>Interim</span>
+                <strong>${w.interim_no ? 'INT-' + w.interim_no : '-'}</strong>
+            </div>
+
+            <div class="mobile-row">
+                <span>Amaun</span>
+                <strong>
+                    RM ${(w.amount_spent || 0)
+                        .toLocaleString(undefined,{minimumFractionDigits:2})}
+                </strong>
+            </div>
+
+            <div class="mobile-row">
+                <span>Tarikh</span>
+                <strong>${formatTarikhBM(w.qpb_date)}</strong>
+            </div>
+
+            <div class="mobile-actions">
+                <button class="btn-action"
+                    style="background:var(--ios-orange);padding:6px 12px;font-size:11px;"
+                    onclick="openBlueform(${w.id})">
+                    Blueform
+                </button>
+            </div>
+
+        </div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+    function generateDistrictTabs(data){
+
+const container = document.getElementById("districtTabs");
+
+let districts = [...new Set(data.map(w => w.district || "LAIN"))];
+
+let html = `<div class="district-tab active" onclick="filterDistrict('ALL',this)">SEMUA</div>`;
+
+districts.forEach(d=>{
+html += `<div class="district-tab" onclick="filterDistrict('${d}',this)">${d}</div>`;
+});
+
+container.innerHTML = html;
+
+}
+
+function filterDistrict(district,el){
+
+document.querySelectorAll('.district-tab').forEach(t=>t.classList.remove('active'));
+el.classList.add('active');
+
+/* TAB SEMUA → IKUT TARIKH */
+if(district === "ALL"){
+
+currentView = "DATE";
+
+const sorted = [...allWorks].sort((a,b)=>{
+
+const d1 = new Date(a.qpb_date || "1900-01-01");
+const d2 = new Date(b.qpb_date || "1900-01-01");
+
+if(d1.getTime() !== d2.getTime()){
+return d1 - d2;
+}
+
+const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
+const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
+
+return aSeq - bSeq;
+
+});
+
+renderTable(sorted,false);
+return;
+
+}
+
+/* DISTRICT */
+currentView = "AREA";
+
+const filtered = allWorks.filter(w => (w.district || '') === district);
+
+/* 🔥 APPLY SORT DI SINI */
+const sorted = sortWorkOrders(filtered, areaPriority || {});
+
+renderTable(sorted,true);
+
+}
+    function getInitials(text){
+
+const ignore = ['AND','OF','THE','&','DAN'];
+
+return text
+    .toUpperCase()
+    .replace(/[^A-Z\s]/g,'')
+    .split(/\s+/)
+    .filter(word => word.length > 0 && !ignore.includes(word))
+    .map(word => word[0])
+    .join('.');
+
+}
+
+    function buildSectionBreakdown(work){
+
+const s = work.section_category || {};
+
+let html = '';
+
+Object.keys(s).forEach(sec=>{
+
+const amt = Number(s[sec]?.amt || 0);
+if(amt <= 0) return;
+
+html += `
+<div style="display:flex;justify-content:space-between;font-size:11px;color:#666;">
+<span>${sec}</span>
+<span>RM ${amt.toLocaleString(undefined,{minimumFractionDigits:2})}</span>
+</div>
+`;
+
+});
+
+/* tambahan provisional */
+const add = Number(work.additional || 0);
+
+if(add > 0){
+html += `
+<div style="display:flex;justify-content:space-between;font-size:11px;color:#666;">
+<span>PROVISIONAL SUM</span>
+<span>RM ${add.toLocaleString(undefined,{minimumFractionDigits:2})}</span>
+</div>
+`;
+}
+
+return html;
+
+}
+    
+function formatTarikhBM(dateStr){
+
+if(!dateStr) return '';
+
+const bulan = [
+'JANUARI','FEBRUARI','MAC','APRIL','MEI','JUN',
+'JULAI','OGOS','SEPTEMBER','OKTOBER','NOVEMBER','DISEMBER'
+];
+
+const d = new Date(dateStr);
+const hari = String(d.getDate()).padStart(2,'0');
+const bulanText = bulan[d.getMonth()];
+const tahun = d.getFullYear();
+
+return `${hari} ${bulanText} ${tahun}`;
+
+}
+        
+    // --- BLUEFORM GENERATION LOGIC ---
+    async function openBlueform(id) {
+        window.currentBFId = id;
+        console.log("OPEN BF:", id);  // 🔥 test
+    try {
+
+        const res = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}&select=*,contract(*,units(unit_name))`, { headers });
+        const result = await res.json();
+        const data = result[0];
+
+        const seq = data.sequence_no || '';
+
+        const c = data.contract;
+        const refPrefix = c.reference || 'RSAJ/M&E/IP/11-';
+        
+        let formattedRef = seq.replace(/([A-Z]{2,4}\d+)$/i, ' - $1');
+        const unitName = (c.units?.unit_name || '').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+        const b = c.contract_sections_breakdown || {};
+        const s = data.section_category ?? {};
+
+        // =============================
+// KIRAAN NILAI KERJA
+// =============================
+
+// jumlah kerja dari section_category
+let totalSection = 0;
+
+Object.values(s).forEach(sec => {
+    totalSection += Number(sec?.amt || 0);
+});
+
+// kerja tambahan (PROVISIONAL)
+let provisionalExtra = Number(data.additional || 0);
+
+// jumlah sebenar work order
+let totalWorkValue = totalSection + provisionalExtra;
+
+        // ambil semua interim ikut kronologi
+const interimRes = await fetch(
+`${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=date_received.asc`,
+{ headers }
+);
+
+const allInterims = await interimRes.json();
+
+        let cutoffDate = new Date(data.qpb_date);
+
+/* jika work order sudah claimed */
+if(data.status === "Claimed"){
+
+for(const int of allInterims){
+
+const cat = int.claim_breakdown || {};
+
+const found = Object.values(cat).some(sec =>
+Number(sec?.work_order_id) === Number(data.id)
+);
+
+if(found){
+
+cutoffDate = new Date(int.date_received);
+break;
+
+}
+
+}
+
+}
+        
+        const woRes = await fetch(
+`${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}`,
+{ headers }
+);
+
+let allWO = await woRes.json();
+let sectionUsed = {};
+let totalSalvage = 0;
+let totalPG = 0;
+let timeline = [];
+
+/* ambil area order dari database */
+const areaRes = await fetch(
+`${SB_URL}/rest/v1/contract?id=eq.${c.id}&select=area_code`,
+{ headers }
+);
+
+const areaRows = await areaRes.json();
+
+const areaPriority = {};
+
+const areaList = (areaRows[0]?.area_code || '')
+.split(',')
+.map(a => a.trim().toUpperCase())
+.filter(a => a.length > 0);
+
+areaList.forEach((a,i)=>{
+    areaPriority[a] = i + 1;
+});
+        
+// sort ikut kronologi
+// sort ikut kronologi sebenar
+allWO.sort((a,b)=>{
+
+    /* 1️⃣ TARIKH QPB */
+    const d1 = new Date(a.qpb_date);
+    const d2 = new Date(b.qpb_date);
+
+    if(d1 < d2) return -1;
+    if(d1 > d2) return 1;
+
+    /* 2️⃣ AREA PRIORITY (jika tarikh sama) */
+    const aArea = (a.area_code || '').toUpperCase();
+    const bArea = (b.area_code || '').toUpperCase();
+
+    const aRank = areaPriority[aArea] ?? 999;
+    const bRank = areaPriority[bArea] ?? 999;
+
+    if(aRank < bRank) return -1;
+    if(aRank > bRank) return 1;
+
+    /* 3️⃣ SEQUENCE NUMBER */
+    const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
+    const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
+
+    return aSeq - bSeq;
+
+});
+
+// 1️⃣ Tolak INTERIM dahulu (ikut date_received)
+allInterims.forEach(int => {
+
+const intDate = new Date(int.date_received);
+const curDate = cutoffDate;
+
+if(intDate > curDate) return;
+
+const salvage = Number(int.salvage_value || 0);
+const pg = Number(int.performance_guarantee_sum || 0);
+
+totalSalvage += salvage;
+totalPG += pg;
+
+const cat = int.claim_breakdown || {};
+
+let amt = 0;
+
+Object.values(cat).forEach(s=>{
+    amt += Number(s?.amt || s?.amount || s?.value || 0);
+});
+
+timeline.push({
+    type:'INTERIM',
+    date:int.date_received,
+    amount:amt,
+    salvage:salvage,
+    pg:pg
+});
+    
+    Object.keys(cat).forEach(sec => {
+
+        const val = Number(cat[sec]?.amt || cat[sec]?.amount || cat[sec]?.value || 0);
+
+        if(!sectionUsed[sec]) sectionUsed[sec] = 0;
+
+        sectionUsed[sec] += val;
+
+    });
+
+});
+
+allWO.filter(w => {
+
+/* skip claimed */
+if(w.status === "Claimed") return false;
+
+/* skip work order semasa */
+if(Number(w.id) === Number(data.id)) return false;
+
+if(!w.qpb_date) return false;
+
+const woDate = new Date(w.qpb_date);
+const curDate = cutoffDate;
+
+/* 1️⃣ jika tarikh lebih awal → kira */
+if(woDate < curDate) return true;
+
+/* 2️⃣ jika tarikh lebih lewat → jangan kira */
+if(woDate > curDate) return false;
+
+/* 3️⃣ jika tarikh sama → ikut AREA */
+const wArea = (w.area_code || '').toUpperCase();
+const curArea = (data.area_code || '').toUpperCase();
+
+const wRank = areaPriority[wArea] || 99;
+const curRank = areaPriority[curArea] || 99;
+
+if(wRank < curRank) return true;
+if(wRank > curRank) return false;
+
+/* 4️⃣ jika area sama → ikut sequence */
+const wSeq = parseInt((w.sequence_no || '').match(/\d+/)?.[0] || 0);
+const curSeq = parseInt((data.sequence_no || '').match(/\d+/)?.[0] || 0);
+
+return wSeq <= curSeq;
+
+})
+.forEach(wo => {
+
+timeline.push({
+type:'WORKORDER',
+date:wo.qpb_date,
+seq:parseInt((wo.sequence_no || '').match(/\d+/)?.[0] || 0),
+amount:Number(wo.amount_spent || 0),
+salvage:0
+});
+    
+    const cat = wo.section_category || {};
+
+    Object.keys(cat).forEach(sec => {
+
+        const amt = Number(cat[sec]?.amt || 0);
+
+        if(!sectionUsed[sec]) sectionUsed[sec] = 0;
+
+        sectionUsed[sec] += amt;
+
+    });
+
+    /* tambahan PROVISIONAL SUM */
+const add = Number(wo.additional || 0);
+
+if(add > 0){
+    if(!sectionUsed["PROVISIONAL SUM"]) sectionUsed["PROVISIONAL SUM"] = 0;
+    sectionUsed["PROVISIONAL SUM"] += add;
+}
+
+});        
+
+        /* ================================
+   TAMBAH NILAI WORK ORDER SEMASA
+   supaya baki section = selepas WO ini
+================================ */
+
+const currentSections = data.section_category || {};
+
+Object.keys(currentSections).forEach(sec => {
+
+const amt = Number(currentSections[sec]?.amt || 0);
+
+if(!sectionUsed[sec]) sectionUsed[sec] = 0;
+
+sectionUsed[sec] += amt;
+
+});
+
+/* tambahan provisional WO semasa */
+
+const currentAdd = Number(data.additional || 0);
+
+if(currentAdd > 0){
+
+if(!sectionUsed["PROVISIONAL SUM"]) sectionUsed["PROVISIONAL SUM"] = 0;
+
+sectionUsed["PROVISIONAL SUM"] += currentAdd;
+
+}
+    /* ================================
+   TAMBAH WORK ORDER SEMASA
+   supaya baki kontrak selepas WO ini
+================================ */
+
+timeline.push({
+type:'WORKORDER',
+date:data.qpb_date,
+seq:parseInt((data.sequence_no || '').match(/\d+/)?.[0] || 0),
+amount: totalWorkValue,
+salvage:0
+});
+        let dynamicHtml = '';
+            let currentRow = 6;
+
+            const tpl = JSON.parse(localStorage.getItem(`bf_sections_${c.id}`) || '{}');
+            
+            Object.keys(b).sort().forEach((key, idx) => {
+
+    const label = b[key]?.desc || tpl[key]?.label || key;
+    const active = tpl[key]?.active ?? true;
+
+    if (!active) return;
+
+    const sumValue = b[key]?.amt || 0;
+
+    let workValue = Number(s[key]?.amt || 0);
+
+    dynamicHtml += `
+        <div class="grp-dyn-${idx}">
+            <hr style="border:0.5px solid #000;margin:8px 0;">
+
+            <div class="bf-row">
+    <div class="bf-label"><span class="bf-no">${currentRow++}</span><span>${label.toUpperCase().includes('SUM') ? label : label + ' Sum'}</span></div><div class="bf-colon">:</div><div class="bf-value">RM ${sumValue.toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+
+            <div class="bf-row">
+    <div class="bf-label">
+        <span class="bf-no">${currentRow++}</span>
+        <span>Anggaran Kerja (${getInitials(label)})</span></div><div class="bf-colon">:</div><div class="bf-value">RM ${workValue.toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+        </div>
+    `;
+});
+
+let totalContract = Number(c.contract_sum || 0);
+
+timeline.sort((a,b)=>{
+
+const d1 = new Date(a.date);
+const d2 = new Date(b.date);
+
+if(d1 < d2) return -1;
+if(d1 > d2) return 1;
+
+/* interim dahulu */
+if(a.type !== b.type){
+return a.type === 'INTERIM' ? -1 : 1;
+}
+
+/* workorder ikut sequence */
+if(a.type === 'WORKORDER'){
+return (a.seq || 0) - (b.seq || 0);
+}
+
+return 0;
+
+});
+        
+let bakiKontrak = totalContract;
+
+timeline.forEach(t => {
+
+if(t.type === 'INTERIM'){
+    bakiKontrak -= t.amount;
+    bakiKontrak += (t.salvage || 0);
+    bakiKontrak += (t.pg || 0);
+}
+
+else if(t.type === 'WORKORDER'){
+    bakiKontrak -= t.amount;
+}
+
+});
+        
+let locationText = formatLocation(data.location);
+
+function formatLocation(loc){
+if(!loc) return '';
+
+let txt = loc.toUpperCase().trim();
+
+/* tukar KAMPUNG → KG */
+txt = txt.replace(/\bKAMPUNG\b/g,'KG');
+
+/* jika ada BPH atau RESERVOIR → kekalkan */
+if(txt.includes('BPH') || txt.includes('RESERVOIR')){
+return txt;
+}
+
+/* jika belum ada LRA → tambah */
+if(!txt.startsWith('LRA')){
+txt = 'LRA ' + txt;
+}
+
+return txt;
+
+}
+        
+            let html = `
+                <div class="bf-row"><div class="bf-label"><span class="bf-no">1</span><span>   No. Rujukan</span></div><div class="bf-colon">:</div><div class="bf-value">${refPrefix}${formattedRef}</div></div>
+                <div class="bf-row"><div class="bf-label"><span class="bf-no">2</span><span>   No. Work Order</span></div><div class="bf-colon">:</div><div class="bf-value">${data.work_id}</div></div>
+                <div class="bf-row"><div class="bf-label"><span class="bf-no">3</span><span>   No. Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value">${c.contract_code}</div></div>
+                <div class="bf-row"><div class="bf-label"><span class="bf-no">4</span><span>   Nama Kontraktor</span></div><div class="bf-colon">:</div><div class="bf-value">${c.contractor}</div></div>
+                <div class="bf-row"><div class="bf-label"><span class="bf-no">5</span><span>   Tempoh Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value">${formatTarikhBM(c.contract_start)} ~ ${formatTarikhBM(c.contract_end)}</div></div>
+                
+                ${dynamicHtml}
+
+<div class="bf-row">
+    <div class="bf-label">
+        <span class="bf-no">${currentRow++}</span>
+        <span>Anggaran Kerja (<i>Tambahan</i>)</span>
+    </div>
+    <div class="bf-colon">:</div>
+    <div class="bf-value">
+        RM ${provisionalExtra.toLocaleString(undefined,{minimumFractionDigits:2})}
+    </div>
+</div>
+                <hr style="border: 0.5px solid #000; margin: 8px 0;">
+                <div class="bf-row"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Jumlah Harga Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value">RM ${Number(c.contract_sum || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+                
+                <div style="margin-top: 8px;">
+                    <div class="bf-row"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>BAKI</span></div><div class="bf-colon">:</div><div class="bf-value"></div></div>
+                    <div class="bf-baki-table">
+                    ${Object.keys(b).map(sec => {
+
+let label = (b[sec].desc || '').toUpperCase();
+
+if(label.includes('GENERAL') || label.includes('PRELIMINARIES')){
+label = 'G&P';
+}
+else if(label.includes('PREVENTIVE')){
+label = 'PREVENTIVE MAINTENANCE';
+}
+else if(label.includes('PROACTIVE')){
+label = 'PROACTIVE MAINTENANCE';
+}
+
+label = label.replace(/CHARGES/g,'').trim();
+
+const contractAmt = Number(b[sec]?.amt || 0);
+const usedAmt = Number(sectionUsed[sec] || 0);
+
+const baki = contractAmt - usedAmt;
+
+return `
+
+<div class="bf-row" style="font-size:9px;">
+<div class="bf-label" style="width:220px;">
+<span style="margin-left:25px;">${label}</span>
+</div>
+<div class="bf-colon">:</div>
+<div class="bf-value">
+RM ${baki.toLocaleString(undefined,{minimumFractionDigits:2})}
+</div>
+</div>
+`;
+
+}).join('')}
+
+<div class="bf-row" style="font-size:9px;">
+<div class="bf-label" style="width:220px;">
+<span style="margin-left:25px;">SALVAGE VALUE</span>
+</div>
+<div class="bf-colon">:</div>
+<div class="bf-value">
+RM ${totalSalvage.toLocaleString(undefined,{minimumFractionDigits:2})}
+</div>
+</div>
+
+<div class="bf-row" style="font-size:9px;">
+<div class="bf-label" style="width:220px;">
+<span style="margin-left:25px;">PERFORMANCE GUARANTEE</span>
+</div>
+<div class="bf-colon">:</div>
+<div class="bf-value">
+RM ${totalPG.toLocaleString(undefined,{minimumFractionDigits:2})}
+</div>
+</div>
+
+</div></div>
+                <div class="bf-row" style="margin-top:8px;"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Baki Harga Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value" style="font-weight:bold;">RM ${bakiKontrak.toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+                <hr style="border: 0.5px solid #000; margin: 8px 0;">
+                <div class="bf-row"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Tajuk Kerja</span></div><div class="bf-colon">:</div><div class="bf-value">${data.description.toUpperCase()} DI ${locationText} (RM ${totalWorkValue.toLocaleString(undefined,{minimumFractionDigits:2})})</div></div>
+            `;
+
+            document.getElementById('bf_executive_unit').innerText =unitName ? `Eksekutif ${unitName}` : 'Eksekutif';
+            const bf = document.getElementById('blueformPage');
+
+document.getElementById('bf_content').innerHTML = html;
+
+bf.classList.add('active');
+
+/* 🔥 paksa visible */
+bf.style.display = 'block';
+
+/* 🔥 force reflow (WAJIB) */
+bf.offsetHeight;
+        
+        } catch (e) { 
+    console.error(e);
+    alert("Ralat memaparkan borang."); 
+}
+    }
+
+    function toggleBfGroup(className, isVisible) {
+        const elements = document.getElementsByClassName(className);
+        for (let el of elements) isVisible ? el.classList.remove('hide-group') : el.classList.add('hide-group');
+    }
+
+    function closeBlueform() {
+    const bf = document.getElementById('blueformPage');
+    
+    bf.classList.remove('active');
+    bf.style.display = 'none';   // 🔥 WAJIB tambah ini
+}
+
+function formatRM(v){
+return Number(v).toLocaleString(undefined,{
+minimumFractionDigits:2,
+maximumFractionDigits:2
+});
+}
+    function buildInterimMatrix(contract, interims, workorders){
+
+const sections = contract.contract_sections_breakdown || {};
+const interimCount = interims.length;
+const sectionNames = Object.keys(sections);
+
+/* HEADER */
+
+let head = `<tr>
+<th>ITEM</th>
+<th>DESCRIPTION</th>
+<th>AS PER CONTRACT</th>`;
+
+for(let i=1;i<=interimCount;i++){
+head += `<th>INTERIM ${i}</th>`;
+}
+
+head += `
+<th>TOTAL CLAIM</th>
+<th>CONTRACT BALANCE</th>
+<th>ON GOING WORKS</th>
+<th>ON GOING CONTRACT BALANCE</th>
+</tr>`;
+
+document.getElementById("interimHead").innerHTML = head;
+
+
+/* BODY */
+
+let body='';
+
+sectionNames.forEach((sec,index)=>{
+
+const letter=String.fromCharCode(65+index);
+const contractAmt=Number(sections[sec]?.amt||0);
+
+let row=`
+<tr>
+<td>${letter}</td>
+<td>${sections[sec]?.desc || sec}</td>
+<td style="text-align:right;">${formatRM(contractAmt)}</td>
+`;
+
+let totalClaim=0;
+
+/* interim columns */
+
+interims.forEach(int=>{
+
+const cat=int.claim_breakdown || {};
+
+let val = Number(cat[sec]?.amt || 0);
+
+totalClaim+=val;
+
+row+=`<td style="text-align:right;">${val?formatRM(val):'-'}</td>`;
+
+});
+
+/* contract balance */
+
+const contractBalance=contractAmt-totalClaim;
+
+/* pending work order */
+
+let ongoing=0;
+
+workorders
+.filter(w=>w.status!=='Claimed')
+.forEach(w=>{
+
+const cat=w.section_category||{};
+ongoing += Number(cat[sec]?.amt || 0);
+
+/* tambahan hanya jika tiada dalam section_category */
+if(sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]){
+ongoing += Number(w.additional || 0);
+}
+
+});
+
+/* after WO */
+
+const afterWO=contractBalance-ongoing;
+
+row+=`
+<td style="text-align:right;">${formatRM(totalClaim)}</td>
+<td style="text-align:right;">${formatRM(contractBalance)}</td>
+<td style="text-align:right;">${formatRM(ongoing)}</td>
+<td style="text-align:right;font-weight:bold;color:${afterWO<0?'red':'black'};">
+${formatRM(afterWO)}
+</td>
+`;
+
+row+=`</tr>`;
+
+body+=row;
+
+});
+
+        /* ==============================
+SALVAGE VALUE ROW
+============================== */
+
+let salvageRow = `
+<tr>
+<td></td>
+<td>SALVAGE VALUE</td>
+<td style="text-align:right;">-</td>
+`;
+
+let salvageTotal = 0;
+
+interims.forEach(int=>{
+
+const val = Number(int.salvage_value || 0);
+salvageTotal += val;
+
+salvageRow += `<td style="text-align:right;">${val?formatRM(val):'-'}</td>`;
+
+});
+
+salvageRow += `
+<td style="text-align:right;">${formatRM(salvageTotal)}</td>
+<td colspan="3"></td>
+</tr>
+`;
+
+body += salvageRow;
+
+
+/* ==============================
+PERFORMANCE GUARANTEE ROW
+============================== */
+
+let pgRow = `
+<tr>
+<td></td>
+<td>PERFORMANCE GUARANTEE SUM</td>
+<td style="text-align:right;">-</td>
+`;
+
+let pgTotal = 0;
+
+interims.forEach(int=>{
+
+const val = Number(int.performance_guarantee_sum || 0);
+pgTotal += val;
+
+pgRow += `<td style="text-align:right;">${val?formatRM(val):'-'}</td>`;
+
+});
+
+pgRow += `
+<td style="text-align:right;">${formatRM(pgTotal)}</td>
+<td colspan="3"></td>
+</tr>
+`;
+
+body += pgRow;
+
+                /* ==============================
+TOTAL ONGOING CONTRACT BALANCE
+============================== */
+
+let totalOngoingBalance = 0;
+
+sectionNames.forEach(sec=>{
+
+const contractAmt = Number(sections[sec]?.amt || 0);
+
+let claimed = 0;
+
+interims.forEach(int=>{
+claimed += Number(int.claim_breakdown?.[sec]?.amt || 0);
+});
+
+let ongoing = 0;
+
+workorders
+.filter(w=>w.status!=='Claimed')
+.forEach(w=>{
+
+const cat = w.section_category || {};
+ongoing += Number(cat[sec]?.amt || 0);
+
+if(sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]){
+ongoing += Number(w.additional || 0);
+}
+
+});
+
+totalOngoingBalance += contractAmt - claimed - ongoing;
+
+});
+
+/* tambah salvage + pg */
+
+totalOngoingBalance += salvageTotal;
+totalOngoingBalance += pgTotal;
+        
+/* ==============================
+TOTAL ROW
+============================== */
+
+let totalRow=`<tr style="font-weight:bold;background:#f5f5f5;">
+<td colspan="2">TOTAL</td>`;
+
+let totalContract=0;
+
+sectionNames.forEach(sec=>{
+totalContract+=Number(sections[sec]?.amt||0);
+});
+
+let totalClaim = 0;
+
+interims.forEach(int=>{
+totalClaim += Number(int.net_amount || 0);
+});
+        
+totalRow+=`<td style="text-align:right;">${formatRM(totalContract)}</td>`;
+
+let interimTotals=new Array(interimCount).fill(0);
+
+interims.forEach((int,i)=>{
+
+interimTotals[i] = Number(int.net_amount || 0);
+
+});
+
+interimTotals.forEach(v=>{
+totalRow+=`<td style="text-align:right;">${formatRM(v)}</td>`;
+});
+
+/* TOTAL CLAIM */
+totalRow += `<td style="text-align:right;">${formatRM(totalClaim)}</td>`;
+
+/* CONTRACT BALANCE kosong */
+totalRow += `<td></td>`;
+
+/* ONGOING WORK kosong */
+totalRow += `<td></td>`;
+
+/* ONGOING CONTRACT BALANCE */
+totalRow += `
+<td style="text-align:right;font-weight:bold;">
+${formatRM(totalOngoingBalance)}
+</td>
+</tr>`;
+
+body += totalRow;
+  
+document.getElementById("interimBody").innerHTML=body;
+
+}
+function printBlueform() {
+
+    const bf = document.getElementById('blueformPage');
+
+    if (!bf.classList.contains('active')) {
+        alert("Blueform belum dibuka.");
+        return;
+    }
+
+    // 🔥 force render dulu
+    bf.style.display = 'block';
+    bf.offsetHeight;
+
+    // 🔥 tunggu render + paint
+    setTimeout(() => {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                window.print();
+            });
+        });
+    }, 200);
+}
+</script>
 </body>
 </html>
