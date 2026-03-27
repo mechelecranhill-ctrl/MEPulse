@@ -1000,7 +1000,33 @@ if(!id){
             return aSeq - bSeq;
         });
     }
+// =======================================================
+// Mobile Cards Rendering
+// =======================================================
+function renderMobileCards(data) {
+    const container = document.getElementById('mobileCardContainer');
+    container.innerHTML = ''; // kosongkan dahulu
 
+    data.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'mobile-card';
+        card.innerHTML = `
+            <div class="mobile-card-header">
+                <span class="mobile-title">${item.work_id || '-'}</span>
+                <span class="mobile-sub">${item.location || '-'}</span>
+            </div>
+            <div class="mobile-row">
+                <span>Status</span>
+                <span>${item.status || 'PENDING'}</span>
+            </div>
+            <div class="mobile-row">
+                <span>Amaun Claim (RM)</span>
+                <span>${item.claim_amount || 0}</span>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
     async function loadSingleContract(id){
         currentContractId = id;
     try{
@@ -1027,6 +1053,11 @@ areaList.forEach((a,i)=>{
 
         const woRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}`, { headers });
         allWorks = await woRes.json();
+// Render desktop table
+renderTable(allWorks, true);
+
+// 🔹 Tambah ini untuk mobile cards
+renderMobileCards(allWorks);
 
         const intRes = await fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${id}&order=date_received.asc`, { headers });
         const interims = await intRes.json();
