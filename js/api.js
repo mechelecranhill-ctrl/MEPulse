@@ -7,10 +7,8 @@ import './table.js';
 import './blueform.js';
 import './utils.js';
 
-// Panggil fungsi bila button diklik
 document.getElementById('openBtn').addEventListener('click', openTemplate);
 
-// Contoh: load kontrak bila halaman ready
 async function init() {
     const contract = await fetchContract(currentContractId);
     console.log(contract);
