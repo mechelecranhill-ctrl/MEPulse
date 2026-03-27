@@ -1,7 +1,7 @@
 // main.js
 import { fetchContract, fetchWorkOrders, fetchInterims } from './api.js';
 import { state } from './state.js';
-import { renderDistrictTabs } from './ui/district.js';
+import { generateDistrictTabs } from './ui/district.js';
 import { renderMobileCards } from './ui/mobile.js';
 import { renderTable } from './ui/table.js';
 import { renderTemplateModal } from './ui/template.js';
