@@ -27,3 +27,4 @@ export function renderTable(data, showArea = true){
 
     renderMobileCards(data);
 }
+ 
