@@ -1,20 +1,22 @@
-async function openBlueform(id){
+// generator.js
+import { state } from './state.js';
 
-    const res = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}`, { headers });
-    const data = (await res.json())[0];
+export function generateBlueform(contract, works){
+    const container = document.getElementById('bf_content');
+    container.innerHTML = '';
 
-    const html = `
-        <div>
-            <h3>BLUEFORM</h3>
+    Object.keys(state.bfSections).forEach(sectionKey => {
+        const section = state.bfSections[sectionKey];
+        if(!section.active) return;
 
-            <div>No WO: ${data.work_id}</div>
-            <div>Lokasi: ${data.location}</div>
-            <div>Amaun: RM ${Number(data.amount_spent).toLocaleString()}</div>
-
-        </div>
-    `;
-
-    document.getElementById('bf_content').innerHTML = html;
-
-    document.getElementById('blueformPage').style.display = 'block';
+        const sectionDiv = document.createElement('div');
+        sectionDiv.className = 'bf-row';
+        sectionDiv.innerHTML = `
+            <div class="bf-label">${section.label}</div>
+            <div class="bf-value">
+                ${works.filter(w=>w.section === sectionKey).map(w => `${w.description} (${w.amount_work})`).join('<br>')}
+            </div>
+        `;
+        container.appendChild(sectionDiv);
+    });
 }
