@@ -1,4 +1,4 @@
-// print.js
+// print
 export function printBlueform(){
     const el = document.getElementById('blueformPage');
     el.classList.add('active');
