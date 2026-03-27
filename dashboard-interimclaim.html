@@ -191,6 +191,7 @@
             border-radius: 15px;
             margin-top: 20px;
             table-layout: fixed;
+            will-change: auto;
         }
         .desktop-table th {
             background: #f8f9fa;
@@ -226,10 +227,6 @@
             vertical-align: middle;
             transition: all 0.2s ease;
         }
-        .desktop-table tr:hover { 
-            background: #f9fbff;
-            transform: scale(1.002);
-                                }   
         .tag {
             padding: 5px 10px;
             border-radius: 20px;
@@ -973,8 +970,8 @@ function renderTable(data, showArea = true){
     currentTableData = data;
 
     const tbody = document.getElementById('workOrderTbody');
-    tbody.innerHTML = '';
 
+    let html = '';
     let currentArea = '';
 
     data.forEach(w => {
@@ -982,18 +979,16 @@ function renderTable(data, showArea = true){
         const area = (w.area_code || 'LAIN').toUpperCase();
 
         if(showArea && area !== currentArea){
-
-            tbody.innerHTML += `
+            html += `
             <tr class="area-header">
                 <td colspan="9" style="padding:10px;">
                     <i class="fa fa-layer-group"></i> ${area}
                 </td>
             </tr>`;
-
             currentArea = area;
         }
 
-        tbody.innerHTML += `
+        html += `
         <tr>
             <td>
                 <span class="tag ${w.status === 'Claimed' ? 'claimed' : 'pending'}">
@@ -1002,7 +997,6 @@ function renderTable(data, showArea = true){
             </td>
 
             <td><strong>${w.sequence_no || '-'}</strong></td>
-
             <td><strong>${w.work_id}</strong></td>
 
             <td>
@@ -1038,21 +1032,21 @@ function renderTable(data, showArea = true){
         </tr>`;
     });
 
-    // 🔥 IMPORTANT: call mobile render ONCE
+    tbody.innerHTML = html; // ✅ sekali je render
+
     renderMobileCards(data);
 }
 
 function renderMobileCards(data){
 
     const container = document.getElementById('mobileCardContainer');
-
     if(!container) return;
 
-    container.innerHTML = '';
+    let html = '';
 
     data.forEach(w => {
 
-        container.innerHTML += `
+        html += `
         <div class="mobile-card">
 
             <div class="mobile-card-header">
@@ -1063,10 +1057,7 @@ function renderMobileCards(data){
                 </span>
             </div>
 
-            <div class="mobile-sub">
-                ${w.description || '-'}
-            </div>
-
+            <div class="mobile-sub">${w.description || '-'}</div>
             <div class="mobile-sub">
                 <i class="fa fa-map-pin"></i> ${w.location || 'N/A'}
             </div>
@@ -1097,9 +1088,10 @@ function renderMobileCards(data){
                 </button>
             </div>
 
-        </div>
-        `;
+        </div>`;
     });
+
+    container.innerHTML = html;
 }
 
     function generateDistrictTabs(data){
