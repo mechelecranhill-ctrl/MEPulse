@@ -1,9 +1,10 @@
 // app.js
-import './utils.js';
-import './api.js';
+import { openTemplate, saveTemplate } from './template.js';
+import { fetchContract } from './api.js';
 import './config.js';
 import './state.js';
 import './table.js';
-import './template.js';
 import './blueform.js';
-import './main.js';
+import './utils.js';
+
+document.getElementById('openBtn').addEventListener('click', openTemplate);
