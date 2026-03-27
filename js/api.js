@@ -1,4 +1,4 @@
-// api.js
+// api.js 
 import { SB_URL, headers } from './config.js';
 
 export async function fetchContract(id){
