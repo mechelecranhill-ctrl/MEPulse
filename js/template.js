@@ -1,6 +1,4 @@
 export function openTemplate(){     // --- TEMPLATE MANAGER LOGIC ---
-    async function openTemplate() {
-
     const id = currentContractId;
 
 if(!id){
