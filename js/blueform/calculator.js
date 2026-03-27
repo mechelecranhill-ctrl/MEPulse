@@ -1,15 +1,6 @@
-function calculateBaki(contract, interims, workorders){
-
-    let total = Number(contract.contract_sum || 0);
-
-    interims.forEach(i=>{
-        total -= Number(i.net_amount || 0);
-        total += Number(i.salvage_value || 0);
-    });
-
-    workorders.forEach(w=>{
-        total -= Number(w.amount_spent || 0);
-    });
-
-    return total;
+// calculator.js
+export function calculateTotals(works){
+    const totalWork = works.reduce((acc,w)=> acc + (w.amount_work || 0), 0);
+    const totalClaim = works.reduce((acc,w)=> acc + (w.amount_claim || 0), 0);
+    return { totalWork, totalClaim };
 }
