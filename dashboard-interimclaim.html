@@ -830,7 +830,7 @@
 <script>
     const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
     const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
-    const headers = { 'apikey': SB_KEY, 'Authorization': Bearer ${SB_KEY}, 'Content-Type': 'application/json' };
+    const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
 
     let currentView = "AREA";
     let allWorks = [];
@@ -918,18 +918,18 @@ if(!id){
     alert("Tiada kontrak dipilih.");
     return;
 }
-    const res = await fetch(${SB_URL}/rest/v1/contract?id=eq.${id}, { headers });
+    const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, { headers });
     const data = await res.json();
     const contract = data[0];
     const sections = contract.contract_sections_breakdown || {};
-        const saved = JSON.parse(localStorage.getItem(bf_sections_${id}) || '{}');
+        const saved = JSON.parse(localStorage.getItem(`bf_sections_${id}`) || '{}');
     const container = document.getElementById('dynamicRowsContainer');
     const savedPrefix = contract.reference || 'RSAJ/M&E/IP/11-';
         document.getElementById('refPrefixInput').value = savedPrefix;
     container.innerHTML = '';
     Object.keys(sections).forEach(key => {
     const desc = sections[key]?.desc || '';
-    const display = ${key} — ${desc};
+    const display = `${key} — ${desc}`;
     const label = saved[key]?.label || desc;
     const active = saved[key]?.active ?? true;
     addTemplateRow(display, label, active, key);
@@ -965,11 +965,11 @@ if(!id){
 });
         const id = currentContractId;
         /* simpan template section */
-        localStorage.setItem(bf_sections_${id}, JSON.stringify(obj));        
+        localStorage.setItem(`bf_sections_${id}`, JSON.stringify(obj));        
         /* ambil prefix */
         const prefix = document.getElementById('refPrefixInput').value;
         /* hantar ke database contract.reference */
-        await fetch(${SB_URL}/rest/v1/contract?id=eq.${id}, {
+        await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, {
             method:'PATCH',
             headers,
             body: JSON.stringify({  
@@ -1003,7 +1003,7 @@ if(!id){
     async function loadSingleContract(id){
         currentContractId = id;
     try{
-        const res = await fetch(${SB_URL}/rest/v1/contract?id=eq.${id}, { headers });
+        const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, { headers });
         const data = await res.json();
         const c = data[0];
 
@@ -1024,14 +1024,14 @@ areaList.forEach((a,i)=>{
 
         document.getElementById('tableWrapper').style.display = 'block';
 
-        const woRes = await fetch(${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}, { headers });
+        const woRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}`, { headers });
         allWorks = await woRes.json();
 
 renderTable(allWorks, true);
 
 renderMobileCards(allWorks);
 
-        const intRes = await fetch(${SB_URL}/rest/v1/interims?contract_id=eq.${id}&order=date_received.asc, { headers });
+        const intRes = await fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${id}&order=date_received.asc`, { headers });
         const interims = await intRes.json();
 
         buildInterimMatrix(c, interims, allWorks);
@@ -1181,10 +1181,10 @@ const container = document.getElementById("districtTabs");
 
 let districts = [...new Set(data.map(w => w.district || "LAIN"))];
 
-let html = <div class="district-tab active" onclick="filterDistrict('ALL',this)">SEMUA</div>;
+let html = `<div class="district-tab active" onclick="filterDistrict('ALL',this)">SEMUA</div>`;
 
 districts.forEach(d=>{
-html += <div class="district-tab" onclick="filterDistrict('${d}',this)">${d}</div>;
+html += `<div class="district-tab" onclick="filterDistrict('${d}',this)">${d}</div>`;
 });
 
 container.innerHTML = html;
@@ -1297,7 +1297,7 @@ const hari = String(d.getDate()).padStart(2,'0');
 const bulanText = bulan[d.getMonth()];
 const tahun = d.getFullYear();
 
-return ${hari} ${bulanText} ${tahun};
+return `${hari} ${bulanText} ${tahun}`;
 
 }
         
@@ -1307,7 +1307,7 @@ return ${hari} ${bulanText} ${tahun};
         console.log("OPEN BF:", id);  // 🔥 test
     try {
 
-        const res = await fetch(${SB_URL}/rest/v1/work_orders?id=eq.${id}&select=*,contract(*,units(unit_name)), { headers });
+        const res = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}&select=*,contract(*,units(unit_name))`, { headers });
         const result = await res.json();
         const data = result[0];
 
@@ -1340,7 +1340,7 @@ let totalWorkValue = totalSection + provisionalExtra;
 
         // ambil semua interim ikut kronologi
 const interimRes = await fetch(
-${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=date_received.asc,
+`${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=date_received.asc`,
 { headers }
 );
 
@@ -1371,7 +1371,7 @@ break;
 }
         
         const woRes = await fetch(
-${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id},
+`${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}`,
 { headers }
 );
 
@@ -1383,7 +1383,7 @@ let timeline = [];
 
 /* ambil area order dari database */
 const areaRes = await fetch(
-${SB_URL}/rest/v1/contract?id=eq.${c.id}&select=area_code,
+`${SB_URL}/rest/v1/contract?id=eq.${c.id}&select=area_code`,
 { headers }
 );
 
@@ -1582,7 +1582,7 @@ salvage:0
         let dynamicHtml = '';
             let currentRow = 6;
 
-            const tpl = JSON.parse(localStorage.getItem(bf_sections_${c.id}) || '{}');
+            const tpl = JSON.parse(localStorage.getItem(`bf_sections_${c.id}`) || '{}');
             
             Object.keys(b).sort().forEach((key, idx) => {
 
@@ -1761,7 +1761,7 @@ RM ${totalPG.toLocaleString(undefined,{minimumFractionDigits:2})}
                 <div class="bf-row"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Tajuk Kerja</span></div><div class="bf-colon">:</div><div class="bf-value">${data.description.toUpperCase()} DI ${locationText} (RM ${totalWorkValue.toLocaleString(undefined,{minimumFractionDigits:2})})</div></div>
             `;
 
-            document.getElementById('bf_executive_unit').innerText =unitName ? Eksekutif ${unitName} : 'Eksekutif';
+            document.getElementById('bf_executive_unit').innerText =unitName ? `Eksekutif ${unitName}` : 'Eksekutif';
             const bf = document.getElementById('blueformPage');
 
 document.getElementById('bf_content').innerHTML = html;
@@ -1812,7 +1812,7 @@ let head = `<tr>
 <th>AS PER CONTRACT</th>`;
 
 for(let i=1;i<=interimCount;i++){
-head += <th>INTERIM ${i}</th>;
+head += `<th>INTERIM ${i}</th>`;
 }
 
 head += `
@@ -1853,7 +1853,7 @@ let val = Number(cat[sec]?.amt || 0);
 
 totalClaim+=val;
 
-row+=<td style="text-align:right;">${val?formatRM(val):'-'}</td>;
+row+=`<td style="text-align:right;">${val?formatRM(val):'-'}</td>`;
 
 });
 
@@ -1892,7 +1892,7 @@ ${formatRM(afterWO)}
 </td>
 `;
 
-row+=</tr>;
+row+=`</tr>`;
 
 body+=row;
 
@@ -1916,7 +1916,7 @@ interims.forEach(int=>{
 const val = Number(int.salvage_value || 0);
 salvageTotal += val;
 
-salvageRow += <td style="text-align:right;">${val?formatRM(val):'-'}</td>;
+salvageRow += `<td style="text-align:right;">${val?formatRM(val):'-'}</td>`;
 
 });
 
@@ -1947,7 +1947,7 @@ interims.forEach(int=>{
 const val = Number(int.performance_guarantee_sum || 0);
 pgTotal += val;
 
-pgRow += <td style="text-align:right;">${val?formatRM(val):'-'}</td>;
+pgRow += `<td style="text-align:right;">${val?formatRM(val):'-'}</td>`;
 
 });
 
@@ -2018,7 +2018,7 @@ interims.forEach(int=>{
 totalClaim += Number(int.net_amount || 0);
 });
         
-totalRow+=<td style="text-align:right;">${formatRM(totalContract)}</td>;
+totalRow+=`<td style="text-align:right;">${formatRM(totalContract)}</td>`;
 
 let interimTotals=new Array(interimCount).fill(0);
 
@@ -2029,17 +2029,17 @@ interimTotals[i] = Number(int.net_amount || 0);
 });
 
 interimTotals.forEach(v=>{
-totalRow+=<td style="text-align:right;">${formatRM(v)}</td>;
+totalRow+=`<td style="text-align:right;">${formatRM(v)}</td>`;
 });
 
 /* TOTAL CLAIM */
-totalRow += <td style="text-align:right;">${formatRM(totalClaim)}</td>;
+totalRow += `<td style="text-align:right;">${formatRM(totalClaim)}</td>`;
 
 /* CONTRACT BALANCE kosong */
-totalRow += <td></td>;
+totalRow += `<td></td>`;
 
 /* ONGOING WORK kosong */
-totalRow += <td></td>;
+totalRow += `<td></td>`;
 
 /* ONGOING CONTRACT BALANCE */
 totalRow += `
