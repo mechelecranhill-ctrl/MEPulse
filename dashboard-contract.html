@@ -22,8 +22,6 @@
             flex-direction: column; 
             overflow: hidden; 
         }
-
-        /* --- SEARCH BOX STYLE --- */
         .search-container {
             padding: 5px 10px 10px 0;
             flex-shrink: 0;
@@ -43,8 +41,6 @@
             border-color: var(--ios-blue);
             box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
         }
-
-        /* --- LOGIK MOBILE SLIDE-IN & USAGE BUTTON --- */
         .mobile-usage-btn { display: none; } 
 
         @media (max-width: 768px) {
@@ -344,7 +340,6 @@
         if(!currentContract) return;
 
         try {
-            // Ambil data interims untuk pengiraan kronologi
             const resI = await fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${currentContract.id}&order=date_received.asc`, { headers });
             const currentInterims = await resI.json();
 
@@ -353,7 +348,6 @@
             const end = new Date(currentContract.contract_end);
             const today = new Date();
 
-            // LOGIK PENGIRAAN BULAN (Jangan Usik)
             const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
             let monthsElapsed = (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()) + 1;
             monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
@@ -368,7 +362,6 @@
             selectedSections.sort().forEach(s => {
                 if(!sections[s]) return;
                 
-                // LOGIK ACTUAL: (Interim claim_breakdown) + (Work Order tanpa interim_no)
                 let totalInterimClaim = 0;
                 currentInterims.forEach(int => {
                     if (int.claim_breakdown?.[s]) {
@@ -438,7 +431,6 @@
             labels.push(s); 
             targetAvgData.push((sections[s]?.amt / totalMonths).toFixed(2));
             
-            // Pengiraan Actual untuk Chart
             let interimAmt = currentInterims.reduce((sum, int) => sum + (int.claim_breakdown?.[s]?.amt || 0), 0);
             let pendingWOAmt = currentWO.reduce((sum, wo) => {
                 return (!wo.interim_no && wo.section_category?.[s]) ? sum + (wo.section_category[s].amt || 0) : sum;
