@@ -120,11 +120,12 @@ function exportExcel(){
     const c = window.contractData;
     const wb = XLSX.utils.book_new();
     
+    // Susunan data mengikut keperluan anda
     const ws_data = [
         [], // Row 1
         ["", c.contract_name || ""], // Row 2 (Tajuk Utama)
-        [], // Row 3 (Untuk merge tajuk)
-        [], // Row 4 (Untuk merge tajuk)
+        [], // Row 3
+        [], // Row 4
         ["", "CONTRACT NO.", "", ":", c.contract_code || "-"], // Row 5
         ["", "CONTRACTOR", "", ":", c.contractor || "-"],     // Row 6
         ["", "CONTRACT PERIOD", "", ":", c.contract_period || "-"], // Row 7
@@ -135,7 +136,7 @@ function exportExcel(){
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
     // ==========================================
-    // 1. MERGE CELLS (B2 sehingga P4)
+    // 1. MERGE CELLS (Tajuk dari B2 sehingga P4)
     // ==========================================
     ws["!merges"] = [
         { 
@@ -145,21 +146,14 @@ function exportExcel(){
     ];
 
     // ==========================================
-    // 2. SET TINGGI BARIS (Row Height 15.75)
+    // 2. SET SEMUA BARIS KEPADA 15.75
     // ==========================================
-    // 15.75 points dalam Excel biasanya bersamaan kira-kira 21 pixels dalam SheetJS
-    const standardHeight = 21; 
-    const rowCount = ws_data.length + 10; // Tambah buffer baris kosong
-    
+    const rowCount = ws_data.length;
     ws['!rows'] = [];
+    
     for (let i = 0; i < rowCount; i++) {
-        if (i === 1) { 
-            // Khusus Row 2 (Tajuk), kita bagi tinggi lebih (cth: 45) 
-            // supaya Wrap Text nampak jelas, baris lain tetap 15.75
-            ws['!rows'].push({ hpt: 45 }); 
-        } else {
-            ws['!rows'].push({ hpt: 15.75 }); 
-        }
+        // Semua baris tanpa pengecualian ditetapkan 15.75
+        ws['!rows'].push({ hpt: 15.75 });
     }
 
     // ==========================================
@@ -179,8 +173,9 @@ function exportExcel(){
     }
     ws["!cols"] = colWidths;
 
+    // Nama fail mengikut format
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
-    XLSX.writeFile(wb, "Contract_Summary_Final.xlsx");
+    XLSX.writeFile(wb, "Contract_Summary_All_Rows_15.75.xlsx");
 }
 async function loadSummary(){
     if(!contractId) return;
