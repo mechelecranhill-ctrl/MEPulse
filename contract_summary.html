@@ -190,12 +190,27 @@ async function loadSummary(){
     try {
         const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}`, { headers });
         const data = await res.json();
-        const c = data[0];
-        window.contractData = c;
-        document.getElementById('excelBody').innerHTML = `
-            <tr><td>1</td><td>${c.contract_code}</td><td>${c.contract contractor}</td><td>${Number(c.contract_sum).toLocaleString()}</td></tr>
-        `;
-    } catch(err) { console.error(err); }
+        
+        if (data && data.length > 0) {
+            const c = data[0];
+            window.contractData = c;
+            
+            // Pastikan tiada jarak pada ${c.contractor}
+            document.getElementById('excelBody').innerHTML = `
+                <tr>
+                    <td>1</td>
+                    <td>${c.contract_code || '-'}</td>
+                    <td>${c.contractor || '-'}</td>
+                    <td>${Number(c.contract_sum || 0).toLocaleString()}</td>
+                </tr>
+            `;
+        } else {
+            document.getElementById('excelBody').innerHTML = `<tr><td colspan="4">Data tidak dijumpai</td></tr>`;
+        }
+    } catch(err) { 
+        console.error("Ralat memuat data:", err);
+        document.getElementById('excelBody').innerHTML = `<tr><td colspan="4">Ralat teknikal berlaku</td></tr>`;
+    }
 }
 
 function goBack(){ window.history.back(); }
