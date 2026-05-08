@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="ms">
 <head>
 <meta charset="UTF-8">
@@ -132,29 +132,33 @@ function exportExcel(){
     const wb = XLSX.utils.book_new();
     const ws_data = [];
 
-    // =========================
-    // TITLE
-    // =========================
-    ws_data.push(["CONTRACT SUMMARY REPORT"]);
+    // ==========================================
+    // 1. TAJUK (Row 1)
+    // ==========================================
+    ws_data.push([c.contract_name || "-"]);
+    
+    // Jarak baris kosong seperti dalam contoh
+    ws_data.push([]);
+    ws_data.push([]);
     ws_data.push([]);
 
-    // =========================
-    // HEADER INFO
-    // =========================
-    ws_data.push(["Contract Name", c.contract_name || "-"]);
-    ws_data.push(["Contract Code", c.contract_code || "-"]);
-    ws_data.push(["Contractor", c.contractor || "-"]);
-    ws_data.push(["Contract Period", c.contract_period || "-"]);
-    ws_data.push(["Total Contract (RM)", c.contract_sum || 0]);
-    ws_data.push(["Performance Guarantee (RM)", c.pg_sum || 0]);
-    ws_data.push(["Used (RM)", c.used || 0]);
-    ws_data.push(["Balance (RM)", c.balance || 0]);
+    // ==========================================
+    // 2. HEADER INFO (Label : Data)
+    // ==========================================
+    ws_data.push(["CONTRACT NO.", ":", c.contract_code || "-"]);
+    ws_data.push(["CONTRACTOR", ":", c.contractor || "-"]);
+    ws_data.push(["CONTRACT PERIOD", ":", c.contract_period || "-"]);
+    
+    const formattedSum = "RM" + Number(c.contract_sum || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+    ws_data.push(["CONTRACT SUM", ":", formattedSum]);
+    
+    ws_data.push(["PERFORMANCE GUARANTEE SUM", ":", c.pg_sum || "-"]);
 
-    ws_data.push([]);
+    ws_data.push([]); // Baris kosong sebelum table
 
-    // =========================
-    // TABLE HEADER
-    // =========================
+    // ==========================================
+    // 3. TABLE HEADER
+    // ==========================================
     ws_data.push(["No","Description","Amount (RM)"]);
 
     let no = 1;
@@ -166,77 +170,38 @@ function exportExcel(){
         ]);
     });
 
-    // =========================
-    // CREATE SHEET
-    // =========================
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
     // =========================
-    // 🔥 TITLE MERGE + CENTER
+    // 4. FORMATTING EXCEL
     // =========================
-    ws["A1"] = { v: "CONTRACT SUMMARY REPORT" };
-
+    
+    // Merge tajuk utama di baris pertama
     ws["!merges"] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } } // merge A1:C1
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } } 
     ];
 
-    // =========================
-    // 💰 CURRENCY FORMAT RM
-    // =========================
+    // Laraskan lebar kolum (A: Lebar Label, B: Lebar Titik, C: Lebar Data)
+    ws["!cols"] = [
+        { wch: 30 }, 
+        { wch: 3 },  
+        { wch: 70 }  
+    ];
+
+    // Format mata wang untuk kolum Amount (Kolum C bermula baris ke-11)
     const range = XLSX.utils.decode_range(ws["!ref"]);
-
-    for (let R = 0; R <= range.e.r; R++) {
-        for (let C = 0; C <= range.e.c; C++) {
-
-            const cell_address = XLSX.utils.encode_cell({ r: R, c: C });
-            const cell = ws[cell_address];
-
-            if (!cell) continue;
-
-            // format RM columns (Total, Used, Balance, Amount column)
-            if (C === 2 && R >= 9) {
-                cell.z = '"RM" #,##0.00';
-            }
+    for (let R = 10; R <= range.e.r; R++) {
+        const cell_address = XLSX.utils.encode_cell({ r: R, c: 2 });
+        if (ws[cell_address]) {
+            ws[cell_address].z = '#,##0.00';
         }
     }
-
-    // =========================
-    // PAGE SETUP A4 LANDSCAPE
-    // =========================
-    ws["!pageSetup"] = {
-        orientation: "landscape",
-        paperSize: 9
-    };
-
-    // =========================
-    // 🖨️ HEADER REPEAT EVERY PAGE
-    // =========================
-    ws["!printHeader"] = ["1:9"];
-
-    ws["!autofilter"] = { ref: `A${8}:C${range.e.r + 1}` };
-
-    ws["!pageSetup"].fitToWidth = 1;
-    ws["!pageSetup"].fitToHeight = 0;
-
-    ws["!margins"] = {
-        left: 0.3, right: 0.3,
-        top: 0.5, bottom: 0.5
-    };
-
-    // =========================
-    // COLUMN WIDTH
-    // =========================
-    ws["!cols"] = [
-        { wch: 5 },
-        { wch: 50 },
-        { wch: 20 }
-    ];
 
     XLSX.utils.book_append_sheet(wb, ws, "Contract Summary");
     XLSX.writeFile(wb, "Contract_Summary.xlsx");
 }
-    async function loadSummary(){
 
+async function loadSummary(){
     if(!contractId){
         document.getElementById('excelBody').innerHTML =
         `<tr><td colspan="7">No contract ID found</td></tr>`;
@@ -258,13 +223,7 @@ function exportExcel(){
 
         let balance = Number(c.contract_sum || 0) - used;
 
-        // 👉 SIMPAN GLOBAL (IMPORTANT)
-        window.contractData = {
-            ...c,
-            used,
-            balance
-        };
-
+        window.contractData = { ...c, used, balance };
         window.workOrders = works;
 
         document.getElementById('excelBody').innerHTML = `
