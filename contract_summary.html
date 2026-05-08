@@ -9,56 +9,15 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 
 <style>
-body{
-    font-family:-apple-system,system-ui,sans-serif;
-    margin:0;
-    background:#f5f7fb;
-    padding:20px;
-}
-
-.header{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:15px;
-}
-
-.card{
-    background:white;
-    padding:20px;
-    border-radius:15px;
-    box-shadow:0 4px 15px rgba(0,0,0,0.08);
-}
-
-.btn{
-    padding:10px 14px;
-    border:none;
-    border-radius:10px;
-    cursor:pointer;
-    font-weight:600;
-}
-
+body{ font-family:-apple-system,system-ui,sans-serif; margin:0; background:#f5f7fb; padding:20px; }
+.header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; }
+.card{ background:white; padding:20px; border-radius:15px; box-shadow:0 4px 15px rgba(0,0,0,0.08); }
+.btn{ padding:10px 14px; border:none; border-radius:10px; cursor:pointer; font-weight:600; }
 .btn-blue{ background:#007AFF; color:white; }
 .btn-dark{ background:#333; color:white; }
-
-#excelTable {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-    background: white;
-}
-
-#excelTable th {
-    background: #f3f3f3;
-    border: 1px solid #ccc;
-    padding: 8px;
-    text-align: left;
-}
-
-#excelTable td {
-    border: 1px solid #ddd;
-    padding: 8px;
-}
+#excelTable { width: 100%; border-collapse: collapse; font-size: 12px; background: white; }
+#excelTable th { background: #f3f3f3; border: 1px solid #ccc; padding: 8px; text-align: left; }
+#excelTable td { border: 1px solid #ddd; padding: 8px; }
 </style>
 </head>
 
@@ -67,7 +26,7 @@ body{
 <div class="header">
     <div>
         <h2 style="margin:0;">Contract Summary</h2>
-        <small style="color:#666;">Eksport ikut format gambar Excel</small>
+        <small style="color:#666;">Eksport ikut format gambar Excel (Termasuk Pecahan Interim)</small>
     </div>
 
     <div style="display:flex; gap:10px;">
@@ -102,12 +61,7 @@ body{
 const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
 
-const headers = {
-    'apikey': SB_KEY,
-    'Authorization': `Bearer ${SB_KEY}`,
-    'Content-Type': 'application/json'
-};
-
+const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
 const params = new URLSearchParams(window.location.search);
 const contractId = params.get('id');
 
@@ -120,7 +74,7 @@ function exportExcel(){
     const c = window.contractData;
     const wb = XLSX.utils.book_new();
     
-    // 1. Bina Sheet menggunakan AOA
+    // 1. DATA HEADER (Row 1 - Row 12)
     const ws_data = [
         [], // Row 1
         ["", c.contract_name || ""], // Row 2 (Tajuk Utama)
@@ -129,14 +83,43 @@ function exportExcel(){
         ["", "CONTRACT NO.", "", ":", c.contract_code || "-"], // Row 5
         ["", "CONTRACTOR", "", ":", c.contractor || "-"],     // Row 6
         ["", "CONTRACT PERIOD", "", ":", c.contract_period || "-"], // Row 7
-        ["", "CONTRACT SUM", "", ":", "RM" + Number(c.contract_sum || 0).toLocaleString(undefined, {minimumFractionDigits: 2})], // Row 8
-        ["", "PERFORMANCE GUARANTEE SUM", "", ":", c.pg_sum || "-"] // Row 9
+        ["", "CONTRACT SUM", "", ":", "RM " + Number(c.contract_sum || 0).toLocaleString(undefined, {minimumFractionDigits: 2})], // Row 8
+        ["", "PERFORMANCE GUARANTEE SUM", "", ":", c.pg_sum || "-"], // Row 9
+        [], // Row 10
+        [], // Row 11
+        []  // Row 12
     ];
+
+    // 2. HEADER JADUAL (Row 13 & 14)
+    const tableHeader1 = ["", "ITEM", "DESCRIPTION", "AS PER CONTRACT", "INTERIM NO.1", "INTERIM NO.2", "INTERIM NO.3", "INTERIM NO.4", "INTERIM NO.5", "INTERIM NO.6", "INTERIM NO.7", "INTERIM NO.8", "INTERIM NO.9", "INTERIM NO.10"];
+    const tableHeader2 = ["", "", "", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM"];
+    ws_data.push(tableHeader1);
+    ws_data.push(tableHeader2);
+
+    // 3. DATA ITEM (Contoh data statik berdasarkan gambar)
+    const items = [
+        ["A", "GENERAL & PRELIMINARIES", 24500.00],
+        ["B", "PREVENTIVE MAINTENANCE & SERVICE CHARGES", 156000.00],
+        ["C", "PROACTIVE MAINTENANCE & OVERHAUL SERVICE CHARGES", 1365900.00],
+        ["D", "CALIBRATION & VERIFICATION CHARGES", 425550.00],
+        ["E", "WORKMANSHIP CHARGES", 96000.00],
+        ["F", "SUPPLY & DELIVERY OF SPARE PART", 340434.00],
+        ["G", "PROVISIONAL SUM", 0]
+    ];
+
+    items.forEach(item => {
+        let row = ["", item[0], item[1], item[2]];
+        for(let i=0; i<10; i++) row.push("-"); // Kosongkan interim jika tiada data
+        ws_data.push(row);
+    });
 
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
-    // 2. Tambah Gaya BOLD (Gunakan xlsx-js-style)
-    // Menebalkan Tajuk Utama (B2)
+    // ==========================================
+    // STYLING & GAYA
+    // ==========================================
+
+    // Tajuk Utama (B2) - Bold & Center
     if(ws["B2"]) {
         ws["B2"].s = {
             font: { bold: true, sz: 12 },
@@ -144,41 +127,59 @@ function exportExcel(){
         };
     }
 
-    // Menebalkan Data di Kolum E (E5 hingga E9)
-    const dataRows = [5, 6, 7, 8, 9];
-    dataRows.forEach(row => {
-        const cellRef = "E" + row;
-        if(ws[cellRef]) {
-            ws[cellRef].s = {
-                font: { bold: true }
-            };
-        }
+    // Bold Data Maklumat Kontrak (E5:E9)
+    [5, 6, 7, 8, 9].forEach(r => {
+        const cell = "E" + r;
+        if(ws[cell]) ws[cell].s = { font: { bold: true } };
     });
 
-    // 3. MERGE CELLS (Tajuk dari B2 sehingga P4)
-    ws["!merges"] = [
-        { 
-            s: { r: 1, c: 1 }, // Row 2, Col B
-            e: { r: 3, c: 13 }  // Row 4, Col N
-        }
-    ];
-
-    // 4. SET SEMUA BARIS KEPADA 15.75
-    ws['!rows'] = [];
-    for (let i = 0; i < ws_data.length; i++) {
-        ws['!rows'].push({ hpt: 15.75 });
+    // Gaya Header Jadual (Row 13 & 14) - Kelabu & Border
+    for(let c=1; c<=13; c++) {
+        [13, 14].forEach(r => {
+            const cellRef = XLSX.utils.encode_cell({r: r-1, c: c});
+            if(ws[cellRef]) {
+                ws[cellRef].s = {
+                    fill: { fgColor: { rgb: "D3D3D3" } },
+                    font: { bold: true },
+                    border: { top: {style:"thin"}, bottom: {style:"thin"}, left: {style:"thin"}, right: {style:"thin"} },
+                    alignment: { horizontal: "center" }
+                };
+            }
+        });
     }
 
-    // 5. SET LEBAR KOLUM
-    const colWidths = [
-        { wch: 2 },  { wch: 35 }, { wch: 5 }, { wch: 3 }, { wch: 45 }
+    // Warna Khusus: Row E (Oren) & Row F (Kuning)
+    for(let c=1; c<=13; c++) {
+        const cellE = XLSX.utils.encode_cell({r: 18, c: c}); // Row 19 (Indeks 18)
+        const cellF = XLSX.utils.encode_cell({r: 19, c: c}); // Row 20 (Indeks 19)
+        if(ws[cellE]) ws[cellE].s = { fill: { fgColor: { rgb: "FFCC99" } }, border: { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} } };
+        if(ws[cellF]) ws[cellF].s = { fill: { fgColor: { rgb: "FFFF00" } }, border: { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} } };
+    }
+
+    // Border untuk semua sel data dalam jadual
+    for(let r=15; r<=ws_data.length; r++) {
+        for(let c=1; c<=13; c++) {
+            const cell = XLSX.utils.encode_cell({r: r-1, c: c});
+            if(ws[cell] && !ws[cell].s) {
+                ws[cell].s = { border: { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} } };
+            }
+        }
+    }
+
+    // 4. MERGE & ROWS/COLS
+    ws["!merges"] = [
+        { s: { r: 1, c: 1 }, e: { r: 3, c: 13 } }, // Tajuk N
+        { s: { r: 12, c: 1 }, e: { r: 13, c: 1 } }, // Merge ITEM
+        { s: { r: 12, c: 2 }, e: { r: 13, c: 2 } }  // Merge DESC
     ];
-    for(let i = 5; i <= 15; i++) { colWidths.push({ wch: 10 }); }
-    ws["!cols"] = colWidths;
+
+    ws['!rows'] = ws_data.map(() => ({ hpt: 15.75 }));
+    ws["!cols"] = [{wch:2}, {wch:8}, {wch:45}, {wch:18}, {wch:12}, {wch:12}, {wch:12}, {wch:12}, {wch:12}, {wch:12}, {wch:12}, {wch:12}, {wch:12}, {wch:12}];
 
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
-    XLSX.writeFile(wb, "Contract_Summary_Bold.xlsx");
+    XLSX.writeFile(wb, "Contract_Summary_Complete.xlsx");
 }
+
 async function loadSummary(){
     if(!contractId) return;
     try {
@@ -186,14 +187,8 @@ async function loadSummary(){
         const data = await res.json();
         const c = data[0];
         window.contractData = c;
-
         document.getElementById('excelBody').innerHTML = `
-            <tr>
-                <td>1</td>
-                <td>${c.contract_code}</td>
-                <td>${c.contractor}</td>
-                <td>${Number(c.contract_sum).toLocaleString()}</td>
-            </tr>
+            <tr><td>1</td><td>${c.contract_code}</td><td>${c.contractor}</td><td>${Number(c.contract_sum).toLocaleString()}</td></tr>
         `;
     } catch(err) { console.error(err); }
 }
