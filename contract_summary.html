@@ -65,7 +65,7 @@ const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Conten
 const params = new URLSearchParams(window.location.search);
 const contractId = params.get('id');
 
-async function exportExcel() {
+function exportExcel() {
     if (!window.contractData) {
         alert("Data belum sedia");
         return;
@@ -74,42 +74,42 @@ async function exportExcel() {
     const c = window.contractData;
     const wb = XLSX.utils.book_new();
 
-    // 1. Ambil data pecahan seksyen (Section Breakdown)
-    // Mengandaikan c.contract_sections_breakdown adalah JSON object dari Supabase
-    const sections = c.contract_sections_breakdown || {};
-
-    // 2. Header Maklumat Kontrak (Row 1 - 12)
+    // 1. Header Maklumat Kontrak (Row 1 - 12)
     const ws_data = [
         [], // Row 1
         ["", c.contract_name || "SUMMARY OF CONTRACT"], // Row 2 (B2)
         [], // Row 3
         [], // Row 4
         ["", "CONTRACT NO.", ":", c.contract_code || "-"], // Row 5
-        ["", "CONTRACTOR", ":", c.contractor || "-"],      // Row 6
+        ["", "CONTRACTOR", ":", c.contractor || "-"],     // Row 6
         ["", "CONTRACT PERIOD", ":", c.contract_period || "-"], // Row 7
         ["", "CONTRACT SUM", ":", "RM " + Number(c.contract_sum || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })], // Row 8
         ["", "PERFORMANCE GUARANTEE SUM", ":", c.pg_sum || "-"], // Row 9
         [], [], [], // Row 10, 11, 12
         
-        // 3. Header Jadual Utama (Row 13 & 14)
+        // 2. Header Jadual Utama (Row 13 & 14)
         ["ITEM", "DESCRIPTION", "", "AS PER CONTRACT", "INTERIM NO.1", "INTERIM NO.2", "INTERIM NO.3", "INTERIM NO.4", "INTERIM NO.5", "INTERIM NO.6", "INTERIM NO.7", "INTERIM NO.8", "INTERIM NO.9", "INTERIM NO.10"],
         ["", "", "", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM"]
     ];
 
-    // 4. Data Items (A-G) - Diambil secara dinamik dari sections
-    const itemKeys = ["A", "B", "C", "D", "E", "F", "G"];
-    itemKeys.forEach(key => {
-        const itemData = sections[key] || { desc: "-", total: 0 };
-        let row = [
-            key, 
-            itemData.desc, 
-            "", 
-            itemData.total // Kolum D (As Per Contract)
-        ];
-        
-        // Tambah Placeholder untuk Interim (E hingga N)
-        // Jika anda ada data interim (contoh: itemData.interim1), anda boleh masukkan di sini
+    // 3. Data Items (A-G)
+    // Nota: Jika data interim ada dalam 'c', anda boleh petakan di sini. 
+    // Buat masa ini kita gunakan placeholder '-' untuk kolum interim 1-10.
+    const items = [
+        ["A", "GENERAL & PRELIMINARIES", 24500.00],
+        ["B", "PREVENTIVE MAINTENANCE & SERVICE CHARGES", 156000.00],
+        ["C", "PROACTIVE MAINTENANCE & OVERHAUL SERVICE CHARGES", 1365900.00],
+        ["D", "CALIBRATION & VERIFICATION CHARGES", 425550.00],
+        ["E", "WORKMANSHIP CHARGES", 96000.00],
+        ["F", "SUPPLY & DELIVERY OF SPARE PART", 340434.00],
+        ["G", "PROVISIONAL SUM", 2200000.00]
+    ];
+
+    items.forEach(item => {
+        let row = [item[0], item[1], "", item[2]]; // Kolum A, B, C, D
+        // Tambah 10 kolum untuk Interim (E hingga N)
         for (let i = 1; i <= 10; i++) {
+            // Jika ada data interim dalam database (contoh: c.interim1_A), masukkan di sini
             row.push("-"); 
         }
         ws_data.push(row);
@@ -117,28 +117,17 @@ async function exportExcel() {
 
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
-    // --- STYLING MENGGUNAKAN xlsx-js-style ---
-    
+    // --- STYLING ---
     // Tajuk Besar (B2)
-    ws["B2"].s = { 
-        font: { bold: true, sz: 14, color: { rgb: "000000" } }, 
-        alignment: { horizontal: "left", vertical: "center" } 
-    };
+    ws["B2"].s = { font: { bold: true, sz: 12 }, alignment: { vertical: "center" } };
 
-    // Styling Maklumat Kontrak (B5:D9)
-    const infoRows = [5, 6, 7, 8, 9];
-    infoRows.forEach(r => {
-        const labelCell = `B${r}`;
-        const colonCell = `C${r}`;
-        const valueCell = `D${r}`;
-        
-        if(ws[labelCell]) ws[labelCell].s = { font: { bold: true, sz: 10 } };
-        if(ws[colonCell]) ws[colonCell].s = { alignment: { horizontal: "center" } };
-        if(ws[valueCell]) ws[valueCell].s = { font: { sz: 10 } };
+    // Symbol ":" di Column C (Row 5-9)
+    ["C5", "C6", "C7", "C8", "C9"].forEach(ref => {
+        if (ws[ref]) ws[ref].s = { alignment: { horizontal: "center" } };
     });
 
-    // Border & Header Table (Row 13 ke atas)
-    const tableStartRow = 12; // Index 0-based
+    // Border & Header Table (Row 13 ke bawah)
+    const tableStartRow = 12; 
     const tableEndRow = ws_data.length - 1;
     const tableEndCol = 13; // Kolum N
 
@@ -153,48 +142,44 @@ async function exportExcel() {
                 left: { style: "thin" }, right: { style: "thin" }
             };
 
-            // Header Row Styling (Grey)
+            // Header Styling (Grey Fill)
             if (r === 12 || r === 13) {
                 ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } };
                 ws[cellRef].s.font = { bold: true, sz: 9 };
-                ws[cellRef].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
+                ws[cellRef].s.alignment = { horizontal: "center", vertical: "center" };
             }
         }
     }
 
-    // --- WARNA KHAS UNTUK ITEM E, F, G (Berdasarkan Index Row) ---
-    const specialRows = [
-        { rowIdx: 18, rgb: "FFCC99" }, // Item E (Index 18)
-        { rowIdx: 19, rgb: "FFFF00" }, // Item F (Index 19)
-        { rowIdx: 20, rgb: "FFFF00" }  // Item G (Index 20)
+    // --- KHAS: Warna Baris E, F, G ---
+    const rowsToColor = [
+        { idx: 18, rgb: "FFCC99" }, // Item E (Row 19 excel biasanya)
+        { idx: 19, rgb: "FFFF00" }, // Item F
+        { idx: 20, rgb: "FFFF00" }  // Item G
     ];
 
-    specialRows.forEach(cfg => {
+    rowsToColor.forEach(cfg => {
         for (let col = 0; col <= tableEndCol; col++) {
-            const cellRef = XLSX.utils.encode_cell({ r: cfg.rowIdx, c: col });
-            if (ws[cellRef]) {
-                ws[cellRef].s.fill = { fgColor: { rgb: cfg.rgb } };
-                ws[cellRef].s.font = { sz: 9 };
-            }
+            const cellRef = XLSX.utils.encode_cell({ r: cfg.idx, c: col });
+            if (ws[cellRef]) ws[cellRef].s.fill = { fgColor: { rgb: cfg.rgb } };
         }
     });
 
-    // Pengurusan Merges
+    // Merges
     ws["!merges"] = [
-        { s: { r: 1, c: 1 }, e: { r: 1, c: 5 } },      // Merge Title
-        { s: { r: 12, c: 0 }, e: { r: 13, c: 0 } },   // Merge Header ITEM
-        { s: { r: 12, c: 1 }, e: { r: 13, c: 2 } },   // Merge Header DESCRIPTION
-        { s: { r: 12, c: 3 }, e: { r: 12, c: 3 } }    // AS PER CONTRACT
+        { s: { r: 1, c: 1 }, e: { r: 3, c: 13 } },    // Title
+        { s: { r: 12, c: 0 }, e: { r: 13, c: 0 } },  // ITEM
+        { s: { r: 12, c: 1 }, e: { r: 13, c: 2 } }   // DESCRIPTION
     ];
 
-    // Lebar Kolum
+    // Column Widths
     ws["!cols"] = [
-        { wch: 6 }, { wch: 45 }, { wch: 3 }, { wch: 20 }, // A, B, C, D
-        { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, // Interim 1-5
-        { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }  // Interim 6-10
+        { wch: 6 }, { wch: 40 }, { wch: 3 }, { wch: 18 },
+        { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
+        { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }
     ];
 
-    XLSX.utils.book_append_sheet(wb, ws, "Contract Summary");
+    XLSX.utils.book_append_sheet(wb, ws, "Summary");
     XLSX.writeFile(wb, `Summary_${c.contract_code || 'Contract'}.xlsx`);
 }
 async function loadSummary(){
