@@ -74,10 +74,10 @@ function exportExcel() {
     const c = window.contractData;
     const wb = XLSX.utils.book_new();
 
-    // 1. Ambil data dinamik dari claim_breakdown (JSONB)
-    // Mengandaikan struktur: { "SECTION A": { "amt": 0 }, ... }
-    const breakdown = c.claim_breakdown || {};
-    const sectionKeys = Object.keys(breakdown).sort(); // Susun A-G
+    // 1. Ambil data dinamik dari contract_sections_breakdown (JSONB)
+    const breakdown = c.contract_sections_breakdown || {};
+    // Susun kunci (SECTION A, B, C...) supaya turutan betul dalam Excel
+    const sectionKeys = Object.keys(breakdown).sort(); 
 
     // Header Maklumat Kontrak
     const ws_data = [
@@ -85,76 +85,73 @@ function exportExcel() {
         ["", c.contract_name || "SUMMARY OF CONTRACT"], // Row 2
         [], [],
         ["", "CONTRACT NO.", ":", c.contract_code || "-"],
-        ["", "CONTRACTOR", ":", c.contractor || "-"],
+        ["", "CONTRACTOR", ":", c.contract contractor || "-"],
         ["", "CONTRACT PERIOD", ":", c.contract_period || "-"],
         ["", "CONTRACT SUM", ":", "RM " + Number(c.contract_sum || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })],
         ["", "PERFORMANCE GUARANTEE SUM", ":", c.pg_sum || "-"],
         [], [], [],
         
-        // Header Jadual Utama
+        // Header Jadual Utama (Row 13 & 14)
         ["ITEM", "DESCRIPTION", "", "AS PER CONTRACT", "INTERIM NO.1", "INTERIM NO.2", "INTERIM NO.3", "INTERIM NO.4", "INTERIM NO.5", "INTERIM NO.6", "INTERIM NO.7", "INTERIM NO.8", "INTERIM NO.9", "INTERIM NO.10"],
         ["", "", "", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM"]
     ];
 
-    // 2. Masukkan data secara dinamik berdasarkan kunci dalam JSONB
+    // 2. Masukkan data secara dinamik daripada JSONB
     sectionKeys.forEach(key => {
-        // Ambil huruf (cth: "A") daripada "SECTION A"
-        const itemLetter = key.replace("SECTION ", ""); 
-        const amount = breakdown[key].amt || 0;
+        const itemLetter = key.replace("SECTION ", "").trim(); 
+        const itemData = breakdown[key];
         
-        // Map Description (Jika ada mapping nama spesifik, boleh tambah di sini)
-        const descMapping = {
-            "A": "GENERAL & PRELIMINARIES",
-            "B": "PREVENTIVE MAINTENANCE & SERVICE CHARGES",
-            "C": "PROACTIVE MAINTENANCE & OVERHAUL SERVICE CHARGES",
-            "D": "CALIBRATION & VERIFICATION CHARGES",
-            "E": "WORKMANSHIP CHARGES",
-            "F": "SUPPLY & DELIVERY OF SPARE PART",
-            "G": "PROVISIONAL SUM"
-        };
+        // Ambil desc dan amt terus dari JSONB
+        const description = itemData.desc ? itemData.desc.trim() : key;
+        const amount = itemData.amt || 0;
 
-        let row = [itemLetter, descMapping[itemLetter] || key, "", amount];
-        for (let i = 1; i <= 10; i++) { row.push("-"); }
+        // Bina baris: [A, Description, (empty for merge), Amount, ...Interims]
+        let row = [itemLetter, description, "", amount];
+        
+        // Placeholder untuk kolum Interim (E hingga N)
+        for (let i = 1; i <= 10; i++) { 
+            row.push("-"); 
+        }
         ws_data.push(row);
     });
 
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
-    // --- MERGES ---
+    // --- PENGURUSAN MERGES ---
     const lastRowIdx = ws_data.length - 1;
     let merges = [
-        { s: { r: 1, c: 1 }, e: { r: 3, c: 13 } },    // Tajuk
-        { s: { r: 12, c: 0 }, e: { r: 13, c: 0 } },  // Header ITEM
-        { s: { r: 12, c: 1 }, e: { r: 13, c: 2 } }   // Header DESCRIPTION
+        { s: { r: 1, c: 1 }, e: { r: 3, c: 13 } },    // Tajuk Besar
+        { s: { r: 12, c: 0 }, e: { r: 13, c: 0 } },  // Merge ITEM (Header)
+        { s: { r: 12, c: 1 }, e: { r: 13, c: 2 } }   // Merge DESCRIPTION (Header)
     ];
 
+    // Merge Kolum B & C untuk setiap baris data dinamik
     for (let i = 14; i <= lastRowIdx; i++) {
         merges.push({ s: { r: i, c: 1 }, e: { r: i, c: 2 } });
     }
     ws["!merges"] = merges;
 
-    // --- STYLING (ALIGNMENT & BORDER) ---
+    // --- STYLING (ALIGNMENT, BORDER & COLOR) ---
     for (let r = 12; r <= lastRowIdx; r++) {
         for (let col = 0; col <= 13; col++) {
             const cellRef = XLSX.utils.encode_cell({ r: r, c: col });
             if (!ws[cellRef]) ws[cellRef] = { t: 's', v: '' };
             if (!ws[cellRef].s) ws[cellRef].s = {};
 
-            // Border nipis untuk semua sel
+            // 1. Border nipis untuk semua
             ws[cellRef].s.border = {
                 top: { style: "thin" }, bottom: { style: "thin" },
                 left: { style: "thin" }, right: { style: "thin" }
             };
 
-            // ALIGNMENT KE TENGAH UNTUK SEMUA ITEM (Kecuali Description)
-            if (col !== 1) {
-                ws[cellRef].s.alignment = { horizontal: "center", vertical: "center" };
-            } else {
-                // Description tetap kiri supaya senang baca
+            // 2. Alignment: Tengah untuk semua KECUALI Description (Kolum B)
+            if (col === 1) {
                 ws[cellRef].s.alignment = { horizontal: "left", vertical: "center", wrapText: true };
+            } else {
+                ws[cellRef].s.alignment = { horizontal: "center", vertical: "center" };
             }
 
-            // Bold untuk Header
+            // 3. Header Styling (Bold & Grey)
             if (r === 12 || r === 13) {
                 ws[cellRef].s.font = { bold: true, sz: 9 };
                 ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } };
@@ -162,14 +159,15 @@ function exportExcel() {
         }
     }
 
-    // --- WARNA DINAMIK (E, F, G) ---
-    // Mencari baris berdasarkan huruf di Kolum A
+    // --- WARNA DINAMIK MENGIKUT ITEM ---
     for (let r = 14; r <= lastRowIdx; r++) {
         const itemLetterCell = ws[XLSX.utils.encode_cell({ r: r, c: 0 })];
         if (itemLetterCell) {
             let color = null;
-            if (itemLetterCell.v === "E") color = "FFCC99"; // Oren
-            if (itemLetterCell.v === "F" || itemLetterCell.v === "G") color = "FFFF00"; // Kuning
+            const letter = itemLetterCell.v.toString().toUpperCase();
+            
+            if (letter === "E") color = "FFCC99"; // Oren Lembut
+            if (letter === "F" || letter === "G") color = "FFFF00"; // Kuning Terang
 
             if (color) {
                 for (let col = 0; col <= 13; col++) {
@@ -180,10 +178,11 @@ function exportExcel() {
         }
     }
 
+    // Lebar Kolum
     ws["!cols"] = [
-        { wch: 6 }, { wch: 40 }, { wch: 3 }, { wch: 18 },
-        { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
-        { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }
+        { wch: 6 }, { wch: 45 }, { wch: 3 }, { wch: 20 },
+        { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
+        { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
