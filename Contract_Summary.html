@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contract Summary (Excel View)</title>
+
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+body{
+    font-family:-apple-system,system-ui,sans-serif;
+    margin:0;
+    background:#f5f7fb;
+    padding:20px;
+}
+
+.header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:15px;
+}
+
+.card{
+    background:white;
+    padding:20px;
+    border-radius:15px;
+    box-shadow:0 4px 15px rgba(0,0,0,0.08);
+}
+
+.btn{
+    padding:10px 14px;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+    font-weight:600;
+}
+
+.btn-blue{ background:#007AFF; color:white; }
+.btn-dark{ background:#333; color:white; }
+
+#excelTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    background: white;
+}
+
+#excelTable th {
+    background: #f3f3f3;
+    border: 1px solid #ccc;
+    padding: 8px;
+    text-align: left;
+    position: sticky;
+    top: 0;
+}
+
+#excelTable td {
+    border: 1px solid #ddd;
+    padding: 8px;
+}
+
+#excelTable tr:nth-child(even) {
+    background: #fafafa;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+    <div>
+        <h2 style="margin:0;">Contract Summary</h2>
+        <small style="color:#666;">Excel Style View</small>
+    </div>
+
+    <div style="display:flex; gap:10px;">
+        <button class="btn btn-blue" onclick="exportExcel()">
+            <i class="fa fa-file-excel"></i> Export Excel
+        </button>
+
+        <button class="btn btn-dark" onclick="goBack()">
+            <i class="fa fa-arrow-left"></i> Back
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div style="overflow:auto;">
+        <table id="excelTable">
+            <thead>
+                <tr>
+                    <th>No</th>
+                    <th>Contract Code</th>
+                    <th>Contract Name</th>
+                    <th>Contractor</th>
+                    <th>Total Contract (RM)</th>
+                    <th>Total Used (RM)</th>
+                    <th>Balance (RM)</th>
+                </tr>
+            </thead>
+            <tbody id="excelBody">
+                <tr><td colspan="7">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
+const SB_KEY = 'YOUR_SUPABASE_KEY_HERE';
+
+const headers = {
+    'apikey': SB_KEY,
+    'Authorization': `Bearer ${SB_KEY}`,
+    'Content-Type': 'application/json'
+};
+
+const params = new URLSearchParams(window.location.search);
+const contractId = params.get('id');
+
+async function loadSummary(){
+
+    if(!contractId){
+        document.getElementById('excelBody').innerHTML =
+        `<tr><td colspan="7">No contract ID found</td></tr>`;
+        return;
+    }
+
+    try {
+        const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}`, { headers });
+        const data = await res.json();
+        const c = data[0];
+
+        const res2 = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}`, { headers });
+        const works = await res2.json();
+
+        let used = 0;
+        works.forEach(w => {
+            used += Number(w.amount_spent || 0);
+        });
+
+        let balance = Number(c.contract_sum || 0) - used;
+
+        document.getElementById('excelBody').innerHTML = `
+            <tr>
+                <td>1</td>
+                <td>${c.contract_code || '-'}</td>
+                <td>${c.contract_name || '-'}</td>
+                <td>${c.contractor || '-'}</td>
+                <td>${Number(c.contract_sum||0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+                <td>${used.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+                <td style="font-weight:bold;color:${balance<0?'red':'green'};">
+                    ${balance.toLocaleString(undefined,{minimumFractionDigits:2})}
+                </td>
+            </tr>
+        `;
+
+    } catch(err){
+        console.error(err);
+        document.getElementById('excelBody').innerHTML =
+        `<tr><td colspan="7">Error loading data</td></tr>`;
+    }
+}
+
+function exportExcel(){
+    let table = document.getElementById("excelTable");
+    let wb = XLSX.utils.table_to_book(table, {sheet:"Contract Summary"});
+    XLSX.writeFile(wb, "Contract_Summary.xlsx");
+}
+
+function goBack(){
+    window.history.back();
+}
+
+loadSummary();
+</script>
+
+</body>
+</html>
