@@ -191,7 +191,7 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
                 <label>Pilih Kontrak</label><select id="i_contract_id" onchange="onInterimContractSelect()"><option value="">Pilih Unit Dahulu</option></select>
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div><label>No. Interim</label><input type="number" id="i_no"></div>
+                    <div><label>No. Interim</label><input type="number" id="i_no" oninput="autoDetectInterim()"></div>
                     <div><label>Tarikh Terima</label><input type="date" id="i_date_received"></div>
                 </div>
 
@@ -799,8 +799,39 @@ return total;
         };
 
         try {
-            const resInterim = await fetch(`${SB_URL}/rest/v1/interims`, { 
-                method: 'POST', 
+            // CHECK EXISTING
+const checkRes = await fetch(
+`${SB_URL}/rest/v1/interims?contract_id=eq.${cId}&interim_no=eq.${iNo}&select=id`,
+{ headers }
+);
+
+const existing = await checkRes.json();
+
+let resInterim;
+
+if(existing.length > 0){
+
+// UPDATE
+resInterim = await fetch(
+`${SB_URL}/rest/v1/interims?id=eq.${existing[0].id}`,
+{
+method: 'PATCH',
+headers,
+body: JSON.stringify(interimPayload)
+});
+
+}else{
+
+// INSERT
+resInterim = await fetch(
+`${SB_URL}/rest/v1/interims`,
+{
+method: 'POST',
+headers,
+body: JSON.stringify(interimPayload)
+});
+
+} 
                 headers: { ...headers, 'Prefer': 'resolution=merge-duplicates' }, 
                 body: JSON.stringify(interimPayload) 
             });
@@ -967,6 +998,77 @@ console.log("Existing Work Order loaded");
 }catch(e){
 
 console.error("Auto detect error:", e);
+
+}
+
+},500);
+
+}
+    let interimDetectTimer = null;
+
+function autoDetectInterim(){
+
+clearTimeout(interimDetectTimer);
+
+interimDetectTimer = setTimeout(async ()=>{
+
+const contractId = document.getElementById('i_contract_id').value;
+const interimNo = document.getElementById('i_no').value;
+
+if(!contractId || !interimNo) return;
+
+try{
+
+const res = await fetch(
+`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}&interim_no=eq.${interimNo}&select=*`,
+{ headers }
+);
+
+const data = await res.json();
+
+if(data.length === 0){
+
+console.log("Interim baru");
+return;
+
+}
+
+const i = data[0];
+
+document.getElementById('i_date_received').value = i.date_received || '';
+document.getElementById('i_salvage').value = i.salvage_value || 0;
+document.getElementById('i_pg_sum').value = i.performance_guarantee_sum || 0;
+
+// reload section form
+onInterimContractSelect();
+
+setTimeout(()=>{
+
+if(i.claim_breakdown){
+
+Object.keys(i.claim_breakdown).forEach(sec=>{
+
+const input = document.querySelector(
+`.i_sec_claim_val[data-sec="${sec}"]`
+);
+
+if(input){
+input.value = i.claim_breakdown[sec].amt || 0;
+}
+
+});
+
+}
+
+calcInterimManualTotal();
+
+},100);
+
+console.log("Existing Interim loaded");
+
+}catch(e){
+
+console.error("Auto detect interim error:", e);
 
 }
 
