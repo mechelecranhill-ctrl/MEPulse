@@ -75,20 +75,34 @@ async function exportExcel() {
     const c = window.contractData;
 
     /* LOAD INTERIMS */
-    const intRes = await fetch(
-        `${SB_URL}/rest/v1/interim_claim?contract_id=eq.${c.id}&order=created_at.asc`,
-        { headers }
-    );
 
-    const interims = await intRes.json();
+const intRes = await fetch(
+    `${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=created_at.asc`,
+    { headers }
+);
 
-    /* LOAD WORK ORDERS */
-    const woRes = await fetch(
-        `${SB_URL}/rest/v1/work_order?contract_id=eq.${c.id}`,
-        { headers }
-    );
+const interimsRaw = await intRes.json();
 
-    const workorders = await woRes.json();
+console.log("INTERIMS:", interimsRaw);
+
+const interims = Array.isArray(interimsRaw)
+    ? interimsRaw
+    : [];
+
+/* LOAD WORK ORDERS */
+
+const woRes = await fetch(
+    `${SB_URL}/rest/v1/workorder?contract_id=eq.${c.id}`,
+    { headers }
+);
+
+const workordersRaw = await woRes.json();
+
+console.log("WORKORDERS:", workordersRaw);
+
+const workorders = Array.isArray(workordersRaw)
+    ? workordersRaw
+    : [];
 
     const wb = XLSX.utils.book_new();
 
