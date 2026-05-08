@@ -404,74 +404,239 @@ const workorders = Array.isArray(workordersRaw)
         XLSX.utils.aoa_to_sheet(ws_data);
 
     /* =========================
-       MERGE
-    ========================= */
+   MERGES
+========================= */
 
-    const lastCol = header1.length - 1;
+const lastRowIdx = ws_data.length - 1;
 
-    ws["!merges"] = [
-        {
-            s:{r:1,c:1},
-            e:{r:3,c:lastCol}
+let merges = [
+
+    /* TITLE */
+    {
+        s:{ r:1, c:1 },
+        e:{ r:3, c:lastCol }
+    },
+
+    /* ITEM HEADER */
+    {
+        s:{ r:12, c:0 },
+        e:{ r:13, c:0 }
+    },
+
+    /* DESCRIPTION HEADER */
+    {
+        s:{ r:12, c:1 },
+        e:{ r:13, c:1 }
+    }
+
+];
+
+/* merge description rows */
+
+for(let r=14; r<=lastRowIdx; r++){
+
+    merges.push({
+        s:{ r:r, c:1 },
+        e:{ r:r, c:1 }
+    });
+
+}
+
+ws["!merges"] = merges;
+
+/* =========================
+   STYLING
+========================= */
+
+for(let r=12; r<=lastRowIdx; r++){
+
+    for(let cidx=0; cidx<=lastCol; cidx++){
+
+        const cellRef =
+            XLSX.utils.encode_cell({
+                r:r,
+                c:cidx
+            });
+
+        if(!ws[cellRef]){
+            ws[cellRef] = {
+                t:'s',
+                v:''
+            };
         }
-    ];
 
-    /* =========================
-       STYLE
-    ========================= */
+        if(!ws[cellRef].s){
+            ws[cellRef].s = {};
+        }
 
-    const range =
-        XLSX.utils.decode_range(ws['!ref']);
+        /* BORDER */
 
-    for(let R=0; R<=range.e.r; ++R){
+        ws[cellRef].s.border = {
 
-        for(let C=0; C<=range.e.c; ++C){
+            top:{ style:"thin" },
+            bottom:{ style:"thin" },
+            left:{ style:"thin" },
+            right:{ style:"thin" }
 
-            const cellRef =
-                XLSX.utils.encode_cell({r:R,c:C});
+        };
 
-            if(!ws[cellRef]) continue;
+        /* ALIGNMENT */
+
+        if(cidx === 1){
+
+            ws[cellRef].s.alignment = {
+
+                horizontal:"left",
+                vertical:"center",
+                wrapText:true
+
+            };
+
+        }else{
+
+            ws[cellRef].s.alignment = {
+
+                horizontal:"center",
+                vertical:"center",
+                wrapText:true
+
+            };
+
+        }
+
+        /* HEADER */
+
+        if(r===12 || r===13){
+
+            ws[cellRef].s.font = {
+
+                bold:true,
+                sz:9
+
+            };
+
+            ws[cellRef].s.fill = {
+
+                fgColor:{ rgb:"EAEAEA" }
+
+            };
+
+        }
+
+    }
+
+}
+
+/* =========================
+   TITLE STYLE
+========================= */
+
+if(ws["B2"]){
+
+    ws["B2"].s = {
+
+        font:{
+            bold:true,
+            sz:12
+        },
+
+        alignment:{
+            horizontal:"center",
+            vertical:"center",
+            wrapText:true
+        }
+
+    };
+
+}
+
+/* =========================
+   CONTRACT INFO STYLE
+========================= */
+
+for(let r=4; r<=8; r++){
+
+    for(let cidx=1; cidx<=3; cidx++){
+
+        const cellRef =
+            XLSX.utils.encode_cell({
+                r:r,
+                c:cidx
+            });
+
+        if(ws[cellRef]){
 
             if(!ws[cellRef].s)
                 ws[cellRef].s = {};
 
-            ws[cellRef].s.border = {
-                top:{style:"thin"},
-                bottom:{style:"thin"},
-                left:{style:"thin"},
-                right:{style:"thin"}
+            ws[cellRef].s.font = {
+                bold:true
             };
 
             ws[cellRef].s.alignment = {
+
                 vertical:"center",
-                horizontal:
-                    C===1 ? "left" : "center",
                 wrapText:true
+
             };
 
-            /* HEADER */
+        }
 
-            if(R===12 || R===13){
+    }
 
-                ws[cellRef].s.font = {
-                    bold:true,
-                    sz:9
-                };
+}
 
-                ws[cellRef].s.fill = {
-                    fgColor:{rgb:"EAEAEA"}
-                };
+/* =========================
+   DYNAMIC ROW COLORS
+========================= */
 
-            }
+for(let r=14; r<=lastRowIdx; r++){
 
-            /* TITLE */
+    const itemCell = ws[
+        XLSX.utils.encode_cell({
+            r:r,
+            c:0
+        })
+    ];
 
-            if(cellRef==="B2"){
+    if(itemCell){
 
-                ws[cellRef].s.font = {
-                    bold:true,
-                    sz:12
-                };
+        let color = null;
+
+        const letter =
+            itemCell.v
+            .toString()
+            .toUpperCase();
+
+        if(letter === "E")
+            color = "FFCC99";
+
+        if(letter === "F" || letter === "G")
+            color = "FFFF00";
+
+        if(color){
+
+            for(let cidx=0; cidx<=lastCol; cidx++){
+
+                const cell =
+                    ws[
+                        XLSX.utils.encode_cell({
+                            r:r,
+                            c:cidx
+                        })
+                    ];
+
+                if(cell){
+
+                    cell.s.fill = {
+
+                        fgColor:{
+                            rgb:color
+                        }
+
+                    };
+
+                }
 
             }
 
@@ -479,29 +644,38 @@ const workorders = Array.isArray(workordersRaw)
 
     }
 
-    /* =========================
-       COLUMN WIDTH
-    ========================= */
+}
 
-    const cols = [
-        {wch:8},
-        {wch:45},
-        {wch:18}
-    ];
+/* =========================
+   COLUMN WIDTH
+========================= */
 
-    for(let i=0;i<interimCount;i++){
-        cols.push({wch:18});
-    }
+const cols = [
 
-    cols.push(
-        {wch:18},
-        {wch:18},
-        {wch:18},
-        {wch:22}
-    );
+    { wch:6 },   // ITEM
+    { wch:45 },  // DESCRIPTION
+    { wch:20 }   // AS PER CONTRACT
 
-    ws["!cols"] = cols;
+];
 
+/* INTERIMS */
+
+for(let i=0; i<interimCount; i++){
+
+    cols.push({ wch:15 });
+
+}
+
+/* TOTALS */
+
+cols.push(
+    { wch:18 },
+    { wch:18 },
+    { wch:18 },
+    { wch:22 }
+);
+
+ws["!cols"] = cols;
     XLSX.utils.book_append_sheet(
         wb,
         ws,
