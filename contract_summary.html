@@ -112,55 +112,72 @@ const params = new URLSearchParams(window.location.search);
 const contractId = params.get('id');
 
 function exportExcel(){
-    if (!window.contractData) return;
+    if (!window.contractData) {
+        alert("Data belum sedia");
+        return;
+    }
 
     const c = window.contractData;
     const wb = XLSX.utils.book_new();
     
-    // Array 2D untuk data (Setiap array dalam adalah satu row)
-    const ws_data = [];
-
-    // Row 1: Kosong
-    ws_data.push([]); 
-    
-    // Row 2: Tajuk Panjang (Start Column B)
-    ws_data.push(["", c.contract_name || "-"]); 
-
-    // Row 3 & 4: Kosong
-    ws_data.push([]);
-    ws_data.push([]);
-
-    // Row 5 - 9: Maklumat (Column B: Label, Column D: ":", Column E: Data)
-    ws_data.push(["", "CONTRACT NO.", "", ":", c.contract_code || "-"]);
-    ws_data.push(["", "CONTRACTOR", "", ":", c.contractor || "-"]);
-    ws_data.push(["", "CONTRACT PERIOD", "", ":", c.contract_period || "-"]);
-    ws_data.push(["", "CONTRACT SUM", "", ":", "RM" + Number(c.contract_sum || 0).toLocaleString(undefined, {minimumFractionDigits: 2})]);
-    ws_data.push(["", "PERFORMANCE GUARANTEE SUM", "", ":", c.pg_sum || "-"]);
+    // Array 2D (AOA) - Kita susun baris demi baris
+    const ws_data = [
+        [], // Row 1 (Kosong)
+        ["", c.contract_name || ""], // Row 2 (Start dari Col B)
+        [], // Row 3 (Kosong)
+        [], // Row 4 (Kosong)
+        ["", "CONTRACT NO.", "", ":", c.contract_code || "-"], // Row 5
+        ["", "CONTRACTOR", "", ":", c.contractor || "-"],     // Row 6
+        ["", "CONTRACT PERIOD", "", ":", c.contract_period || "-"], // Row 7
+        ["", "CONTRACT SUM", "", ":", "RM" + Number(c.contract_sum || 0).toLocaleString(undefined, {minimumFractionDigits: 2})], // Row 8
+        ["", "PERFORMANCE GUARANTEE SUM", "", ":", c.pg_sum || "-"] // Row 9
+    ];
 
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
     // ==========================================
-    // FORMATTING (COL WIDTH & MERGE)
+    // 1. MERGE CELLS (Tajuk Row 2 dari B ke P)
     // ==========================================
-    
-    // Set lebar kolum supaya sama macam Excel dalam gambar
-    ws["!cols"] = [
+    // s = start, e = end | r = row, c = col (indeks bermula 0)
+    ws["!merges"] = [
+        { 
+            s: { r: 1, c: 1 }, // Row 2 (r:1), Col B (c:1)
+            e: { r: 2, c: 15 }  // Sampai Row 3 (r:2), Col P (c:15)
+        }
+    ];
+
+    // ==========================================
+    // 2. SET LEBAR KOLUM (Width)
+    // ==========================================
+    const colWidths = [
         { wch: 2 },  // A
         { wch: 35 }, // B (Label)
-        { wch: 5 },  // C
+        { wch: 5 },  // C (Jarak)
         { wch: 3 },  // D (:)
-        { wch: 60 }  // E (Data)
+        { wch: 40 }  // E (Data)
     ];
+    
+    // Tambah lebar untuk kolum F sehingga P supaya border/tampilan luas
+    for(let i=5; i<=15; i++) {
+        colWidths.push({ wch: 10 });
+    }
+    ws["!cols"] = colWidths;
 
-    // Merge tajuk utama (Row 2, dari Column B hingga Column O/P lebih kurang)
-    ws["!merges"] = [
-        { s: { r: 1, c: 1 }, e: { r: 2, c: 10 } } 
-    ];
+    // ==========================================
+    // 3. WRAP TEXT (Untuk Tajuk Panjang)
+    // ==========================================
+    // Nota: Versi percuma XLSX (SheetJS) terhad pada struktur data.
+    // Kita pastikan sel B2 mempunyai nilai tajuk.
+    if(ws["B2"]) {
+        ws["B2"].s = { 
+            alignment: { vertical: "center", horizontal: "left", wrapText: true },
+            font: { bold: true }
+        };
+    }
 
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
-    XLSX.writeFile(wb, "Contract_Summary_Format.xlsx");
+    XLSX.writeFile(wb, "Contract_Summary_P_Column.xlsx");
 }
-
 async function loadSummary(){
     if(!contractId) return;
     try {
