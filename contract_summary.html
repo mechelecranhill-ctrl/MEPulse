@@ -120,12 +120,11 @@ function exportExcel(){
     const c = window.contractData;
     const wb = XLSX.utils.book_new();
     
-    // Array 2D (AOA) - Kita susun baris demi baris
     const ws_data = [
-        [], // Row 1 (Kosong)
-        ["", c.contract_name || ""], // Row 2 (Start dari Col B)
-        [], // Row 3 (Kosong)
-        [], // Row 4 (Kosong)
+        [], // Row 1
+        ["", c.contract_name || ""], // Row 2 (Tajuk Utama)
+        [], // Row 3 (Simpan kosong untuk merge)
+        [], // Row 4 (Simpan kosong untuk merge)
         ["", "CONTRACT NO.", "", ":", c.contract_code || "-"], // Row 5
         ["", "CONTRACTOR", "", ":", c.contractor || "-"],     // Row 6
         ["", "CONTRACT PERIOD", "", ":", c.contract_period || "-"], // Row 7
@@ -136,47 +135,46 @@ function exportExcel(){
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
     // ==========================================
-    // 1. MERGE CELLS (Tajuk Row 2 dari B ke P)
+    // 1. MERGE CELLS (B2 sehingga P4)
     // ==========================================
-    // s = start, e = end | r = row, c = col (indeks bermula 0)
+    // Kita merge 3 baris (Row 2, 3, 4) supaya tajuk ada ruang untuk wrap
     ws["!merges"] = [
         { 
-            s: { r: 1, c: 1 }, // Row 2 (r:1), Col B (c:1)
-            e: { r: 2, c: 15 }  // Sampai Row 3 (r:2), Col P (c:15)
+            s: { r: 1, c: 1 }, // Start: Row 2 (indeks 1), Col B (indeks 1)
+            e: { r: 3, c: 15 }  // End: Row 4 (indeks 3), Col P (indeks 15)
         }
     ];
 
     // ==========================================
-    // 2. SET LEBAR KOLUM (Width)
+    // 2. SET TINGGI BARIS (Row Height)
+    // ==========================================
+    // Ini memaksa Excel membuka ruang tinggi untuk tajuk (Wrap Text Manual)
+    ws['!rows'] = [
+        { hpt: 15 }, // Row 1
+        { hpt: 40 }, // Row 2 (Tinggi untuk tajuk)
+        { hpt: 15 }, // Row 3
+        { hpt: 15 }  // Row 4
+    ];
+
+    // ==========================================
+    // 3. SET LEBAR KOLUM (Width)
     // ==========================================
     const colWidths = [
         { wch: 2 },  // A
         { wch: 35 }, // B (Label)
-        { wch: 5 },  // C (Jarak)
+        { wch: 5 },  // C
         { wch: 3 },  // D (:)
-        { wch: 40 }  // E (Data)
+        { wch: 45 }  // E (Data)
     ];
     
-    // Tambah lebar untuk kolum F sehingga P supaya border/tampilan luas
-    for(let i=5; i<=15; i++) {
+    // Lebarkan kolum F sehingga P
+    for(let i = 5; i <= 15; i++) {
         colWidths.push({ wch: 10 });
     }
     ws["!cols"] = colWidths;
 
-    // ==========================================
-    // 3. WRAP TEXT (Untuk Tajuk Panjang)
-    // ==========================================
-    // Nota: Versi percuma XLSX (SheetJS) terhad pada struktur data.
-    // Kita pastikan sel B2 mempunyai nilai tajuk.
-    if(ws["B2"]) {
-        ws["B2"].s = { 
-            alignment: { vertical: "center", horizontal: "left", wrapText: true },
-            font: { bold: true }
-        };
-    }
-
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
-    XLSX.writeFile(wb, "Contract_Summary_P_Column.xlsx");
+    XLSX.writeFile(wb, "Contract_Summary_Final.xlsx");
 }
 async function loadSummary(){
     if(!contractId) return;
