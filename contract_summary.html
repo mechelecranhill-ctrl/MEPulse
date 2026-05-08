@@ -79,7 +79,6 @@ function exportExcel(){
         ["", c.contract_name || ""], // Row 2
         [], // Row 3
         [], // Row 4
-        // Kolum A: Kosong, Kolum B: Label, Kolum C: Simbol, Kolum D: Data
         ["", "CONTRACT NO.", ":", c.contract_code || "-"], 
         ["", "CONTRACTOR", ":", c.contractor || "-"],     
         ["", "CONTRACT PERIOD", ":", c.contract_period || "-"], 
@@ -103,7 +102,6 @@ function exportExcel(){
     ];
 
     items.forEach(item => {
-        // Data Jadual: Item(A), Desc(B & C merged), Amount(D)
         let row = [item[0], item[1], "", item[2]]; 
         for(let i=0; i<10; i++) row.push("-"); 
         ws_data.push(row);
@@ -111,89 +109,83 @@ function exportExcel(){
 
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
-    // Styling Tajuk Utama (B2)
+    // --- STYLING HEADER INFO (ATAS) ---
     ws["B2"].s = {
         font: { bold: true, sz: 11 },
         alignment: { wrapText: true, vertical: "center", horizontal: "center" }
     };
+    ["C5","C6","C7","C8","C9"].forEach(ref => { if(ws[ref]) ws[ref].s = { alignment: { horizontal: "center" } }; });
+    ["D5","D6","D7","D8","D9"].forEach(ref => { if(ws[ref]) ws[ref].s = { font: { bold: true } }; });
 
-    // Styling Simbol : (C5:C9)
-    ["C5","C6","C7","C8","C9"].forEach(ref => {
-        if(ws[ref]) ws[ref].s = { alignment: { horizontal: "center" } };
-    });
+    // --- MELETAKKAN BORDER PADA SEMUA SEL JADUAL (ROW 13 HINGGA AKHIR) ---
+    const tableStartRow = 12; // Index 12 adalah Row 13
+    const tableEndRow = ws_data.length - 1;
+    const tableEndCol = 13; // Column N (Interim 10)
 
-    // Styling Data Kontrak (D5:D9)
-    ["D5","D6","D7","D8","D9"].forEach(ref => {
-        if(ws[ref]) ws[ref].s = { font: { bold: true } };
-    });
+    for (let r = tableStartRow; r <= tableEndRow; r++) {
+        for (let col = 0; col <= tableEndCol; col++) {
+            const cellRef = XLSX.utils.encode_cell({ r: r, c: col });
+            
+            // Wujudkan sel jika ia kosong supaya border boleh diletakkan
+            if (!ws[cellRef]) ws[cellRef] = { t: 's', v: '' };
+            
+            // Tetapkan border standard
+            if (!ws[cellRef].s) ws[cellRef].s = {};
+            ws[cellRef].s.border = {
+                top: { style: "thin" },
+                bottom: { style: "thin" },
+                left: { style: "thin" },
+                right: { style: "thin" }
+            };
 
-    // Gaya Header Jadual (Row 13-14)
-    for(let col=0; col<=13; col++) {
-        [13, 14].forEach(row => {
-            const cell = XLSX.utils.encode_cell({r: row-1, c: col});
-            if(ws[cell]) {
-                ws[cell].s = {
-                    fill: { fgColor: { rgb: "D3D3D3" } },
-                    font: { bold: true, sz: 9 },
-                    border: { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} },
-                    alignment: { horizontal: "center", vertical: "center" }
-                };
+            // Tambah gaya khusus untuk Header (Row 13 & 14)
+            if (r === 12 || r === 13) {
+                ws[cellRef].s.fill = { fgColor: { rgb: "D3D3D3" } };
+                ws[cellRef].s.font = { bold: true, sz: 9 };
+                ws[cellRef].s.alignment = { horizontal: "center", vertical: "center" };
             }
-        });
+        }
     }
 
-    // Warna & Border untuk Baris Item E, F, G
-    const colorRows = [
-        { row: 18, color: "FFCC99" }, // Row 19 (Oren)
-        { row: 19, color: "FFFF00" }, // Row 20 (Kuning)
-        { row: 20, color: "FFFF00" }  // Row 21 (Kuning)
+    // --- WARNA KHUSUS UNTUK ITEM E, F, G (IKUT KEDUDUKAN DALAM JADUAL) ---
+    const colorConfigs = [
+        { row: 18, color: "FFCC99" }, // Row 19 (E)
+        { row: 19, color: "FFFF00" }, // Row 20 (F)
+        { row: 20, color: "FFFF00" }  // Row 21 (G)
     ];
 
-    colorRows.forEach(config => {
-        for(let col=0; col<=13; col++) {
-            const cell = XLSX.utils.encode_cell({r: config.row, c: col});
-            if(ws[cell]) {
-                ws[cell].s = { 
-                    fill: { fgColor: { rgb: config.color } }, 
-                    border: { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} }
-                };
+    colorConfigs.forEach(config => {
+        for (let col = 0; col <= tableEndCol; col++) {
+            const cellRef = XLSX.utils.encode_cell({ r: config.row, c: col });
+            if (ws[cellRef]) {
+                ws[cellRef].s.fill = { fgColor: { rgb: config.color } };
             }
         }
     });
 
-    // MERGE CELLS
+    // --- MERGE CELLS ---
     let merges = [
         { s: { r: 1, c: 1 }, e: { r: 3, c: 13 } }, // Tajuk (B2:N4)
         { s: { r: 12, c: 0 }, e: { r: 13, c: 0 } }, // Merge ITEM (Col A)
         { s: { r: 12, c: 1 }, e: { r: 13, c: 2 } }  // Merge DESCRIPTION (Col B:C)
     ];
 
-    // Merge Description untuk baris data (Col B:C) supaya selaras dengan tajuk
     for(let i=0; i<items.length; i++) {
         let r = 14 + i;
         merges.push({ s: { r: r, c: 1 }, e: { r: r, c: 2 } });
-        
-        // Letak border pada Column C yang tersembunyi dalam merge
-        const cellC = XLSX.utils.encode_cell({r: r, c: 2});
-        if(!ws[cellC]) ws[cellC] = { t: 's', v: '' };
-        ws[cellC].s = { border: { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} } };
     }
     ws["!merges"] = merges;
 
     ws['!rows'] = ws_data.map(() => ({ hpt: 15.75 }));
     ws["!cols"] = [
-        {wch: 5},  // A
-        {wch: 35}, // B
-        {wch: 3},  // C (Simbol :)
-        {wch: 22}, // D (Data)
+        {wch: 5}, {wch: 35}, {wch: 3}, {wch: 22},
         {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12},
         {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
-    XLSX.writeFile(wb, "Contract_Summary_Precise.xlsx");
+    XLSX.writeFile(wb, "Contract_Summary_Bordered.xlsx");
 }
-
 async function loadSummary(){
     if(!contractId) return;
     try {
