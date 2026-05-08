@@ -123,25 +123,39 @@ const contractId = params.get('id');
 
 function exportExcel(){
 
+    if (!window.contractData) {
+        alert("Data belum load lagi");
+        return;
+    }
+
+    const c = window.contractData;
     const wb = XLSX.utils.book_new();
     const ws_data = [];
 
-    const c = window.contractData;
-
+    // =========================
+    // TITLE
+    // =========================
     ws_data.push(["CONTRACT SUMMARY REPORT"]);
     ws_data.push([]);
 
-    ws_data.push(["Contract Name", c.contract_name]);
-    ws_data.push(["Contract Code", c.contract_code]);
-    ws_data.push(["Contractor", c.contractor]);
+    // =========================
+    // HEADER INFO
+    // =========================
+    ws_data.push(["Contract Name", c.contract_name || "-"]);
+    ws_data.push(["Contract Code", c.contract_code || "-"]);
+    ws_data.push(["Contractor", c.contractor || "-"]);
     ws_data.push(["Contract Period", c.contract_period || "-"]);
-    ws_data.push(["Total Contract (RM)", c.contract_sum]);
+    ws_data.push(["Total Contract (RM)", c.contract_sum || 0]);
     ws_data.push(["Performance Guarantee (RM)", c.pg_sum || 0]);
-    ws_data.push(["Used (RM)", c.used]);
-    ws_data.push(["Balance (RM)", c.balance]);
+    ws_data.push(["Used (RM)", c.used || 0]);
+    ws_data.push(["Balance (RM)", c.balance || 0]);
 
     ws_data.push([]);
-    ws_data.push(["No","Description","Amount"]);
+
+    // =========================
+    // TABLE HEADER
+    // =========================
+    ws_data.push(["No","Description","Amount (RM)"]);
 
     let no = 1;
     (window.workOrders || []).forEach(w => {
@@ -152,13 +166,66 @@ function exportExcel(){
         ]);
     });
 
+    // =========================
+    // CREATE SHEET
+    // =========================
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
+    // =========================
+    // 🔥 TITLE MERGE + CENTER
+    // =========================
+    ws["A1"] = { v: "CONTRACT SUMMARY REPORT" };
+
+    ws["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } } // merge A1:C1
+    ];
+
+    // =========================
+    // 💰 CURRENCY FORMAT RM
+    // =========================
+    const range = XLSX.utils.decode_range(ws["!ref"]);
+
+    for (let R = 0; R <= range.e.r; R++) {
+        for (let C = 0; C <= range.e.c; C++) {
+
+            const cell_address = XLSX.utils.encode_cell({ r: R, c: C });
+            const cell = ws[cell_address];
+
+            if (!cell) continue;
+
+            // format RM columns (Total, Used, Balance, Amount column)
+            if (C === 2 && R >= 9) {
+                cell.z = '"RM" #,##0.00';
+            }
+        }
+    }
+
+    // =========================
+    // PAGE SETUP A4 LANDSCAPE
+    // =========================
     ws["!pageSetup"] = {
         orientation: "landscape",
         paperSize: 9
     };
 
+    // =========================
+    // 🖨️ HEADER REPEAT EVERY PAGE
+    // =========================
+    ws["!printHeader"] = ["1:9"];
+
+    ws["!autofilter"] = { ref: `A${8}:C${range.e.r + 1}` };
+
+    ws["!pageSetup"].fitToWidth = 1;
+    ws["!pageSetup"].fitToHeight = 0;
+
+    ws["!margins"] = {
+        left: 0.3, right: 0.3,
+        top: 0.5, bottom: 0.5
+    };
+
+    // =========================
+    // COLUMN WIDTH
+    // =========================
     ws["!cols"] = [
         { wch: 5 },
         { wch: 50 },
@@ -167,10 +234,6 @@ function exportExcel(){
 
     XLSX.utils.book_append_sheet(wb, ws, "Contract Summary");
     XLSX.writeFile(wb, "Contract_Summary.xlsx");
-
-    if (!window.contractData) {
-    alert("Data belum load lagi");
-    return;
 }
     async function loadSummary(){
 
