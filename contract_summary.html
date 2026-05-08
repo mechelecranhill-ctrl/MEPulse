@@ -53,17 +53,11 @@ body{
     border: 1px solid #ccc;
     padding: 8px;
     text-align: left;
-    position: sticky;
-    top: 0;
 }
 
 #excelTable td {
     border: 1px solid #ddd;
     padding: 8px;
-}
-
-#excelTable tr:nth-child(even) {
-    background: #fafafa;
 }
 </style>
 </head>
@@ -73,14 +67,13 @@ body{
 <div class="header">
     <div>
         <h2 style="margin:0;">Contract Summary</h2>
-        <small style="color:#666;">Excel Style View</small>
+        <small style="color:#666;">Eksport ikut format gambar Excel</small>
     </div>
 
     <div style="display:flex; gap:10px;">
         <button class="btn btn-blue" onclick="exportExcel()">
             <i class="fa fa-file-excel"></i> Export Excel
         </button>
-
         <button class="btn btn-dark" onclick="goBack()">
             <i class="fa fa-arrow-left"></i> Back
         </button>
@@ -94,15 +87,12 @@ body{
                 <tr>
                     <th>No</th>
                     <th>Contract Code</th>
-                    <th>Contract Name</th>
                     <th>Contractor</th>
                     <th>Total Contract (RM)</th>
-                    <th>Total Used (RM)</th>
-                    <th>Balance (RM)</th>
                 </tr>
             </thead>
             <tbody id="excelBody">
-                <tr><td colspan="7">Loading...</td></tr>
+                <tr><td colspan="4">Loading data...</td></tr>
             </tbody>
         </table>
     </div>
@@ -122,137 +112,76 @@ const params = new URLSearchParams(window.location.search);
 const contractId = params.get('id');
 
 function exportExcel(){
-
-    if (!window.contractData) {
-        alert("Data belum load lagi");
-        return;
-    }
+    if (!window.contractData) return;
 
     const c = window.contractData;
     const wb = XLSX.utils.book_new();
+    
+    // Array 2D untuk data (Setiap array dalam adalah satu row)
     const ws_data = [];
 
-    // ==========================================
-    // 1. TAJUK (Row 1)
-    // ==========================================
-    ws_data.push([c.contract_name || "-"]);
+    // Row 1: Kosong
+    ws_data.push([]); 
     
-    // Jarak baris kosong seperti dalam contoh
+    // Row 2: Tajuk Panjang (Start Column B)
+    ws_data.push(["", c.contract_name || "-"]); 
+
+    // Row 3 & 4: Kosong
     ws_data.push([]);
     ws_data.push([]);
-    ws_data.push([]);
 
-    // ==========================================
-    // 2. HEADER INFO (Label : Data)
-    // ==========================================
-    ws_data.push(["CONTRACT NO.", ":", c.contract_code || "-"]);
-    ws_data.push(["CONTRACTOR", ":", c.contractor || "-"]);
-    ws_data.push(["CONTRACT PERIOD", ":", c.contract_period || "-"]);
-    
-    const formattedSum = "RM" + Number(c.contract_sum || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
-    ws_data.push(["CONTRACT SUM", ":", formattedSum]);
-    
-    ws_data.push(["PERFORMANCE GUARANTEE SUM", ":", c.pg_sum || "-"]);
-
-    ws_data.push([]); // Baris kosong sebelum table
-
-    // ==========================================
-    // 3. TABLE HEADER
-    // ==========================================
-    ws_data.push(["No","Description","Amount (RM)"]);
-
-    let no = 1;
-    (window.workOrders || []).forEach(w => {
-        ws_data.push([
-            no++,
-            w.description || "-",
-            Number(w.amount_spent || 0)
-        ]);
-    });
+    // Row 5 - 9: Maklumat (Column B: Label, Column D: ":", Column E: Data)
+    ws_data.push(["", "CONTRACT NO.", "", ":", c.contract_code || "-"]);
+    ws_data.push(["", "CONTRACTOR", "", ":", c.contractor || "-"]);
+    ws_data.push(["", "CONTRACT PERIOD", "", ":", c.contract_period || "-"]);
+    ws_data.push(["", "CONTRACT SUM", "", ":", "RM" + Number(c.contract_sum || 0).toLocaleString(undefined, {minimumFractionDigits: 2})]);
+    ws_data.push(["", "PERFORMANCE GUARANTEE SUM", "", ":", c.pg_sum || "-"]);
 
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
-    // =========================
-    // 4. FORMATTING EXCEL
-    // =========================
+    // ==========================================
+    // FORMATTING (COL WIDTH & MERGE)
+    // ==========================================
     
-    // Merge tajuk utama di baris pertama
-    ws["!merges"] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } } 
-    ];
-
-    // Laraskan lebar kolum (A: Lebar Label, B: Lebar Titik, C: Lebar Data)
+    // Set lebar kolum supaya sama macam Excel dalam gambar
     ws["!cols"] = [
-        { wch: 30 }, 
-        { wch: 3 },  
-        { wch: 70 }  
+        { wch: 2 },  // A
+        { wch: 35 }, // B (Label)
+        { wch: 5 },  // C
+        { wch: 3 },  // D (:)
+        { wch: 60 }  // E (Data)
     ];
 
-    // Format mata wang untuk kolum Amount (Kolum C bermula baris ke-11)
-    const range = XLSX.utils.decode_range(ws["!ref"]);
-    for (let R = 10; R <= range.e.r; R++) {
-        const cell_address = XLSX.utils.encode_cell({ r: R, c: 2 });
-        if (ws[cell_address]) {
-            ws[cell_address].z = '#,##0.00';
-        }
-    }
+    // Merge tajuk utama (Row 2, dari Column B hingga Column O/P lebih kurang)
+    ws["!merges"] = [
+        { s: { r: 1, c: 1 }, e: { r: 2, c: 10 } } 
+    ];
 
-    XLSX.utils.book_append_sheet(wb, ws, "Contract Summary");
-    XLSX.writeFile(wb, "Contract_Summary.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "Summary");
+    XLSX.writeFile(wb, "Contract_Summary_Format.xlsx");
 }
 
 async function loadSummary(){
-    if(!contractId){
-        document.getElementById('excelBody').innerHTML =
-        `<tr><td colspan="7">No contract ID found</td></tr>`;
-        return;
-    }
-
+    if(!contractId) return;
     try {
         const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}`, { headers });
         const data = await res.json();
         const c = data[0];
-
-        const res2 = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}`, { headers });
-        const works = await res2.json();
-
-        let used = 0;
-        works.forEach(w => {
-            used += Number(w.amount_spent || 0);
-        });
-
-        let balance = Number(c.contract_sum || 0) - used;
-
-        window.contractData = { ...c, used, balance };
-        window.workOrders = works;
+        window.contractData = c;
 
         document.getElementById('excelBody').innerHTML = `
             <tr>
                 <td>1</td>
-                <td>${c.contract_code || '-'}</td>
-                <td>${c.contract_name || '-'}</td>
-                <td>${c.contractor || '-'}</td>
-                <td>${Number(c.contract_sum||0).toLocaleString()}</td>
-                <td>${used.toLocaleString()}</td>
-                <td style="font-weight:bold;color:${balance<0?'red':'green'};">
-                    ${balance.toLocaleString()}
-                </td>
+                <td>${c.contract_code}</td>
+                <td>${c.contractor}</td>
+                <td>${Number(c.contract_sum).toLocaleString()}</td>
             </tr>
         `;
-
-    } catch(err){
-        console.error(err);
-        document.getElementById('excelBody').innerHTML =
-        `<tr><td colspan="7">Error loading data</td></tr>`;
-    }
+    } catch(err) { console.error(err); }
 }
 
-function goBack(){
-    window.history.back();
-}
-
+function goBack(){ window.history.back(); }
 loadSummary();
-    
 </script>
 
 </body>
