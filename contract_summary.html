@@ -121,7 +121,58 @@ const headers = {
 const params = new URLSearchParams(window.location.search);
 const contractId = params.get('id');
 
-async function loadSummary(){
+function exportExcel(){
+
+    const wb = XLSX.utils.book_new();
+    const ws_data = [];
+
+    const c = window.contractData;
+
+    ws_data.push(["CONTRACT SUMMARY REPORT"]);
+    ws_data.push([]);
+
+    ws_data.push(["Contract Name", c.contract_name]);
+    ws_data.push(["Contract Code", c.contract_code]);
+    ws_data.push(["Contractor", c.contractor]);
+    ws_data.push(["Contract Period", c.contract_period || "-"]);
+    ws_data.push(["Total Contract (RM)", c.contract_sum]);
+    ws_data.push(["Performance Guarantee (RM)", c.pg_sum || 0]);
+    ws_data.push(["Used (RM)", c.used]);
+    ws_data.push(["Balance (RM)", c.balance]);
+
+    ws_data.push([]);
+    ws_data.push(["No","Description","Amount"]);
+
+    let no = 1;
+    (window.workOrders || []).forEach(w => {
+        ws_data.push([
+            no++,
+            w.description || "-",
+            Number(w.amount_spent || 0)
+        ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+
+    ws["!pageSetup"] = {
+        orientation: "landscape",
+        paperSize: 9
+    };
+
+    ws["!cols"] = [
+        { wch: 5 },
+        { wch: 50 },
+        { wch: 20 }
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, "Contract Summary");
+    XLSX.writeFile(wb, "Contract_Summary.xlsx");
+
+    if (!window.contractData) {
+    alert("Data belum load lagi");
+    return;
+}
+    async function loadSummary(){
 
     if(!contractId){
         document.getElementById('excelBody').innerHTML =
@@ -144,16 +195,25 @@ async function loadSummary(){
 
         let balance = Number(c.contract_sum || 0) - used;
 
+        // 👉 SIMPAN GLOBAL (IMPORTANT)
+        window.contractData = {
+            ...c,
+            used,
+            balance
+        };
+
+        window.workOrders = works;
+
         document.getElementById('excelBody').innerHTML = `
             <tr>
                 <td>1</td>
                 <td>${c.contract_code || '-'}</td>
                 <td>${c.contract_name || '-'}</td>
                 <td>${c.contractor || '-'}</td>
-                <td>${Number(c.contract_sum||0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
-                <td>${used.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+                <td>${Number(c.contract_sum||0).toLocaleString()}</td>
+                <td>${used.toLocaleString()}</td>
                 <td style="font-weight:bold;color:${balance<0?'red':'green'};">
-                    ${balance.toLocaleString(undefined,{minimumFractionDigits:2})}
+                    ${balance.toLocaleString()}
                 </td>
             </tr>
         `;
@@ -165,17 +225,12 @@ async function loadSummary(){
     }
 }
 
-function exportExcel(){
-    let table = document.getElementById("excelTable");
-    let wb = XLSX.utils.table_to_book(table, {sheet:"Contract Summary"});
-    XLSX.writeFile(wb, "Contract_Summary.xlsx");
-}
-
 function goBack(){
     window.history.back();
 }
 
 loadSummary();
+    
 </script>
 
 </body>
