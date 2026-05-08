@@ -26,7 +26,7 @@ body{ font-family:-apple-system,system-ui,sans-serif; margin:0; background:#f5f7
 <div class="header">
     <div>
         <h2 style="margin:0;">Contract Summary</h2>
-        <small style="color:#666;">Eksport ikut format tepat Row & Column Excel</small>
+        <small style="color:#666;">Eksport: Kolum C (Simbol :) | Kolum D (Data)</small>
     </div>
 
     <div style="display:flex; gap:10px;">
@@ -76,16 +76,17 @@ function exportExcel(){
     
     const ws_data = [
         [], // Row 1
-        ["", c.contract_name || ""], // Row 2 (Mula Col B)
+        ["", c.contract_name || ""], // Row 2
         [], // Row 3
         [], // Row 4
-        ["", "CONTRACT NO.", "", ":", c.contract_code || "-"], // Row 5
-        ["", "CONTRACTOR", "", ":", c.contractor || "-"],     // Row 6
-        ["", "CONTRACT PERIOD", "", ":", c.contract_period || "-"], // Row 7
-        ["", "CONTRACT SUM", "", ":", "RM" + Number(c.contract_sum || 0).toLocaleString(undefined, {minimumFractionDigits: 2})], // Row 8
-        ["", "PERFORMANCE GUARANTEE SUM", "", ":", c.pg_sum || "-"], // Row 9
+        // Kolum A: Kosong, Kolum B: Label, Kolum C: Simbol, Kolum D: Data
+        ["", "CONTRACT NO.", ":", c.contract_code || "-"], 
+        ["", "CONTRACTOR", ":", c.contractor || "-"],     
+        ["", "CONTRACT PERIOD", ":", c.contract_period || "-"], 
+        ["", "CONTRACT SUM", ":", "RM" + Number(c.contract_sum || 0).toLocaleString(undefined, {minimumFractionDigits: 2})], 
+        ["", "PERFORMANCE GUARANTEE SUM", ":", c.pg_sum || "-"], 
         [], [], [],
-        // Row 13: Header Jadual (ITEM di Col A)
+        // Row 13: Header Jadual
         ["ITEM", "DESCRIPTION", "", "AS PER CONTRACT", "INTERIM NO.1", "INTERIM NO.2", "INTERIM NO.3", "INTERIM NO.4", "INTERIM NO.5", "INTERIM NO.6", "INTERIM NO.7", "INTERIM NO.8", "INTERIM NO.9", "INTERIM NO.10"],
         // Row 14: Sub-header RM
         ["", "", "", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM"]
@@ -102,7 +103,7 @@ function exportExcel(){
     ];
 
     items.forEach(item => {
-        // Description merangkumi Col B dan C (index 1 & 2)
+        // Data Jadual: Item(A), Desc(B & C merged), Amount(D)
         let row = [item[0], item[1], "", item[2]]; 
         for(let i=0; i<10; i++) row.push("-"); 
         ws_data.push(row);
@@ -110,14 +111,19 @@ function exportExcel(){
 
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
-    // Styling Tajuk (B2:P4)
+    // Styling Tajuk Utama (B2)
     ws["B2"].s = {
         font: { bold: true, sz: 11 },
         alignment: { wrapText: true, vertical: "center", horizontal: "center" }
     };
 
-    // Styling Maklumat Kontrak (E5:E9)
-    ["E5","E6","E7","E8","E9"].forEach(ref => {
+    // Styling Simbol : (C5:C9)
+    ["C5","C6","C7","C8","C9"].forEach(ref => {
+        if(ws[ref]) ws[ref].s = { alignment: { horizontal: "center" } };
+    });
+
+    // Styling Data Kontrak (D5:D9)
+    ["D5","D6","D7","D8","D9"].forEach(ref => {
         if(ws[ref]) ws[ref].s = { font: { bold: true } };
     });
 
@@ -136,7 +142,7 @@ function exportExcel(){
         });
     }
 
-    // Warna & Merge untuk Data Item
+    // Warna & Border untuk Baris Item E, F, G
     const colorRows = [
         { row: 18, color: "FFCC99" }, // Row 19 (Oren)
         { row: 19, color: "FFFF00" }, // Row 20 (Kuning)
@@ -162,12 +168,12 @@ function exportExcel(){
         { s: { r: 12, c: 1 }, e: { r: 13, c: 2 } }  // Merge DESCRIPTION (Col B:C)
     ];
 
-    // Merge Description untuk setiap baris data (Col B:C)
+    // Merge Description untuk baris data (Col B:C) supaya selaras dengan tajuk
     for(let i=0; i<items.length; i++) {
         let r = 14 + i;
         merges.push({ s: { r: r, c: 1 }, e: { r: r, c: 2 } });
         
-        // Pastikan border tetap ada pada Column C yang di-merge
+        // Letak border pada Column C yang tersembunyi dalam merge
         const cellC = XLSX.utils.encode_cell({r: r, c: 2});
         if(!ws[cellC]) ws[cellC] = { t: 's', v: '' };
         ws[cellC].s = { border: { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} } };
@@ -176,13 +182,16 @@ function exportExcel(){
 
     ws['!rows'] = ws_data.map(() => ({ hpt: 15.75 }));
     ws["!cols"] = [
-        {wch: 5}, {wch: 35}, {wch: 2}, {wch: 18},
+        {wch: 5},  // A
+        {wch: 35}, // B
+        {wch: 3},  // C (Simbol :)
+        {wch: 22}, // D (Data)
         {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12},
         {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
-    XLSX.writeFile(wb, "Contract_Summary_Final.xlsx");
+    XLSX.writeFile(wb, "Contract_Summary_Precise.xlsx");
 }
 
 async function loadSummary(){
