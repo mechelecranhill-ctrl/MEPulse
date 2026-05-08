@@ -74,94 +74,111 @@ function exportExcel() {
     const c = window.contractData;
     const wb = XLSX.utils.book_new();
 
-    // 1. Header Maklumat Kontrak
+    // 1. Ambil data dinamik dari claim_breakdown (JSONB)
+    // Mengandaikan struktur: { "SECTION A": { "amt": 0 }, ... }
+    const breakdown = c.claim_breakdown || {};
+    const sectionKeys = Object.keys(breakdown).sort(); // Susun A-G
+
+    // Header Maklumat Kontrak
     const ws_data = [
         [], // Row 1
         ["", c.contract_name || "SUMMARY OF CONTRACT"], // Row 2
         [], [],
-        ["", "CONTRACT NO.", ":", c.contract_code || "-"], // Row 5
+        ["", "CONTRACT NO.", ":", c.contract_code || "-"],
         ["", "CONTRACTOR", ":", c.contractor || "-"],
         ["", "CONTRACT PERIOD", ":", c.contract_period || "-"],
         ["", "CONTRACT SUM", ":", "RM " + Number(c.contract_sum || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })],
         ["", "PERFORMANCE GUARANTEE SUM", ":", c.pg_sum || "-"],
         [], [], [],
         
-        // 2. Header Jadual (Row 13 & 14)
+        // Header Jadual Utama
         ["ITEM", "DESCRIPTION", "", "AS PER CONTRACT", "INTERIM NO.1", "INTERIM NO.2", "INTERIM NO.3", "INTERIM NO.4", "INTERIM NO.5", "INTERIM NO.6", "INTERIM NO.7", "INTERIM NO.8", "INTERIM NO.9", "INTERIM NO.10"],
         ["", "", "", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM"]
     ];
 
-    // 3. Data Items (A-G)
-    const items = [
-        ["A", "GENERAL & PRELIMINARIES", 24500.00],
-        ["B", "PREVENTIVE MAINTENANCE & SERVICE CHARGES", 156000.00],
-        ["C", "PROACTIVE MAINTENANCE & OVERHAUL SERVICE CHARGES", 1365900.00],
-        ["D", "CALIBRATION & VERIFICATION CHARGES", 425550.00],
-        ["E", "WORKMANSHIP CHARGES", 96000.00],
-        ["F", "SUPPLY & DELIVERY OF SPARE PART", 340434.00],
-        ["G", "PROVISIONAL SUM", 2200000.00]
-    ];
+    // 2. Masukkan data secara dinamik berdasarkan kunci dalam JSONB
+    sectionKeys.forEach(key => {
+        // Ambil huruf (cth: "A") daripada "SECTION A"
+        const itemLetter = key.replace("SECTION ", ""); 
+        const amount = breakdown[key].amt || 0;
+        
+        // Map Description (Jika ada mapping nama spesifik, boleh tambah di sini)
+        const descMapping = {
+            "A": "GENERAL & PRELIMINARIES",
+            "B": "PREVENTIVE MAINTENANCE & SERVICE CHARGES",
+            "C": "PROACTIVE MAINTENANCE & OVERHAUL SERVICE CHARGES",
+            "D": "CALIBRATION & VERIFICATION CHARGES",
+            "E": "WORKMANSHIP CHARGES",
+            "F": "SUPPLY & DELIVERY OF SPARE PART",
+            "G": "PROVISIONAL SUM"
+        };
 
-    items.forEach(item => {
-        // Kolum A=item[0], B=item[1], C="", D=item[2]
-        let row = [item[0], item[1], "", item[2]]; 
+        let row = [itemLetter, descMapping[itemLetter] || key, "", amount];
         for (let i = 1; i <= 10; i++) { row.push("-"); }
         ws_data.push(row);
     });
 
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
-    // --- PENGURUSAN MERGES (PENTING) ---
+    // --- MERGES ---
     const lastRowIdx = ws_data.length - 1;
-    
     let merges = [
-        { s: { r: 1, c: 1 }, e: { r: 3, c: 13 } },    // Tajuk Besar
-        { s: { r: 12, c: 0 }, e: { r: 13, c: 0 } },  // Header ITEM (A13:A14)
-        { s: { r: 12, c: 1 }, e: { r: 13, c: 2 } }   // Header DESCRIPTION (B13:C14)
+        { s: { r: 1, c: 1 }, e: { r: 3, c: 13 } },    // Tajuk
+        { s: { r: 12, c: 0 }, e: { r: 13, c: 0 } },  // Header ITEM
+        { s: { r: 12, c: 1 }, e: { r: 13, c: 2 } }   // Header DESCRIPTION
     ];
 
-    // Merge Kolum B & C untuk setiap baris data (Item A hingga G)
-    // Row data bermula dari index 14 (Row 15 dalam Excel)
     for (let i = 14; i <= lastRowIdx; i++) {
         merges.push({ s: { r: i, c: 1 }, e: { r: i, c: 2 } });
     }
     ws["!merges"] = merges;
 
-    // --- STYLING ---
-    const tableEndCol = 13; // Kolum N
-
+    // --- STYLING (ALIGNMENT & BORDER) ---
     for (let r = 12; r <= lastRowIdx; r++) {
-        for (let col = 0; col <= tableEndCol; col++) {
+        for (let col = 0; col <= 13; col++) {
             const cellRef = XLSX.utils.encode_cell({ r: r, c: col });
             if (!ws[cellRef]) ws[cellRef] = { t: 's', v: '' };
             if (!ws[cellRef].s) ws[cellRef].s = {};
 
-            // Border untuk semua sel jadual
+            // Border nipis untuk semua sel
             ws[cellRef].s.border = {
                 top: { style: "thin" }, bottom: { style: "thin" },
                 left: { style: "thin" }, right: { style: "thin" }
             };
 
-            // Alignment untuk Description (Kolum B)
-            if (col === 1 && r >= 14) {
+            // ALIGNMENT KE TENGAH UNTUK SEMUA ITEM (Kecuali Description)
+            if (col !== 1) {
+                ws[cellRef].s.alignment = { horizontal: "center", vertical: "center" };
+            } else {
+                // Description tetap kiri supaya senang baca
                 ws[cellRef].s.alignment = { horizontal: "left", vertical: "center", wrapText: true };
+            }
+
+            // Bold untuk Header
+            if (r === 12 || r === 13) {
+                ws[cellRef].s.font = { bold: true, sz: 9 };
+                ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } };
             }
         }
     }
 
-    // Warna Khas (Gunakan index baris yang dinamik jika perlu)
-    const rowsToColor = [
-        { idx: 18, rgb: "FFCC99" }, // Item E
-        { idx: 19, rgb: "FFFF00" }, // Item F
-        { idx: 20, rgb: "FFFF00" }  // Item G
-    ];
+    // --- WARNA DINAMIK (E, F, G) ---
+    // Mencari baris berdasarkan huruf di Kolum A
+    for (let r = 14; r <= lastRowIdx; r++) {
+        const itemLetterCell = ws[XLSX.utils.encode_cell({ r: r, c: 0 })];
+        if (itemLetterCell) {
+            let color = null;
+            if (itemLetterCell.v === "E") color = "FFCC99"; // Oren
+            if (itemLetterCell.v === "F" || itemLetterCell.v === "G") color = "FFFF00"; // Kuning
 
-    rowsToColor.forEach(cfg => {
-        for (let col = 0; col <= tableEndCol; col++) {
-            const cellRef = XLSX.utils.encode_cell({ r: cfg.idx, c: col });
-            if (ws[cellRef]) ws[cellRef].s.fill = { fgColor: { rgb: cfg.rgb } };
+            if (color) {
+                for (let col = 0; col <= 13; col++) {
+                    const cell = ws[XLSX.utils.encode_cell({ r: r, c: col })];
+                    cell.s.fill = { fgColor: { rgb: color } };
+                }
+            }
         }
-    });
+    }
 
     ws["!cols"] = [
         { wch: 6 }, { wch: 40 }, { wch: 3 }, { wch: 18 },
