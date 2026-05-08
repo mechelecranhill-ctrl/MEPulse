@@ -6,7 +6,7 @@
 <title>Contract Summary (Excel View)</title> 
 
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 
 <style>
 body{
@@ -120,7 +120,7 @@ function exportExcel(){
     const c = window.contractData;
     const wb = XLSX.utils.book_new();
     
-    // Susunan data mengikut keperluan anda
+    // 1. Bina Sheet menggunakan AOA
     const ws_data = [
         [], // Row 1
         ["", c.contract_name || ""], // Row 2 (Tajuk Utama)
@@ -135,47 +135,49 @@ function exportExcel(){
 
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
-    // ==========================================
-    // 1. MERGE CELLS (Tajuk dari B2 sehingga P4)
-    // ==========================================
+    // 2. Tambah Gaya BOLD (Gunakan xlsx-js-style)
+    // Menebalkan Tajuk Utama (B2)
+    if(ws["B2"]) {
+        ws["B2"].s = {
+            font: { bold: true, sz: 12 },
+            alignment: { wrapText: true, vertical: "center", horizontal: "center" }
+        };
+    }
+
+    // Menebalkan Data di Kolum E (E5 hingga E9)
+    const dataRows = [5, 6, 7, 8, 9];
+    dataRows.forEach(row => {
+        const cellRef = "E" + row;
+        if(ws[cellRef]) {
+            ws[cellRef].s = {
+                font: { bold: true }
+            };
+        }
+    });
+
+    // 3. MERGE CELLS (Tajuk dari B2 sehingga P4)
     ws["!merges"] = [
         { 
             s: { r: 1, c: 1 }, // Row 2, Col B
-            e: { r: 3, c: 13 }  // Row 4, Col N
+            e: { r: 3, c: 15 }  // Row 4, Col P
         }
     ];
 
-    // ==========================================
-    // 2. SET SEMUA BARIS KEPADA 15.75
-    // ==========================================
-    const rowCount = ws_data.length;
+    // 4. SET SEMUA BARIS KEPADA 15.75
     ws['!rows'] = [];
-    
-    for (let i = 0; i < rowCount; i++) {
-        // Semua baris tanpa pengecualian ditetapkan 15.75
+    for (let i = 0; i < ws_data.length; i++) {
         ws['!rows'].push({ hpt: 15.75 });
     }
 
-    // ==========================================
-    // 3. SET LEBAR KOLUM (Width)
-    // ==========================================
+    // 5. SET LEBAR KOLUM
     const colWidths = [
-        { wch: 2 },  // A
-        { wch: 35 }, // B (Label)
-        { wch: 5 },  // C
-        { wch: 3 },  // D (:)
-        { wch: 45 }  // E (Data)
+        { wch: 2 },  { wch: 35 }, { wch: 5 }, { wch: 3 }, { wch: 45 }
     ];
-    
-    // Lebarkan kolum F sehingga P (Indeks 15)
-    for(let i = 5; i <= 15; i++) {
-        colWidths.push({ wch: 10 });
-    }
+    for(let i = 5; i <= 15; i++) { colWidths.push({ wch: 10 }); }
     ws["!cols"] = colWidths;
 
-    // Nama fail mengikut format
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
-    XLSX.writeFile(wb, "Contract_Summary_All_Rows_15.75.xlsx");
+    XLSX.writeFile(wb, "Contract_Summary_Bold.xlsx");
 }
 async function loadSummary(){
     if(!contractId) return;
