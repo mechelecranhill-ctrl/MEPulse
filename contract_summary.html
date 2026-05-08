@@ -123,8 +123,8 @@ function exportExcel(){
     const ws_data = [
         [], // Row 1
         ["", c.contract_name || ""], // Row 2 (Tajuk Utama)
-        [], // Row 3 (Simpan kosong untuk merge)
-        [], // Row 4 (Simpan kosong untuk merge)
+        [], // Row 3 (Untuk merge tajuk)
+        [], // Row 4 (Untuk merge tajuk)
         ["", "CONTRACT NO.", "", ":", c.contract_code || "-"], // Row 5
         ["", "CONTRACTOR", "", ":", c.contractor || "-"],     // Row 6
         ["", "CONTRACT PERIOD", "", ":", c.contract_period || "-"], // Row 7
@@ -137,24 +137,30 @@ function exportExcel(){
     // ==========================================
     // 1. MERGE CELLS (B2 sehingga P4)
     // ==========================================
-    // Kita merge 3 baris (Row 2, 3, 4) supaya tajuk ada ruang untuk wrap
     ws["!merges"] = [
         { 
-            s: { r: 1, c: 1 }, // Start: Row 2 (indeks 1), Col B (indeks 1)
-            e: { r: 3, c: 15 }  // End: Row 4 (indeks 3), Col P (indeks 15)
+            s: { r: 1, c: 1 }, // Row 2, Col B
+            e: { r: 3, c: 13 }  // Row 4, Col N
         }
     ];
 
     // ==========================================
-    // 2. SET TINGGI BARIS (Row Height)
+    // 2. SET TINGGI BARIS (Row Height 15.75)
     // ==========================================
-    // Ini memaksa Excel membuka ruang tinggi untuk tajuk (Wrap Text Manual)
-    ws['!rows'] = [
-        { hpt: 15 }, // Row 1
-        { hpt: 40 }, // Row 2 (Tinggi untuk tajuk)
-        { hpt: 15 }, // Row 3
-        { hpt: 15 }  // Row 4
-    ];
+    // 15.75 points dalam Excel biasanya bersamaan kira-kira 21 pixels dalam SheetJS
+    const standardHeight = 21; 
+    const rowCount = ws_data.length + 10; // Tambah buffer baris kosong
+    
+    ws['!rows'] = [];
+    for (let i = 0; i < rowCount; i++) {
+        if (i === 1) { 
+            // Khusus Row 2 (Tajuk), kita bagi tinggi lebih (cth: 45) 
+            // supaya Wrap Text nampak jelas, baris lain tetap 15.75
+            ws['!rows'].push({ hpt: 45 }); 
+        } else {
+            ws['!rows'].push({ hpt: 15.75 }); 
+        }
+    }
 
     // ==========================================
     // 3. SET LEBAR KOLUM (Width)
@@ -167,7 +173,7 @@ function exportExcel(){
         { wch: 45 }  // E (Data)
     ];
     
-    // Lebarkan kolum F sehingga P
+    // Lebarkan kolum F sehingga P (Indeks 15)
     for(let i = 5; i <= 15; i++) {
         colWidths.push({ wch: 10 });
     }
