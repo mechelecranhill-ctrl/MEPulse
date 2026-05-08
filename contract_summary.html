@@ -74,27 +74,23 @@ function exportExcel(){
     const c = window.contractData;
     const wb = XLSX.utils.book_new();
     
-    // 1. DATA HEADER (Susunan tepat ikut Row)
     const ws_data = [
         [], // Row 1
-        ["", c.contract_name || ""], // Row 2 (Mula Column B)
+        ["", c.contract_name || ""], // Row 2 (Mula Col B)
         [], // Row 3
         [], // Row 4
-        ["", "CONTRACT NO.", "", ":", c.contract_code || "-"], // Row 5 (Col B, D, E)
+        ["", "CONTRACT NO.", "", ":", c.contract_code || "-"], // Row 5
         ["", "CONTRACTOR", "", ":", c.contractor || "-"],     // Row 6
         ["", "CONTRACT PERIOD", "", ":", c.contract_period || "-"], // Row 7
         ["", "CONTRACT SUM", "", ":", "RM" + Number(c.contract_sum || 0).toLocaleString(undefined, {minimumFractionDigits: 2})], // Row 8
         ["", "PERFORMANCE GUARANTEE SUM", "", ":", c.pg_sum || "-"], // Row 9
-        [], // Row 10
-        [], // Row 11
-        [], // Row 12
+        [], [], [],
         // Row 13: Header Jadual (ITEM di Col A)
         ["ITEM", "DESCRIPTION", "", "AS PER CONTRACT", "INTERIM NO.1", "INTERIM NO.2", "INTERIM NO.3", "INTERIM NO.4", "INTERIM NO.5", "INTERIM NO.6", "INTERIM NO.7", "INTERIM NO.8", "INTERIM NO.9", "INTERIM NO.10"],
         // Row 14: Sub-header RM
         ["", "", "", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM", "RM"]
     ];
 
-    // 2. DATA ITEM (Row 15 ke bawah)
     const items = [
         ["A", "GENERAL & PRELIMINARIES", 24500.00],
         ["B", "PREVENTIVE MAINTENANCE & SERVICE CHARGES", 156000.00],
@@ -106,29 +102,26 @@ function exportExcel(){
     ];
 
     items.forEach(item => {
-        let row = [item[0], item[1], "", item[2]]; // Item (A), Desc (B), Gap (C), Amt (D)
+        // Description merangkumi Col B dan C (index 1 & 2)
+        let row = [item[0], item[1], "", item[2]]; 
         for(let i=0; i<10; i++) row.push("-"); 
         ws_data.push(row);
     });
 
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
-    // ==========================================
-    // 3. STYLING & FORMATTING
-    // ==========================================
-
-    // Tajuk Utama (B2:P4)
+    // Styling Tajuk (B2:P4)
     ws["B2"].s = {
         font: { bold: true, sz: 11 },
         alignment: { wrapText: true, vertical: "center", horizontal: "center" }
     };
 
-    // Data Kontrak Bold (E5:E9)
+    // Styling Maklumat Kontrak (E5:E9)
     ["E5","E6","E7","E8","E9"].forEach(ref => {
         if(ws[ref]) ws[ref].s = { font: { bold: true } };
     });
 
-    // Gaya Header Jadual (Row 13-14) - Kelabu & Border
+    // Gaya Header Jadual (Row 13-14)
     for(let col=0; col<=13; col++) {
         [13, 14].forEach(row => {
             const cell = XLSX.utils.encode_cell({r: row-1, c: col});
@@ -143,7 +136,7 @@ function exportExcel(){
         });
     }
 
-    // Warna Oren (Row 19 - Item E) & Kuning (Row 20, 21 - Item F, G)
+    // Warna & Merge untuk Data Item
     const colorRows = [
         { row: 18, color: "FFCC99" }, // Row 19 (Oren)
         { row: 19, color: "FFFF00" }, // Row 20 (Kuning)
@@ -156,29 +149,36 @@ function exportExcel(){
             if(ws[cell]) {
                 ws[cell].s = { 
                     fill: { fgColor: { rgb: config.color } }, 
-                    border: { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} },
-                    font: { bold: col === 3 } // Bold hanya untuk column AS PER CONTRACT
+                    border: { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} }
                 };
             }
         }
     });
 
-    // 4. MERGE CELLS (Ikut Gambar)
-    ws["!merges"] = [
-        { s: { r: 1, c: 1 }, e: { r: 3, c: 15 } }, // Tajuk B2:P4
-        { s: { r: 12, c: 0 }, e: { r: 13, c: 0 } }, // Merge ITEM (Row 13-14)
-        { s: { r: 12, c: 1 }, e: { r: 13, c: 2 } }  // Merge DESCRIPTION (Col B-C, Row 13-14)
+    // MERGE CELLS
+    let merges = [
+        { s: { r: 1, c: 1 }, e: { r: 3, c: 13 } }, // Tajuk (B2:N4)
+        { s: { r: 12, c: 0 }, e: { r: 13, c: 0 } }, // Merge ITEM (Col A)
+        { s: { r: 12, c: 1 }, e: { r: 13, c: 2 } }  // Merge DESCRIPTION (Col B:C)
     ];
 
-    // 5. KETINGGIAN & LEBAR
+    // Merge Description untuk setiap baris data (Col B:C)
+    for(let i=0; i<items.length; i++) {
+        let r = 14 + i;
+        merges.push({ s: { r: r, c: 1 }, e: { r: r, c: 2 } });
+        
+        // Pastikan border tetap ada pada Column C yang di-merge
+        const cellC = XLSX.utils.encode_cell({r: r, c: 2});
+        if(!ws[cellC]) ws[cellC] = { t: 's', v: '' };
+        ws[cellC].s = { border: { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} } };
+    }
+    ws["!merges"] = merges;
+
     ws['!rows'] = ws_data.map(() => ({ hpt: 15.75 }));
     ws["!cols"] = [
-        {wch: 5},  // A (ITEM)
-        {wch: 35}, // B (DESCRIPTION)
-        {wch: 2},  // C (DESCRIPTION Merge Part)
-        {wch: 18}, // D (AS PER CONTRACT)
-        {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}, // E-I (Interim 1-5)
-        {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}  // J-N (Interim 6-10)
+        {wch: 5}, {wch: 35}, {wch: 2}, {wch: 18},
+        {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12},
+        {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
@@ -190,12 +190,9 @@ async function loadSummary(){
     try {
         const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}`, { headers });
         const data = await res.json();
-        
         if (data && data.length > 0) {
             const c = data[0];
             window.contractData = c;
-            
-            // Pastikan tiada jarak pada ${c.contractor}
             document.getElementById('excelBody').innerHTML = `
                 <tr>
                     <td>1</td>
@@ -204,13 +201,8 @@ async function loadSummary(){
                     <td>${Number(c.contract_sum || 0).toLocaleString()}</td>
                 </tr>
             `;
-        } else {
-            document.getElementById('excelBody').innerHTML = `<tr><td colspan="4">Data tidak dijumpai</td></tr>`;
         }
-    } catch(err) { 
-        console.error("Ralat memuat data:", err);
-        document.getElementById('excelBody').innerHTML = `<tr><td colspan="4">Ralat teknikal berlaku</td></tr>`;
-    }
+    } catch(err) { console.error(err); }
 }
 
 function goBack(){ window.history.back(); }
