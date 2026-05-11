@@ -131,110 +131,36 @@ const workorders = Array.isArray(workordersRaw)
     ];
 
     /* =========================
-   SPLIT INTERIMS
-========================= */
-
-const chunkSize = 10;
-
-const interimGroups = [];
-
-for(let i=0; i<interims.length; i += chunkSize){
-
-    interimGroups.push(
-        interims.slice(i, i + chunkSize)
-    );
-
-}
-
-if(interimGroups.length === 0){
-    interimGroups.push([]);
-}
-
-/* =========================
-   BUILD TABLES
-========================= */
-
-interimGroups.forEach((group, groupIndex)=>{
-
-    /* GAP */
-
-    if(groupIndex > 0){
-
-        ws_data.push([]);
-        ws_data.push([]);
-
-    }
-
-    const isLastGroup =
-        groupIndex === interimGroups.length - 1;
-
-    /* =========================
-       HEADER
+       TABLE HEADER
     ========================= */
 
     let header1 = [
         "ITEM",
-        "DESCRIPTION"
+        "DESCRIPTION",
+        "AS PER CONTRACT"
     ];
 
-    /* ONLY FIRST TABLE */
-    if(groupIndex === 0){
-
-        header1.push("AS PER CONTRACT");
-
+    for(let i=1;i<=interimCount;i++){
+        header1.push(`INTERIM ${i}`);
     }
 
-    group.forEach((_, idx)=>{
-
-        header1.push(
-            `INTERIM NO.${groupIndex * 10 + idx + 1}`
-        );
-
-    });
-
-    /* ONLY LAST TABLE */
-
-    if(isLastGroup){
-
-        header1.push(
-            "TOTAL CLAIM",
-            "CONTRACT BALANCE",
-            "ON GOING WORKS",
-            "ON GOING CONTRACT BALANCE"
-        );
-
-    }
-
-    ws_data.push(header1);
-
-    /* =========================
-       HEADER RM ROW
-    ========================= */
+    header1.push(
+        "TOTAL CLAIM",
+        "CONTRACT BALANCE",
+        "ON GOING WORKS",
+        "ON GOING CONTRACT BALANCE"
+    );
 
     let header2 = [];
 
-    header1.forEach((h, idx)=>{
+    for(let i=0;i<header1.length;i++){
+        header2.push("RM");
+    }
 
-        if(idx <= 1){
+    header2[0] = "";
+    header2[1] = "";
 
-            header2.push("");
-
-        }else{
-
-            if(h === "TOTAL CLAIM"){
-
-                header2.push("(RM)");
-
-            }else{
-
-                header2.push("RM");
-
-            }
-
-        }
-
-    });
-
+    ws_data.push(header1);
     ws_data.push(header2);
 
     /* =========================
@@ -243,141 +169,75 @@ interimGroups.forEach((group, groupIndex)=>{
 
     sectionNames.forEach((sec,index)=>{
 
-        const letter =
-            String.fromCharCode(65+index);
+        const letter = String.fromCharCode(65+index);
 
         const contractAmt =
             Number(sections[sec]?.amt || 0);
 
         let row = [
             letter,
-            sections[sec]?.desc || sec
+            sections[sec]?.desc || sec,
+            contractAmt
         ];
 
-        /* FIRST TABLE ONLY */
+        let totalClaim = 0;
 
-        if(groupIndex === 0){
+        /* INTERIMS */
 
-            row.push(contractAmt);
+        interims.forEach(int=>{
 
-        }
+            const val =
+                Number(
+                    int.claim_breakdown?.[sec]?.amt || 0
+                );
 
-        /* INTERIM VALUES */
-
-        group.forEach(int=>{
-
-            const val = Number(
-                int.claim_breakdown?.[sec]?.amt || 0
-            );
+            totalClaim += val;
 
             row.push(val || "-");
 
         });
 
-        /* LAST TABLE ONLY */
+        /* CONTRACT BALANCE */
 
-        if(isLastGroup){
+        const contractBalance =
+            contractAmt - totalClaim;
 
-            let totalClaim = 0;
+        /* ONGOING */
 
-            interims.forEach(int=>{
+        let ongoing = 0;
 
-                totalClaim += Number(
-                    int.claim_breakdown?.[sec]?.amt || 0
-                );
+        workorders
+        .filter(w=>w.status !== 'Claimed')
+        .forEach(w=>{
 
-            });
+            const cat = w.section_category || {};
 
-            const contractBalance =
-                contractAmt - totalClaim;
-
-            let ongoing = 0;
-
-            workorders
-            .filter(w=>w.status !== 'Claimed')
-            .forEach(w=>{
-
-                const cat =
-                    w.section_category || {};
-
-                ongoing += Number(
-                    cat[sec]?.amt || 0
-                );
-
-                if(
-                    sec === "PROVISIONAL SUM" &&
-                    !cat["PROVISIONAL SUM"]
-                ){
-
-                    ongoing += Number(
-                        w.additional || 0
-                    );
-
-                }
-
-            });
-
-            const afterWO =
-                contractBalance - ongoing;
-
-            row.push(
-                totalClaim,
-                contractBalance,
-                ongoing,
-                afterWO
+            ongoing += Number(
+                cat[sec]?.amt || 0
             );
 
-        }
+            if(
+                sec === "PROVISIONAL SUM" &&
+                !cat["PROVISIONAL SUM"]
+            ){
+                ongoing += Number(w.additional || 0);
+            }
+
+        });
+
+        const afterWO =
+            contractBalance - ongoing;
+
+        row.push(
+            totalClaim,
+            contractBalance,
+            ongoing,
+            afterWO
+        );
 
         ws_data.push(row);
 
     });
-
-    /* =========================
-       PG ROW
-    ========================= */
-
-    let pgRow = [
-        "",
-        "PERFORMANCE GUARANTEE SUM"
-    ];
-
-    if(groupIndex === 0){
-        pgRow.push("-");
-    }
-
-    group.forEach(int=>{
-
-        pgRow.push(
-            Number(
-                int.performance_guarantee_sum || 0
-            ) || "-"
-        );
-
-    });
-
-    if(isLastGroup){
-
-        let pgTotal = 0;
-
-        interims.forEach(int=>{
-
-            pgTotal += Number(
-                int.performance_guarantee_sum || 0
-            );
-
-        });
-
-        pgRow.push(
-            pgTotal || "-",
-            "-",
-            "-",
-            "-"
-        );
-
-    }
-
-    ws_data.push(pgRow);
 
     /* =========================
        SALVAGE ROW
@@ -385,20 +245,16 @@ interimGroups.forEach((group, groupIndex)=>{
 
     let salvageRow = [
         "",
-        "SALVAGE VALUE"
+        "SALVAGE VALUE",
+        "-"
     ];
-
-    if(groupIndex === 0){
-        salvageRow.push("-");
-    }
 
     let salvageTotal = 0;
 
-    group.forEach(int=>{
+    interims.forEach(int=>{
 
-        const val = Number(
-            int.salvage_value || 0
-        );
+        const val =
+            Number(int.salvage_value || 0);
 
         salvageTotal += val;
 
@@ -406,55 +262,124 @@ interimGroups.forEach((group, groupIndex)=>{
 
     });
 
-    if(isLastGroup){
+    salvageRow.push(
+        salvageTotal,
+        "",
+        "",
+        ""
+    );
 
-        let grandSalvage = 0;
+    ws_data.push(salvageRow);
+
+    /* =========================
+       PG ROW
+    ========================= */
+
+    let pgRow = [
+        "",
+        "PERFORMANCE GUARANTEE SUM",
+        "-"
+    ];
+
+    let pgTotal = 0;
+
+    interims.forEach(int=>{
+
+        const val =
+            Number(
+                int.performance_guarantee_sum || 0
+            );
+
+        pgTotal += val;
+
+        pgRow.push(val || "-");
+
+    });
+
+    pgRow.push(
+        pgTotal,
+        "",
+        "",
+        ""
+    );
+
+    ws_data.push(pgRow);
+
+    /* =========================
+       TOTAL BALANCE
+    ========================= */
+
+    let totalOngoingBalance = 0;
+
+    sectionNames.forEach(sec=>{
+
+        const contractAmt =
+            Number(sections[sec]?.amt || 0);
+
+        let claimed = 0;
 
         interims.forEach(int=>{
 
-            grandSalvage += Number(
-                int.salvage_value || 0
+            claimed += Number(
+                int.claim_breakdown?.[sec]?.amt || 0
             );
 
         });
 
-        salvageRow.push(
-            grandSalvage || "-",
-            Math.abs(grandSalvage || 0),
-            "",
-            Math.abs(grandSalvage || 0)
-        );
+        let ongoing = 0;
 
-    }
+        workorders
+        .filter(w=>w.status !== 'Claimed')
+        .forEach(w=>{
 
-    ws_data.push(salvageRow);
+            const cat = w.section_category || {};
+
+            ongoing += Number(
+                cat[sec]?.amt || 0
+            );
+
+            if(
+                sec === "PROVISIONAL SUM" &&
+                !cat["PROVISIONAL SUM"]
+            ){
+                ongoing += Number(w.additional || 0);
+            }
+
+        });
+
+        totalOngoingBalance +=
+            contractAmt - claimed - ongoing;
+
+    });
+
+    totalOngoingBalance += salvageTotal;
+    totalOngoingBalance += pgTotal;
 
     /* =========================
        TOTAL ROW
     ========================= */
 
+    let totalContract = 0;
+
+    sectionNames.forEach(sec=>{
+        totalContract +=
+            Number(sections[sec]?.amt || 0);
+    });
+
+    let totalClaim = 0;
+
+    interims.forEach(int=>{
+        totalClaim +=
+            Number(int.net_amount || 0);
+    });
+
     let totalRow = [
-        "TOTAL BRING TO INTERIM PAYMENT",
-        ""
+        "TOTAL",
+        "",
+        totalContract
     ];
 
-    if(groupIndex === 0){
-
-        let totalContract = 0;
-
-        sectionNames.forEach(sec=>{
-
-            totalContract += Number(
-                sections[sec]?.amt || 0
-            );
-
-        });
-
-        totalRow.push(totalContract);
-
-    }
-
-    group.forEach(int=>{
+    interims.forEach(int=>{
 
         totalRow.push(
             Number(int.net_amount || 0)
@@ -462,86 +387,14 @@ interimGroups.forEach((group, groupIndex)=>{
 
     });
 
-    if(isLastGroup){
-
-        let totalClaim = 0;
-
-        interims.forEach(int=>{
-
-            totalClaim += Number(
-                int.net_amount || 0
-            );
-
-        });
-
-        let totalOngoingBalance = 0;
-
-        sectionNames.forEach(sec=>{
-
-            const contractAmt =
-                Number(
-                    sections[sec]?.amt || 0
-                );
-
-            let claimed = 0;
-
-            interims.forEach(int=>{
-
-                claimed += Number(
-                    int.claim_breakdown?.[sec]?.amt || 0
-                );
-
-            });
-
-            let ongoing = 0;
-
-            workorders
-            .filter(w=>w.status !== 'Claimed')
-            .forEach(w=>{
-
-                const cat =
-                    w.section_category || {};
-
-                ongoing += Number(
-                    cat[sec]?.amt || 0
-                );
-
-                if(
-                    sec === "PROVISIONAL SUM" &&
-                    !cat["PROVISIONAL SUM"]
-                ){
-
-                    ongoing += Number(
-                        w.additional || 0
-                    );
-
-                }
-
-            });
-
-            totalOngoingBalance +=
-                contractAmt - claimed - ongoing;
-
-        });
-
-        totalRow.push(
-            totalClaim,
-            Number(c.contract_sum || 0) - totalClaim,
-            workorders
-                .filter(w=>w.status !== 'Claimed')
-                .reduce(
-                    (a,b)=>
-                        a + Number(b.amount || 0),
-                    0
-                ),
-            totalOngoingBalance
-        );
-
-    }
+    totalRow.push(
+        totalClaim,
+        "",
+        "",
+        totalOngoingBalance
+    );
 
     ws_data.push(totalRow);
-
-});
 
     /* =========================
        CREATE SHEET
@@ -549,9 +402,7 @@ interimGroups.forEach((group, groupIndex)=>{
 
     const ws =
         XLSX.utils.aoa_to_sheet(ws_data);
-    const lastCol = Math.max(
-    ...ws_data.map(r => r.length)
-) - 1;
+    const lastCol = header1.length - 1;
 
     /* =========================
    MERGES
