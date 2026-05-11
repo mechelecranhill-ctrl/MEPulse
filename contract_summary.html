@@ -84,6 +84,8 @@ async function exportExcel() {
     const sectionNames = Object.keys(sections);
 
     const wb = XLSX.utils.book_new();
+    
+    // Merge tajuk dari B2 sampai N3 (Kolum index 1 hingga 13)
     let merges = [{ s: { r: 1, c: 1 }, e: { r: 2, c: 13 } }]; 
 
     const fmtCurrency = "#,##0.00"; 
@@ -106,9 +108,6 @@ async function exportExcel() {
         const startRow = ws_data.length;
         let h1 = ["ITEM", "DESCRIPTION", "", "AS PER CONTRACT"];
         for (let i = startInt; i <= endInt; i++) h1.push(`INTERIM NO.${i}`);
-        
-        // Simpan info index di mana summary bermula
-        let summaryIdxStart = h1.length; 
         if (isLastSet) h1.push("TOTAL CLAIM", "CONTRACT BALANCE", "ON GOING WORKS", "ON GOING CONTRACT BALANCE");
         
         let h2 = h1.map((h, i) => (i < 3 ? "" : "RM"));
@@ -188,18 +187,9 @@ async function exportExcel() {
     ws["!merges"] = merges;
 
     const lastRowIdx = ws_data.length - 1;
-    
-    // Tetapkan Row Height 15.75 untuk semua row
-    ws["!rows"] = [];
-    for (let i = 0; i <= lastRowIdx; i++) { ws["!rows"].push({ hpt: 15.75 }); }
 
     for (let r = 0; r <= lastRowIdx; r++) {
-        const rowData = ws_data[r] || [];
-        // Cari kolum mula summary untuk row header dalam table set terakhir
-        // Index bermula dari AS PER CONTRACT (3) + 26 Interim = Kolum 30 (index 29)
-        // Jadi TOTAL CLAIM dsb bermula pada index 30 ke atas
-        
-        for (let cidx = 0; cidx <= 45; cidx++) {
+        for (let cidx = 0; cidx <= 40; cidx++) {
             const cellRef = XLSX.utils.encode_cell({ r: r, c: cidx });
             if (!ws[cellRef]) continue;
             if (!ws[cellRef].s) ws[cellRef].s = {};
@@ -213,7 +203,7 @@ async function exportExcel() {
                 continue;
             }
 
-            // INFO ATAS
+            // INFO ATAS (No Borders)
             if (r < 10) {
                 if (r === 7 && cidx === 3) { 
                     ws[cellRef].t = 'n';
@@ -224,7 +214,7 @@ async function exportExcel() {
                 continue; 
             }
 
-            // JADUAL BAWAH (SETTING DEFAULT)
+            // JADUAL BAWAH
             ws[cellRef].s.border = {
                 top: { style: "thin" }, bottom: { style: "thin" },
                 left: { style: "thin" }, right: { style: "thin" }
@@ -232,19 +222,14 @@ async function exportExcel() {
             ws[cellRef].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
             if (cidx === 1) ws[cellRef].s.alignment.horizontal = "left";
 
-            // FORMAT NOMBOR JADUAL
+            // Format Nombor Jadual
             if (typeof ws[cellRef].v === 'number' && cidx >= 3) {
                 ws[cellRef].t = 'n';
                 ws[cellRef].z = fmtCurrency;
             }
 
-            // --- BOLD RUMUSAN (TOTAL CLAIM, BALANCE, ONGOING) ---
-            // Dalam buildTableSet(21, 26, true), kolum 0-3 (Item, Desc, Empty, AsPer)
-            // Kolum 4-9 (Interim 21-26). Maka index 10 ke atas adalah Summary.
-            // Namun untuk konsistensi seluruh sheet, kita check index global kolum:
-            if (cidx >= 30) { 
-                ws[cellRef].s.font = { bold: true };
-            }
+            // Bold Summary (Total Claim ke kanan)
+            if (cidx >= 14) ws[cellRef].s.font = { bold: true };
 
             const valStr = ws[cellRef].v ? ws[cellRef].v.toString() : "";
             if (valStr.includes("INTERIM NO") || valStr === "ITEM" || valStr === "DESCRIPTION" || valStr === "AS PER CONTRACT" || valStr.includes("CLAIM") || valStr.includes("BALANCE") || valStr.includes("WORKS")) {
@@ -257,16 +242,14 @@ async function exportExcel() {
             if (rowInd === "E") ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } };
             if (rowInd === "F" || rowInd === "G") ws[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } };
             
-            // Bold Baris Khas di bawah
+            // Bold Baris Akhir
             const label = ws[XLSX.utils.encode_cell({ r: r, c: 1 })]?.v;
-            if (label === "TOTAL BRING TO INTERIM PAYMENT" || label === "PERFORMANCE GUARANTEE SUM" || label === "SALVAGE VALUE") {
-                ws[cellRef].s.font = { bold: true };
-            }
+            if (label === "TOTAL BRING TO INTERIM PAYMENT") ws[cellRef].s.font = { bold: true };
         }
     }
 
     ws["!cols"] = [{ wch: 6 }, { wch: 40 }, { wch: 3 }, { wch: 25 }];
-    for (let i = 0; i < 40; i++) ws["!cols"].push({ wch: 14 });
+    for (let i = 0; i < 35; i++) ws["!cols"].push({ wch: 14 });
 
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
     XLSX.writeFile(wb, `Summary_${c.contract_code || 'Contract'}.xlsx`);
