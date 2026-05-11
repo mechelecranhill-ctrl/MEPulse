@@ -258,23 +258,65 @@ async function exportExcel() {
 async function loadSummary(){
     if(!contractId) return;
     try {
-        const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}`, { headers });
-        const data = await res.json();
-        if (data && data.length > 0) {
-            const c = data[0];
+        // 1. Fetch data serentak (Contract, Interims, Work Orders)
+        const [conRes, intRes, woRes] = await Promise.all([
+            fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}`, { headers }),
+            fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}`, { headers }),
+            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}`, { headers })
+        ]);
+
+        const contracts = await conRes.json();
+        const interims = await intRes.json();
+        const workorders = await woRes.json();
+
+        if (contracts && contracts.length > 0) {
+            const c = contracts[0];
             window.contractData = c;
-            document.getElementById('excelBody').innerHTML = `
-                <tr>
-                    <td>1</td>
-                    <td>${c.contract_code || '-'}</td>
-                    <td>${c.contractor || '-'}</td>
-                    <td>${Number(c.contract_sum || 0).toLocaleString()}</td>
-                </tr>
+
+            // 2. Kira Total Claimed (Sama logic dengan Excel)
+            let totalClaimed = interims.reduce((sum, int) => sum + Number(int.net_amount || 0), 0);
+            
+            // 3. Kira Ongoing Works (Work orders yang belum claimed)
+            let ongoing = workorders
+                .filter(w => w.status !== 'Claimed')
+                .reduce((sum, w) => sum + Number(w.total_amount || 0), 0);
+
+            const contractSum = Number(c.contract_sum || 0);
+            const balance = contractSum - totalClaimed;
+            const finalBalance = balance - ongoing;
+
+            // 4. Kemas kini UI Dashboard supaya sama dengan Excel
+            document.getElementById('excelTable').innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Contract Code</th>
+                        <th>Contractor</th>
+                        <th>Total Contract (RM)</th>
+                        <th>Total Claimed (RM)</th>
+                        <th>Current Balance (RM)</th>
+                        <th>Ongoing Works (RM)</th>
+                        <th>Net Balance (RM)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>${c.contract_code || '-'}</td>
+                        <td>${c.contractor || '-'}</td>
+                        <td style="font-weight:bold;">${contractSum.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                        <td style="color: #d9534f;">${totalClaimed.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                        <td style="font-weight:bold;">${balance.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                        <td style="color: #f0ad4e;">${ongoing.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                        <td style="background: #eaffea; font-weight:bold;">${finalBalance.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    </tr>
+                </tbody>
             `;
         }
-    } catch(err) { console.error(err); }
+    } catch(err) { 
+        console.error(err);
+        document.getElementById('excelBody').innerHTML = `<tr><td colspan="7">Ralat memuatkan data.</td></tr>`;
+    }
 }
-
+    
 function goBack(){ window.history.back(); }
 loadSummary();
 </script>
