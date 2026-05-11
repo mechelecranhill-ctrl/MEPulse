@@ -84,10 +84,8 @@ async function exportExcel() {
     const sectionNames = Object.keys(sections);
 
     const wb = XLSX.utils.book_new();
-    
     let merges = [{ s: { r: 1, c: 1 }, e: { r: 2, c: 13 } }]; 
 
-    // Kolum C digunakan untuk ':', Kolum D untuk data (Anjak ke kiri)
     let ws_data = [
         [], // Row 1
         ["", c.contract_name || "SUMMARY OF CONTRACT"], // Row 2
@@ -183,16 +181,21 @@ async function exportExcel() {
             if (!ws[cellRef]) continue;
             if (!ws[cellRef].s) ws[cellRef].s = {};
 
-            // --- LOGIK BORDER & BOLD UNTUK HEADER (Row 1-10) ---
+            // --- STYLING HEADER MAKLUMAT (Row 1-10) ---
             if (r < 10) {
                 ws[cellRef].s.border = {}; // Tiada border
-                if (cidx >= 1) ws[cellRef].s.font = { bold: true }; // Bold semua isi
-                if (cidx === 1) ws[cellRef].s.alignment = { horizontal: "left" };
-                else ws[cellRef].s.alignment = { horizontal: "center" };
-                continue; // Skip styling border bawah
+                
+                if (cidx === 3) { // Hanya kolum D (Nilai maklumat)
+                    ws[cellRef].s.font = { bold: true, sz: 10 };
+                    ws[cellRef].s.alignment = { horizontal: "left" };
+                } else {
+                    ws[cellRef].s.font = { bold: false, sz: 10 };
+                    ws[cellRef].s.alignment = { horizontal: (cidx === 1 ? "left" : "center") };
+                }
+                continue; 
             }
 
-            // Border untuk bahagian table sahaja (Row > 10)
+            // Border untuk bahagian table sahaja
             ws[cellRef].s.border = {
                 top: { style: "thin" }, bottom: { style: "thin" },
                 left: { style: "thin" }, right: { style: "thin" }
@@ -215,7 +218,7 @@ async function exportExcel() {
 
     if (ws["B2"]) {
         ws["B2"].s = {
-            font: { bold: true, sz: 14 },
+            font: { bold: true, sz: 12 }, // Saiz font tajuk kekal 12
             alignment: { horizontal: "center", vertical: "center" }
         };
     }
@@ -223,14 +226,15 @@ async function exportExcel() {
     ws["!cols"] = [
         { wch: 6 },  // A
         { wch: 40 }, // B
-        { wch: 3 },  // C (Simbol : kecilkan)
-        { wch: 25 }  // D (Data maklumat)
+        { wch: 3 },  // C (Simbol :)
+        { wch: 30 }  // D (Nilai maklumat - dilebarkan sedikit untuk justify left)
     ];
     for (let i = 0; i < 30; i++) ws["!cols"].push({ wch: 14 });
 
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
     XLSX.writeFile(wb, `Summary_${c.contract_code || 'Contract'}.xlsx`);
 }
+    
 async function loadSummary(){
     if(!contractId) return;
     try {
