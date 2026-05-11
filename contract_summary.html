@@ -82,7 +82,6 @@ async function exportExcel() {
     const c = window.contractData;
     const period = `${formatDateMY(c.contract_start)} ~ ${formatDateMY(c.contract_end)}`;
     
-    // PEMBETULAN 1: Menambah penutup ).toLocaleString dan ;
     const pgSumFormatted = Number(c.performance_guarantee_total || 0).toLocaleString(undefined, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
@@ -126,7 +125,10 @@ async function exportExcel() {
         
         let h2 = h1.map((h, i) => (i < 3 ? "" : "RM"));
         ws_data.push(h1, h2);
-        merges.push({ s: { r: startRow, c: 1 }, e: { r: startRow + 1, c: 2 } });
+
+        // MERGE UNTUK ITEM & DESCRIPTION (Mendatar & Menegak)
+        merges.push({ s: { r: startRow, c: 0 }, e: { r: startRow + 1, c: 0 } }); // Merge ITEM
+        merges.push({ s: { r: startRow, c: 1 }, e: { r: startRow + 1, c: 2 } }); // Merge DESCRIPTION
 
         sectionNames.forEach((sec, idx) => {
             const currentRowIdx = ws_data.length;
@@ -216,7 +218,6 @@ async function exportExcel() {
                 continue;
             }
 
-            // PEMBETULAN 2: Struktur if/else pada info atas (r < 10)
             if (r < 10) {
                 if (r === 7 && cidx === 3) { 
                     ws[cellRef].t = 'n';
@@ -243,8 +244,12 @@ async function exportExcel() {
 
             if (cidx >= 14) ws[cellRef].s.font = { bold: true };
 
+            // PEWARNAAN HEADER & SEL "RM"
             const valStr = ws[cellRef].v ? ws[cellRef].v.toString() : "";
-            if (valStr.includes("INTERIM NO") || valStr === "ITEM" || valStr === "DESCRIPTION" || valStr === "AS PER CONTRACT" || valStr.includes("CLAIM") || valStr.includes("BALANCE") || valStr.includes("WORKS")) {
+            const isHeader = valStr.includes("INTERIM NO") || valStr === "ITEM" || valStr === "DESCRIPTION" || valStr === "AS PER CONTRACT" || valStr.includes("CLAIM") || valStr.includes("BALANCE") || valStr.includes("WORKS");
+            const isRMHeader = valStr === "RM";
+
+            if (isHeader || isRMHeader) {
                 ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } };
                 ws[cellRef].s.font = { bold: true };
             }
@@ -258,7 +263,7 @@ async function exportExcel() {
         }
     }
 
-    ws["!cols"] = [{ wch: 6 }, { wch: 40 }, { wch: 3 }, { wch: 25 }];
+    ws["!cols"] = [{ wch: 8 }, { wch: 40 }, { wch: 3 }, { wch: 25 }];
     for (let i = 0; i < 35; i++) ws["!cols"].push({ wch: 14 });
 
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
