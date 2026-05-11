@@ -85,7 +85,6 @@ async function exportExcel() {
 
     const wb = XLSX.utils.book_new();
     
-    // Anjakan Row (Data bermula row 1 hingga 10 untuk header maklumat kontrak)
     let ws_data = [
         [], // Row 1
         ["", c.contract_name || "SUMMARY OF CONTRACT"], // Row 2 (B2)
@@ -111,23 +110,19 @@ async function exportExcel() {
             const letter = String.fromCharCode(65 + idx);
             const contractAmt = Number(sections[sec]?.amt || 0);
             let row = [letter, sections[sec]?.desc || sec, (startInt === 1 ? contractAmt : "-")];
-
             for (let i = startInt; i <= endInt; i++) {
                 const val = Number(interims[i - 1]?.claim_breakdown?.[sec]?.amt || 0);
                 row.push(val || "-");
             }
-
             if (isLastSet) {
                 let totalClaimAll = 0;
                 interims.forEach(int => totalClaimAll += Number(int.claim_breakdown?.[sec]?.amt || 0));
-                
                 let ongoing = 0;
                 workorders.filter(w => w.status !== 'Claimed').forEach(w => {
                     const cat = w.section_category || {};
                     ongoing += Number(cat[sec]?.amt || 0);
                     if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) ongoing += Number(w.additional || 0);
                 });
-
                 const balance = contractAmt - totalClaimAll;
                 row.push(totalClaimAll, balance, ongoing, (balance - ongoing));
             }
@@ -169,19 +164,24 @@ async function exportExcel() {
 
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
-    // MERGE TAJUK: Dari B2 (r:1, c:1) hingga N3 (r:2, c:13)
-    ws["!merges"] = [
-        { s: { r: 1, c: 1 }, e: { r: 2, c: 13 } } 
-    ];
+    // MERGE TAJUK
+    ws["!merges"] = [{ s: { r: 1, c: 1 }, e: { r: 2, c: 13 } }];
 
     const lastRowIdx = ws_data.length - 1;
+
+    // --- PENETAPAN TINGGI BARIS (FIXED 15.75) ---
+    ws["!rows"] = [];
+    for (let i = 0; i <= lastRowIdx; i++) {
+        ws["!rows"].push({ hpt: 15.75 }); // hpt adalah points yang digunakan Excel
+    }
+
+    // Styling Loop
     for (let r = 0; r <= lastRowIdx; r++) {
         for (let cidx = 0; cidx <= 30; cidx++) {
             const cellRef = XLSX.utils.encode_cell({ r: r, c: cidx });
             if (!ws[cellRef]) continue;
             if (!ws[cellRef].s) ws[cellRef].s = {};
 
-            // Border nipis
             ws[cellRef].s.border = {
                 top: { style: "thin" }, bottom: { style: "thin" },
                 left: { style: "thin" }, right: { style: "thin" }
@@ -190,21 +190,18 @@ async function exportExcel() {
             ws[cellRef].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
             if (cidx === 1) ws[cellRef].s.alignment.horizontal = "left";
 
-            // Header Table
             const val = ws[cellRef].v ? ws[cellRef].v.toString() : "";
             if (val.includes("INTERIM NO") || val === "ITEM" || val === "DESCRIPTION" || val === "AS PER CONTRACT") {
                 ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } };
                 ws[cellRef].s.font = { bold: true, sz: 10 };
             }
 
-            // Warna Seksyen E, F, G
             const rowHeader = ws[XLSX.utils.encode_cell({ r: r, c: 0 })]?.v;
             if (rowHeader === "E") ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } };
             if (rowHeader === "F" || rowHeader === "G") ws[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } };
         }
     }
 
-    // Styling khusus untuk tajuk yang telah di-merge (B2)
     if (ws["B2"]) {
         ws["B2"].s = {
             font: { bold: true, sz: 12 },
