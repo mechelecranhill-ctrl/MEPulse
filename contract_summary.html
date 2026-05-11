@@ -131,7 +131,7 @@ const workorders = Array.isArray(workordersRaw)
     ];
 
     /* =========================
-       TABLE HEADER
+       TABLE HEADER (Fixed 1-12)
     ========================= */
 
     let header1 = [
@@ -140,7 +140,8 @@ const workorders = Array.isArray(workordersRaw)
         "AS PER CONTRACT"
     ];
 
-    for(let i=1;i<=interimCount;i++){
+    // Sentiasa buat 12 kolum interim
+    for(let i=1; i<=12; i++){
         header1.push(`INTERIM ${i}`);
     }
 
@@ -151,14 +152,7 @@ const workorders = Array.isArray(workordersRaw)
         "ON GOING CONTRACT BALANCE"
     );
 
-    let header2 = [];
-
-    for(let i=0;i<header1.length;i++){
-        header2.push("RM");
-    }
-
-    header2[0] = "";
-    header2[1] = "";
+    let header2 = header1.map((h, i) => (i < 2 ? "" : "RM"));
 
     ws_data.push(header1);
     ws_data.push(header2);
@@ -182,20 +176,20 @@ const workorders = Array.isArray(workordersRaw)
 
         let totalClaim = 0;
 
-        /* INTERIMS */
-
-        interims.forEach(int=>{
-
-            const val =
-                Number(
-                    int.claim_breakdown?.[sec]?.amt || 0
-                );
-
-            totalClaim += val;
-
-            row.push(val || "-");
-
-        });
+        /* INTERIMS (Fixed 1-12) */
+        
+        // Loop tetap 12 kali
+        for(let i = 0; i < 12; i++) {
+            const intData = interims[i]; // Ambil data jika ada (cth: index 0-6 untuk interim 1-7)
+            
+            if (intData) {
+                const val = Number(intData.claim_breakdown?.[sec]?.amt || 0);
+                totalClaim += val;
+                row.push(val || 0); // Jika ada data tapi 0, letak 0
+            } else {
+                row.push(0); // Jika interim tidak wujud (8-12), letak 0
+            }
+        }
 
         /* CONTRACT BALANCE */
 
@@ -240,71 +234,33 @@ const workorders = Array.isArray(workordersRaw)
     });
 
     /* =========================
-       SALVAGE ROW
+       SALVAGE ROW (Fixed 12)
     ========================= */
-
-    let salvageRow = [
-        "",
-        "SALVAGE VALUE",
-        "-"
-    ];
-
+    let salvageRow = ["", "SALVAGE VALUE", "-"];
     let salvageTotal = 0;
 
-    interims.forEach(int=>{
-
-        const val =
-            Number(int.salvage_value || 0);
-
+    for (let i = 0; i < 12; i++) {
+        const val = interims[i] ? Number(interims[i].salvage_value || 0) : 0;
         salvageTotal += val;
-
-        salvageRow.push(val || "-");
-
-    });
-
-    salvageRow.push(
-        salvageTotal,
-        "",
-        "",
-        ""
-    );
-
+        salvageRow.push(val);
+    }
+    salvageRow.push(salvageTotal, "", "", "");
     ws_data.push(salvageRow);
 
     /* =========================
-       PG ROW
+       PG ROW (Fixed 12)
     ========================= */
-
-    let pgRow = [
-        "",
-        "PERFORMANCE GUARANTEE SUM",
-        "-"
-    ];
-
+    let pgRow = ["", "PERFORMANCE GUARANTEE SUM", "-"];
     let pgTotal = 0;
 
-    interims.forEach(int=>{
-
-        const val =
-            Number(
-                int.performance_guarantee_sum || 0
-            );
-
+    for (let i = 0; i < 12; i++) {
+        const val = interims[i] ? Number(interims[i].performance_guarantee_sum || 0) : 0;
         pgTotal += val;
-
-        pgRow.push(val || "-");
-
-    });
-
-    pgRow.push(
-        pgTotal,
-        "",
-        "",
-        ""
-    );
-
+        pgRow.push(val);
+    }
+    pgRow.push(pgTotal, "", "", "");
     ws_data.push(pgRow);
-
+    
     /* =========================
        TOTAL BALANCE
     ========================= */
@@ -356,41 +312,26 @@ const workorders = Array.isArray(workordersRaw)
     totalOngoingBalance += pgTotal;
 
     /* =========================
-       TOTAL ROW
+       TOTAL ROW (Fixed 12)
     ========================= */
-
     let totalContract = 0;
-
-    sectionNames.forEach(sec=>{
-        totalContract +=
-            Number(sections[sec]?.amt || 0);
+    sectionNames.forEach(sec => {
+        totalContract += Number(sections[sec]?.amt || 0);
     });
 
-    let totalClaim = 0;
+    let grandTotalClaim = 0;
+    let totalRow = ["TOTAL", "", totalContract];
 
-    interims.forEach(int=>{
-        totalClaim +=
-            Number(int.net_amount || 0);
-    });
-
-    let totalRow = [
-        "TOTAL",
-        "",
-        totalContract
-    ];
-
-    interims.forEach(int=>{
-
-        totalRow.push(
-            Number(int.net_amount || 0)
-        );
-
-    });
+    for (let i = 0; i < 12; i++) {
+        const netAmt = interims[i] ? Number(interims[i].net_amount || 0) : 0;
+        grandTotalClaim += netAmt;
+        totalRow.push(netAmt);
+    }
 
     totalRow.push(
-        totalClaim,
-        "",
-        "",
+        grandTotalClaim, 
+        "", 
+        "", 
         totalOngoingBalance
     );
 
