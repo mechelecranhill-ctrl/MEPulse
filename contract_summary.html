@@ -65,14 +65,6 @@ const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Conten
 const params = new URLSearchParams(window.location.search);
 const contractId = params.get('id');
 
-function formatDateMY(dateStr) {
-    if (!dateStr) return "-";
-    const date = new Date(dateStr);
-    if (isNaN(date)) return "-"; 
-    const months = ["JANUARI", "FEBRUARI", "MAC", "APRIL", "MEI", "JUN", "JULAI", "OGOS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DISEMBER"];
-    return `${String(date.getDate()).padStart(2, '0')} ${months[date.getMonth()]} ${date.getFullYear()}`;
-}
-
 async function exportExcel() {
     if (!window.contractData) {
         alert("Data belum sedia");
@@ -80,6 +72,28 @@ async function exportExcel() {
     }
 
     const c = window.contractData;
+    
+    // --- TAMBAHAN: AMBIL DATA UNIT UNTUK NAMA FAIL ---
+    let unitName = "UNIT";
+    try {
+        const unitRes = await fetch(`${SB_URL}/rest/v1/units?id=eq.${c.unit_id}`, { headers });
+        const units = await unitRes.json();
+        if (units && units.length > 0) {
+            unitName = units[0].unit_name;
+        }
+    } catch (e) {
+        console.error("Gagal ambil nama unit:", e);
+    }
+
+    // --- FORMAT TAHUN & NAMA FAIL ---
+    const startYear = c.contract_start ? new Date(c.contract_start).getFullYear() : "????";
+    const endYear = c.contract_end ? new Date(c.contract_end).getFullYear() : "????";
+    const contractCode = c.contract_code || "-";
+    
+    // FORMAT: [UNIT] [YEAR-YEAR] [CODE] SUMMARY
+    const fileName = `${unitName} ${startYear} - ${endYear} ${contractCode} SUMMARY.xlsx`;
+    // ----------------------------------------------
+
     const period = `${formatDateMY(c.contract_start)} ~ ${formatDateMY(c.contract_end)}`;
     
     const pgSumFormatted = Number(c.performance_guarantee_total || 0).toLocaleString(undefined, {
@@ -126,9 +140,8 @@ async function exportExcel() {
         let h2 = h1.map((h, i) => (i < 3 ? "" : "RM"));
         ws_data.push(h1, h2);
 
-        // MERGE UNTUK ITEM & DESCRIPTION (Mendatar & Menegak)
-        merges.push({ s: { r: startRow, c: 0 }, e: { r: startRow + 1, c: 0 } }); // Merge ITEM
-        merges.push({ s: { r: startRow, c: 1 }, e: { r: startRow + 1, c: 2 } }); // Merge DESCRIPTION
+        merges.push({ s: { r: startRow, c: 0 }, e: { r: startRow + 1, c: 0 } });
+        merges.push({ s: { r: startRow, c: 1 }, e: { r: startRow + 1, c: 2 } });
 
         sectionNames.forEach((sec, idx) => {
             const currentRowIdx = ws_data.length;
@@ -222,8 +235,6 @@ async function exportExcel() {
                 if (r === 7 && cidx === 3) { 
                     ws[cellRef].t = 'n';
                     ws[cellRef].z = fmtRM;
-                } else if (r === 8 && cidx === 3) {
-                    ws[cellRef].t = 's'; 
                 }
                 ws[cellRef].s.font = { bold: (cidx !== 1) };
                 ws[cellRef].s.alignment = { horizontal: (cidx === 1 || cidx === 3 ? "left" : "center") };
@@ -244,7 +255,6 @@ async function exportExcel() {
 
             if (cidx >= 14) ws[cellRef].s.font = { bold: true };
 
-            // PEWARNAAN HEADER & SEL "RM"
             const valStr = ws[cellRef].v ? ws[cellRef].v.toString() : "";
             const isHeader = valStr.includes("INTERIM NO") || valStr === "ITEM" || valStr === "DESCRIPTION" || valStr === "AS PER CONTRACT" || valStr.includes("CLAIM") || valStr.includes("BALANCE") || valStr.includes("WORKS");
             const isRMHeader = valStr === "RM";
@@ -267,7 +277,8 @@ async function exportExcel() {
     for (let i = 0; i < 35; i++) ws["!cols"].push({ wch: 14 });
 
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
-    XLSX.writeFile(wb, `Summary_${c.contract_code || 'Contract'}.xlsx`);
+
+    XLSX.writeFile(wb, fileName);
 }
 
 async function loadSummary(){
