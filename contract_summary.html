@@ -81,6 +81,9 @@ async function exportExcel() {
 
     const c = window.contractData;
     const period = `${formatDateMY(c.contract_start)} ~ ${formatDateMY(c.contract_end)}`;
+    const pgSumFormatted = Number(c.performance_guarantee_sum || 0).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
 
     const [intRes, woRes] = await Promise.all([
         fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=created_at.asc`, { headers }),
@@ -99,6 +102,7 @@ async function exportExcel() {
 
     const fmtCurrency = "#,##0.00"; 
     const fmtRM = '"RM"#,##0.00'; 
+    const pgInfo = `RM ${pgSumFormatted} (${c.insurance_no || '-'})`;
 
     let ws_data = [
         [], // Row 1
@@ -109,7 +113,7 @@ async function exportExcel() {
         ["", "CONTRACTOR", ":", c.contractor || "-"],
         ["", "CONTRACT PERIOD", ":", period],
         ["", "CONTRACT SUM", ":", Number(c.contract_sum || 0)],
-        ["", "PERFORMANCE GUARANTEE SUM", ":", c.pg_sum || "-"],
+        ["", "PERFORMANCE GUARANTEE SUM", ":", pgInfo],
         [] 
     ];
 
@@ -217,6 +221,10 @@ async function exportExcel() {
                 if (r === 7 && cidx === 3) { 
                     ws[cellRef].t = 'n';
                     ws[cellRef].z = fmtRM;
+                }    
+                    if (r === 8 && cidx === 3) {
+                        ws[cellRef].t = 's'; // 's' bermaksud string/text
+                        }
                 }
                 ws[cellRef].s.font = { bold: (cidx !== 1) };
                 ws[cellRef].s.alignment = { horizontal: (cidx === 1 || cidx === 3 ? "left" : "center") };
