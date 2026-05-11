@@ -86,6 +86,10 @@ async function exportExcel() {
     const wb = XLSX.utils.book_new();
     let merges = [{ s: { r: 1, c: 1 }, e: { r: 2, c: 13 } }]; 
 
+    // FORMAT CURRENCY
+    const fmtCurrency = "#,##0.00"; // Tanpa simbol
+    const fmtRM = '"RM"#,##0.00'; // Dengan simbol RM
+
     let ws_data = [
         [], // Row 1
         ["", c.contract_name || "SUMMARY OF CONTRACT"], // Row 2
@@ -103,9 +107,6 @@ async function exportExcel() {
         const startRow = ws_data.length;
         let h1 = ["ITEM", "DESCRIPTION", "", "AS PER CONTRACT"];
         for (let i = startInt; i <= endInt; i++) h1.push(`INTERIM NO.${i}`);
-        
-        // Simpan index column bermula summary
-        let summaryColStart = h1.length; 
         if (isLastSet) h1.push("TOTAL CLAIM", "CONTRACT BALANCE", "ON GOING WORKS", "ON GOING CONTRACT BALANCE");
         
         let h2 = h1.map((h, i) => (i < 3 ? "" : "RM"));
@@ -121,7 +122,7 @@ async function exportExcel() {
 
             for (let i = startInt; i <= endInt; i++) {
                 const val = Number(interims[i - 1]?.claim_breakdown?.[sec]?.amt || 0);
-                row.push(val || "-");
+                row.push(val || 0); // Tukar "-" ke 0 untuk format nombor
             }
 
             if (isLastSet) {
@@ -142,7 +143,7 @@ async function exportExcel() {
 
         const addSpecialRow = (label, interimKey, isNet = false) => {
             const rIdx = ws_data.length;
-            let row = ["", label, "", "-"];
+            let row = ["", label, "", 0];
             
             if(isNet && startInt === 1) {
                 let sumContract = 0;
@@ -152,7 +153,7 @@ async function exportExcel() {
 
             for (let i = startInt; i <= endInt; i++) {
                 const val = isNet ? Number(interims[i - 1]?.net_amount || 0) : Number(interims[i - 1]?.[interimKey] || 0);
-                row.push(val || "-");
+                row.push(val || 0);
             }
 
             if (isLastSet) {
@@ -173,7 +174,7 @@ async function exportExcel() {
                     const totalBalance = totalContractAmt - totalClaimSum;
                     row.push(totalClaimSum, totalBalance, totalOngoingSum, (totalBalance - totalOngoingSum));
                 } else {
-                    row.push(totalClaimSum, "-", "-", "-");
+                    row.push(totalClaimSum, 0, 0, 0);
                 }
             }
             ws_data.push(row);
@@ -194,29 +195,29 @@ async function exportExcel() {
     ws["!merges"] = merges;
 
     const lastRowIdx = ws_data.length - 1;
-    ws["!rows"] = [];
-    for (let i = 0; i <= lastRowIdx; i++) { ws["!rows"].push({ hpt: 15.75 }); }
 
-    // Styling Loop
     for (let r = 0; r <= lastRowIdx; r++) {
-        // Cari header untuk tahu di mana kolum summary bermula (TOTAL CLAIM)
-        const rowData = ws_data[r] || [];
-        const isSummaryHeaderRow = rowData.includes("TOTAL CLAIM");
-
         for (let cidx = 0; cidx <= 40; cidx++) {
             const cellRef = XLSX.utils.encode_cell({ r: r, c: cidx });
             if (!ws[cellRef]) continue;
             if (!ws[cellRef].s) ws[cellRef].s = {};
 
-            // Header info (Top 10 rows)
+            const cellValue = ws[cellRef].v;
+
+            // 1. FORMAT UNTUK MAKLUMAT KONTRAK (BAHAGIAN ATAS)
             if (r < 10) {
+                if (r === 7 && cidx === 3) { // Baris CONTRACT SUM
+                    ws[cellRef].t = 'n';
+                    ws[cellRef].z = fmtRM;
+                    ws[cellRef].s.font = { bold: true };
+                }
                 if (cidx === 1) ws[cellRef].s.font = { bold: false };
                 else ws[cellRef].s.font = { bold: true };
                 ws[cellRef].s.alignment = { horizontal: (cidx === 1 || cidx === 3 ? "left" : "center") };
                 continue; 
             }
 
-            // Border & Alignment default
+            // 2. FORMAT UNTUK JADUAL (BAHAGIAN BAWAH)
             ws[cellRef].s.border = {
                 top: { style: "thin" }, bottom: { style: "thin" },
                 left: { style: "thin" }, right: { style: "thin" }
@@ -224,38 +225,30 @@ async function exportExcel() {
             ws[cellRef].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
             if (cidx === 1) ws[cellRef].s.alignment.horizontal = "left";
 
-            // BOLD LOGIC untuk kolum Summary (TOTAL CLAIM ke kanan)
-            // Kolum bermula dari index 14 jika INTERIM 1-26 dipaparkan
-            if (cidx >= 14) { 
-                ws[cellRef].s.font = { bold: true };
+            // Jika nilai adalah nombor, apply format currency (tanpa simbol)
+            if (typeof cellValue === 'number' && cidx >= 3) {
+                ws[cellRef].t = 'n';
+                ws[cellRef].z = fmtCurrency;
             }
 
-            const val = ws[cellRef].v ? ws[cellRef].v.toString() : "";
-            
-            // Header Tables
-            if (val.includes("INTERIM NO") || val === "ITEM" || val === "DESCRIPTION" || val === "AS PER CONTRACT" || val.includes("CLAIM") || val.includes("BALANCE") || val.includes("WORKS")) {
+            // Bold logic untuk Summary Columns
+            if (cidx >= 14) ws[cellRef].s.font = { bold: true };
+
+            const valStr = cellValue ? cellValue.toString() : "";
+            if (valStr.includes("INTERIM NO") || valStr === "ITEM" || valStr === "DESCRIPTION" || valStr === "AS PER CONTRACT" || valStr.includes("CLAIM") || valStr.includes("BALANCE") || valStr.includes("WORKS")) {
                 ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } };
                 ws[cellRef].s.font = { bold: true, sz: 10 };
             }
 
-            // Coloring specific sections based on your requirements
             const rowIndicator = ws[XLSX.utils.encode_cell({ r: r, c: 0 })]?.v;
             if (rowIndicator === "E") ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } };
             if (rowIndicator === "F" || rowIndicator === "G") ws[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } };
             
-            // Baris "TOTAL BRING TO INTERIM PAYMENT" kena Bold juga
             const labelCell = ws[XLSX.utils.encode_cell({ r: r, c: 1 })]?.v;
             if (labelCell === "TOTAL BRING TO INTERIM PAYMENT") {
                 ws[cellRef].s.font = { bold: true };
             }
         }
-    }
-
-    if (ws["B2"]) {
-        ws["B2"].s = {
-            font: { bold: true, sz: 12 },
-            alignment: { horizontal: "center", vertical: "center", wrapText: true }
-        };
     }
 
     ws["!cols"] = [{ wch: 6 }, { wch: 40 }, { wch: 3 }, { wch: 25 }];
