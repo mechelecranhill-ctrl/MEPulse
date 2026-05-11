@@ -281,16 +281,35 @@ async function loadSummary(){
         if (contracts && contracts.length > 0) {
             const c = contracts[0];
             window.contractData = c;
+            const sections = c.contract_sections_breakdown || {};
+            const sectionNames = Object.keys(sections);
 
-            let totalClaimed = interims.reduce((sum, int) => sum + Number(int.net_amount || 0), 0);
-            let ongoing = workorders
-                .filter(w => w.status !== 'Claimed')
-                .reduce((sum, w) => sum + Number(w.total_amount || 0), 0);
+            // 1. KIRA TOTAL CLAIMED (Gunakan breakdown sepertimana di Excel)
+            let totalClaimed = 0;
+            interims.forEach(int => {
+                sectionNames.forEach(sec => {
+                    totalClaimed += Number(int.claim_breakdown?.[sec]?.amt || 0);
+                });
+            });
+
+            // 2. KIRA ONGOING WORKS (Gunakan logic filter status & breakdown sepertimana di Excel)
+            let ongoing = 0;
+            workorders.filter(w => w.status !== 'Claimed').forEach(w => {
+                const cat = w.section_category || {};
+                sectionNames.forEach(sec => {
+                    ongoing += Number(cat[sec]?.amt || 0);
+                    // Tambahan logic Provisional Sum jika ada
+                    if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) {
+                        ongoing += Number(w.additional || 0);
+                    }
+                });
+            });
 
             const contractSum = Number(c.contract_sum || 0);
             const balance = contractSum - totalClaimed;
             const finalBalance = balance - ongoing;
 
+            // Kemaskini Dashboard UI
             document.getElementById('excelTable').innerHTML = `
                 <thead>
                     <tr>
