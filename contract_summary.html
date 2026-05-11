@@ -140,19 +140,45 @@ async function exportExcel() {
         const addSpecialRow = (label, interimKey, isNet = false) => {
             const rIdx = ws_data.length;
             let row = ["", label, "", "-"];
+            
+            // Kolum AS PER CONTRACT
             if(isNet && startInt === 1) {
                 let sumContract = 0;
                 sectionNames.forEach(s => sumContract += Number(sections[s]?.amt || 0));
                 row[3] = sumContract;
             }
+
+            // Kolum Interim 
             for (let i = startInt; i <= endInt; i++) {
                 const val = isNet ? Number(interims[i - 1]?.net_amount || 0) : Number(interims[i - 1]?.[interimKey] || 0);
                 row.push(val || "-");
             }
+
+            // Tambahan Pengiraan untuk Baris Terakhir (Summary Columns)
             if (isLastSet) {
-                let total = 0;
-                interims.forEach(int => total += Number(isNet ? int.net_amount : (int[interimKey] || 0)));
-                row.push(total, (isNet ? "" : "-"), "-", "-");
+                let totalClaimSum = 0;
+                interims.forEach(int => totalClaimSum += Number(isNet ? int.net_amount : (int[interimKey] || 0)));
+                
+                if (isNet) {
+                    // Pengiraan untuk baris Net di kolum hujung
+                    let totalContractAmt = 0;
+                    sectionNames.forEach(s => totalContractAmt += Number(sections[s]?.amt || 0));
+                    
+                    let totalOngoingSum = 0;
+                    workorders.filter(w => w.status !== 'Claimed').forEach(w => {
+                        // Jika ada breakdown, jumlahkan. Jika tidak, ambil total WO
+                        if(w.section_category) {
+                            sectionNames.forEach(s => totalOngoingSum += Number(w.section_category[s]?.amt || 0));
+                        } else {
+                            totalOngoingSum += Number(w.total_amount || 0);
+                        }
+                    });
+
+                    const totalBalance = totalContractAmt - totalClaimSum;
+                    row.push(totalClaimSum, totalBalance, totalOngoingSum, (totalBalance - totalOngoingSum));
+                } else {
+                    row.push(totalClaimSum, "-", "-", "-");
+                }
             }
             ws_data.push(row);
             merges.push({ s: { r: rIdx, c: 1 }, e: { r: rIdx, c: 2 } });
@@ -183,13 +209,8 @@ async function exportExcel() {
 
             if (r < 10) {
                 ws[cellRef].s.border = {};
-                if (cidx === 1) {
-                    ws[cellRef].s.font = { bold: false };
-                } else if (cidx === 3) {
-                    ws[cellRef].s.font = { bold: true };
-                } else {
-                    ws[cellRef].s.font = { bold: true };
-                }
+                if (cidx === 1) ws[cellRef].s.font = { bold: false };
+                else ws[cellRef].s.font = { bold: true };
 
                 if (cidx === 1 || cidx === 3) ws[cellRef].s.alignment = { horizontal: "left" };
                 else ws[cellRef].s.alignment = { horizontal: "center" };
@@ -219,17 +240,12 @@ async function exportExcel() {
     if (ws["B2"]) {
         ws["B2"].s = {
             font: { bold: true, sz: 12 },
-            alignment: { horizontal: "center", vertical: "center", wrapText: true } // Wrap text tajuk di sini
+            alignment: { horizontal: "center", vertical: "center", wrapText: true }
         };
     }
 
-    ws["!cols"] = [
-        { wch: 6 },  // A
-        { wch: 40 }, // B
-        { wch: 3 },  // C
-        { wch: 25 }  // D
-    ];
-    for (let i = 0; i < 30; i++) ws["!cols"].push({ wch: 14 });
+    ws["!cols"] = [{ wch: 6 }, { wch: 40 }, { wch: 3 }, { wch: 25 }];
+    for (let i = 0; i < 35; i++) ws["!cols"].push({ wch: 14 });
 
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
     XLSX.writeFile(wb, `Summary_${c.contract_code || 'Contract'}.xlsx`);
