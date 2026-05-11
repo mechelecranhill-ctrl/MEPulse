@@ -65,6 +65,14 @@ const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Conten
 const params = new URLSearchParams(window.location.search);
 const contractId = params.get('id');
 
+    function formatDateMY(dateStr) {
+    if (!dateStr) return "-";
+    const date = new Date(dateStr);
+    if (isNaN(date)) return "-"; 
+    const months = ["JANUARI", "FEBRUARI", "MAC", "APRIL", "MEI", "JUN", "JULAI", "OGOS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DISEMBER"];
+    return `${String(date.getDate()).padStart(2, '0')} ${months[date.getMonth()]} ${date.getFullYear()}`;
+}
+    
 async function exportExcel() {
     if (!window.contractData) {
         alert("Data belum sedia");
@@ -72,6 +80,7 @@ async function exportExcel() {
     }
 
     const c = window.contractData;
+    const period = `${formatDateMY(c.contract_start)} ~ ${formatDateMY(c.contract_end)}`;
 
     const [intRes, woRes] = await Promise.all([
         fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=created_at.asc`, { headers }),
@@ -98,7 +107,7 @@ async function exportExcel() {
         [], // Row 4
         ["", "CONTRACT NO.", ":", c.contract_code || "-"], 
         ["", "CONTRACTOR", ":", c.contractor || "-"],
-        ["", "CONTRACT PERIOD", ":", c.contract_period || "-"],
+        ["", "CONTRACT PERIOD", ":", period],
         ["", "CONTRACT SUM", ":", Number(c.contract_sum || 0)],
         ["", "PERFORMANCE GUARANTEE SUM", ":", c.pg_sum || "-"],
         [] 
