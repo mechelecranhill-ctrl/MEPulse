@@ -65,14 +65,14 @@ const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Conten
 const params = new URLSearchParams(window.location.search);
 const contractId = params.get('id');
 
-    function formatDateMY(dateStr) {
+function formatDateMY(dateStr) {
     if (!dateStr) return "-";
     const date = new Date(dateStr);
     if (isNaN(date)) return "-"; 
     const months = ["JANUARI", "FEBRUARI", "MAC", "APRIL", "MEI", "JUN", "JULAI", "OGOS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DISEMBER"];
     return `${String(date.getDate()).padStart(2, '0')} ${months[date.getMonth()]} ${date.getFullYear()}`;
 }
-    
+
 async function exportExcel() {
     if (!window.contractData) {
         alert("Data belum sedia");
@@ -81,9 +81,12 @@ async function exportExcel() {
 
     const c = window.contractData;
     const period = `${formatDateMY(c.contract_start)} ~ ${formatDateMY(c.contract_end)}`;
+    
+    // PEMBETULAN 1: Menambah penutup ).toLocaleString dan ;
     const pgSumFormatted = Number(c.performance_guarantee_sum || 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
 
     const [intRes, woRes] = await Promise.all([
         fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=created_at.asc`, { headers }),
@@ -96,8 +99,6 @@ async function exportExcel() {
     const sectionNames = Object.keys(sections);
 
     const wb = XLSX.utils.book_new();
-    
-    // Merge tajuk dari B2 sampai N3 (Kolum index 1 hingga 13)
     let merges = [{ s: { r: 1, c: 1 }, e: { r: 2, c: 13 } }]; 
 
     const fmtCurrency = "#,##0.00"; 
@@ -105,10 +106,10 @@ async function exportExcel() {
     const pgInfo = `RM ${pgSumFormatted} (${c.insurance_no || '-'})`;
 
     let ws_data = [
-        [], // Row 1
-        ["", c.contract_name || "SUMMARY OF CONTRACT"], // Row 2 (B2)
-        [], // Row 3
-        [], // Row 4
+        [], 
+        ["", c.contract_name || "SUMMARY OF CONTRACT"], 
+        [], 
+        [], 
         ["", "CONTRACT NO.", ":", c.contract_code || "-"], 
         ["", "CONTRACTOR", ":", c.contractor || "-"],
         ["", "CONTRACT PERIOD", ":", period],
@@ -207,7 +208,6 @@ async function exportExcel() {
             if (!ws[cellRef]) continue;
             if (!ws[cellRef].s) ws[cellRef].s = {};
 
-            // KHAS UNTUK TAJUK (B2)
             if (r === 1 && cidx === 1) {
                 ws[cellRef].s = {
                     font: { bold: true, sz: 12 },
@@ -216,22 +216,19 @@ async function exportExcel() {
                 continue;
             }
 
-            // INFO ATAS (No Borders)
+            // PEMBETULAN 2: Struktur if/else pada info atas (r < 10)
             if (r < 10) {
                 if (r === 7 && cidx === 3) { 
                     ws[cellRef].t = 'n';
                     ws[cellRef].z = fmtRM;
-                }    
-                    if (r === 8 && cidx === 3) {
-                        ws[cellRef].t = 's'; // 's' bermaksud string/text
-                        }
+                } else if (r === 8 && cidx === 3) {
+                    ws[cellRef].t = 's'; 
                 }
                 ws[cellRef].s.font = { bold: (cidx !== 1) };
                 ws[cellRef].s.alignment = { horizontal: (cidx === 1 || cidx === 3 ? "left" : "center") };
                 continue; 
             }
 
-            // JADUAL BAWAH
             ws[cellRef].s.border = {
                 top: { style: "thin" }, bottom: { style: "thin" },
                 left: { style: "thin" }, right: { style: "thin" }
@@ -239,13 +236,11 @@ async function exportExcel() {
             ws[cellRef].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
             if (cidx === 1) ws[cellRef].s.alignment.horizontal = "left";
 
-            // Format Nombor Jadual
             if (typeof ws[cellRef].v === 'number' && cidx >= 3) {
                 ws[cellRef].t = 'n';
                 ws[cellRef].z = fmtCurrency;
             }
 
-            // Bold Summary (Total Claim ke kanan)
             if (cidx >= 14) ws[cellRef].s.font = { bold: true };
 
             const valStr = ws[cellRef].v ? ws[cellRef].v.toString() : "";
@@ -254,12 +249,10 @@ async function exportExcel() {
                 ws[cellRef].s.font = { bold: true };
             }
 
-            // Section Colors
             const rowInd = ws[XLSX.utils.encode_cell({ r: r, c: 0 })]?.v;
             if (rowInd === "E") ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } };
             if (rowInd === "F" || rowInd === "G") ws[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } };
             
-            // Bold Baris Akhir
             const label = ws[XLSX.utils.encode_cell({ r: r, c: 1 })]?.v;
             if (label === "TOTAL BRING TO INTERIM PAYMENT") ws[cellRef].s.font = { bold: true };
         }
@@ -271,11 +264,10 @@ async function exportExcel() {
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
     XLSX.writeFile(wb, `Summary_${c.contract_code || 'Contract'}.xlsx`);
 }
-    
+
 async function loadSummary(){
     if(!contractId) return;
     try {
-        // 1. Fetch data serentak (Contract, Interims, Work Orders)
         const [conRes, intRes, woRes] = await Promise.all([
             fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}`, { headers }),
             fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}`, { headers }),
@@ -290,10 +282,7 @@ async function loadSummary(){
             const c = contracts[0];
             window.contractData = c;
 
-            // 2. Kira Total Claimed (Sama logic dengan Excel)
             let totalClaimed = interims.reduce((sum, int) => sum + Number(int.net_amount || 0), 0);
-            
-            // 3. Kira Ongoing Works (Work orders yang belum claimed)
             let ongoing = workorders
                 .filter(w => w.status !== 'Claimed')
                 .reduce((sum, w) => sum + Number(w.total_amount || 0), 0);
@@ -302,7 +291,6 @@ async function loadSummary(){
             const balance = contractSum - totalClaimed;
             const finalBalance = balance - ongoing;
 
-            // 4. Kemas kini UI Dashboard supaya sama dengan Excel
             document.getElementById('excelTable').innerHTML = `
                 <thead>
                     <tr>
@@ -333,9 +321,10 @@ async function loadSummary(){
         document.getElementById('excelBody').innerHTML = `<tr><td colspan="7">Ralat memuatkan data.</td></tr>`;
     }
 }
-    
+
 function goBack(){ window.history.back(); }
 loadSummary();
+    
 </script>
 
 </body>
