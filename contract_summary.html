@@ -131,6 +131,35 @@ const workorders = Array.isArray(workordersRaw)
     ];
 
     /* =========================
+   SPLIT INTERIMS
+========================= */
+
+const interimGroups = [];
+
+for(let i=0; i<interims.length; i += 10){
+    interimGroups.push(
+        interims.slice(i, i + 10)
+    );
+}
+
+/* kalau tiada interim */
+if(interimGroups.length === 0){
+    interimGroups.push([]);
+}
+
+/* =========================
+   BUILD TABLES
+========================= */
+
+interimGroups.forEach((group, groupIndex)=>{
+
+    /* GAP ANTARA TABLE */
+    if(groupIndex > 0){
+        ws_data.push([]);
+        ws_data.push([]);
+    }
+
+    /* =========================
        TABLE HEADER
     ========================= */
 
@@ -140,9 +169,11 @@ const workorders = Array.isArray(workordersRaw)
         "AS PER CONTRACT"
     ];
 
-    for(let i=1;i<=interimCount;i++){
-        header1.push(`INTERIM ${i}`);
-    }
+    group.forEach((_, idx)=>{
+        header1.push(
+            `INTERIM ${groupIndex * 10 + idx + 1}`
+        );
+    });
 
     header1.push(
         "TOTAL CLAIM",
@@ -160,6 +191,8 @@ const workorders = Array.isArray(workordersRaw)
     header2[0] = "";
     header2[1] = "";
 
+    const tableStartRow = ws_data.length;
+
     ws_data.push(header1);
     ws_data.push(header2);
 
@@ -169,7 +202,8 @@ const workorders = Array.isArray(workordersRaw)
 
     sectionNames.forEach((sec,index)=>{
 
-        const letter = String.fromCharCode(65+index);
+        const letter =
+            String.fromCharCode(65+index);
 
         const contractAmt =
             Number(sections[sec]?.amt || 0);
@@ -182,22 +216,27 @@ const workorders = Array.isArray(workordersRaw)
 
         let totalClaim = 0;
 
-        /* INTERIMS */
+        /* SEMUA CLAIM */
 
         interims.forEach(int=>{
 
-            const val =
-                Number(
-                    int.claim_breakdown?.[sec]?.amt || 0
-                );
+            totalClaim += Number(
+                int.claim_breakdown?.[sec]?.amt || 0
+            );
 
-            totalClaim += val;
+        });
+
+        /* GROUP CLAIM */
+
+        group.forEach(int=>{
+
+            const val = Number(
+                int.claim_breakdown?.[sec]?.amt || 0
+            );
 
             row.push(val || "-");
 
         });
-
-        /* CONTRACT BALANCE */
 
         const contractBalance =
             contractAmt - totalClaim;
@@ -220,7 +259,9 @@ const workorders = Array.isArray(workordersRaw)
                 sec === "PROVISIONAL SUM" &&
                 !cat["PROVISIONAL SUM"]
             ){
-                ongoing += Number(w.additional || 0);
+                ongoing += Number(
+                    w.additional || 0
+                );
             }
 
         });
@@ -253,12 +294,17 @@ const workorders = Array.isArray(workordersRaw)
 
     interims.forEach(int=>{
 
-        const val =
-            Number(int.salvage_value || 0);
+        salvageTotal += Number(
+            int.salvage_value || 0
+        );
 
-        salvageTotal += val;
+    });
 
-        salvageRow.push(val || "-");
+    group.forEach(int=>{
+
+        salvageRow.push(
+            Number(int.salvage_value || 0) || "-"
+        );
 
     });
 
@@ -285,14 +331,19 @@ const workorders = Array.isArray(workordersRaw)
 
     interims.forEach(int=>{
 
-        const val =
+        pgTotal += Number(
+            int.performance_guarantee_sum || 0
+        );
+
+    });
+
+    group.forEach(int=>{
+
+        pgRow.push(
             Number(
                 int.performance_guarantee_sum || 0
-            );
-
-        pgTotal += val;
-
-        pgRow.push(val || "-");
+            ) || "-"
+        );
 
     });
 
@@ -342,7 +393,9 @@ const workorders = Array.isArray(workordersRaw)
                 sec === "PROVISIONAL SUM" &&
                 !cat["PROVISIONAL SUM"]
             ){
-                ongoing += Number(w.additional || 0);
+                ongoing += Number(
+                    w.additional || 0
+                );
             }
 
         });
@@ -362,15 +415,21 @@ const workorders = Array.isArray(workordersRaw)
     let totalContract = 0;
 
     sectionNames.forEach(sec=>{
-        totalContract +=
-            Number(sections[sec]?.amt || 0);
+
+        totalContract += Number(
+            sections[sec]?.amt || 0
+        );
+
     });
 
     let totalClaim = 0;
 
     interims.forEach(int=>{
-        totalClaim +=
-            Number(int.net_amount || 0);
+
+        totalClaim += Number(
+            int.net_amount || 0
+        );
+
     });
 
     let totalRow = [
@@ -379,7 +438,7 @@ const workorders = Array.isArray(workordersRaw)
         totalContract
     ];
 
-    interims.forEach(int=>{
+    group.forEach(int=>{
 
         totalRow.push(
             Number(int.net_amount || 0)
@@ -395,6 +454,8 @@ const workorders = Array.isArray(workordersRaw)
     );
 
     ws_data.push(totalRow);
+
+});
 
     /* =========================
        CREATE SHEET
