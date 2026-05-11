@@ -103,6 +103,9 @@ async function exportExcel() {
         const startRow = ws_data.length;
         let h1 = ["ITEM", "DESCRIPTION", "", "AS PER CONTRACT"];
         for (let i = startInt; i <= endInt; i++) h1.push(`INTERIM NO.${i}`);
+        
+        // Simpan index column bermula summary
+        let summaryColStart = h1.length; 
         if (isLastSet) h1.push("TOTAL CLAIM", "CONTRACT BALANCE", "ON GOING WORKS", "ON GOING CONTRACT BALANCE");
         
         let h2 = h1.map((h, i) => (i < 3 ? "" : "RM"));
@@ -141,39 +144,32 @@ async function exportExcel() {
             const rIdx = ws_data.length;
             let row = ["", label, "", "-"];
             
-            // Kolum AS PER CONTRACT
             if(isNet && startInt === 1) {
                 let sumContract = 0;
                 sectionNames.forEach(s => sumContract += Number(sections[s]?.amt || 0));
                 row[3] = sumContract;
             }
 
-            // Kolum Interim 
             for (let i = startInt; i <= endInt; i++) {
                 const val = isNet ? Number(interims[i - 1]?.net_amount || 0) : Number(interims[i - 1]?.[interimKey] || 0);
                 row.push(val || "-");
             }
 
-            // Tambahan Pengiraan untuk Baris Terakhir (Summary Columns)
             if (isLastSet) {
                 let totalClaimSum = 0;
                 interims.forEach(int => totalClaimSum += Number(isNet ? int.net_amount : (int[interimKey] || 0)));
                 
                 if (isNet) {
-                    // Pengiraan untuk baris Net di kolum hujung
                     let totalContractAmt = 0;
                     sectionNames.forEach(s => totalContractAmt += Number(sections[s]?.amt || 0));
-                    
                     let totalOngoingSum = 0;
                     workorders.filter(w => w.status !== 'Claimed').forEach(w => {
-                        // Jika ada breakdown, jumlahkan. Jika tidak, ambil total WO
                         if(w.section_category) {
                             sectionNames.forEach(s => totalOngoingSum += Number(w.section_category[s]?.amt || 0));
                         } else {
                             totalOngoingSum += Number(w.total_amount || 0);
                         }
                     });
-
                     const totalBalance = totalContractAmt - totalClaimSum;
                     row.push(totalClaimSum, totalBalance, totalOngoingSum, (totalBalance - totalOngoingSum));
                 } else {
@@ -201,39 +197,57 @@ async function exportExcel() {
     ws["!rows"] = [];
     for (let i = 0; i <= lastRowIdx; i++) { ws["!rows"].push({ hpt: 15.75 }); }
 
+    // Styling Loop
     for (let r = 0; r <= lastRowIdx; r++) {
-        for (let cidx = 0; cidx <= 35; cidx++) {
+        // Cari header untuk tahu di mana kolum summary bermula (TOTAL CLAIM)
+        const rowData = ws_data[r] || [];
+        const isSummaryHeaderRow = rowData.includes("TOTAL CLAIM");
+
+        for (let cidx = 0; cidx <= 40; cidx++) {
             const cellRef = XLSX.utils.encode_cell({ r: r, c: cidx });
             if (!ws[cellRef]) continue;
             if (!ws[cellRef].s) ws[cellRef].s = {};
 
+            // Header info (Top 10 rows)
             if (r < 10) {
-                ws[cellRef].s.border = {};
                 if (cidx === 1) ws[cellRef].s.font = { bold: false };
                 else ws[cellRef].s.font = { bold: true };
-
-                if (cidx === 1 || cidx === 3) ws[cellRef].s.alignment = { horizontal: "left" };
-                else ws[cellRef].s.alignment = { horizontal: "center" };
+                ws[cellRef].s.alignment = { horizontal: (cidx === 1 || cidx === 3 ? "left" : "center") };
                 continue; 
             }
 
+            // Border & Alignment default
             ws[cellRef].s.border = {
                 top: { style: "thin" }, bottom: { style: "thin" },
                 left: { style: "thin" }, right: { style: "thin" }
             };
-
             ws[cellRef].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
             if (cidx === 1) ws[cellRef].s.alignment.horizontal = "left";
 
+            // BOLD LOGIC untuk kolum Summary (TOTAL CLAIM ke kanan)
+            // Kolum bermula dari index 14 jika INTERIM 1-26 dipaparkan
+            if (cidx >= 14) { 
+                ws[cellRef].s.font = { bold: true };
+            }
+
             const val = ws[cellRef].v ? ws[cellRef].v.toString() : "";
-            if (val.includes("INTERIM NO") || val === "ITEM" || val === "DESCRIPTION" || val === "AS PER CONTRACT") {
+            
+            // Header Tables
+            if (val.includes("INTERIM NO") || val === "ITEM" || val === "DESCRIPTION" || val === "AS PER CONTRACT" || val.includes("CLAIM") || val.includes("BALANCE") || val.includes("WORKS")) {
                 ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } };
                 ws[cellRef].s.font = { bold: true, sz: 10 };
             }
 
-            const rowHeader = ws[XLSX.utils.encode_cell({ r: r, c: 0 })]?.v;
-            if (rowHeader === "E") ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } };
-            if (rowHeader === "F" || rowHeader === "G") ws[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } };
+            // Coloring specific sections based on your requirements
+            const rowIndicator = ws[XLSX.utils.encode_cell({ r: r, c: 0 })]?.v;
+            if (rowIndicator === "E") ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } };
+            if (rowIndicator === "F" || rowIndicator === "G") ws[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } };
+            
+            // Baris "TOTAL BRING TO INTERIM PAYMENT" kena Bold juga
+            const labelCell = ws[XLSX.utils.encode_cell({ r: r, c: 1 })]?.v;
+            if (labelCell === "TOTAL BRING TO INTERIM PAYMENT") {
+                ws[cellRef].s.font = { bold: true };
+            }
         }
     }
 
