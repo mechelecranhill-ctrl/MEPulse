@@ -26,7 +26,7 @@ body{ font-family:-apple-system,system-ui,sans-serif; margin:0; background:#f5f7
 <div class="header">
     <div>
         <h2 style="margin:0;">Contract Summary</h2>
-        <small style="color:#666;">Format: 3-Tier Tables (1-10, 11-20, 21-26 + Totals)</small>
+        <small style="color:#666;">Format: 3-Tier Tables | Merged Title (B2:N3)</small>
     </div>
 
     <div style="display:flex; gap:10px;">
@@ -73,7 +73,6 @@ async function exportExcel() {
 
     const c = window.contractData;
 
-    // 1. LOAD INTERIMS & WORK ORDERS
     const [intRes, woRes] = await Promise.all([
         fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=created_at.asc`, { headers }),
         fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}`, { headers })
@@ -85,46 +84,39 @@ async function exportExcel() {
     const sectionNames = Object.keys(sections);
 
     const wb = XLSX.utils.book_new();
+    
+    // Anjakan Row (Data bermula row 1 hingga 10 untuk header maklumat kontrak)
     let ws_data = [
-        [],
-        ["", c.contract_name || "SUMMARY OF CONTRACT"],
-        [],
+        [], // Row 1
+        ["", c.contract_name || "SUMMARY OF CONTRACT"], // Row 2 (B2)
+        [], // Row 3
+        [], // Row 4
         ["", "CONTRACT NO.", ":", c.contract_code || "-"],
         ["", "CONTRACTOR", ":", c.contractor || "-"],
         ["", "CONTRACT PERIOD", ":", c.contract_period || "-"],
         ["", "CONTRACT SUM", ":", Number(c.contract_sum || 0)],
         ["", "PERFORMANCE GUARANTEE SUM", ":", c.pg_sum || "-"],
-        []
+        [] 
     ];
 
-    // 2. FUNGSI UNTUK MEMBINA SETIAP TABLE (1-10, 11-20, 21-26)
     function buildTableSet(startInt, endInt, isLastSet) {
-        // Header 1
         let h1 = ["ITEM", "DESCRIPTION", "AS PER CONTRACT"];
         for (let i = startInt; i <= endInt; i++) h1.push(`INTERIM NO.${i}`);
-        if (isLastSet) {
-            h1.push("TOTAL CLAIM", "CONTRACT BALANCE", "ON GOING WORKS", "ON GOING CONTRACT BALANCE");
-        }
+        if (isLastSet) h1.push("TOTAL CLAIM", "CONTRACT BALANCE", "ON GOING WORKS", "ON GOING CONTRACT BALANCE");
         
-        // Header 2 (RM)
         let h2 = h1.map((h, i) => (i < 2 ? "" : "RM"));
         ws_data.push(h1, h2);
 
-        // Baris Seksyen (A, B, C...)
         sectionNames.forEach((sec, idx) => {
             const letter = String.fromCharCode(65 + idx);
             const contractAmt = Number(sections[sec]?.amt || 0);
-            
-            // Kolum AS PER CONTRACT hanya muncul di table pertama
             let row = [letter, sections[sec]?.desc || sec, (startInt === 1 ? contractAmt : "-")];
 
-            // Masukkan nilai interim dalam range
             for (let i = startInt; i <= endInt; i++) {
                 const val = Number(interims[i - 1]?.claim_breakdown?.[sec]?.amt || 0);
                 row.push(val || "-");
             }
 
-            // Jika set terakhir, tambah kolum rumusan di sebelah kanan
             if (isLastSet) {
                 let totalClaimAll = 0;
                 interims.forEach(int => totalClaimAll += Number(int.claim_breakdown?.[sec]?.amt || 0));
@@ -142,13 +134,11 @@ async function exportExcel() {
             ws_data.push(row);
         });
 
-        // Baris PG
         let pgRow = ["", "PERFORMANCE GUARANTEE SUM", "-"];
         for (let i = startInt; i <= endInt; i++) pgRow.push(Number(interims[i - 1]?.performance_guarantee_sum || 0) || "-");
         if (isLastSet) pgRow.push("-", "-", "-", "-");
         ws_data.push(pgRow);
 
-        // Baris Salvage
         let salvageRow = ["", "SALVAGE VALUE", "-"];
         for (let i = startInt; i <= endInt; i++) salvageRow.push(Number(interims[i - 1]?.salvage_value || 0) || "-");
         if (isLastSet) {
@@ -158,73 +148,71 @@ async function exportExcel() {
         }
         ws_data.push(salvageRow);
 
-        // Baris TOTAL
         let totalRow = ["", "TOTAL BRING TO INTERIM PAYMENT", ""];
         if (startInt === 1) {
             let sumContract = 0;
             sectionNames.forEach(s => sumContract += Number(sections[s]?.amt || 0));
             totalRow[2] = sumContract;
         }
-
-        for (let i = startInt; i <= endInt; i++) {
-            totalRow.push(Number(interims[i - 1]?.net_amount || 0) || "-");
-        }
-        
+        for (let i = startInt; i <= endInt; i++) totalRow.push(Number(interims[i - 1]?.net_amount || 0) || "-");
         if (isLastSet) {
             let grandClaimTotal = 0;
             interims.forEach(int => grandClaimTotal += Number(int.net_amount || 0));
             totalRow.push(grandClaimTotal, "", "", ""); 
         }
-        ws_data.push(totalRow, []); // Baris kosong sebagai pembahagi
+        ws_data.push(totalRow, []); 
     }
 
-    // 3. JANA DATA KE DALAM ARRAY
     buildTableSet(1, 10, false);
     buildTableSet(11, 20, false);
     buildTableSet(21, 26, true);
 
-    // 4. CIPTA SHEET & APPLY STYLING
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
-    const lastRowIdx = ws_data.length - 1;
 
-    // Loop semua sel untuk styling
+    // MERGE TAJUK: Dari B2 (r:1, c:1) hingga N3 (r:2, c:13)
+    ws["!merges"] = [
+        { s: { r: 1, c: 1 }, e: { r: 2, c: 13 } } 
+    ];
+
+    const lastRowIdx = ws_data.length - 1;
     for (let r = 0; r <= lastRowIdx; r++) {
         for (let cidx = 0; cidx <= 30; cidx++) {
             const cellRef = XLSX.utils.encode_cell({ r: r, c: cidx });
             if (!ws[cellRef]) continue;
-
             if (!ws[cellRef].s) ws[cellRef].s = {};
 
-            // Border nipis untuk semua sel data
+            // Border nipis
             ws[cellRef].s.border = {
                 top: { style: "thin" }, bottom: { style: "thin" },
                 left: { style: "thin" }, right: { style: "thin" }
             };
 
-            // Alignment
             ws[cellRef].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
             if (cidx === 1) ws[cellRef].s.alignment.horizontal = "left";
 
-            // Header Styling (Kelabu + Bold)
+            // Header Table
             const val = ws[cellRef].v ? ws[cellRef].v.toString() : "";
             if (val.includes("INTERIM NO") || val === "ITEM" || val === "DESCRIPTION" || val === "AS PER CONTRACT") {
                 ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } };
                 ws[cellRef].s.font = { bold: true, sz: 10 };
             }
 
-            // Warna Baris Spesifik (E, F, G)
+            // Warna Seksyen E, F, G
             const rowHeader = ws[XLSX.utils.encode_cell({ r: r, c: 0 })]?.v;
             if (rowHeader === "E") ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } };
             if (rowHeader === "F" || rowHeader === "G") ws[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } };
         }
     }
 
-    // Styling Tajuk Utama (B2)
+    // Styling khusus untuk tajuk yang telah di-merge (B2)
     if (ws["B2"]) {
-        ws["B2"].s = { font: { bold: true, sz: 14 }, alignment: { horizontal: "center" } };
+        ws["B2"].s = {
+            font: { bold: true, sz: 12 },
+            alignment: { horizontal: "center", vertical: "center", wrapText: true },
+            fill: { fgColor: { rgb: "FFFFFF" } }
+        };
     }
 
-    // Lebar Kolum
     ws["!cols"] = [{ wch: 6 }, { wch: 45 }, { wch: 20 }];
     for (let i = 0; i < 28; i++) ws["!cols"].push({ wch: 14 });
 
