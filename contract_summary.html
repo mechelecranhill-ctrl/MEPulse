@@ -85,35 +85,50 @@ async function exportExcel() {
 
     const wb = XLSX.utils.book_new();
     
+    // Inisialisasi merges array
+    let merges = [{ s: { r: 1, c: 1 }, e: { r: 2, c: 13 } }]; // Tajuk B2:N3
+
     let ws_data = [
         [], // Row 1
-        ["", c.contract_name || "SUMMARY OF CONTRACT"], // Row 2 (B2)
+        ["", c.contract_name || "SUMMARY OF CONTRACT"], // Row 2
         [], // Row 3
         [], // Row 4
-        ["", "CONTRACT NO.", ":", c.contract_code || "-"],
-        ["", "CONTRACTOR", ":", c.contractor || "-"],
-        ["", "CONTRACT PERIOD", ":", c.contract_period || "-"],
-        ["", "CONTRACT SUM", ":", Number(c.contract_sum || 0)],
-        ["", "PERFORMANCE GUARANTEE SUM", ":", c.pg_sum || "-"],
+        ["", "CONTRACT NO.", "", ":", c.contract_code || "-"], // Anjak sebab Description merge
+        ["", "CONTRACTOR", "", ":", c.contractor || "-"],
+        ["", "CONTRACT PERIOD", "", ":", c.contract_period || "-"],
+        ["", "CONTRACT SUM", "", ":", Number(c.contract_sum || 0)],
+        ["", "PERFORMANCE GUARANTEE SUM", "", ":", c.pg_sum || "-"],
         [] 
     ];
 
     function buildTableSet(startInt, endInt, isLastSet) {
-        let h1 = ["ITEM", "DESCRIPTION", "AS PER CONTRACT"];
+        const startRow = ws_data.length;
+        
+        // Header 1 (ITEM, DESCRIPTION (Merge B+C), AS PER CONTRACT (D))
+        let h1 = ["ITEM", "DESCRIPTION", "", "AS PER CONTRACT"];
         for (let i = startInt; i <= endInt; i++) h1.push(`INTERIM NO.${i}`);
         if (isLastSet) h1.push("TOTAL CLAIM", "CONTRACT BALANCE", "ON GOING WORKS", "ON GOING CONTRACT BALANCE");
         
-        let h2 = h1.map((h, i) => (i < 2 ? "" : "RM"));
+        // Header 2 (RM)
+        let h2 = h1.map((h, i) => (i < 3 ? "" : "RM"));
         ws_data.push(h1, h2);
+        
+        // Tambah merge untuk header Description (Kolum B & C)
+        merges.push({ s: { r: startRow, c: 1 }, e: { r: startRow + 1, c: 2 } });
 
         sectionNames.forEach((sec, idx) => {
+            const currentRowIdx = ws_data.length;
             const letter = String.fromCharCode(65 + idx);
             const contractAmt = Number(sections[sec]?.amt || 0);
-            let row = [letter, sections[sec]?.desc || sec, (startInt === 1 ? contractAmt : "-")];
+            
+            // Kolum: A=Letter, B=Desc, C=(empty for merge), D=ContractAmt, E...=Interims
+            let row = [letter, sections[sec]?.desc || sec, "", (startInt === 1 ? contractAmt : "-")];
+
             for (let i = startInt; i <= endInt; i++) {
                 const val = Number(interims[i - 1]?.claim_breakdown?.[sec]?.amt || 0);
                 row.push(val || "-");
             }
+
             if (isLastSet) {
                 let totalClaimAll = 0;
                 interims.forEach(int => totalClaimAll += Number(int.claim_breakdown?.[sec]?.amt || 0));
@@ -126,36 +141,39 @@ async function exportExcel() {
                 const balance = contractAmt - totalClaimAll;
                 row.push(totalClaimAll, balance, ongoing, (balance - ongoing));
             }
+            
             ws_data.push(row);
+            // Merge B & C untuk setiap baris seksyen
+            merges.push({ s: { r: currentRowIdx, c: 1 }, e: { r: currentRowIdx, c: 2 } });
         });
 
-        let pgRow = ["", "PERFORMANCE GUARANTEE SUM", "-"];
-        for (let i = startInt; i <= endInt; i++) pgRow.push(Number(interims[i - 1]?.performance_guarantee_sum || 0) || "-");
-        if (isLastSet) pgRow.push("-", "-", "-", "-");
-        ws_data.push(pgRow);
+        // PG, Salvage, Total (juga perlu merge B & C)
+        const addSpecialRow = (label, interimKey, isNet = false) => {
+            const rIdx = ws_data.length;
+            let row = ["", label, "", "-"];
+            if(isNet && startInt === 1) {
+                let sumContract = 0;
+                sectionNames.forEach(s => sumContract += Number(sections[s]?.amt || 0));
+                row[3] = sumContract;
+            }
 
-        let salvageRow = ["", "SALVAGE VALUE", "-"];
-        for (let i = startInt; i <= endInt; i++) salvageRow.push(Number(interims[i - 1]?.salvage_value || 0) || "-");
-        if (isLastSet) {
-            let totalSalvage = 0;
-            interims.forEach(int => totalSalvage += Number(int.salvage_value || 0));
-            salvageRow.push(totalSalvage, "", "", "");
-        }
-        ws_data.push(salvageRow);
+            for (let i = startInt; i <= endInt; i++) {
+                const val = isNet ? Number(interims[i - 1]?.net_amount || 0) : Number(interims[i - 1]?.[interimKey] || 0);
+                row.push(val || "-");
+            }
+            if (isLastSet) {
+                let total = 0;
+                interims.forEach(int => total += Number(isNet ? int.net_amount : (int[interimKey] || 0)));
+                row.push(total, (isNet ? "" : "-"), "-", "-");
+            }
+            ws_data.push(row);
+            merges.push({ s: { r: rIdx, c: 1 }, e: { r: rIdx, c: 2 } });
+        };
 
-        let totalRow = ["", "TOTAL BRING TO INTERIM PAYMENT", ""];
-        if (startInt === 1) {
-            let sumContract = 0;
-            sectionNames.forEach(s => sumContract += Number(sections[s]?.amt || 0));
-            totalRow[2] = sumContract;
-        }
-        for (let i = startInt; i <= endInt; i++) totalRow.push(Number(interims[i - 1]?.net_amount || 0) || "-");
-        if (isLastSet) {
-            let grandClaimTotal = 0;
-            interims.forEach(int => grandClaimTotal += Number(int.net_amount || 0));
-            totalRow.push(grandClaimTotal, "", "", ""); 
-        }
-        ws_data.push(totalRow, []); 
+        addSpecialRow("PERFORMANCE GUARANTEE SUM", "performance_guarantee_sum");
+        addSpecialRow("SALVAGE VALUE", "salvage_value");
+        addSpecialRow("TOTAL BRING TO INTERIM PAYMENT", "", true);
+        ws_data.push([]); 
     }
 
     buildTableSet(1, 10, false);
@@ -163,21 +181,16 @@ async function exportExcel() {
     buildTableSet(21, 26, true);
 
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    ws["!merges"] = merges;
 
-    // MERGE TAJUK
-    ws["!merges"] = [{ s: { r: 1, c: 1 }, e: { r: 2, c: 13 } }];
-
+    // Fixed Row Height 15.75
     const lastRowIdx = ws_data.length - 1;
-
-    // --- PENETAPAN TINGGI BARIS (FIXED 15.75) ---
     ws["!rows"] = [];
-    for (let i = 0; i <= lastRowIdx; i++) {
-        ws["!rows"].push({ hpt: 15.75 }); // hpt adalah points yang digunakan Excel
-    }
+    for (let i = 0; i <= lastRowIdx; i++) { ws["!rows"].push({ hpt: 15.75 }); }
 
-    // Styling Loop
+    // Styling
     for (let r = 0; r <= lastRowIdx; r++) {
-        for (let cidx = 0; cidx <= 30; cidx++) {
+        for (let cidx = 0; cidx <= 35; cidx++) {
             const cellRef = XLSX.utils.encode_cell({ r: r, c: cidx });
             if (!ws[cellRef]) continue;
             if (!ws[cellRef].s) ws[cellRef].s = {};
@@ -210,8 +223,14 @@ async function exportExcel() {
         };
     }
 
-    ws["!cols"] = [{ wch: 6 }, { wch: 45 }, { wch: 20 }];
-    for (let i = 0; i < 28; i++) ws["!cols"].push({ wch: 14 });
+    // Column Widths: B = 40, yang lain kekal/default
+    ws["!cols"] = [
+        { wch: 6 },  // A
+        { wch: 40 }, // B (Ubah ke 40)
+        { wch: 10 }, // C (Part of merged description)
+        { wch: 20 }  // D (As Per Contract)
+    ];
+    for (let i = 0; i < 30; i++) ws["!cols"].push({ wch: 14 });
 
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
     XLSX.writeFile(wb, `Summary_${c.contract_code || 'Contract'}.xlsx`);
