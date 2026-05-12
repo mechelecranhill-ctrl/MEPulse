@@ -177,17 +177,55 @@ async function startAutoDownload() {
             buildTableSet(11, 20, false);
             buildTableSet(21, 26, true);
 
+            // ==========================================
+            // KIRA DATA UNTUK SHEET 2 (LOGIK BARU)
+            // ==========================================
+            let s2_labourSum = 0, s2_spareSum = 0, s2_provSum = 0;
+            let s2_labourOngoingBal = 0, s2_spareOngoingBal = 0, s2_provOngoingBal = 0;
+
+            sectionNames.forEach(sec => {
+                const desc = (sections[sec]?.desc || sec).toUpperCase();
+                const contractAmt = Number(sections[sec]?.amt || 0);
+                
+                let totalClaimed = 0;
+                interims.forEach(int => totalClaimed += Number(int.claim_breakdown?.[sec]?.amt || 0));
+                
+                let ongoingWorks = 0;
+                workorders.filter(w => w.status !== 'Claimed').forEach(w => {
+                    const cat = w.section_category || {};
+                    ongoingWorks += Number(cat[sec]?.amt || 0);
+                    if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) ongoingWorks += Number(w.additional || 0);
+                });
+
+                const balance = contractAmt - totalClaimed;
+                const ongoingContractBal = balance - ongoingWorks;
+
+                if (desc.includes("LABOUR") || desc.includes("WORKMANSHIP")) {
+                    s2_labourSum += contractAmt;
+                    s2_labourOngoingBal += ongoingContractBal;
+                } else if (desc.includes("SPARE")) {
+                    s2_spareSum += contractAmt;
+                    s2_spareOngoingBal += ongoingContractBal;
+                } else if (desc.includes("PROVISIONAL")) {
+                    s2_provSum += contractAmt;
+                    s2_provOngoingBal += ongoingContractBal;
+                }
+            });
+
+            const calcPerc = (bal, total) => total > 0 ? ((bal / total) * 100).toFixed(0) + "%" : "0%";
+
+            // ==========================================
+            // SHEET 1 STYLING (DIKEKALKAN)
+            // ==========================================
             const ws = XLSX.utils.aoa_to_sheet(ws_data);
             ws["!merges"] = merges;
             const lastRowIdx = ws_data.length - 1;
 
-            // STYLING SHEET 1
             for (let r = 0; r <= lastRowIdx; r++) {
                 for (let cidx = 0; cidx <= 40; cidx++) {
                     const cellRef = XLSX.utils.encode_cell({ r: r, c: cidx });
                     if (!ws[cellRef]) continue;
                     if (!ws[cellRef].s) ws[cellRef].s = {};
-
                     if (r === 1 && cidx === 1) {
                         ws[cellRef].s = { font: { bold: true, sz: 12 }, alignment: { horizontal: "center", vertical: "center", wrapText: true } };
                         continue;
@@ -206,33 +244,10 @@ async function startAutoDownload() {
                     
                     const valStr = ws[cellRef].v ? ws[cellRef].v.toString() : "";
                     const isHeaderRow = valStr.includes("INTERIM NO") || valStr === "ITEM" || valStr === "DESCRIPTION" || valStr === "AS PER CONTRACT" || valStr.includes("CLAIM") || valStr.includes("BALANCE") || valStr.includes("WORKS");
-                    const isRMHeader = valStr === "RM";
-                    
-                    if (isHeaderRow || isRMHeader) { 
+                    if (isHeaderRow || valStr === "RM") { 
                         ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } }; 
                         ws[cellRef].s.font = { bold: true }; 
                     }
-                    
-                    const rowAboveValue = ws[XLSX.utils.encode_cell({ r: r-1, c: cidx })]?.v;
-                    if (rowAboveValue && rowAboveValue.toString().includes("INTERIM NO")) ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } };
-
-                    // ==========================================
-                    // LOGIK HIGHLIGHT DINAMIK BERDASARKAN DESCRIPTION
-                    // ==========================================
-                    const rowDesc = ws[XLSX.utils.encode_cell({ r: r, c: 1 })]?.v?.toString().toUpperCase() || "";
-                    if (rowDesc) {
-                        if (rowDesc.includes("LABOUR") || rowDesc.includes("WORKMANSHIP")) {
-                            ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } }; // Oren
-                        } else if (rowDesc.includes("SPARE") || rowDesc.includes("PROVISIONAL")) {
-                            ws[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } }; // Kuning
-                        } else if (rowDesc.includes("REFURBISHMENT")) {
-                            ws[cellRef].s.fill = { fgColor: { rgb: "A9A9A9" } }; // Kelabu Gelap
-                            ws[cellRef].s.font = { color: { rgb: "FFFFFF" } }; // Font putih supaya nampak
-                        }
-                    }
-
-                    const label = ws[XLSX.utils.encode_cell({ r: r, c: 1 })]?.v;
-                    if (label === "TOTAL BRING TO INTERIM PAYMENT") ws[cellRef].s.font = { bold: true };
                 }
             }
             ws["!cols"] = [{ wch: 8 }, { wch: 40 }, { wch: 3 }, { wch: 25 }];
@@ -244,11 +259,11 @@ async function startAutoDownload() {
             // ==========================================
             let ws2_data = [
                 [], [], 
-                ["TOTAL LABOUR CHARGES", "RM", 0, "", "", "", "ON GOING SUPPLY OF SPARE PART BALANCE", "0%"],
+                ["TOTAL LABOUR CHARGES", "RM", s2_labourSum, "", "", "", "ON GOING LABOUR CHARGES BALANCE", calcPerc(s2_labourOngoingBal, s2_labourSum)],
                 [],
-                ["TOTAL SUPPLY OF SPARE PART", "RM", 0, "", "", "", "ON GOING LABOUR CHARGES BALANCE", "0%"],
+                ["TOTAL SUPPLY OF SPARE PART", "RM", s2_spareSum, "", "", "", "ON GOING SUPPLY OF SPARE PART BALANCE", calcPerc(s2_spareOngoingBal, s2_spareSum)],
                 [],
-                ["TOTAL PROVISIONAL SUM", "RM", 0, "", "", "", "ON GOING PROV SUM BALANCE", "0%"],
+                ["TOTAL PROVISIONAL SUM", "RM", s2_provSum, "", "", "", "ON GOING PROV SUM BALANCE", calcPerc(s2_provOngoingBal, s2_provSum)],
                 [],
                 ["TOTAL APPROVED CM WORKS", "RM", 0, "", "", "", "TOTAL G&P CLAIMED", "0%"],
                 ["TOTAL CM WORKS CLAIMED", "RM", 0, "0%", "", "", "BAL. G&P NOT CLAIM", "100%"],
@@ -281,13 +296,7 @@ async function startAutoDownload() {
                     if(r===2 && c<3) ws2[ref].s.fill = { fgColor: { rgb: "FFCC99" } }; 
                     if(r===4 && c<3) ws2[ref].s.fill = { fgColor: { rgb: "FFFF00" } }; 
                     if(r===6 && c<3) ws2[ref].s.fill = { fgColor: { rgb: "FFFF00" } }; 
-                    if(r===8 && c<3) ws2[ref].s.fill = { fgColor: { rgb: "FFCC99" } }; 
-                    if(r===13 && c<4) { ws2[ref].s.fill = { fgColor: { rgb: "FF0000" } }; ws2[ref].s.font = { color: { rgb: "FFFFFF" }, bold: true }; }
-                    if(c >= 6) {
-                        if(r===2 || r===6) ws2[ref].s.fill = { fgColor: { rgb: "FFFF00" } };
-                        if(r===4) ws2[ref].s.fill = { fgColor: { rgb: "FFCC99" } };
-                    }
-                    if(r === 21) ws2[ref].s.font = { bold: true };
+                    if(r===21) ws2[ref].s.font = { bold: true };
                 }
             }
             ws2["!cols"] = [{ wch: 35 }, { wch: 5 }, { wch: 15 }, { wch: 10 }, { wch: 5 }, { wch: 5 }, { wch: 40 }, { wch: 10 }];
