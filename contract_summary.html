@@ -89,8 +89,7 @@ async function startAutoDownload() {
                 ["", "PERFORMANCE GUARANTEE SUM", ":", pgInfo],
                 [] 
             ];
-        }
-    }
+
             function buildTableSet(startInt, endInt, isLastSet) {
                 const startRow = ws_data.length;
                 let h1 = ["ITEM", "DESCRIPTION", "", "AS PER CONTRACT"];
@@ -444,97 +443,176 @@ async function startAutoDownload() {
             ws3["!merges"] = currentMerges;
 
             // 4. Styling Dinamik untuk Sheet 3
-            
-            for (let r = 0; r < ws3_data.length; r++) {
 
-                const isGrandTotalRow = ws3_data[r] && ws3_data[r][0] === "GRAND TOTAL";
-                const currentLastCol = 3 + (sectionCount * 2) + 2;
-                
-                for (let c = 0; c < currentLastCol; c++) {
-                    const ref = XLSX.utils.encode_cell({ r: r, c: c });
-                    if (!ws3[ref]) {ws3[ref] = { v: "", t: "s", s: {} };
-                                    }
-                    if (!ws3[ref].s) ws3[ref].s = {};
+for (let r = 0; r < ws3_data.length; r++) {
 
-                    const val = ws3[ref].v ? ws3[ref].v.toString() : "";
+    const isGrandTotalRow = ws3_data[r] && ws3_data[r][0] === "GRAND TOTAL";
+    const currentLastCol = 3 + (sectionCount * 2) + 2;
 
-                    if (isGrandTotalRow) {
-                        ws3[ref].s.font = { bold: true }; // Tebalkan keseluruhan baris
-                        ws3[ref].s.fill = { fgColor: { rgb: "EAEAEA" } }; // Warna kelabu lembut
-                        ws3[ref].s.border = { top: { style: "double" }, bottom: { style: "double" }, left: { style: "double" }, right: { style: "double" } };
-                      
-                        // Alignment tengah untuk teks "GRAND TOTAL" yang di-merge
-                        if (c === 0) {
-                            ws3[ref].s.alignment = { horizontal: "center", vertical: "center" };
-                        }
-                    }
-                    
-                    // Styling Header (Background Kelabu)
-                    if (daerahList.includes(val) || val.includes("SENARAI PERMOHONAN") || val === "NO." || val === "DESCRIPTION" || val === "LABOUR CHARGES" || val === "(RM)") {
-                        ws3[ref].s.fill = { fgColor: { rgb: "EAEAEA" } };
-                        ws3[ref].s.font = { bold: true };
-                        ws3[ref].s.alignment = { horizontal: "center", vertical: "center" };
-                    }
+    for (let c = 0; c < currentLastCol; c++) {
 
-                    if (r > 0 && ws3_data[r] && ws3_data[r].length > 0 && !daerahList.includes(ws3_data[r][0])) {
-                        if (ws3[ref].v === undefined) ws3[ref] = { v: "", t: "s", s: {} };
-                        if (!ws3[ref].s) ws3[ref].s = {};
+        const ref = XLSX.utils.encode_cell({ r: r, c: c });
 
-                        ws3[ref].s.border = { 
-                            top: { style: "thin" }, 
-                            bottom: { style: "thin" }, 
-                            left: { style: "thin" }, 
-                            right: { style: "thin" } 
-                        };
-                    }
-                }
-    
-                        ws3[ref].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
-    
-                    // Border untuk baris yang ada data (kecuali tajuk besar)
-                    if (r > 0 && !daerahList.includes(ws3_data[r][0]) && !isGrandTotalRow) {
-                        ws3[ref].s.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
-                        ws3[ref].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
-                        if (c === 1) ws3[ref].s.alignment.horizontal = "left";
-                    }
+        if (!ws3[ref]) {
+            ws3[ref] = { v: "", t: "s", s: {} };
+        }
 
-                    // Warna Column Data
-                    if (r > 6 && typeof ws3[ref].v === 'number') {
-    
-                        let currentSecIdx;
-                        if (c >= 4 && c < 4 + sectionCount) {
-                            currentSecIdx = c - 4; // Indeks dalam dynamicSectionKeys (Quotation)
-                        } 
-                        else if (c >= 4 + sectionCount && c < 4 + (sectionCount * 2)) {
-                            currentSecIdx = c - (4 + sectionCount); // Indeks dalam dynamicSectionKeys (Payment)
-                        }
+        if (!ws3[ref].s) ws3[ref].s = {};
 
-                        if (currentSecIdx !== undefined) {
-                            const secKey = dynamicSectionKeys[currentSecIdx];
-                            const secDesc = (sections[secKey]?.desc || secKey).toUpperCase();
+        const val = ws3[ref].v ? ws3[ref].v.toString() : "";
 
-                            // Apply warna berdasarkan deskripsi seksyen
-                            if (secDesc.includes("LABOUR") || secDesc.includes("WORKMANSHIP")) {
-                                ws3[ref].s.fill = { fgColor: { rgb: "FFCC99" } }; // Jingga cair
-                            } 
-       
-                            else if (secDesc.includes("SPARE") || secDesc.includes("PROVISIONAL")) {
-                                ws3[ref].s.fill = { fgColor: { rgb: "FFFF00" } }; // Kuning
-                            } 
-                            else if (secDesc.includes("REFURBISHMENT")) {
-                                ws3[ref].s.fill = { fgColor: { rgb: "A9A9A9" } }; // Kelabu
-                            }
-   
-                        }
+        // =========================
+        // DEFAULT ALIGNMENT
+        // =========================
+        ws3[ref].s.alignment = {
+            horizontal: "center",
+            vertical: "center",
+            wrapText: true
+        };
 
-                        ws3[ref].t = 'n'; 
-                        ws3[ref].z = fmtCurrency;
-                        if (isGrandTotalRow) {
-                            ws3[ref].s.font = { bold: true };
-                        }
-                    }
-                }  
+        if (c === 1) {
+            ws3[ref].s.alignment.horizontal = "left";
+        }
+
+        // =========================
+        // HEADER STYLE
+        // =========================
+        if (
+            daerahList.includes(val) ||
+            val.includes("SENARAI PERMOHONAN") ||
+            val === "NO." ||
+            val === "DESCRIPTION" ||
+            val === "LOCATION" ||
+            val === "WORK ORDER" ||
+            val === "QUOTATION" ||
+            val === "PAYMENT" ||
+            val === "(RM)"
+        ) {
+
+            ws3[ref].s.fill = {
+                fgColor: { rgb: "EAEAEA" }
+            };
+
+            ws3[ref].s.font = {
+                bold: true
+            };
+
+            ws3[ref].s.alignment = {
+                horizontal: "center",
+                vertical: "center",
+                wrapText: true
+            };
+        }
+
+        // =========================
+        // BORDER
+        // =========================
+        if (
+            r > 0 &&
+            ws3_data[r] &&
+            ws3_data[r].length > 0 &&
+            !daerahList.includes(ws3_data[r][0])
+        ) {
+
+            ws3[ref].s.border = {
+                top: { style: "thin" },
+                bottom: { style: "thin" },
+                left: { style: "thin" },
+                right: { style: "thin" }
+            };
+        }
+
+        // =========================
+        // GRAND TOTAL STYLE
+        // =========================
+        if (isGrandTotalRow) {
+
+            ws3[ref].s.font = {
+                bold: true
+            };
+
+            ws3[ref].s.fill = {
+                fgColor: { rgb: "EAEAEA" }
+            };
+
+            ws3[ref].s.border = {
+                top: { style: "double" },
+                bottom: { style: "double" },
+                left: { style: "double" },
+                right: { style: "double" }
+            };
+
+            if (c === 0) {
+                ws3[ref].s.alignment = {
+                    horizontal: "center",
+                    vertical: "center"
+                };
             }
+        }
+
+        // =========================
+        // NUMBER FORMAT + WARNA
+        // =========================
+        if (r > 6 && typeof ws3[ref].v === 'number') {
+
+            let currentSecIdx;
+
+            // QUOTATION SECTION
+            if (c >= 4 && c < 4 + sectionCount) {
+                currentSecIdx = c - 4;
+            }
+
+            // PAYMENT SECTION
+            else if (
+                c >= 4 + sectionCount &&
+                c < 4 + (sectionCount * 2)
+            ) {
+                currentSecIdx = c - (4 + sectionCount);
+            }
+
+            if (currentSecIdx !== undefined) {
+
+                const secKey = dynamicSectionKeys[currentSecIdx];
+                const secDesc = (sections[secKey]?.desc || secKey).toUpperCase();
+
+                // LABOUR
+                if (
+                    secDesc.includes("LABOUR") ||
+                    secDesc.includes("WORKMANSHIP")
+                ) {
+
+                    ws3[ref].s.fill = {
+                        fgColor: { rgb: "FFCC99" }
+                    };
+                }
+
+                // SPARE / PROVISIONAL
+                else if (
+                    secDesc.includes("SPARE") ||
+                    secDesc.includes("PROVISIONAL")
+                ) {
+
+                    ws3[ref].s.fill = {
+                        fgColor: { rgb: "FFFF00" }
+                    };
+                }
+
+                // REFURBISHMENT
+                else if (
+                    secDesc.includes("REFURBISHMENT")
+                ) {
+
+                    ws3[ref].s.fill = {
+                        fgColor: { rgb: "A9A9A9" }
+                    };
+                }
+            }
+
+            ws3[ref].t = 'n';
+            ws3[ref].z = fmtCurrency;
+        }
+    }
+}  
 
             ws3["!rows"] = ws3_data.map(() => ({ hpt: 15.75 }));
             ws3["!cols"] = [{ wch: 5 }, { wch: 40 }, { wch: 20 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 20 }];
