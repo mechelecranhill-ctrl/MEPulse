@@ -242,6 +242,8 @@ async function startAutoDownload() {
             }
             ws["!cols"] = [{ wch: 8 }, { wch: 40 }, { wch: 3 }, { wch: 25 }];
             for (let i = 0; i < 35; i++) ws["!cols"].push({ wch: 14 });
+            ws['!pageSetup'] = { orientation: 'landscape', paperSize: 9 }; 
+            ws['!printHeader'] = [1, 10]; // Ulang baris 1 hingga 10 (Header maklumat kontrak)
             XLSX.utils.book_append_sheet(wb, ws, "Summary");
 
             // ==========================================
@@ -324,18 +326,22 @@ async function startAutoDownload() {
                 }
             }
             ws2["!cols"] = [{ wch: 35 }, { wch: 5 }, { wch: 15 }, { wch: 10 }, { wch: 5 }, { wch: 5 }, { wch: 40 }, { wch: 10 }];
+            ws2['!pageSetup'] = { orientation: 'landscape', paperSize: 9 };
             XLSX.utils.book_append_sheet(wb, ws2, "Budget Usage");
             
             // ==========================================
             // SHEET 3: LIST WORK ORDER
             // ==========================================
-            
-            // Header mengikut format gambar
+            // Masukkan tajuk berdasarkan gambar (Baris 1 dan Baris 3)
+
             let ws3_data = [
-                [], // Row 1 kosong
-                [], // Row 2 kosong
-                ["NO.", "DESCRIPTION", "LOCATION", "WORK ORDER", "QUOTATION", "", "", "", "PAYMENT", "", "", "", "QUATATION APPROVAL DATE", "STATUS / PAID AS PER INTERIM NO"],
-                ["", "", "", "", "LABOUR CHARGES", "SUPPLY SPARE PARTS", "S.O.R (CONTRACT)", "NON S.O.R", "LABOUR CHARGES", "SUPPLY SPARE PARTS", "S.O.R (CONTRACT)", "NON S.O.R", "", ""],
+                ["SEGAMAT"], // Row 1
+                [],          // Row 2 (Kosong)
+                ["SENARAI PERMOHONAN KERJA-KERJA KONTRAK PENYELENGGARAAN"], // Row 3
+                [],          // Row 4 (Kosong)
+                // Header Jadual bermula di Row 5
+                ["NO.", "DESCRIPTION", "LOCATION", "WORK ORDER", "QUOTATION", "", "", "", "PAYMENT", "", "", "", "QUOTATION APPROVAL DATE", "STATUS / PAID AS PER INTERIM NO"],
+                ["", "", "", "", "LABOUR CHARGES", "SUPPLY SPARE PARTS", "S.O.R (CONTRACT)", "NON S.O.R", "LABOUR CHARGES", "SUPPLY SPARE PARTS", "S.O.R (CONTRACT)", "NON S.O.R", "", ""], 
                 ["", "", "", "", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "", ""]
             ];
 
@@ -370,14 +376,16 @@ async function startAutoDownload() {
 
             // Merging Headers (Ikut format Row 3-5)
             ws3["!merges"] = [
-                { s: { r: 2, c: 0 }, e: { r: 4, c: 0 } }, // NO.
-                { s: { r: 2, c: 1 }, e: { r: 4, c: 1 } }, // DESCRIPTION
-                { s: { r: 2, c: 2 }, e: { r: 4, c: 2 } }, // LOCATION
-                { s: { r: 2, c: 3 }, e: { r: 4, c: 3 } }, // WORK ORDER
-                { s: { r: 2, c: 4 }, e: { r: 2, c: 7 } }, // QUOTATION Group
-                { s: { r: 2, c: 8 }, e: { r: 2, c: 11 } }, // PAYMENT Group
-                { s: { r: 2, c: 12 }, e: { r: 4, c: 12 } }, // APPROVAL DATE
-                { s: { r: 2, c: 13 }, e: { r: 4, c: 13 } }  // STATUS
+                { s: { r: 0, c: 0 }, e: { r: 0, c: 13 } }, 
+                { s: { r: 2, c: 0 }, e: { r: 2, c: 13 } },
+                { s: { r: 4, c: 0 }, e: { r: 6, c: 0 } }, // NO.
+                { s: { r: 4, c: 1 }, e: { r: 6, c: 1 } }, // DESCRIPTION
+                { s: { r: 4, c: 2 }, e: { r: 6, c: 2 } }, // LOCATION
+                { s: { r: 4, c: 3 }, e: { r: 6, c: 3 } }, // WORK ORDER
+                { s: { r: 4, c: 4 }, e: { r: 4, c: 7 } }, // QUOTATION Group
+                { s: { r: 4, c: 8 }, e: { r: 4, c: 11 } }, // PAYMENT Group
+                { s: { r: 4, c: 12 }, e: { r: 6, c: 12 } }, // DATE
+                { s: { r: 4, c: 13 }, e: { r: 6, c: 13 } }  // STATUS
             ];
 
             // Styling Sheet 3
@@ -409,11 +417,20 @@ async function startAutoDownload() {
                         ws3[ref].t = 'n';
                         ws3[ref].z = fmtCurrency;
                     }
+
+                    // Dalam loop styling ws3
+                    if (r === 0 || r === 2) {
+                        ws3[ref].s.font = { bold: true, sz: 12 };
+                        ws3[ref].s.alignment = { horizontal: "left" };
+                        delete ws3[ref].s.border; // Buang border untuk tajuk atas
+                        continue;
+                    }
                 }
             }
 
             ws3["!cols"] = [{ wch: 5 }, { wch: 40 }, { wch: 20 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 20 }];
-            
+            ws3['!pageSetup'] = { orientation: 'landscape', paperSize: 9 };
+            ws3['!printHeader'] = [5, 7];
             XLSX.utils.book_append_sheet(wb, ws3, "List Work Order");
 
             XLSX.writeFile(wb, fileName);
