@@ -72,9 +72,6 @@ async function startAutoDownload() {
             const sectionNames = Object.keys(sections);
             const wb = XLSX.utils.book_new();
             
-            // ==========================================
-            // KOD ASAL ANDA (SHEET 1) - TIDAK DIUSIK
-            // ==========================================
             let merges = [{ s: { r: 1, c: 1 }, e: { r: 2, c: 13 } }]; 
             const fmtCurrency = '#,##0.00;\\(#,##0.00\\);"-"'; 
             const fmtRM = '"RM"#,##0.00'; 
@@ -184,11 +181,13 @@ async function startAutoDownload() {
             ws["!merges"] = merges;
             const lastRowIdx = ws_data.length - 1;
 
+            // STYLING SHEET 1
             for (let r = 0; r <= lastRowIdx; r++) {
                 for (let cidx = 0; cidx <= 40; cidx++) {
                     const cellRef = XLSX.utils.encode_cell({ r: r, c: cidx });
                     if (!ws[cellRef]) continue;
                     if (!ws[cellRef].s) ws[cellRef].s = {};
+
                     if (r === 1 && cidx === 1) {
                         ws[cellRef].s = { font: { bold: true, sz: 12 }, alignment: { horizontal: "center", vertical: "center", wrapText: true } };
                         continue;
@@ -204,15 +203,34 @@ async function startAutoDownload() {
                     if (cidx === 1) ws[cellRef].s.alignment.horizontal = "left";
                     if (typeof ws[cellRef].v === 'number' && cidx >= 3) { ws[cellRef].t = 'n'; ws[cellRef].z = fmtCurrency; }
                     if (cidx >= 14) ws[cellRef].s.font = { bold: true };
+                    
                     const valStr = ws[cellRef].v ? ws[cellRef].v.toString() : "";
                     const isHeaderRow = valStr.includes("INTERIM NO") || valStr === "ITEM" || valStr === "DESCRIPTION" || valStr === "AS PER CONTRACT" || valStr.includes("CLAIM") || valStr.includes("BALANCE") || valStr.includes("WORKS");
                     const isRMHeader = valStr === "RM";
-                    if (isHeaderRow || isRMHeader) { ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } }; ws[cellRef].s.font = { bold: true }; }
+                    
+                    if (isHeaderRow || isRMHeader) { 
+                        ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } }; 
+                        ws[cellRef].s.font = { bold: true }; 
+                    }
+                    
                     const rowAboveValue = ws[XLSX.utils.encode_cell({ r: r-1, c: cidx })]?.v;
                     if (rowAboveValue && rowAboveValue.toString().includes("INTERIM NO")) ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } };
-                    const rowInd = ws[XLSX.utils.encode_cell({ r: r, c: 0 })]?.v;
-                    if (rowInd === "E") ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } };
-                    if (rowInd === "F" || rowInd === "G") ws[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } };
+
+                    // ==========================================
+                    // LOGIK HIGHLIGHT DINAMIK BERDASARKAN DESCRIPTION
+                    // ==========================================
+                    const rowDesc = ws[XLSX.utils.encode_cell({ r: r, c: 1 })]?.v?.toString().toUpperCase() || "";
+                    if (rowDesc) {
+                        if (rowDesc.includes("LABOUR") || rowDesc.includes("WORKMANSHIP")) {
+                            ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } }; // Oren
+                        } else if (rowDesc.includes("SPARE") || rowDesc.includes("PROVISIONAL")) {
+                            ws[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } }; // Kuning
+                        } else if (rowDesc.includes("REFURBISHMENT")) {
+                            ws[cellRef].s.fill = { fgColor: { rgb: "A9A9A9" } }; // Kelabu Gelap
+                            ws[cellRef].s.font = { color: { rgb: "FFFFFF" } }; // Font putih supaya nampak
+                        }
+                    }
+
                     const label = ws[XLSX.utils.encode_cell({ r: r, c: 1 })]?.v;
                     if (label === "TOTAL BRING TO INTERIM PAYMENT") ws[cellRef].s.font = { bold: true };
                 }
@@ -221,9 +239,9 @@ async function startAutoDownload() {
             for (let i = 0; i < 35; i++) ws["!cols"].push({ wch: 14 });
             XLSX.utils.book_append_sheet(wb, ws, "Summary");
 
-            // ============================================================
-            // PENAMBAHAN SHEET 2 (BUDGET USAGE) - SELEPAS SHEET 1 SIAP
-            // ============================================================
+            // ==========================================
+            // SHEET 2 (BUDGET USAGE)
+            // ==========================================
             let ws2_data = [
                 [], [], 
                 ["TOTAL LABOUR CHARGES", "RM", 0, "", "", "", "ON GOING SUPPLY OF SPARE PART BALANCE", "0%"],
@@ -253,7 +271,6 @@ async function startAutoDownload() {
             ];
             
             const ws2 = XLSX.utils.aoa_to_sheet(ws2_data);
-            
             for(let r=0; r<ws2_data.length; r++) {
                 for(let c=0; c<8; c++) {
                     const ref = XLSX.utils.encode_cell({r:r, c:c});
