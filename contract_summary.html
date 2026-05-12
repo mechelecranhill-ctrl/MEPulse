@@ -247,7 +247,7 @@ async function startAutoDownload() {
             XLSX.utils.book_append_sheet(wb, ws, "Summary");
 
             // ==========================================
-            // LOGIK PENGIRAAN UNTUK SHEET 2 (START)
+            // SHEET 2
             // ==========================================
             let sumLab = 0, sumSpa = 0, sumPrv = 0;
             let balLab = 0, balSpa = 0, balPrv = 0;
@@ -273,10 +273,7 @@ async function startAutoDownload() {
             });
 
             const getP = (b, t) => t > 0 ? Math.round((b/t)*100) + "%" : "0%";
-            // ==========================================
-            // LOGIK PENGIRAAN UNTUK SHEET 2
-            // ==========================================
-
+            
             let ws2_data = [
                 [], [], 
                 ["TOTAL LABOUR CHARGES", "RM", sumLab, "", "", "", "ON GOING LABOUR CHARGES BALANCE", getP(balLab, sumLab)],
@@ -428,39 +425,33 @@ async function startAutoDownload() {
 
             rowData.push(formatShortDate(wo.qpb_date));
             rowData.push(wo.status === 'Claimed' ? `INT ${wo.interim_no}` : (wo.status || "PENDING"));
-            rowData.forEach((val, idx) => {
-    if (typeof val === "number") {
-        dTotals[idx] += val;
-    }
-});
+            
             ws3_data.push(rowData);
         });
     }
-                // 2. MASUKKAN GRAND TOTAL (Selepas loop filteredWO tamat)
-                const totalRowIdx = ws3_data.length;
+                // 2. MASUKKAN GRAND TOTAL
+const totalRowIdx = ws3_data.length;
 
 let grandTotalRow = Array(totalCols).fill("");
 
 grandTotalRow[0] = "GRAND TOTAL";
 
-// total ikut column (ini yang betul)
-for (let i = 4; i < 4 + (sectionCount * 2); i++) {
-    grandTotalRow[i] = dTotals[i] || 0;
+// QUOTATION TOTAL PER SECTION
+for (let i = 0; i < sectionCount; i++) {
+    grandTotalRow[4 + i] = dTotals[i] || 0;
 }
 
-// optional last columns
-grandTotalRow[totalCols - 2] = "";
-grandTotalRow[totalCols - 1] = dTotals.reduce((a, b) => a + b, 0);
-
-// optional: kalau nak kosongkan DATE column
-grandTotalRow[totalCols - 2] = "";
+// PAYMENT TOTAL PER SECTION
+for (let i = 0; i < sectionCount; i++) {
+    grandTotalRow[4 + sectionCount + i] = dTotals[sectionCount + i] || 0;
+}
 
 ws3_data.push(grandTotalRow);
 
-// merge kiri (NO + DESC + LOC + WO)
-currentMerges.push({ 
-    s: { r: totalRowIdx, c: 0 }, 
-    e: { r: totalRowIdx, c: 3 } 
+// merge kiri
+currentMerges.push({
+    s: { r: totalRowIdx, c: 0 },
+    e: { r: totalRowIdx, c: 3 }
 });
             });
 
