@@ -403,8 +403,8 @@ async function startAutoDownload() {
                     dTotal.pLab, dTotal.pSpa, 0, dTotal.pNon, 
                     "", ""
                 ]);
-                // Merge untuk perkataan "GRAND TOTAL" (Kolum B, C, D) 
-                currentMerges.push({ s: { r: totalRowIdx, c: 1 }, e: { r: totalRowIdx, c: 3 } });
+                // Merge untuk perkataan "GRAND TOTAL" (Kolum A, B, C, D) 
+                currentMerges.push({ s: { r: totalRowIdx, c: 0 }, e: { r: totalRowIdx, c: 3 } });
                 // Jarakkan 3 baris sebelum daerah seterusnya
                 ws3_data.push([], [], []);
             });
@@ -414,6 +414,9 @@ async function startAutoDownload() {
 
             // 4. Styling Dinamik untuk Sheet 3
             for (let r = 0; r < ws3_data.length; r++) {
+
+                const isGrandTotalRow = ws3_data[r] && ws3_data[r][1] === "GRAND TOTAL";
+                
                 for (let c = 0; c < 14; c++) {
                     const ref = XLSX.utils.encode_cell({ r: r, c: c });
                     if (!ws3[ref]) continue;
@@ -421,6 +424,17 @@ async function startAutoDownload() {
 
                     const val = ws3[ref].v ? ws3[ref].v.toString() : "";
 
+                    if (isGrandTotalRow) {
+                        ws3[ref].s.font = { bold: true }; // Tebalkan keseluruhan baris
+                        ws3[ref].s.fill = { fgColor: { rgb: "EAEAEA" } }; // Warna kelabu lembut
+                        ws3[ref].s.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+                      
+                        // Alignment tengah untuk teks "GRAND TOTAL" yang di-merge
+                        if (c === 0) {
+                            ws3[ref].s.alignment = { horizontal: "center", vertical: "center" };
+                        }
+                    }
+                    
                     // Styling Header (Background Kelabu)
                     if (daerahList.includes(val) || val.includes("SENARAI PERMOHONAN") || val === "NO." || val === "DESCRIPTION" || val === "LABOUR CHARGES" || val === "(RM)") {
                         ws3[ref].s.fill = { fgColor: { rgb: "EAEAEA" } };
@@ -429,7 +443,7 @@ async function startAutoDownload() {
                     }
 
                     // Border untuk baris yang ada data (kecuali tajuk besar)
-                    if (r > 0 && !daerahList.includes(ws3_data[r][0])) {
+                    if (r > 0 && !daerahList.includes(ws3_data[r][0]) && !isGrandTotalRow) {
                         ws3[ref].s.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
                         ws3[ref].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
                         if (c === 1) ws3[ref].s.alignment.horizontal = "left";
@@ -441,6 +455,9 @@ async function startAutoDownload() {
                         if (c === 5 || c === 6 || c === 9 || c === 10) ws3[ref].s.fill = { fgColor: { rgb: "FFFF00" } }; 
                         if (c === 7 || c === 11) ws3[ref].s.fill = { fgColor: { rgb: "A9A9A9" } }; 
                         ws3[ref].t = 'n'; ws3[ref].z = fmtCurrency;
+                       
+                        if (isGrandTotalRow) {
+                            ws3[ref].s.font = { bold: true };
                     }
                 }
             }
