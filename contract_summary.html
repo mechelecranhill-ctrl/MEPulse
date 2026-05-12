@@ -401,7 +401,8 @@ async function startAutoDownload() {
     currentMerges.push({ s: { r: startRow + 4, c: 4 + (sectionCount * 2) + 1 }, e: { r: startRow + 6, c: 4 + (sectionCount * 2) + 1 } });
 
     const filteredWO = workorders.filter(wo => (wo.district || "").toUpperCase() === daerah.toUpperCase());
-    let dTotals = new Array(sectionCount * 2).fill(0);
+                let totalCols = 4 + (sectionCount * 2) + 2;
+                let dTotals = new Array(totalCols).fill(0);
     
     if (filteredWO.length > 0) {
         filteredWO.forEach((wo, index) => {
@@ -427,26 +428,29 @@ async function startAutoDownload() {
 
             rowData.push(formatShortDate(wo.qpb_date));
             rowData.push(wo.status === 'Claimed' ? `INT ${wo.interim_no}` : (wo.status || "PENDING"));
+            rowData.forEach((val, idx) => {
+    if (typeof val === "number") {
+        dTotals[idx] += val;
+    }
+});
             ws3_data.push(rowData);
         });
     }
                 // 2. MASUKKAN GRAND TOTAL (Selepas loop filteredWO tamat)
                 const totalRowIdx = ws3_data.length;
 
-// total semua quotation + payment
-const grandTotalSum = dTotals.reduce((a, b) => a + b, 0);
-
-// total column keseluruhan Sheet 3
-const totalCols = 4 + (sectionCount * 2) + 2;
-
-// create empty row penuh
 let grandTotalRow = Array(totalCols).fill("");
 
-// label
 grandTotalRow[0] = "GRAND TOTAL";
 
-// 👉 letak TOTAL DI COLUMN STATUS (last column)
-grandTotalRow[totalCols - 1] = grandTotalSum;
+// total ikut column (ini yang betul)
+for (let i = 4; i < 4 + (sectionCount * 2); i++) {
+    grandTotalRow[i] = dTotals[i] || 0;
+}
+
+// optional last columns
+grandTotalRow[totalCols - 2] = "";
+grandTotalRow[totalCols - 1] = dTotals.reduce((a, b) => a + b, 0);
 
 // optional: kalau nak kosongkan DATE column
 grandTotalRow[totalCols - 2] = "";
