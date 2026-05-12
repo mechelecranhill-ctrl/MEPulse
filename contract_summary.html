@@ -31,7 +31,6 @@ function formatDateMY(dateStr) {
     return `${String(date.getDate()).padStart(2, '0')} ${months[date.getMonth()]} ${date.getFullYear()}`;
 }
 
-// Fungsi ringkas untuk tarikh interim (DD/MM/YYYY)
 function formatShortDate(dateStr) {
     if (!dateStr) return "-";
     const date = new Date(dateStr);
@@ -73,9 +72,10 @@ async function startAutoDownload() {
             const sectionNames = Object.keys(sections);
             const wb = XLSX.utils.book_new();
             
-            // Note: Header sekarang ada 3 baris (Interim No, Date, RM)
+            // ==========================================
+            // KOD ASAL ANDA (SHEET 1) - TIDAK DIUSIK
+            // ==========================================
             let merges = [{ s: { r: 1, c: 1 }, e: { r: 2, c: 13 } }]; 
-
             const fmtCurrency = '#,##0.00;\\(#,##0.00\\);"-"'; 
             const fmtRM = '"RM"#,##0.00'; 
             const pgInfo = `RM ${pgSumFormatted} (${c.insurance_no || '-'})`;
@@ -94,13 +94,10 @@ async function startAutoDownload() {
 
             function buildTableSet(startInt, endInt, isLastSet) {
                 const startRow = ws_data.length;
-                
-                // BARIS 1: Judul Utama
                 let h1 = ["ITEM", "DESCRIPTION", "", "AS PER CONTRACT"];
                 for (let i = startInt; i <= endInt; i++) h1.push(`INTERIM NO.${i}`);
                 if (isLastSet) h1.push("TOTAL CLAIM", "CONTRACT BALANCE", "ON GOING WORKS", "ON GOING CONTRACT BALANCE");
                 
-                // BARIS 2: Tarikh Received (DIFETCH DARI TABLE INTERIMS)
                 let h2 = ["", "", "", ""];
                 for (let i = startInt; i <= endInt; i++) {
                     const dRec = interims[i - 1]?.date_received;
@@ -108,12 +105,9 @@ async function startAutoDownload() {
                 }
                 if (isLastSet) h2.push("", "", "", "");
 
-                // BARIS 3: RM Label
                 let h3 = h1.map((h, i) => (i < 3 ? "" : "RM"));
-
                 ws_data.push(h1, h2, h3);
 
-                // Merging untuk ITEM dan DESCRIPTION (Sekarang 3 baris tinggi)
                 merges.push({ s: { r: startRow, c: 0 }, e: { r: startRow + 2, c: 0 } });
                 merges.push({ s: { r: startRow, c: 1 }, e: { r: startRow + 2, c: 2 } });
 
@@ -188,53 +182,34 @@ async function startAutoDownload() {
 
             const ws = XLSX.utils.aoa_to_sheet(ws_data);
             ws["!merges"] = merges;
-
             const lastRowIdx = ws_data.length - 1;
 
-            // STYLING (DIKEKALKAN SEPERTI ASAL)
             for (let r = 0; r <= lastRowIdx; r++) {
                 for (let cidx = 0; cidx <= 40; cidx++) {
                     const cellRef = XLSX.utils.encode_cell({ r: r, c: cidx });
                     if (!ws[cellRef]) continue;
                     if (!ws[cellRef].s) ws[cellRef].s = {};
-
                     if (r === 1 && cidx === 1) {
                         ws[cellRef].s = { font: { bold: true, sz: 12 }, alignment: { horizontal: "center", vertical: "center", wrapText: true } };
                         continue;
                     }
-
                     if (r < 10) {
                         if (r === 7 && cidx === 3) { ws[cellRef].t = 'n'; ws[cellRef].z = fmtRM; }
                         ws[cellRef].s.font = { bold: (cidx !== 1) };
                         ws[cellRef].s.alignment = { horizontal: (cidx === 1 || cidx === 3 ? "left" : "center") };
                         continue; 
                     }
-
                     ws[cellRef].s.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
                     ws[cellRef].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
                     if (cidx === 1) ws[cellRef].s.alignment.horizontal = "left";
-
                     if (typeof ws[cellRef].v === 'number' && cidx >= 3) { ws[cellRef].t = 'n'; ws[cellRef].z = fmtCurrency; }
                     if (cidx >= 14) ws[cellRef].s.font = { bold: true };
-
                     const valStr = ws[cellRef].v ? ws[cellRef].v.toString() : "";
-                    
-                    // Logic Header (Termasuk baris tarikh baru)
                     const isHeaderRow = valStr.includes("INTERIM NO") || valStr === "ITEM" || valStr === "DESCRIPTION" || valStr === "AS PER CONTRACT" || valStr.includes("CLAIM") || valStr.includes("BALANCE") || valStr.includes("WORKS");
                     const isRMHeader = valStr === "RM";
-                    
-                    // Warnakan Header (Kelabu)
-                    if (isHeaderRow || isRMHeader) { 
-                        ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } }; 
-                        ws[cellRef].s.font = { bold: true }; 
-                    }
-
-                    // Tambahan: Warnakan juga baris tarikh (h2) supaya seragam dengan header
+                    if (isHeaderRow || isRMHeader) { ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } }; ws[cellRef].s.font = { bold: true }; }
                     const rowAboveValue = ws[XLSX.utils.encode_cell({ r: r-1, c: cidx })]?.v;
-                    if (rowAboveValue && rowAboveValue.toString().includes("INTERIM NO")) {
-                        ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } };
-                    }
-
+                    if (rowAboveValue && rowAboveValue.toString().includes("INTERIM NO")) ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } };
                     const rowInd = ws[XLSX.utils.encode_cell({ r: r, c: 0 })]?.v;
                     if (rowInd === "E") ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } };
                     if (rowInd === "F" || rowInd === "G") ws[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } };
@@ -242,13 +217,66 @@ async function startAutoDownload() {
                     if (label === "TOTAL BRING TO INTERIM PAYMENT") ws[cellRef].s.font = { bold: true };
                 }
             }
-
             ws["!cols"] = [{ wch: 8 }, { wch: 40 }, { wch: 3 }, { wch: 25 }];
             for (let i = 0; i < 35; i++) ws["!cols"].push({ wch: 14 });
-
             XLSX.utils.book_append_sheet(wb, ws, "Summary");
-            XLSX.writeFile(wb, fileName);
 
+            // ============================================================
+            // PENAMBAHAN SHEET 2 (BUDGET USAGE) - SELEPAS SHEET 1 SIAP
+            // ============================================================
+            let ws2_data = [
+                [], [], 
+                ["TOTAL LABOUR CHARGES", "RM", 0, "", "", "", "ON GOING SUPPLY OF SPARE PART BALANCE", "0%"],
+                [],
+                ["TOTAL SUPPLY OF SPARE PART", "RM", 0, "", "", "", "ON GOING LABOUR CHARGES BALANCE", "0%"],
+                [],
+                ["TOTAL PROVISIONAL SUM", "RM", 0, "", "", "", "ON GOING PROV SUM BALANCE", "0%"],
+                [],
+                ["TOTAL APPROVED CM WORKS", "RM", 0, "", "", "", "TOTAL G&P CLAIMED", "0%"],
+                ["TOTAL CM WORKS CLAIMED", "RM", 0, "0%", "", "", "BAL. G&P NOT CLAIM", "100%"],
+                ["BAL. CM WORKS NOT CLAIM", "RM", 0, "0%", "", "", "", ""],
+                [],
+                ["", "", "", "", "", "", "TOTAL PM WORKS CLAIMED", "0%"],
+                ["TOTAL PENDING CLAIM", "RM", 0, "0%", "", "", "BAL. PM WORKS NOT CLAIM", "100%"],
+                [],
+                ["", "", "", "", "", "", "TOTAL CALIBRATION WORKS CLAIMED", "0%"],
+                ["", "", "", "", "", "", "BAL. CALIBRATION WORKS NOT CLAIM", "100%"],
+                [], [], [], [],
+                ["CM BUDGET USAGE BY DISTRICT"],
+                [],
+                ["SEGAMAT", "RM", 0, "0%"],
+                ["MUAR", "RM", 0, "0%"],
+                ["BATU PAHAT", "RM", 0, "0%"],
+                ["KLUANG", "RM", 0, "0%"],
+                ["MERSING", "RM", 0, "0%"],
+                ["TOTAL USAGE OF CM BUDGET", "RM", 0]
+            ];
+            
+            const ws2 = XLSX.utils.aoa_to_sheet(ws2_data);
+            
+            for(let r=0; r<ws2_data.length; r++) {
+                for(let c=0; c<8; c++) {
+                    const ref = XLSX.utils.encode_cell({r:r, c:c});
+                    if(!ws2[ref]) continue;
+                    if(!ws2[ref].s) ws2[ref].s = {};
+                    if(ws2[ref].v !== "" && r > 1) ws2[ref].s.border = { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} };
+                    if(typeof ws2[ref].v === 'number' && c === 2) { ws2[ref].t = 'n'; ws2[ref].z = fmtCurrency; }
+                    if(r===2 && c<3) ws2[ref].s.fill = { fgColor: { rgb: "FFCC99" } }; 
+                    if(r===4 && c<3) ws2[ref].s.fill = { fgColor: { rgb: "FFFF00" } }; 
+                    if(r===6 && c<3) ws2[ref].s.fill = { fgColor: { rgb: "FFFF00" } }; 
+                    if(r===8 && c<3) ws2[ref].s.fill = { fgColor: { rgb: "FFCC99" } }; 
+                    if(r===13 && c<4) { ws2[ref].s.fill = { fgColor: { rgb: "FF0000" } }; ws2[ref].s.font = { color: { rgb: "FFFFFF" }, bold: true }; }
+                    if(c >= 6) {
+                        if(r===2 || r===6) ws2[ref].s.fill = { fgColor: { rgb: "FFFF00" } };
+                        if(r===4) ws2[ref].s.fill = { fgColor: { rgb: "FFCC99" } };
+                    }
+                    if(r === 21) ws2[ref].s.font = { bold: true };
+                }
+            }
+            ws2["!cols"] = [{ wch: 35 }, { wch: 5 }, { wch: 15 }, { wch: 10 }, { wch: 5 }, { wch: 5 }, { wch: 40 }, { wch: 10 }];
+            XLSX.utils.book_append_sheet(wb, ws2, "Budget Usage");
+
+            XLSX.writeFile(wb, fileName);
             setTimeout(() => { window.history.back(); }, 2000);
         }
     } catch(err) { 
@@ -256,9 +284,7 @@ async function startAutoDownload() {
         alert("Ralat memproses data.");
     }
 }
-
 startAutoDownload();
 </script>
-
 </body>
 </html>
