@@ -2,7 +2,8 @@
 <html lang="ms">
 <head>
     <meta charset="UTF-8">
-    <title>Downloading Contract Summary...</title> 
+    <title>Generating Excel...</title> 
+    <!-- Library dikekalkan sama -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <style>
         body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f5f7fb; color: #333; }
@@ -13,27 +14,32 @@
 
 <div class="loader">
     <h3>Sila Tunggu...</h3>
-    <p>Fail Excel sedang dijana secara automatik.</p>
+    <p>Fail Excel anda sedang dijana dan akan dimuat turun secara automatik.</p>
 </div>
 
 <script>
+// KONFIGURASI SUPABASE (DIKEKALKAN)
 const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
-
 const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
 const params = new URLSearchParams(window.location.search);
 const contractId = params.get('id');
 
+// FUNGSI FORMAT TARIKH (DIKEKALKAN)
 function formatDateMY(dateStr) {
     if (!dateStr) return "-";
     const date = new Date(dateStr);
+    if (isNaN(date)) return "-"; 
     const months = ["JANUARI", "FEBRUARI", "MAC", "APRIL", "MEI", "JUN", "JULAI", "OGOS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DISEMBER"];
     return `${String(date.getDate()).padStart(2, '0')} ${months[date.getMonth()]} ${date.getFullYear()}`;
 }
 
-async function startAutoProcess() {
+// FUNGSI UTAMA (GABUNGAN LOAD & EXPORT SECARA AUTOMATIK)
+async function startAutoDownload() {
     if(!contractId) return;
+    
     try {
+        // Ambil data (Sama seperti loadSummary asal)
         const [conRes, intRes, woRes] = await Promise.all([
             fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}`, { headers }),
             fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=created_at.asc`, { headers }),
@@ -47,7 +53,7 @@ async function startAutoProcess() {
         if (contracts && contracts.length > 0) {
             const c = contracts[0];
             
-            // Ambil Nama Unit
+            // Ambil Nama Unit untuk Nama Fail (Sama seperti exportExcel asal)
             let unitName = "UNIT";
             try {
                 const unitRes = await fetch(`${SB_URL}/rest/v1/units?id=eq.${c.unit_id}`, { headers });
@@ -59,23 +65,28 @@ async function startAutoProcess() {
             const endYear = c.contract_end ? new Date(c.contract_end).getFullYear() : "????";
             const fileName = `${unitName} ${startYear} - ${endYear} ${c.contract_code || "-"} SUMMARY.xlsx`;
 
-            // Logik Bina Excel
-            const wb = XLSX.utils.book_new();
-            let merges = [{ s: { r: 1, c: 1 }, e: { r: 2, c: 13 } }];
-            const fmtCurrency = '#,##0.00;\\(#,##0.00\\);"-"';
+            // --- PERMULAAN LOGIK EXCEL (SEMUA FORMAT & STYLE KEKAL) ---
+            const period = `${formatDateMY(c.contract_start)} ~ ${formatDateMY(c.contract_end)}`;
             const pgSumFormatted = Number(c.performance_guarantee_total || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            
             const sections = c.contract_sections_breakdown || {};
             const sectionNames = Object.keys(sections);
+            const wb = XLSX.utils.book_new();
+            let merges = [{ s: { r: 1, c: 1 }, e: { r: 2, c: 13 } }]; 
+
+            const fmtCurrency = '#,##0.00;\\(#,##0.00\\);"-"'; 
+            const fmtRM = '"RM"#,##0.00'; 
+            const pgInfo = `RM ${pgSumFormatted} (${c.insurance_no || '-'})`;
 
             let ws_data = [
                 [], 
                 ["", c.contract_name || "SUMMARY OF CONTRACT"], 
-                [], [],
+                [], [], 
                 ["", "CONTRACT NO.", ":", c.contract_code || "-"], 
                 ["", "CONTRACTOR", ":", c.contractor || "-"],
-                ["", "CONTRACT PERIOD", ":", `${formatDateMY(c.contract_start)} ~ ${formatDateMY(c.contract_end)}`],
+                ["", "CONTRACT PERIOD", ":", period],
                 ["", "CONTRACT SUM", ":", Number(c.contract_sum || 0)],
-                ["", "PERFORMANCE GUARANTEE SUM", ":", `RM ${pgSumFormatted} (${c.insurance_no || '-'})`],
+                ["", "PERFORMANCE GUARANTEE SUM", ":", pgInfo],
                 [] 
             ];
 
@@ -85,42 +96,74 @@ async function startAutoProcess() {
                 for (let i = startInt; i <= endInt; i++) h1.push(`INTERIM NO.${i}`);
                 if (isLastSet) h1.push("TOTAL CLAIM", "CONTRACT BALANCE", "ON GOING WORKS", "ON GOING CONTRACT BALANCE");
                 
-                ws_data.push(h1, h1.map((_, i) => (i < 3 ? "" : "RM")));
-                merges.push({ s: { r: startRow, c: 0 }, e: { r: startRow + 1, c: 0 } }, { s: { r: startRow, c: 1 }, e: { r: startRow + 1, c: 2 } });
+                let h2 = h1.map((h, i) => (i < 3 ? "" : "RM"));
+                ws_data.push(h1, h2);
+                merges.push({ s: { r: startRow, c: 0 }, e: { r: startRow + 1, c: 0 } });
+                merges.push({ s: { r: startRow, c: 1 }, e: { r: startRow + 1, c: 2 } });
 
                 sectionNames.forEach((sec, idx) => {
-                    const rIdx = ws_data.length;
-                    const cAmt = Number(sections[sec]?.amt || 0);
-                    let row = [String.fromCharCode(65 + idx), sections[sec]?.desc || sec, "", cAmt];
+                    const currentRowIdx = ws_data.length;
+                    const letter = String.fromCharCode(65 + idx);
+                    const contractAmt = Number(sections[sec]?.amt || 0);
+                    let row = [letter, sections[sec]?.desc || sec, "", contractAmt];
 
-                    for (let i = startInt; i <= endInt; i++) row.push(Number(interims[i - 1]?.claim_breakdown?.[sec]?.amt || 0));
+                    for (let i = startInt; i <= endInt; i++) {
+                        const val = Number(interims[i - 1]?.claim_breakdown?.[sec]?.amt || 0);
+                        row.push(val || 0);
+                    }
 
                     if (isLastSet) {
-                        let tClaim = 0; interims.forEach(int => tClaim += Number(int.claim_breakdown?.[sec]?.amt || 0));
-                        let ong = 0; workorders.filter(w => w.status !== 'Claimed').forEach(w => {
+                        let totalClaimAll = 0;
+                        interims.forEach(int => totalClaimAll += Number(int.claim_breakdown?.[sec]?.amt || 0));
+                        let ongoing = 0;
+                        workorders.filter(w => w.status !== 'Claimed').forEach(w => {
                             const cat = w.section_category || {};
-                            ong += Number(cat[sec]?.amt || 0);
-                            if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) ong += Number(w.additional || 0);
+                            ongoing += Number(cat[sec]?.amt || 0);
+                            if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) ongoing += Number(w.additional || 0);
                         });
-                        row.push(tClaim, (cAmt - tClaim), ong, (cAmt - tClaim - ong));
+                        const balance = contractAmt - totalClaimAll;
+                        row.push(totalClaimAll, balance, ongoing, (balance - ongoing));
                     }
                     ws_data.push(row);
-                    merges.push({ s: { r: rIdx, c: 1 }, e: { r: rIdx, c: 2 } });
+                    merges.push({ s: { r: currentRowIdx, c: 1 }, e: { r: currentRowIdx, c: 2 } });
                 });
 
-                const addSpec = (label, key, isNet = false) => {
+                const addSpecialRow = (label, interimKey, isNet = false) => {
                     const rIdx = ws_data.length;
-                    let row = ["", label, "", isNet ? sectionNames.reduce((a, s) => a + Number(sections[s]?.amt || 0), 0) : 0];
-                    for (let i = startInt; i <= endInt; i++) row.push(isNet ? Number(interims[i - 1]?.net_amount || 0) : Number(interims[i - 1]?.[key] || 0));
-                    if (isLastSet) row.push(0, 0, 0, 0); // Simplified for auto-download
+                    let row = ["", label, "", 0];
+                    if(isNet) {
+                        let sumContract = 0;
+                        sectionNames.forEach(s => sumContract += Number(sections[s]?.amt || 0));
+                        row[3] = sumContract;
+                    }
+                    for (let i = startInt; i <= endInt; i++) {
+                        const val = isNet ? Number(interims[i - 1]?.net_amount || 0) : Number(interims[i - 1]?.[interimKey] || 0);
+                        row.push(val || 0);
+                    }
+                    if (isLastSet) {
+                        let totalClaimSum = 0;
+                        interims.forEach(int => totalClaimSum += Number(isNet ? int.net_amount : (int[interimKey] || 0)));
+                        if (isNet) {
+                            let totalContractAmt = 0;
+                            sectionNames.forEach(s => totalContractAmt += Number(sections[s]?.amt || 0));
+                            let totalOngoingSum = 0;
+                            workorders.filter(w => w.status !== 'Claimed').forEach(w => {
+                                if(w.section_category) {
+                                    sectionNames.forEach(s => totalOngoingSum += Number(w.section_category[s]?.amt || 0));
+                                } else { totalOngoingSum += Number(w.total_amount || 0); }
+                            });
+                            const totalBalance = totalContractAmt - totalClaimSum;
+                            row.push(totalClaimSum, totalBalance, totalOngoingSum, (totalBalance - totalOngoingSum));
+                        } else { row.push(totalClaimSum, 0, 0, 0); }
+                    }
                     ws_data.push(row);
                     merges.push({ s: { r: rIdx, c: 1 }, e: { r: rIdx, c: 2 } });
                 };
 
-                addSpec("PERFORMANCE GUARANTEE SUM", "performance_guarantee_sum");
-                addSpec("SALVAGE VALUE", "salvage_value");
-                addSpec("TOTAL BRING TO INTERIM PAYMENT", "", true);
-                ws_data.push([]);
+                addSpecialRow("PERFORMANCE GUARANTEE SUM", "performance_guarantee_sum");
+                addSpecialRow("SALVAGE VALUE", "salvage_value");
+                addSpecialRow("TOTAL BRING TO INTERIM PAYMENT", "", true);
+                ws_data.push([]); 
             }
 
             buildTableSet(1, 10, false);
@@ -130,32 +173,66 @@ async function startAutoProcess() {
             const ws = XLSX.utils.aoa_to_sheet(ws_data);
             ws["!merges"] = merges;
 
-            // Styling (Sama seperti kod asal anda)
-            for (let r = 0; r < ws_data.length; r++) {
+            const lastRowIdx = ws_data.length - 1;
+
+            // --- STYLING (KEKAL SEPERTI ASAL) ---
+            for (let r = 0; r <= lastRowIdx; r++) {
                 for (let cidx = 0; cidx <= 40; cidx++) {
-                    const ref = XLSX.utils.encode_cell({ r: r, c: cidx });
-                    if (!ws[ref]) continue;
-                    ws[ref].s = ws[ref].s || {};
-                    if (r > 9) {
-                        ws[ref].s.border = { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} };
-                        if (typeof ws[ref].v === 'number' && cidx >= 3) { ws[ref].t = 'n'; ws[ref].z = fmtCurrency; }
+                    const cellRef = XLSX.utils.encode_cell({ r: r, c: cidx });
+                    if (!ws[cellRef]) continue;
+                    if (!ws[cellRef].s) ws[cellRef].s = {};
+
+                    if (r === 1 && cidx === 1) {
+                        ws[cellRef].s = { font: { bold: true, sz: 12 }, alignment: { horizontal: "center", vertical: "center", wrapText: true } };
+                        continue;
                     }
+
+                    if (r < 10) {
+                        if (r === 7 && cidx === 3) { ws[cellRef].t = 'n'; ws[cellRef].z = fmtRM; }
+                        ws[cellRef].s.font = { bold: (cidx !== 1) };
+                        ws[cellRef].s.alignment = { horizontal: (cidx === 1 || cidx === 3 ? "left" : "center") };
+                        continue; 
+                    }
+
+                    ws[cellRef].s.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+                    ws[cellRef].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
+                    if (cidx === 1) ws[cellRef].s.alignment.horizontal = "left";
+
+                    if (typeof ws[cellRef].v === 'number' && cidx >= 3) { ws[cellRef].t = 'n'; ws[cellRef].z = fmtCurrency; }
+                    if (cidx >= 14) ws[cellRef].s.font = { bold: true };
+
+                    const valStr = ws[cellRef].v ? ws[cellRef].v.toString() : "";
+                    const isHeader = valStr.includes("INTERIM NO") || valStr === "ITEM" || valStr === "DESCRIPTION" || valStr === "AS PER CONTRACT" || valStr.includes("CLAIM") || valStr.includes("BALANCE") || valStr.includes("WORKS");
+                    const isRMHeader = valStr === "RM";
+
+                    if (isHeader || isRMHeader) { ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } }; ws[cellRef].s.font = { bold: true }; }
+                    const rowInd = ws[XLSX.utils.encode_cell({ r: r, c: 0 })]?.v;
+                    if (rowInd === "E") ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } };
+                    if (rowInd === "F" || rowInd === "G") ws[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } };
+                    const label = ws[XLSX.utils.encode_cell({ r: r, c: 1 })]?.v;
+                    if (label === "TOTAL BRING TO INTERIM PAYMENT") ws[cellRef].s.font = { bold: true };
                 }
             }
 
+            ws["!cols"] = [{ wch: 8 }, { wch: 40 }, { wch: 3 }, { wch: 25 }];
+            for (let i = 0; i < 35; i++) ws["!cols"].push({ wch: 14 });
+
             XLSX.utils.book_append_sheet(wb, ws, "Summary");
+
+            // MUAT TURUN FAIL
             XLSX.writeFile(wb, fileName);
 
-            // Kembali ke halaman sebelumnya selepas muat turun bermula
-            setTimeout(() => { window.history.back(); }, 1500);
+            // SELEPAS DOWNLOAD, KEMBALI KE HALAMAN SEBELUMNYA
+            setTimeout(() => { window.history.back(); }, 2000);
         }
-    } catch(err) {
+    } catch(err) { 
         console.error(err);
-        alert("Ralat memproses fail.");
+        alert("Ralat memproses data.");
     }
 }
 
-startAutoProcess();
+// JALANKAN PROSES SEBAIK SAHAJA LOAD
+startAutoDownload();
 </script>
 
 </body>
