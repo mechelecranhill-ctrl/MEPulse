@@ -657,8 +657,35 @@ ws3Cols.push({ wch: 20 });
 ws3["!cols"] = ws3Cols;
 
             XLSX.utils.book_append_sheet(wb, ws3, "List Work Order");
-            XLSX.writeFile(wb, fileName);
-            setTimeout(() => { window.history.back(); }, 2000);
+
+// ===== PWA SAFE DOWNLOAD =====
+const wbout = XLSX.write(wb, {
+    bookType: 'xlsx',
+    type: 'array'
+});
+
+const blob = new Blob(
+    [wbout],
+    {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    }
+);
+
+const url = URL.createObjectURL(blob);
+
+const a = document.createElement("a");
+a.href = url;
+a.download = fileName;
+
+document.body.appendChild(a);
+a.click();
+
+setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    window.history.back();
+}, 1500);
     
     } else {   
         alert("Tiada data kontrak dijumpai.");
