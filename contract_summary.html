@@ -72,7 +72,9 @@ async function startAutoDownload() {
             const sectionNames = Object.keys(sections);
             const wb = XLSX.utils.book_new();
 
-            // --- SHEET 1: SUMMARY (KOD ASAL ANDA) ---
+            // ============================================================
+            // KOD ASAL SHEET 1 (SUMMARY) - JANGAN UBAH
+            // ============================================================
             let merges = [{ s: { r: 1, c: 1 }, e: { r: 2, c: 13 } }]; 
             const fmtCurrency = '#,##0.00;\\(#,##0.00\\);"-"'; 
             const fmtRM = '"RM"#,##0.00'; 
@@ -216,9 +218,11 @@ async function startAutoDownload() {
             for (let i = 0; i < 35; i++) ws["!cols"].push({ wch: 14 });
             XLSX.utils.book_append_sheet(wb, ws, "Summary");
 
-            // --- SHEET 2: BUDGET USAGE (RUJUKAN GAMBAR) ---
+            // ============================================================
+            // PENAMBAHAN SHEET 2 (BUDGET USAGE)
+            // ============================================================
             let ws2_data = [
-                [], [], // Row 1 & 2 Kosong
+                [], [], // Bermula dari Row 3 (Indeks 2)
                 ["TOTAL LABOUR CHARGES", "RM", 0, "", "", "", "ON GOING SUPPLY OF SPARE PART BALANCE", "0%"],
                 [],
                 ["TOTAL SUPPLY OF SPARE PART", "RM", 0, "", "", "", "ON GOING LABOUR CHARGES BALANCE", "0%"],
@@ -226,14 +230,14 @@ async function startAutoDownload() {
                 ["TOTAL PROVISIONAL SUM", "RM", 0, "", "", "", "ON GOING PROV SUM BALANCE", "0%"],
                 [],
                 ["TOTAL APPROVED CM WORKS", "RM", 0, "", "", "", "TOTAL G&P CLAIMED", "0%"],
-                ["TOTAL CM WORKS CLAIMED", "RM", 0, "0%", "", "", "BAL. G&P NOT CLAIM", "0%"],
+                ["TOTAL CM WORKS CLAIMED", "RM", 0, "0%", "", "", "BAL. G&P NOT CLAIM", "100%"],
                 ["BAL. CM WORKS NOT CLAIM", "RM", 0, "0%", "", "", "", ""],
                 [],
                 ["", "", "", "", "", "", "TOTAL PM WORKS CLAIMED", "0%"],
-                ["TOTAL PENDING CLAIM", "RM", 0, "0%", "", "", "BAL. PM WORKS NOT CLAIM", "0%"],
+                ["TOTAL PENDING CLAIM", "RM", 0, "0%", "", "", "BAL. PM WORKS NOT CLAIM", "100%"],
                 [],
                 ["", "", "", "", "", "", "TOTAL CALIBRATION WORKS CLAIMED", "0%"],
-                ["", "", "", "", "", "", "BAL. CALIBRATION WORKS NOT CLAIM", "0%"],
+                ["", "", "", "", "", "", "BAL. CALIBRATION WORKS NOT CLAIM", "100%"],
                 [], [], [], [],
                 ["CM BUDGET USAGE BY DISTRICT"],
                 [],
@@ -247,37 +251,40 @@ async function startAutoDownload() {
 
             const ws2 = XLSX.utils.aoa_to_sheet(ws2_data);
             
-            // Style Sheet 2
-            for(let r=2; r<ws2_data.length; r++) {
-                for(let cidx=0; cidx<8; cidx++) {
-                    const ref = XLSX.utils.encode_cell({r:r, c:cidx});
+            // Styling Sheet 2
+            for(let r=0; r<ws2_data.length; r++) {
+                for(let c=0; c<8; c++) {
+                    const ref = XLSX.utils.encode_cell({r:r, c:c});
                     if(!ws2[ref]) continue;
                     if(!ws2[ref].s) ws2[ref].s = {};
                     
-                    // Borders & Alignments
+                    // Borders & General Alignment
                     if(ws2[ref].v !== "") {
                         ws2[ref].s.border = { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} };
+                        ws2[ref].s.alignment = { vertical: "center", horizontal: "left" };
                     }
-                    
-                    // Specific Colors (Based on your image)
-                    if(r===2 && cidx<3) ws2[ref].s.fill = { fgColor: { rgb: "FFCC99" } }; // Labour
-                    if(r===4 && cidx<3) ws2[ref].s.fill = { fgColor: { rgb: "FFFF00" } }; // Spare Part
-                    if(r===6 && cidx<3) ws2[ref].s.fill = { fgColor: { rgb: "FFFF00" } }; // Prov Sum
-                    if(r===8 && cidx<3) ws2[ref].s.fill = { fgColor: { rgb: "FFCC99" } }; // Approved
-                    if(r===13 && cidx<4) { // Red Pending Claim
-                         ws2[ref].s.fill = { fgColor: { rgb: "FF0000" } };
-                         ws2[ref].s.font = { color: { rgb: "FFFFFF" }, bold: true };
+
+                    // Format Mata Wang & Peratus
+                    if(typeof ws2[ref].v === 'number' && c === 2) { ws2[ref].t = 'n'; ws2[ref].z = fmtCurrency; }
+
+                    // Warna Mengikut Gambar
+                    if(r===2 && c<3) ws2[ref].s.fill = { fgColor: { rgb: "FFCC99" } }; // Oren Labour
+                    if(r===4 && c<3) ws2[ref].s.fill = { fgColor: { rgb: "FFFF00" } }; // Kuning Spare Part
+                    if(r===6 && c<3) ws2[ref].s.fill = { fgColor: { rgb: "FFFF00" } }; // Kuning Prov Sum
+                    if(r===8 && c<3) ws2[ref].s.fill = { fgColor: { rgb: "FFCC99" } }; // Oren Approved
+                    if(r===13 && c<4) { // Merah Pending Claim
+                        ws2[ref].s.fill = { fgColor: { rgb: "FF0000" } };
+                        ws2[ref].s.font = { color: { rgb: "FFFFFF" }, bold: true };
                     }
-                    
-                    // Right side colors
-                    if(cidx >= 6) {
+                    // Sisi Kanan (Kuning & Oren)
+                    if(c >= 6) {
                         if(r===2 || r===6) ws2[ref].s.fill = { fgColor: { rgb: "FFFF00" } };
                         if(r===4) ws2[ref].s.fill = { fgColor: { rgb: "FFCC99" } };
                     }
                 }
             }
-            
-            ws2["!cols"] = [{ wch: 30 }, { wch: 5 }, { wch: 15 }, { wch: 10 }, { wch: 5 }, { wch: 5 }, { wch: 35 }, { wch: 10 }];
+
+            ws2["!cols"] = [{ wch: 35 }, { wch: 5 }, { wch: 15 }, { wch: 10 }, { wch: 5 }, { wch: 5 }, { wch: 40 }, { wch: 10 }];
             XLSX.utils.book_append_sheet(wb, ws2, "Budget Usage");
 
             XLSX.writeFile(wb, fileName);
