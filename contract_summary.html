@@ -217,14 +217,31 @@ async function startAutoDownload() {
                     }
                     
                     const rowDesc = ws[XLSX.utils.encode_cell({ r: r, c: 1 })]?.v?.toString().toUpperCase() || "";
-                    if (rowDesc) {
-                        if (rowDesc.includes("LABOUR") || rowDesc.includes("WORKMANSHIP")) ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } };
-                        else if (rowDesc.includes("SPARE") || rowDesc.includes("PROVISIONAL")) ws[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } };
-                        else if (rowDesc.includes("REFURBISHMENT")) {
-                            ws[cellRef].s.fill = { fgColor: { rgb: "A9A9A9" } };
-                            ws[cellRef].s.font = { color: { rgb: "000000" } };
-                        }
-                    }
+
+if (rowDesc) {
+    // 1. Logik Warna Latar Belakang
+    if (rowDesc.includes("LABOUR") || rowDesc.includes("WORKMANSHIP")) {
+        ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } };
+    } 
+    else if (rowDesc.includes("SPARE") || rowDesc.includes("PROVISIONAL")) {
+        ws[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } };
+    } 
+    else if (rowDesc.includes("REFURBISHMENT")) {
+        ws[cellRef].s.fill = { fgColor: { rgb: "A9A9A9" } };
+    }
+
+    // 2. Logik BOLD & FONT HITAM (Untuk semua baris total di bahagian bawah)
+if (
+    rowDesc.includes("TOTAL BRING TO INTERIM") || 
+    rowDesc.includes("PERFORMANCE GUARANTEE SUM") || 
+    rowDesc.includes("SALVAGE VALUE")
+) {
+    ws[cellRef].s.font = { bold: true, color: { rgb: "000000" } };
+} else {
+    // Pastikan font selain header/total tetap hitam tapi tak bold
+    if (!ws[cellRef].s.font) ws[cellRef].s.font = {};
+    ws[cellRef].s.font.color = { rgb: "000000" };
+}
                 }
             }
             ws["!cols"] = [{ wch: 8 }, { wch: 40 }, { wch: 3 }, { wch: 25 }];
