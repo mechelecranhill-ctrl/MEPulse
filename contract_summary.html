@@ -1,60 +1,20 @@
 <!DOCTYPE html> 
 <html lang="ms">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Contract Summary (Excel View)</title> 
-
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
-
-<style>
-body{ font-family:-apple-system,system-ui,sans-serif; margin:0; background:#f5f7fb; padding:20px; }
-.header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; }
-.card{ background:white; padding:20px; border-radius:15px; box-shadow:0 4px 15px rgba(0,0,0,0.08); }
-.btn{ padding:10px 14px; border:none; border-radius:10px; cursor:pointer; font-weight:600; }
-.btn-blue{ background:#007AFF; color:white; }
-.btn-dark{ background:#333; color:white; }
-#excelTable { width: 100%; border-collapse: collapse; font-size: 12px; background: white; }
-#excelTable th { background: #f3f3f3; border: 1px solid #ccc; padding: 8px; text-align: left; }
-#excelTable td { border: 1px solid #ddd; padding: 8px; }
-</style>
+    <meta charset="UTF-8">
+    <title>Downloading Contract Summary...</title> 
+    <!-- Library Diperlukan -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f4f4f9; color: #555; }
+        .loader { text-align: center; }
+    </style>
 </head>
-
 <body>
 
-<div class="header">
-    <div>
-        <h2 style="margin:0;">Contract Summary</h2>
-        <small style="color:#666;">Format: Excel.xlsx</small>
-    </div>
-
-    <div style="display:flex; gap:10px;">
-        <button class="btn btn-blue" onclick="exportExcel()">
-            <i class="fa fa-file-excel"></i> Export Excel
-        </button>
-        <button class="btn btn-dark" onclick="goBack()">
-            <i class="fa fa-arrow-left"></i> Back
-        </button>
-    </div>
-</div>
-
-<div class="card">
-    <div style="overflow:auto;">
-        <table id="excelTable">
-            <thead>
-                <tr>
-                    <th>No</th>
-                    <th>Contract Code</th>
-                    <th>Contractor</th>
-                    <th>Total Contract (RM)</th>
-                </tr>
-            </thead>
-            <tbody id="excelBody">
-                <tr><td colspan="4">Loading data...</td></tr>
-            </tbody>
-        </table>
-    </div>
+<div class="loader">
+    <p>Menjana fail Excel... Sila tunggu sebentar.</p>
+    <small>Halaman ini akan kembali secara automatik selepas muat turun selesai.</small>
 </div>
 
 <script>
@@ -65,238 +25,24 @@ const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Conten
 const params = new URLSearchParams(window.location.search);
 const contractId = params.get('id');
 
-    function formatDateMY(dateStr) {
+function formatDateMY(dateStr) {
     if (!dateStr) return "-";
     const date = new Date(dateStr);
-    if (isNaN(date)) return "-"; 
     const months = ["JANUARI", "FEBRUARI", "MAC", "APRIL", "MEI", "JUN", "JULAI", "OGOS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DISEMBER"];
     return `${String(date.getDate()).padStart(2, '0')} ${months[date.getMonth()]} ${date.getFullYear()}`;
+}
 
-    }
-    
-        async function exportExcel() {
-            
-            if (!window.contractData) {
-        alert("Data belum sedia");
+async function startAutoDownload() {
+    if (!contractId) {
+        alert("ID Kontrak tidak ditemui.");
         return;
     }
 
-    const c = window.contractData;
-    
-    // --- TAMBAHAN: AMBIL DATA UNIT UNTUK NAMA FAIL ---
-    let unitName = "UNIT";
     try {
-        const unitRes = await fetch(`${SB_URL}/rest/v1/units?id=eq.${c.unit_id}`, { headers });
-        const units = await unitRes.json();
-        if (units && units.length > 0) {
-            unitName = units[0].unit_name;
-        }
-    } catch (e) {
-        console.error("Gagal ambil nama unit:", e);
-    }
-
-    // --- FORMAT TAHUN & NAMA FAIL ---
-    const startYear = c.contract_start ? new Date(c.contract_start).getFullYear() : "????";
-    const endYear = c.contract_end ? new Date(c.contract_end).getFullYear() : "????";
-    const contractCode = c.contract_code || "-";
-    
-    // FORMAT: [UNIT] [YEAR-YEAR] [CODE] SUMMARY
-    const fileName = `${unitName} ${startYear} - ${endYear} ${contractCode} SUMMARY.xlsx`;
-    // ----------------------------------------------
-
-    const period = `${formatDateMY(c.contract_start)} ~ ${formatDateMY(c.contract_end)}`;
-    
-    const pgSumFormatted = Number(c.performance_guarantee_total || 0).toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-    });
-
-    const [intRes, woRes] = await Promise.all([
-        fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=created_at.asc`, { headers }),
-        fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}`, { headers })
-    ]);
-
-    const interims = await intRes.json();
-    const workorders = await woRes.json();
-    const sections = c.contract_sections_breakdown || {};
-    const sectionNames = Object.keys(sections);
-
-    const wb = XLSX.utils.book_new();
-    let merges = [{ s: { r: 1, c: 1 }, e: { r: 2, c: 13 } }]; 
-
-    const fmtCurrency = '#,##0.00;\\(#,##0.00\\);"-"'; 
-    const fmtRM = '"RM"#,##0.00'; 
-    const pgInfo = `RM ${pgSumFormatted} (${c.insurance_no || '-'})`;
-
-    let ws_data = [
-        [], 
-        ["", c.contract_name || "SUMMARY OF CONTRACT"], 
-        [], 
-        [], 
-        ["", "CONTRACT NO.", ":", c.contract_code || "-"], 
-        ["", "CONTRACTOR", ":", c.contractor || "-"],
-        ["", "CONTRACT PERIOD", ":", period],
-        ["", "CONTRACT SUM", ":", Number(c.contract_sum || 0)],
-        ["", "PERFORMANCE GUARANTEE SUM", ":", pgInfo],
-        [] 
-    ];
-
-    function buildTableSet(startInt, endInt, isLastSet) {
-        const startRow = ws_data.length;
-        let h1 = ["ITEM", "DESCRIPTION", "", "AS PER CONTRACT"];
-        for (let i = startInt; i <= endInt; i++) h1.push(`INTERIM NO.${i}`);
-        if (isLastSet) h1.push("TOTAL CLAIM", "CONTRACT BALANCE", "ON GOING WORKS", "ON GOING CONTRACT BALANCE");
-        
-        let h2 = h1.map((h, i) => (i < 3 ? "" : "RM"));
-        ws_data.push(h1, h2);
-
-        merges.push({ s: { r: startRow, c: 0 }, e: { r: startRow + 1, c: 0 } });
-        merges.push({ s: { r: startRow, c: 1 }, e: { r: startRow + 1, c: 2 } });
-
-        sectionNames.forEach((sec, idx) => {
-            const currentRowIdx = ws_data.length;
-            const letter = String.fromCharCode(65 + idx);
-            const contractAmt = Number(sections[sec]?.amt || 0);
-            let row = [letter, sections[sec]?.desc || sec, "", contractAmt];
-
-            for (let i = startInt; i <= endInt; i++) {
-                const val = Number(interims[i - 1]?.claim_breakdown?.[sec]?.amt || 0);
-                row.push(val || 0);
-            }
-
-            if (isLastSet) {
-                let totalClaimAll = 0;
-                interims.forEach(int => totalClaimAll += Number(int.claim_breakdown?.[sec]?.amt || 0));
-                let ongoing = 0;
-                workorders.filter(w => w.status !== 'Claimed').forEach(w => {
-                    const cat = w.section_category || {};
-                    ongoing += Number(cat[sec]?.amt || 0);
-                    if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) ongoing += Number(w.additional || 0);
-                });
-                const balance = contractAmt - totalClaimAll;
-                row.push(totalClaimAll, balance, ongoing, (balance - ongoing));
-            }
-            ws_data.push(row);
-            merges.push({ s: { r: currentRowIdx, c: 1 }, e: { r: currentRowIdx, c: 2 } });
-        });
-
-        const addSpecialRow = (label, interimKey, isNet = false) => {
-            const rIdx = ws_data.length;
-            let row = ["", label, "", 0];
-            if(isNet) {
-                let sumContract = 0;
-                sectionNames.forEach(s => sumContract += Number(sections[s]?.amt || 0));
-                row[3] = sumContract;
-            }
-            for (let i = startInt; i <= endInt; i++) {
-                const val = isNet ? Number(interims[i - 1]?.net_amount || 0) : Number(interims[i - 1]?.[interimKey] || 0);
-                row.push(val || 0);
-            }
-            if (isLastSet) {
-                let totalClaimSum = 0;
-                interims.forEach(int => totalClaimSum += Number(isNet ? int.net_amount : (int[interimKey] || 0)));
-                if (isNet) {
-                    let totalContractAmt = 0;
-                    sectionNames.forEach(s => totalContractAmt += Number(sections[s]?.amt || 0));
-                    let totalOngoingSum = 0;
-                    workorders.filter(w => w.status !== 'Claimed').forEach(w => {
-                        if(w.section_category) {
-                            sectionNames.forEach(s => totalOngoingSum += Number(w.section_category[s]?.amt || 0));
-                        } else { totalOngoingSum += Number(w.total_amount || 0); }
-                    });
-                    const totalBalance = totalContractAmt - totalClaimSum;
-                    row.push(totalClaimSum, totalBalance, totalOngoingSum, (totalBalance - totalOngoingSum));
-                } else { row.push(totalClaimSum, 0, 0, 0); }
-            }
-            ws_data.push(row);
-            merges.push({ s: { r: rIdx, c: 1 }, e: { r: rIdx, c: 2 } });
-        };
-
-        addSpecialRow("PERFORMANCE GUARANTEE SUM", "performance_guarantee_sum");
-        addSpecialRow("SALVAGE VALUE", "salvage_value");
-        addSpecialRow("TOTAL BRING TO INTERIM PAYMENT", "", true);
-        ws_data.push([]); 
-    }
-
-    buildTableSet(1, 10, false);
-    buildTableSet(11, 20, false);
-    buildTableSet(21, 26, true);
-
-    const ws = XLSX.utils.aoa_to_sheet(ws_data);
-    ws["!merges"] = merges;
-
-    const lastRowIdx = ws_data.length - 1;
-
-    for (let r = 0; r <= lastRowIdx; r++) {
-        for (let cidx = 0; cidx <= 40; cidx++) {
-            const cellRef = XLSX.utils.encode_cell({ r: r, c: cidx });
-            if (!ws[cellRef]) continue;
-            if (!ws[cellRef].s) ws[cellRef].s = {};
-
-            if (r === 1 && cidx === 1) {
-                ws[cellRef].s = {
-                    font: { bold: true, sz: 12 },
-                    alignment: { horizontal: "center", vertical: "center", wrapText: true }
-                };
-                continue;
-            }
-
-            if (r < 10) {
-                if (r === 7 && cidx === 3) { 
-                    ws[cellRef].t = 'n';
-                    ws[cellRef].z = fmtRM;
-                }
-                ws[cellRef].s.font = { bold: (cidx !== 1) };
-                ws[cellRef].s.alignment = { horizontal: (cidx === 1 || cidx === 3 ? "left" : "center") };
-                continue; 
-            }
-
-            ws[cellRef].s.border = {
-                top: { style: "thin" }, bottom: { style: "thin" },
-                left: { style: "thin" }, right: { style: "thin" }
-            };
-            ws[cellRef].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
-            if (cidx === 1) ws[cellRef].s.alignment.horizontal = "left";
-
-            if (typeof ws[cellRef].v === 'number' && cidx >= 3) {
-                ws[cellRef].t = 'n';
-                ws[cellRef].z = fmtCurrency;
-            }
-
-            if (cidx >= 14) ws[cellRef].s.font = { bold: true };
-
-            const valStr = ws[cellRef].v ? ws[cellRef].v.toString() : "";
-            const isHeader = valStr.includes("INTERIM NO") || valStr === "ITEM" || valStr === "DESCRIPTION" || valStr === "AS PER CONTRACT" || valStr.includes("CLAIM") || valStr.includes("BALANCE") || valStr.includes("WORKS");
-            const isRMHeader = valStr === "RM";
-
-            if (isHeader || isRMHeader) {
-                ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } };
-                ws[cellRef].s.font = { bold: true };
-            }
-
-            const rowInd = ws[XLSX.utils.encode_cell({ r: r, c: 0 })]?.v;
-            if (rowInd === "E") ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } };
-            if (rowInd === "F" || rowInd === "G") ws[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } };
-            
-            const label = ws[XLSX.utils.encode_cell({ r: r, c: 1 })]?.v;
-            if (label === "TOTAL BRING TO INTERIM PAYMENT") ws[cellRef].s.font = { bold: true };
-        }
-    }
-
-    ws["!cols"] = [{ wch: 8 }, { wch: 40 }, { wch: 3 }, { wch: 25 }];
-    for (let i = 0; i < 35; i++) ws["!cols"].push({ wch: 14 });
-
-    XLSX.utils.book_append_sheet(wb, ws, "Summary");
-
-    XLSX.writeFile(wb, fileName);
-}
-
-async function loadSummary(){
-    if(!contractId) return;
-    try {
+        // 1. Ambil Data Utama
         const [conRes, intRes, woRes] = await Promise.all([
             fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}`, { headers }),
-            fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}`, { headers }),
+            fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=created_at.asc`, { headers }),
             fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}`, { headers })
         ]);
 
@@ -304,74 +50,109 @@ async function loadSummary(){
         const interims = await intRes.json();
         const workorders = await woRes.json();
 
-        if (contracts && contracts.length > 0) {
-            const c = contracts[0];
-            window.contractData = c;
-            const sections = c.contract_sections_breakdown || {};
-            const sectionNames = Object.keys(sections);
+        if (!contracts || contracts.length === 0) throw new Error("Kontrak tidak wujud");
+        const c = contracts[0];
 
-            // 1. KIRA TOTAL CLAIMED (Gunakan breakdown sepertimana di Excel)
-            let totalClaimed = 0;
-            interims.forEach(int => {
-                sectionNames.forEach(sec => {
-                    totalClaimed += Number(int.claim_breakdown?.[sec]?.amt || 0);
-                });
+        // 2. Ambil Nama Unit untuk Nama Fail
+        let unitName = "UNIT";
+        const unitRes = await fetch(`${SB_URL}/rest/v1/units?id=eq.${c.unit_id}`, { headers });
+        const units = await unitRes.json();
+        if (units && units.length > 0) unitName = units[0].unit_name;
 
-                totalClaimed += Number(int.performance_guarantee_sum || 0);
-                totalClaimed += Number(int.salvage_value || 0);
-            });
+        const startYear = c.contract_start ? new Date(c.contract_start).getFullYear() : "????";
+        const endYear = c.contract_end ? new Date(c.contract_end).getFullYear() : "????";
+        const fileName = `${unitName} ${startYear} - ${endYear} ${c.contract_code || '-'} SUMMARY.xlsx`;
 
-            let ongoing = 0;
-            workorders.filter(w => w.status !== 'Claimed').forEach(w => {
-                const cat = w.section_category || {};
-                sectionNames.forEach(sec => {
-                    ongoing += Number(cat[sec]?.amt || 0);
-                    if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) {
-                        ongoing += Number(w.additional || 0);
-                    }
-                });
-            });
+        // 3. Bina Struktur Excel (Logik asal anda)
+        const wb = XLSX.utils.book_new();
+        let merges = [{ s: { r: 1, c: 1 }, e: { r: 2, c: 13 } }];
+        const fmtCurrency = '#,##0.00;\\(#,##0.00\\);"-"';
+        const sections = c.contract_sections_breakdown || {};
+        const sectionNames = Object.keys(sections);
+        const period = `${formatDateMY(c.contract_start)} ~ ${formatDateMY(c.contract_end)}`;
+        const pgSum = Number(c.performance_guarantee_total || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+
+        let ws_data = [
+            [],
+            ["", c.contract_name || "SUMMARY OF CONTRACT"],
+            [], [],
+            ["", "CONTRACT NO.", ":", c.contract_code || "-"],
+            ["", "CONTRACTOR", ":", c.contractor || "-"],
+            ["", "CONTRACT PERIOD", ":", period],
+            ["", "CONTRACT SUM", ":", Number(c.contract_sum || 0)],
+            ["", "PERFORMANCE GUARANTEE SUM", ":", `RM ${pgSum} (${c.insurance_no || '-'})`],
+            []
+        ];
+
+        // Fungsi Helper Bina Set Jadual
+        function buildTableSet(startInt, endInt, isLastSet) {
+            const startRow = ws_data.length;
+            let h1 = ["ITEM", "DESCRIPTION", "", "AS PER CONTRACT"];
+            for (let i = startInt; i <= endInt; i++) h1.push(`INTERIM NO.${i}`);
+            if (isLastSet) h1.push("TOTAL CLAIM", "CONTRACT BALANCE", "ON GOING WORKS", "ON GOING CONTRACT BALANCE");
             
-            const contractSum = Number(c.contract_sum || 0);
-            const balance = contractSum - totalClaimed;
-            const finalBalance = balance - ongoing;
+            ws_data.push(h1, h1.map((_, i) => (i < 3 ? "" : "RM")));
+            merges.push({ s: { r: startRow, c: 0 }, e: { r: startRow + 1, c: 0 } }, { s: { r: startRow, c: 1 }, e: { r: startRow + 1, c: 2 } });
 
-            // Kemaskini Dashboard UI
-            document.getElementById('excelTable').innerHTML = `
-                <thead>
-                    <tr>
-                        <th>Contract Code</th>
-                        <th>Contractor</th>
-                        <th>Total Contract (RM)</th>
-                        <th>Total Claimed (RM)</th>
-                        <th>Current Balance (RM)</th>
-                        <th>Ongoing Works (RM)</th>
-                        <th>Net Balance (RM)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>${c.contract_code || '-'}</td>
-                        <td>${c.contractor || '-'}</td>
-                        <td style="font-weight:bold;">${contractSum.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                        <td style="color: #d9534f;">${totalClaimed.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                        <td style="font-weight:bold;">${balance.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                        <td style="color: #f0ad4e;">${ongoing.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                        <td style="background: #eaffea; font-weight:bold;">${finalBalance.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    </tr>
-                </tbody>
-            `;
+            sectionNames.forEach((sec, idx) => {
+                const curR = ws_data.length;
+                const amtVal = Number(sections[sec]?.amt || 0);
+                let row = [String.fromCharCode(65 + idx), sections[sec]?.desc || sec, "", amtVal];
+
+                for (let i = startInt; i <= endInt; i++) {
+                    row.push(Number(interims[i - 1]?.claim_breakdown?.[sec]?.amt || 0));
+                }
+
+                if (isLastSet) {
+                    let totalC = 0; interims.forEach(int => totalC += Number(int.claim_breakdown?.[sec]?.amt || 0));
+                    let onG = 0; workorders.filter(w => w.status !== 'Claimed').forEach(w => {
+                        const cat = w.section_category || {};
+                        onG += Number(cat[sec]?.amt || 0);
+                        if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) onG += Number(w.additional || 0);
+                    });
+                    row.push(totalC, (amtVal - totalC), onG, (amtVal - totalC - onG));
+                }
+                ws_data.push(row);
+                merges.push({ s: { r: curR, c: 1 }, e: { r: curR, c: 2 } });
+            });
+            ws_data.push([]); 
         }
-    } catch(err) { 
+
+        buildTableSet(1, 10, false);
+        buildTableSet(11, 20, false);
+        buildTableSet(21, 26, true);
+
+        const ws = XLSX.utils.aoa_to_sheet(ws_data);
+        ws["!merges"] = merges;
+        
+        // --- Apply Basic Styling ---
+        for (let r = 0; r < ws_data.length; r++) {
+            for (let cidx = 0; cidx < 35; cidx++) {
+                const ref = XLSX.utils.encode_cell({ r: r, c: cidx });
+                if (!ws[ref]) continue;
+                if (!ws[ref].s) ws[ref].s = {};
+                if (r > 9) {
+                    ws[ref].s.border = { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} };
+                    if (typeof ws[ref].v === 'number' && cidx >= 3) { ws[ref].t = 'n'; ws[ref].z = fmtCurrency; }
+                }
+            }
+        }
+        ws["!cols"] = [{ wch: 8 }, { wch: 40 }, { wch: 3 }, { wch: 20 }];
+
+        XLSX.utils.book_append_sheet(wb, ws, "Summary");
+        XLSX.writeFile(wb, fileName);
+
+        // 4. Selesai - Kembali ke Dashboard
+        setTimeout(() => { window.history.back(); }, 1500);
+
+    } catch (err) {
         console.error(err);
-        document.getElementById('excelBody').innerHTML = `<tr><td colspan="7">Ralat memuatkan data.</td></tr>`;
+        alert("Gagal menjana fail: " + err.message);
     }
 }
 
-function goBack(){ window.history.back(); }
-loadSummary();
-    
+// Jalankan sebaik sahaja page load
+window.onload = startAutoDownload;
 </script>
-
 </body>
 </html>
