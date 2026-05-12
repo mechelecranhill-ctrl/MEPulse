@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>Generating Excel...</title> 
-    <!-- Library dikekalkan sama -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <style>
         body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f5f7fb; color: #333; }
@@ -14,18 +13,16 @@
 
 <div class="loader">
     <h3>Sila Tunggu...</h3>
-    <p>Fail Excel anda sedang dijana dan akan dimuat turun secara automatik.</p>
+    <p>Fail Excel sedang dijana dengan tarikh interim...</p>
 </div>
 
 <script>
-// KONFIGURASI SUPABASE (DIKEKALKAN)
 const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
 const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
 const params = new URLSearchParams(window.location.search);
 const contractId = params.get('id');
 
-// FUNGSI FORMAT TARIKH (DIKEKALKAN)
 function formatDateMY(dateStr) {
     if (!dateStr) return "-";
     const date = new Date(dateStr);
@@ -34,12 +31,18 @@ function formatDateMY(dateStr) {
     return `${String(date.getDate()).padStart(2, '0')} ${months[date.getMonth()]} ${date.getFullYear()}`;
 }
 
-// FUNGSI UTAMA (GABUNGAN LOAD & EXPORT SECARA AUTOMATIK)
+// Fungsi ringkas untuk tarikh interim (DD/MM/YYYY)
+function formatShortDate(dateStr) {
+    if (!dateStr) return "-";
+    const date = new Date(dateStr);
+    if (isNaN(date)) return "-";
+    return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+}
+
 async function startAutoDownload() {
     if(!contractId) return;
     
     try {
-        // Ambil data (Sama seperti loadSummary asal)
         const [conRes, intRes, woRes] = await Promise.all([
             fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}`, { headers }),
             fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=created_at.asc`, { headers }),
@@ -52,8 +55,6 @@ async function startAutoDownload() {
 
         if (contracts && contracts.length > 0) {
             const c = contracts[0];
-            
-            // Ambil Nama Unit untuk Nama Fail (Sama seperti exportExcel asal)
             let unitName = "UNIT";
             try {
                 const unitRes = await fetch(`${SB_URL}/rest/v1/units?id=eq.${c.unit_id}`, { headers });
@@ -65,13 +66,14 @@ async function startAutoDownload() {
             const endYear = c.contract_end ? new Date(c.contract_end).getFullYear() : "????";
             const fileName = `${unitName} ${startYear} - ${endYear} ${c.contract_code || "-"} SUMMARY.xlsx`;
 
-            // --- PERMULAAN LOGIK EXCEL (SEMUA FORMAT & STYLE KEKAL) ---
             const period = `${formatDateMY(c.contract_start)} ~ ${formatDateMY(c.contract_end)}`;
             const pgSumFormatted = Number(c.performance_guarantee_total || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
             
             const sections = c.contract_sections_breakdown || {};
             const sectionNames = Object.keys(sections);
             const wb = XLSX.utils.book_new();
+            
+            // Note: Header sekarang ada 3 baris (Interim No, Date, RM)
             let merges = [{ s: { r: 1, c: 1 }, e: { r: 2, c: 13 } }]; 
 
             const fmtCurrency = '#,##0.00;\\(#,##0.00\\);"-"'; 
@@ -92,14 +94,28 @@ async function startAutoDownload() {
 
             function buildTableSet(startInt, endInt, isLastSet) {
                 const startRow = ws_data.length;
+                
+                // BARIS 1: Judul Utama
                 let h1 = ["ITEM", "DESCRIPTION", "", "AS PER CONTRACT"];
                 for (let i = startInt; i <= endInt; i++) h1.push(`INTERIM NO.${i}`);
                 if (isLastSet) h1.push("TOTAL CLAIM", "CONTRACT BALANCE", "ON GOING WORKS", "ON GOING CONTRACT BALANCE");
                 
-                let h2 = h1.map((h, i) => (i < 3 ? "" : "RM"));
-                ws_data.push(h1, h2);
-                merges.push({ s: { r: startRow, c: 0 }, e: { r: startRow + 1, c: 0 } });
-                merges.push({ s: { r: startRow, c: 1 }, e: { r: startRow + 1, c: 2 } });
+                // BARIS 2: Tarikh Received (DIFETCH DARI TABLE INTERIMS)
+                let h2 = ["", "", "", ""];
+                for (let i = startInt; i <= endInt; i++) {
+                    const dRec = interims[i - 1]?.date_received;
+                    h2.push(dRec ? formatShortDate(dRec) : "-");
+                }
+                if (isLastSet) h2.push("", "", "", "");
+
+                // BARIS 3: RM Label
+                let h3 = h1.map((h, i) => (i < 3 ? "" : "RM"));
+
+                ws_data.push(h1, h2, h3);
+
+                // Merging untuk ITEM dan DESCRIPTION (Sekarang 3 baris tinggi)
+                merges.push({ s: { r: startRow, c: 0 }, e: { r: startRow + 2, c: 0 } });
+                merges.push({ s: { r: startRow, c: 1 }, e: { r: startRow + 2, c: 2 } });
 
                 sectionNames.forEach((sec, idx) => {
                     const currentRowIdx = ws_data.length;
@@ -175,7 +191,7 @@ async function startAutoDownload() {
 
             const lastRowIdx = ws_data.length - 1;
 
-            // --- STYLING (KEKAL SEPERTI ASAL) ---
+            // STYLING (DIKEKALKAN SEPERTI ASAL)
             for (let r = 0; r <= lastRowIdx; r++) {
                 for (let cidx = 0; cidx <= 40; cidx++) {
                     const cellRef = XLSX.utils.encode_cell({ r: r, c: cidx });
@@ -202,10 +218,23 @@ async function startAutoDownload() {
                     if (cidx >= 14) ws[cellRef].s.font = { bold: true };
 
                     const valStr = ws[cellRef].v ? ws[cellRef].v.toString() : "";
-                    const isHeader = valStr.includes("INTERIM NO") || valStr === "ITEM" || valStr === "DESCRIPTION" || valStr === "AS PER CONTRACT" || valStr.includes("CLAIM") || valStr.includes("BALANCE") || valStr.includes("WORKS");
+                    
+                    // Logic Header (Termasuk baris tarikh baru)
+                    const isHeaderRow = valStr.includes("INTERIM NO") || valStr === "ITEM" || valStr === "DESCRIPTION" || valStr === "AS PER CONTRACT" || valStr.includes("CLAIM") || valStr.includes("BALANCE") || valStr.includes("WORKS");
                     const isRMHeader = valStr === "RM";
+                    
+                    // Warnakan Header (Kelabu)
+                    if (isHeaderRow || isRMHeader) { 
+                        ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } }; 
+                        ws[cellRef].s.font = { bold: true }; 
+                    }
 
-                    if (isHeader || isRMHeader) { ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } }; ws[cellRef].s.font = { bold: true }; }
+                    // Tambahan: Warnakan juga baris tarikh (h2) supaya seragam dengan header
+                    const rowAboveValue = ws[XLSX.utils.encode_cell({ r: r-1, c: cidx })]?.v;
+                    if (rowAboveValue && rowAboveValue.toString().includes("INTERIM NO")) {
+                        ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } };
+                    }
+
                     const rowInd = ws[XLSX.utils.encode_cell({ r: r, c: 0 })]?.v;
                     if (rowInd === "E") ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } };
                     if (rowInd === "F" || rowInd === "G") ws[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } };
@@ -218,11 +247,8 @@ async function startAutoDownload() {
             for (let i = 0; i < 35; i++) ws["!cols"].push({ wch: 14 });
 
             XLSX.utils.book_append_sheet(wb, ws, "Summary");
-
-            // MUAT TURUN FAIL
             XLSX.writeFile(wb, fileName);
 
-            // SELEPAS DOWNLOAD, KEMBALI KE HALAMAN SEBELUMNYA
             setTimeout(() => { window.history.back(); }, 2000);
         }
     } catch(err) { 
@@ -231,7 +257,6 @@ async function startAutoDownload() {
     }
 }
 
-// JALANKAN PROSES SEBAIK SAHAJA LOAD
 startAutoDownload();
 </script>
 
