@@ -447,11 +447,12 @@ async function startAutoDownload() {
             for (let r = 0; r < ws3_data.length; r++) {
 
                 const isGrandTotalRow = ws3_data[r] && ws3_data[r][0] === "GRAND TOTAL";
-                const currentLastCol = 3 + (sectionCount * 2) + 1;
+                const currentLastCol = 3 + (sectionCount * 2) + 2;
                 
-                for (let c = 0; c < currentLastCol + 1; c++) {
+                for (let c = 0; c < currentLastCol; c++) {
                     const ref = XLSX.utils.encode_cell({ r: r, c: c });
-                    if (!ws3[ref]) continue;
+                    if (!ws3[ref]) {ws3[ref] = { v: "", t: "s", s: {} };
+                                    }
                     if (!ws3[ref].s) ws3[ref].s = {};
 
                     const val = ws3[ref].v ? ws3[ref].v.toString() : "";
@@ -474,6 +475,21 @@ async function startAutoDownload() {
                         ws3[ref].s.alignment = { horizontal: "center", vertical: "center" };
                     }
 
+                    if (r > 0 && ws3_data[r] && ws3_data[r].length > 0 && !daerahList.includes(ws3_data[r][0])) {
+                        if (ws3[ref].v === undefined) ws3[ref] = { v: "", t: "s", s: {} };
+                        if (!ws3[ref].s) ws3[ref].s = {};
+
+                        ws3[ref].s.border = { 
+                            top: { style: "thin" }, 
+                            bottom: { style: "thin" }, 
+                            left: { style: "thin" }, 
+                            right: { style: "thin" } 
+                        };
+                    }
+                }
+    
+                        ws3[ref].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
+    
                     // Border untuk baris yang ada data (kecuali tajuk besar)
                     if (r > 0 && !daerahList.includes(ws3_data[r][0]) && !isGrandTotalRow) {
                         ws3[ref].s.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
