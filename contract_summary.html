@@ -334,7 +334,16 @@ async function startAutoDownload() {
             const districtString = c.district || "SEGAMAT,MUAR,BATU PAHAT,KLUANG,MERSING";
             const daerahList = districtString.split(',').map(d => d.trim());
             
-            const dynamicSectionKeys = Object.keys(sections || {}).sort(); 
+            const allSectionKeys = Object.keys(sections || {});
+            const dynamicSectionKeys = allSectionKeys.filter(key => {
+                const desc = (sections[key]?.desc || key).toUpperCase();
+                return desc.includes("LABOUR") || 
+                    desc.includes("WORKMANSHIP") || 
+                    desc.includes("SPARE") || 
+                    desc.includes("REFURBISHMENT") || 
+                    desc.includes("PROVISIONAL");
+            }).sort(); 
+            
             const sectionCount = dynamicSectionKeys.length;
             
             let ws3_data = [];
@@ -472,13 +481,37 @@ async function startAutoDownload() {
                         if (c === 1) ws3[ref].s.alignment.horizontal = "left";
                     }
 
-                    // Warna Column Data (Ikut logic asal anda)
+                    // Warna Column Data
                     if (r > 6 && typeof ws3[ref].v === 'number') {
-                        if (c === 4 || c === 8) ws3[ref].s.fill = { fgColor: { rgb: "FFCC99" } }; 
-                        if (c === 5 || c === 6 || c === 9 || c === 10) ws3[ref].s.fill = { fgColor: { rgb: "FFFF00" } }; 
-                        if (c === 7 || c === 11) ws3[ref].s.fill = { fgColor: { rgb: "A9A9A9" } }; 
-                        ws3[ref].t = 'n'; ws3[ref].z = fmtCurrency;
-                       
+    
+                        let currentSecIdx;
+                        if (c >= 4 && c < 4 + sectionCount) {
+                            currentSecIdx = c - 4; // Indeks dalam dynamicSectionKeys (Quotation)
+                        } 
+                        else if (c >= 4 + sectionCount && c < 4 + (sectionCount * 2)) {
+                            currentSecIdx = c - (4 + sectionCount); // Indeks dalam dynamicSectionKeys (Payment)
+                        }
+
+                        if (currentSecIdx !== undefined) {
+                            const secKey = dynamicSectionKeys[currentSecIdx];
+                            const secDesc = (sections[secKey]?.desc || secKey).toUpperCase();
+
+                            // Apply warna berdasarkan deskripsi seksyen
+                            if (secDesc.includes("LABOUR") || secDesc.includes("WORKMANSHIP")) {
+                                ws3[ref].s.fill = { fgColor: { rgb: "FFCC99" } }; // Jingga cair
+                            } 
+       
+                            else if (secDesc.includes("SPARE") || secDesc.includes("PROVISIONAL")) {
+                                ws3[ref].s.fill = { fgColor: { rgb: "FFFF00" } }; // Kuning
+                            } 
+                            else if (secDesc.includes("REFURBISHMENT")) {
+                                ws3[ref].s.fill = { fgColor: { rgb: "A9A9A9" } }; // Kelabu
+                            }
+   
+                        }
+
+                        ws3[ref].t = 'n'; 
+                        ws3[ref].z = fmtCurrency;
                         if (isGrandTotalRow) {
                             ws3[ref].s.font = { bold: true };
                         }
