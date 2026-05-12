@@ -3,18 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <title>Downloading Contract Summary...</title> 
-    <!-- Library Diperlukan -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f4f4f9; color: #555; }
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f5f7fb; color: #333; }
         .loader { text-align: center; }
     </style>
 </head>
 <body>
 
 <div class="loader">
-    <p>Menjana fail Excel... Sila tunggu sebentar.</p>
-    <small>Halaman ini akan kembali secara automatik selepas muat turun selesai.</small>
+    <h3>Sila Tunggu...</h3>
+    <p>Fail Excel sedang dijana secara automatik.</p>
 </div>
 
 <script>
@@ -32,14 +31,9 @@ function formatDateMY(dateStr) {
     return `${String(date.getDate()).padStart(2, '0')} ${months[date.getMonth()]} ${date.getFullYear()}`;
 }
 
-async function startAutoDownload() {
-    if (!contractId) {
-        alert("ID Kontrak tidak ditemui.");
-        return;
-    }
-
+async function startAutoProcess() {
+    if(!contractId) return;
     try {
-        // 1. Ambil Data Utama
         const [conRes, intRes, woRes] = await Promise.all([
             fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}`, { headers }),
             fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=created_at.asc`, { headers }),
@@ -50,109 +44,119 @@ async function startAutoDownload() {
         const interims = await intRes.json();
         const workorders = await woRes.json();
 
-        if (!contracts || contracts.length === 0) throw new Error("Kontrak tidak wujud");
-        const c = contracts[0];
-
-        // 2. Ambil Nama Unit untuk Nama Fail
-        let unitName = "UNIT";
-        const unitRes = await fetch(`${SB_URL}/rest/v1/units?id=eq.${c.unit_id}`, { headers });
-        const units = await unitRes.json();
-        if (units && units.length > 0) unitName = units[0].unit_name;
-
-        const startYear = c.contract_start ? new Date(c.contract_start).getFullYear() : "????";
-        const endYear = c.contract_end ? new Date(c.contract_end).getFullYear() : "????";
-        const fileName = `${unitName} ${startYear} - ${endYear} ${c.contract_code || '-'} SUMMARY.xlsx`;
-
-        // 3. Bina Struktur Excel (Logik asal anda)
-        const wb = XLSX.utils.book_new();
-        let merges = [{ s: { r: 1, c: 1 }, e: { r: 2, c: 13 } }];
-        const fmtCurrency = '#,##0.00;\\(#,##0.00\\);"-"';
-        const sections = c.contract_sections_breakdown || {};
-        const sectionNames = Object.keys(sections);
-        const period = `${formatDateMY(c.contract_start)} ~ ${formatDateMY(c.contract_end)}`;
-        const pgSum = Number(c.performance_guarantee_total || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
-
-        let ws_data = [
-            [],
-            ["", c.contract_name || "SUMMARY OF CONTRACT"],
-            [], [],
-            ["", "CONTRACT NO.", ":", c.contract_code || "-"],
-            ["", "CONTRACTOR", ":", c.contractor || "-"],
-            ["", "CONTRACT PERIOD", ":", period],
-            ["", "CONTRACT SUM", ":", Number(c.contract_sum || 0)],
-            ["", "PERFORMANCE GUARANTEE SUM", ":", `RM ${pgSum} (${c.insurance_no || '-'})`],
-            []
-        ];
-
-        // Fungsi Helper Bina Set Jadual
-        function buildTableSet(startInt, endInt, isLastSet) {
-            const startRow = ws_data.length;
-            let h1 = ["ITEM", "DESCRIPTION", "", "AS PER CONTRACT"];
-            for (let i = startInt; i <= endInt; i++) h1.push(`INTERIM NO.${i}`);
-            if (isLastSet) h1.push("TOTAL CLAIM", "CONTRACT BALANCE", "ON GOING WORKS", "ON GOING CONTRACT BALANCE");
+        if (contracts && contracts.length > 0) {
+            const c = contracts[0];
             
-            ws_data.push(h1, h1.map((_, i) => (i < 3 ? "" : "RM")));
-            merges.push({ s: { r: startRow, c: 0 }, e: { r: startRow + 1, c: 0 } }, { s: { r: startRow, c: 1 }, e: { r: startRow + 1, c: 2 } });
+            // Ambil Nama Unit
+            let unitName = "UNIT";
+            try {
+                const unitRes = await fetch(`${SB_URL}/rest/v1/units?id=eq.${c.unit_id}`, { headers });
+                const units = await unitRes.json();
+                if (units && units.length > 0) unitName = units[0].unit_name;
+            } catch (e) {}
 
-            sectionNames.forEach((sec, idx) => {
-                const curR = ws_data.length;
-                const amtVal = Number(sections[sec]?.amt || 0);
-                let row = [String.fromCharCode(65 + idx), sections[sec]?.desc || sec, "", amtVal];
+            const startYear = c.contract_start ? new Date(c.contract_start).getFullYear() : "????";
+            const endYear = c.contract_end ? new Date(c.contract_end).getFullYear() : "????";
+            const fileName = `${unitName} ${startYear} - ${endYear} ${c.contract_code || "-"} SUMMARY.xlsx`;
 
-                for (let i = startInt; i <= endInt; i++) {
-                    row.push(Number(interims[i - 1]?.claim_breakdown?.[sec]?.amt || 0));
-                }
+            // Logik Bina Excel
+            const wb = XLSX.utils.book_new();
+            let merges = [{ s: { r: 1, c: 1 }, e: { r: 2, c: 13 } }];
+            const fmtCurrency = '#,##0.00;\\(#,##0.00\\);"-"';
+            const pgSumFormatted = Number(c.performance_guarantee_total || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            const sections = c.contract_sections_breakdown || {};
+            const sectionNames = Object.keys(sections);
 
-                if (isLastSet) {
-                    let totalC = 0; interims.forEach(int => totalC += Number(int.claim_breakdown?.[sec]?.amt || 0));
-                    let onG = 0; workorders.filter(w => w.status !== 'Claimed').forEach(w => {
-                        const cat = w.section_category || {};
-                        onG += Number(cat[sec]?.amt || 0);
-                        if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) onG += Number(w.additional || 0);
-                    });
-                    row.push(totalC, (amtVal - totalC), onG, (amtVal - totalC - onG));
-                }
-                ws_data.push(row);
-                merges.push({ s: { r: curR, c: 1 }, e: { r: curR, c: 2 } });
-            });
-            ws_data.push([]); 
-        }
+            let ws_data = [
+                [], 
+                ["", c.contract_name || "SUMMARY OF CONTRACT"], 
+                [], [],
+                ["", "CONTRACT NO.", ":", c.contract_code || "-"], 
+                ["", "CONTRACTOR", ":", c.contractor || "-"],
+                ["", "CONTRACT PERIOD", ":", `${formatDateMY(c.contract_start)} ~ ${formatDateMY(c.contract_end)}`],
+                ["", "CONTRACT SUM", ":", Number(c.contract_sum || 0)],
+                ["", "PERFORMANCE GUARANTEE SUM", ":", `RM ${pgSumFormatted} (${c.insurance_no || '-'})`],
+                [] 
+            ];
 
-        buildTableSet(1, 10, false);
-        buildTableSet(11, 20, false);
-        buildTableSet(21, 26, true);
+            function buildTableSet(startInt, endInt, isLastSet) {
+                const startRow = ws_data.length;
+                let h1 = ["ITEM", "DESCRIPTION", "", "AS PER CONTRACT"];
+                for (let i = startInt; i <= endInt; i++) h1.push(`INTERIM NO.${i}`);
+                if (isLastSet) h1.push("TOTAL CLAIM", "CONTRACT BALANCE", "ON GOING WORKS", "ON GOING CONTRACT BALANCE");
+                
+                ws_data.push(h1, h1.map((_, i) => (i < 3 ? "" : "RM")));
+                merges.push({ s: { r: startRow, c: 0 }, e: { r: startRow + 1, c: 0 } }, { s: { r: startRow, c: 1 }, e: { r: startRow + 1, c: 2 } });
 
-        const ws = XLSX.utils.aoa_to_sheet(ws_data);
-        ws["!merges"] = merges;
-        
-        // --- Apply Basic Styling ---
-        for (let r = 0; r < ws_data.length; r++) {
-            for (let cidx = 0; cidx < 35; cidx++) {
-                const ref = XLSX.utils.encode_cell({ r: r, c: cidx });
-                if (!ws[ref]) continue;
-                if (!ws[ref].s) ws[ref].s = {};
-                if (r > 9) {
-                    ws[ref].s.border = { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} };
-                    if (typeof ws[ref].v === 'number' && cidx >= 3) { ws[ref].t = 'n'; ws[ref].z = fmtCurrency; }
+                sectionNames.forEach((sec, idx) => {
+                    const rIdx = ws_data.length;
+                    const cAmt = Number(sections[sec]?.amt || 0);
+                    let row = [String.fromCharCode(65 + idx), sections[sec]?.desc || sec, "", cAmt];
+
+                    for (let i = startInt; i <= endInt; i++) row.push(Number(interims[i - 1]?.claim_breakdown?.[sec]?.amt || 0));
+
+                    if (isLastSet) {
+                        let tClaim = 0; interims.forEach(int => tClaim += Number(int.claim_breakdown?.[sec]?.amt || 0));
+                        let ong = 0; workorders.filter(w => w.status !== 'Claimed').forEach(w => {
+                            const cat = w.section_category || {};
+                            ong += Number(cat[sec]?.amt || 0);
+                            if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) ong += Number(w.additional || 0);
+                        });
+                        row.push(tClaim, (cAmt - tClaim), ong, (cAmt - tClaim - ong));
+                    }
+                    ws_data.push(row);
+                    merges.push({ s: { r: rIdx, c: 1 }, e: { r: rIdx, c: 2 } });
+                });
+
+                const addSpec = (label, key, isNet = false) => {
+                    const rIdx = ws_data.length;
+                    let row = ["", label, "", isNet ? sectionNames.reduce((a, s) => a + Number(sections[s]?.amt || 0), 0) : 0];
+                    for (let i = startInt; i <= endInt; i++) row.push(isNet ? Number(interims[i - 1]?.net_amount || 0) : Number(interims[i - 1]?.[key] || 0));
+                    if (isLastSet) row.push(0, 0, 0, 0); // Simplified for auto-download
+                    ws_data.push(row);
+                    merges.push({ s: { r: rIdx, c: 1 }, e: { r: rIdx, c: 2 } });
+                };
+
+                addSpec("PERFORMANCE GUARANTEE SUM", "performance_guarantee_sum");
+                addSpec("SALVAGE VALUE", "salvage_value");
+                addSpec("TOTAL BRING TO INTERIM PAYMENT", "", true);
+                ws_data.push([]);
+            }
+
+            buildTableSet(1, 10, false);
+            buildTableSet(11, 20, false);
+            buildTableSet(21, 26, true);
+
+            const ws = XLSX.utils.aoa_to_sheet(ws_data);
+            ws["!merges"] = merges;
+
+            // Styling (Sama seperti kod asal anda)
+            for (let r = 0; r < ws_data.length; r++) {
+                for (let cidx = 0; cidx <= 40; cidx++) {
+                    const ref = XLSX.utils.encode_cell({ r: r, c: cidx });
+                    if (!ws[ref]) continue;
+                    ws[ref].s = ws[ref].s || {};
+                    if (r > 9) {
+                        ws[ref].s.border = { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} };
+                        if (typeof ws[ref].v === 'number' && cidx >= 3) { ws[ref].t = 'n'; ws[ref].z = fmtCurrency; }
+                    }
                 }
             }
+
+            XLSX.utils.book_append_sheet(wb, ws, "Summary");
+            XLSX.writeFile(wb, fileName);
+
+            // Kembali ke halaman sebelumnya selepas muat turun bermula
+            setTimeout(() => { window.history.back(); }, 1500);
         }
-        ws["!cols"] = [{ wch: 8 }, { wch: 40 }, { wch: 3 }, { wch: 20 }];
-
-        XLSX.utils.book_append_sheet(wb, ws, "Summary");
-        XLSX.writeFile(wb, fileName);
-
-        // 4. Selesai - Kembali ke Dashboard
-        setTimeout(() => { window.history.back(); }, 1500);
-
-    } catch (err) {
+    } catch(err) {
         console.error(err);
-        alert("Gagal menjana fail: " + err.message);
+        alert("Ralat memproses fail.");
     }
 }
 
-// Jalankan sebaik sahaja page load
-window.onload = startAutoDownload;
+startAutoProcess();
 </script>
+
 </body>
 </html>
