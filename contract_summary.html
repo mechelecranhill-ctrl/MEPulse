@@ -181,13 +181,12 @@ async function startAutoDownload() {
             ws["!merges"] = merges;
             const lastRowIdx = ws_data.length - 1;
 
-            // STYLING SHEET 1 (HIGHLIGHT DIKEMBALIKAN)
+            // STYLING SHEET 1
             for (let r = 0; r <= lastRowIdx; r++) {
                 for (let cidx = 0; cidx <= 40; cidx++) {
                     const cellRef = XLSX.utils.encode_cell({ r: r, c: cidx });
                     if (!ws[cellRef]) continue;
                     if (!ws[cellRef].s) ws[cellRef].s = {};
-
                     if (r === 1 && cidx === 1) {
                         ws[cellRef].s = { font: { bold: true, sz: 12 }, alignment: { horizontal: "center", vertical: "center", wrapText: true } };
                         continue;
@@ -202,6 +201,7 @@ async function startAutoDownload() {
                     ws[cellRef].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
                     if (cidx === 1) ws[cellRef].s.alignment.horizontal = "left";
                     if (typeof ws[cellRef].v === 'number' && cidx >= 3) { ws[cellRef].t = 'n'; ws[cellRef].z = fmtCurrency; }
+                    if (cidx >= 14) ws[cellRef].s.font = { bold: true };
                     
                     const valStr = ws[cellRef].v ? ws[cellRef].v.toString() : "";
                     const isHeaderRow = valStr.includes("INTERIM NO") || valStr === "ITEM" || valStr === "DESCRIPTION" || valStr === "AS PER CONTRACT" || valStr.includes("CLAIM") || valStr.includes("BALANCE") || valStr.includes("WORKS");
@@ -209,15 +209,12 @@ async function startAutoDownload() {
                         ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } }; 
                         ws[cellRef].s.font = { bold: true }; 
                     }
-
-                    // HIGHLIGHT LOGIC ASAL ANDA
+                    
                     const rowDesc = ws[XLSX.utils.encode_cell({ r: r, c: 1 })]?.v?.toString().toUpperCase() || "";
                     if (rowDesc) {
-                        if (rowDesc.includes("LABOUR") || rowDesc.includes("WORKMANSHIP")) {
-                            ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } };
-                        } else if (rowDesc.includes("SPARE") || rowDesc.includes("PROVISIONAL")) {
-                            ws[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } };
-                        } else if (rowDesc.includes("REFURBISHMENT")) {
+                        if (rowDesc.includes("LABOUR") || rowDesc.includes("WORKMANSHIP")) ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } };
+                        else if (rowDesc.includes("SPARE") || rowDesc.includes("PROVISIONAL")) ws[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } };
+                        else if (rowDesc.includes("REFURBISHMENT")) {
                             ws[cellRef].s.fill = { fgColor: { rgb: "A9A9A9" } };
                             ws[cellRef].s.font = { color: { rgb: "FFFFFF" } };
                         }
@@ -229,15 +226,43 @@ async function startAutoDownload() {
             XLSX.utils.book_append_sheet(wb, ws, "Summary");
 
             // ==========================================
-            // SHEET 2 (BUDGET USAGE)
+            // LOGIK PENGIRAAN UNTUK SHEET 2 (START)
             // ==========================================
+            let sumLab = 0, sumSpa = 0, sumPrv = 0;
+            let balLab = 0, balSpa = 0, balPrv = 0;
+
+            sectionNames.forEach(sec => {
+                const desc = (sections[sec]?.desc || sec).toUpperCase();
+                const contractAmt = Number(sections[sec]?.amt || 0);
+                let totalClaimed = 0;
+                interims.forEach(int => totalClaimed += Number(int.claim_breakdown?.[sec]?.amt || 0));
+                
+                let ongoing = 0;
+                workorders.filter(w => w.status !== 'Claimed').forEach(w => {
+                    const cat = w.section_category || {};
+                    ongoing += Number(cat[sec]?.amt || 0);
+                    if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) ongoing += Number(w.additional || 0);
+                });
+
+                const currentBal = (contractAmt - totalClaimed) - ongoing;
+
+                if (desc.includes("LABOUR") || desc.includes("WORKMANSHIP")) { sumLab += contractAmt; balLab += currentBal; }
+                else if (desc.includes("SPARE")) { sumSpa += contractAmt; balSpa += currentBal; }
+                else if (desc.includes("PROVISIONAL")) { sumPrv += contractAmt; balPrv += currentBal; }
+            });
+
+            const getP = (b, t) => t > 0 ? Math.round((b/t)*100) + "%" : "0%";
+            // ==========================================
+            // LOGIK PENGIRAAN UNTUK SHEET 2 (END)
+            // ==========================================
+
             let ws2_data = [
                 [], [], 
-                ["TOTAL LABOUR CHARGES", "RM", 0, "", "", "", "ON GOING LABOUR CHARGES BALANCE", "0%"],
+                ["TOTAL LABOUR CHARGES", "RM", sumLab, "", "", "", "ON GOING LABOUR CHARGES BALANCE", getP(balLab, sumLab)],
                 [],
-                ["TOTAL SUPPLY OF SPARE PART", "RM", 0, "", "", "", "ON GOING SUPPLY OF SPARE PART BALANCE", "0%"],
+                ["TOTAL SUPPLY OF SPARE PART", "RM", sumSpa, "", "", "", "ON GOING SUPPLY OF SPARE PART BALANCE", getP(balSpa, sumSpa)],
                 [],
-                ["TOTAL PROVISIONAL SUM", "RM", 0, "", "", "", "ON GOING PROV SUM BALANCE", "0%"],
+                ["TOTAL PROVISIONAL SUM", "RM", sumPrv, "", "", "", "ON GOING PROV SUM BALANCE", getP(balPrv, sumPrv)],
                 [],
                 ["TOTAL APPROVED CM WORKS", "RM", 0, "", "", "", "TOTAL G&P CLAIMED", "0%"],
                 ["TOTAL CM WORKS CLAIMED", "RM", 0, "0%", "", "", "BAL. G&P NOT CLAIM", "100%"],
