@@ -325,6 +325,96 @@ async function startAutoDownload() {
             }
             ws2["!cols"] = [{ wch: 35 }, { wch: 5 }, { wch: 15 }, { wch: 10 }, { wch: 5 }, { wch: 5 }, { wch: 40 }, { wch: 10 }];
             XLSX.utils.book_append_sheet(wb, ws2, "Budget Usage");
+            
+            // ==========================================
+            // SHEET 3: LIST WORK ORDER
+            // ==========================================
+            
+            // Header mengikut format gambar
+            let ws3_data = [
+                [], // Row 1 kosong
+                [], // Row 2 kosong
+                ["NO.", "DESCRIPTION", "LOCATION", "WORK ORDER", "QUOTATION", "", "", "", "PAYMENT", "", "", "", "QUATATION APPROVAL DATE", "STATUS / PAID AS PER INTERIM NO"],
+                ["", "", "", "", "LABOUR CHARGES", "SUPPLY SPARE PARTS", "S.O.R (CONTRACT)", "NON S.O.R", "LABOUR CHARGES", "SUPPLY SPARE PARTS", "S.O.R (CONTRACT)", "NON S.O.R", "", ""],
+                ["", "", "", "", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "", ""]
+            ];
+
+            // Masukkan data daripada variable 'workorders'
+            workorders.forEach((wo, index) => {
+                const cat = wo.section_category || {};
+                
+                // Logik untuk menentukan column mana nilai patut masuk (Contoh ringkas)
+                // Anda boleh sesuaikan ikut key database anda
+                let row = [
+                    index + 1,
+                    wo.description || "-",
+                    wo.location || "-",
+                    wo.wo_number || "-",
+                    // QUOTATION SECTION
+                    Number(cat["LABOUR"]?.amt || 0), 
+                    Number(cat["SPARE"]?.amt || 0),
+                    0, // S.O.R
+                    Number(wo.additional || 0), // NON S.O.R
+                    // PAYMENT SECTION (Biasanya sama atau ikut interim)
+                    Number(wo.payment_labour || 0),
+                    Number(wo.payment_spare || 0),
+                    0,
+                    Number(wo.payment_non_sor || 0),
+                    formatShortDate(wo.approval_date),
+                    wo.status === 'Claimed' ? `PAID (INT ${wo.interim_no || ''})` : (wo.status || "PENDING")
+                ];
+                ws3_data.push(row);
+            });
+
+            const ws3 = XLSX.utils.aoa_to_sheet(ws3_data);
+
+            // Merging Headers (Ikut format Row 3-5)
+            ws3["!merges"] = [
+                { s: { r: 2, c: 0 }, e: { r: 4, c: 0 } }, // NO.
+                { s: { r: 2, c: 1 }, e: { r: 4, c: 1 } }, // DESCRIPTION
+                { s: { r: 2, c: 2 }, e: { r: 4, c: 2 } }, // LOCATION
+                { s: { r: 2, c: 3 }, e: { r: 4, c: 3 } }, // WORK ORDER
+                { s: { r: 2, c: 4 }, e: { r: 2, c: 7 } }, // QUOTATION Group
+                { s: { r: 2, c: 8 }, e: { r: 2, c: 11 } }, // PAYMENT Group
+                { s: { r: 2, c: 12 }, e: { r: 4, c: 12 } }, // APPROVAL DATE
+                { s: { r: 2, c: 13 }, e: { r: 4, c: 13 } }  // STATUS
+            ];
+
+            // Styling Sheet 3
+            for (let r = 2; r < ws3_data.length; r++) {
+                for (let c = 0; c < 14; c++) {
+                    const ref = XLSX.utils.encode_cell({ r: r, c: c });
+                    if (!ws3[ref]) continue;
+                    if (!ws3[ref].s) ws3[ref].s = {};
+                    
+                    // Border & Alignment
+                    ws3[ref].s.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+                    ws3[ref].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
+
+                    // Header Styling (Grey background)
+                    if (r <= 4) {
+                        ws3[ref].s.fill = { fgColor: { rgb: "EAEAEA" } };
+                        ws3[ref].s.font = { bold: true, sz: 10 };
+                    }
+
+                    // Warna Column (Ikut Gambar)
+                    if (r >= 2) {
+                        if (c === 4 || c === 8) ws3[ref].s.fill = { fgColor: { rgb: "FFCC99" } }; // Labour (Oren cair)
+                        if (c === 5 || c === 6 || c === 9 || c === 10) ws3[ref].s.fill = { fgColor: { rgb: "FFFF00" } }; // Spare/SOR (Kuning)
+                        if (c === 7 || c === 11) ws3[ref].s.fill = { fgColor: { rgb: "A9A9A9" } }; // Non SOR (Kelabu)
+                    }
+
+                    // Format Nombor RM
+                    if (r > 4 && c >= 4 && c <= 11) {
+                        ws3[ref].t = 'n';
+                        ws3[ref].z = fmtCurrency;
+                    }
+                }
+            }
+
+            ws3["!cols"] = [{ wch: 5 }, { wch: 40 }, { wch: 20 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 20 }];
+            
+            XLSX.utils.book_append_sheet(wb, ws3, "List Work Order");
 
             XLSX.writeFile(wb, fileName);
             setTimeout(() => { window.history.back(); }, 2000);
