@@ -368,22 +368,26 @@ async function startAutoDownload() {
                 // 3. Tapis data workorders mengikut daerah semasa
                 const filteredWO = workorders.filter(wo => (wo.district || "").toUpperCase() === daerah.toUpperCase());
 
+                let dTotal = { qLab: 0, qSpa: 0, qSor: 0, qNon: 0, pLab: 0, pSpa: 0, pSor: 0, pNon: 0 };
+
                 if (filteredWO.length > 0) {
+
                     filteredWO.forEach((wo, index) => {
                         const cat = wo.section_category || {};
+                        const qL = Number(cat["LABOUR"]?.amt || 0);
+                        const qS = Number(cat["SPARE"]?.amt || 0);
+                        const qN = Number(wo.additional || 0);
+                        const pL = Number(wo.payment_labour || 0);
+                        const pS = Number(wo.payment_spare || 0);
+                        const pN = Number(wo.payment_non_sor || 0);
+
+                        // Tambah ke total daerah
+                        dTotal.qLab += qL; dTotal.qSpa += qS; dTotal.qNon += qN;
+                        dTotal.pLab += pL; dTotal.pSpa += pS; dTotal.pNon += pN;
+           
                         ws3_data.push([
-                            index + 1,
-                            wo.description || "-",
-                            wo.location || "-",
-                            wo.wo_number || "-",
-                            Number(cat["LABOUR"]?.amt || 0),
-                            Number(cat["SPARE"]?.amt || 0),
-                            0,
-                            Number(wo.additional || 0),
-                            Number(wo.payment_labour || 0),
-                            Number(wo.payment_spare || 0),
-                            0,
-                            Number(wo.payment_non_sor || 0),
+                            index + 1, wo.description || "-", wo.location || "-", wo.wo_number || "-",
+                            qL, qS, 0, qN, pL, pS, 0, pN,
                             formatShortDate(wo.approval_date),
                             wo.status === 'Claimed' ? `PAID (INT ${wo.interim_no || ''})` : (wo.status || "PENDING")
                         ]);
@@ -392,6 +396,15 @@ async function startAutoDownload() {
                     ws3_data.push(["", "TIADA REKOD KERJA", "", "", 0, 0, 0, 0, 0, 0, 0, 0, "", ""]);
                 }
 
+                const totalRowIdx = ws3_data.length;
+                ws3_data.push([ 
+                    "", "GRAND TOTAL", "", "", 
+                    dTotal.qLab, dTotal.qSpa, 0, dTotal.qNon, 
+                    dTotal.pLab, dTotal.pSpa, 0, dTotal.pNon, 
+                    "", ""
+                ]);
+                // Merge untuk perkataan "GRAND TOTAL" (Kolum B, C, D) 
+                currentMerges.push({ s: { r: totalRowIdx, c: 1 }, e: { r: totalRowIdx, c: 3 } });
                 // Jarakkan 3 baris sebelum daerah seterusnya
                 ws3_data.push([], [], []);
             });
