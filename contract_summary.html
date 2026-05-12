@@ -328,71 +328,93 @@ async function startAutoDownload() {
             XLSX.utils.book_append_sheet(wb, ws2, "Budget Usage");
             
             // ==========================================
-// SHEET 3: LIST WORK ORDER (IKUT PECAHAN DAERAH)
-// ==========================================
+            // SHEET 3: LIST WORK ORDER (IKUT PECAHAN DAERAH)
+            // ==========================================
 
-const districtString = c.district || "SEGAMAT,MUAR,BATU PAHAT,KLUANG,MERSING";
-const daerahList = districtString.split(',').map(d => d.trim());
+            const districtString = c.district || "SEGAMAT,MUAR,BATU PAHAT,KLUANG,MERSING";
+            const daerahList = districtString.split(',').map(d => d.trim());
+            
+            const dynamicSectionKeys = Object.keys(sections || {}).sort(); 
+            const sectionCount = dynamicSectionKeys.length;
+            
+            let ws3_data = [];
+            let currentMerges = [];
 
-let ws3_data = [];
-let currentMerges = [];
-
-daerahList.forEach((daerah) => {
-    // 1. Kenalpasti baris permulaan untuk daerah ini
-    const startRow = ws3_data.length;
-
-    // Tajuk Daerah & Header
-    ws3_data.push([daerah.toUpperCase()]); 
-    ws3_data.push([]);
-    ws3_data.push(["SENARAI PERMOHONAN KERJA-KERJA KONTRAK PENYELENGGARAAN"]);
-    ws3_data.push([]);
+            daerahList.forEach((daerah) => {
+                // 1. Kenalpasti baris permulaan untuk daerah ini 
+                const startRow = ws3_data.length;
+   
+                // Tajuk Daerah & Header
+                ws3_data.push([daerah.toUpperCase()]); 
+                ws3_data.push([]);
+                ws3_data.push(["SENARAI PERMOHONAN KERJA-KERJA KONTRAK PENYELENGGARAAN"]);
+                ws3_data.push([]);
     
-    // Header Jadual (Baris 5, 6, 7 dalam blok daerah)
-    ws3_data.push(["NO.", "DESCRIPTION", "LOCATION", "WORK ORDER", "QUOTATION", "", "", "", "PAYMENT", "", "", "", "QUOTATION APPROVAL DATE", "STATUS / PAID AS PER INTERIM NO"]);
-    ws3_data.push(["", "", "", "", "LABOUR CHARGES", "SUPPLY SPARE PARTS", "S.O.R (CONTRACT)", "NON S.O.R", "LABOUR CHARGES", "SUPPLY SPARE PARTS", "S.O.R (CONTRACT)", "NON S.O.R", "", ""]);
-    ws3_data.push(["", "", "", "", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "", ""]);
+                // BARIS 5: Tajuk Utama (Merge Quotation & Payment mengikut bilangan seksyen)
+    let h1 = ["NO.", "DESCRIPTION", "LOCATION", "WORK ORDER", "QUOTATION"];
+    for(let i=0; i < sectionCount - 1; i++) h1.push(""); // Padding untuk merge Quotation
+    h1.push("PAYMENT");
+    for(let i=0; i < sectionCount - 1; i++) h1.push(""); // Padding untuk merge Payment
+    h1.push("QUOTATION APPROVAL DATE", "STATUS / PAID AS PER INTERIM NO");
+    ws3_data.push(h1);
 
-    // Merge Header secara dinamik berdasarkan startRow
-    currentMerges.push({ s: { r: startRow, c: 0 }, e: { r: startRow, c: 13 } }); 
-    currentMerges.push({ s: { r: startRow + 2, c: 0 }, e: { r: startRow + 2, c: 13 } }); 
-    currentMerges.push({ s: { r: startRow + 4, c: 0 }, e: { r: startRow + 6, c: 0 } }); // NO.
-    currentMerges.push({ s: { r: startRow + 4, c: 1 }, e: { r: startRow + 6, c: 1 } }); // DESC
-    currentMerges.push({ s: { r: startRow + 4, c: 2 }, e: { r: startRow + 6, c: 2 } }); // LOC
-    currentMerges.push({ s: { r: startRow + 4, c: 3 }, e: { r: startRow + 6, c: 3 } }); // WO
-    currentMerges.push({ s: { r: startRow + 4, c: 4 }, e: { r: startRow + 4, c: 7 } }); // QUOTATION Group
-    currentMerges.push({ s: { r: startRow + 4, c: 8 }, e: { r: startRow + 4, c: 11 } }); // PAYMENT Group
-    currentMerges.push({ s: { r: startRow + 4, c: 12 }, e: { r: startRow + 6, c: 12 } }); // DATE
-    currentMerges.push({ s: { r: startRow + 4, c: 13 }, e: { r: startRow + 6, c: 13 } }); // STATUS
+    // BARIS 6: Tajuk Seksyen Dinamik (E.g. SECTION C, SECTION D...)
+    let h2 = ["", "", "", ""];
+    dynamicSectionKeys.forEach(key => h2.push(key)); // Tajuk untuk Quotation
+    dynamicSectionKeys.forEach(key => h2.push(key)); // Tajuk untuk Payment
+    h2.push("", "");
+    ws3_data.push(h2);
+
+    // BARIS 7: Unit (RM)
+    let h3 = ["", "", "", ""];
+    for(let i=0; i < (sectionCount * 2); i++) h3.push("(RM)");
+    h3.push("", "");
+    ws3_data.push(h3);
+
+    // LOGIK MERGE DINAMIK
+    const lastColIdx = 3 + (sectionCount * 2) + 2;
+    currentMerges.push({ s: { r: startRow, c: 0 }, e: { r: startRow, c: lastColIdx } }); 
+    currentMerges.push({ s: { r: startRow + 2, c: 0 }, e: { r: startRow + 2, c: lastColIdx } }); 
+    
+    // Merge NO, DESC, LOC, WO (Vertical)
+    [0, 1, 2, 3].forEach(cIdx => {
+        currentMerges.push({ s: { r: startRow + 4, c: cIdx }, e: { r: startRow + 6, c: cIdx } });
+    });
+    
+    // Merge QUOTATION & PAYMENT (Horizontal)
+    currentMerges.push({ s: { r: startRow + 4, c: 4 }, e: { r: startRow + 4, c: 4 + sectionCount - 1 } });
+    currentMerges.push({ s: { r: startRow + 4, c: 4 + sectionCount }, e: { r: startRow + 4, c: 4 + (sectionCount * 2) - 1 } });
+
+    // Merge DATE & STATUS (Vertical)
+    currentMerges.push({ s: { r: startRow + 4, c: 4 + (sectionCount * 2) }, e: { r: startRow + 6, c: 4 + (sectionCount * 2) } });
+    currentMerges.push({ s: { r: startRow + 4, c: 4 + (sectionCount * 2) + 1 }, e: { r: startRow + 6, c: 4 + (sectionCount * 2) + 1 } });
 
     const filteredWO = workorders.filter(wo => (wo.district || "").toUpperCase() === daerah.toUpperCase());
-    let dTotal = { qLab: 0, qSpa: 0, qSor: 0, qNon: 0, pLab: 0, pSpa: 0, pSor: 0, pNon: 0 };
+    let dTotals = new Array(sectionCount * 2).fill(0);
     
     if (filteredWO.length > 0) {
         filteredWO.forEach((wo, index) => {
             const cat = wo.section_category || {};
-            const qL = Number(cat["LABOUR"]?.amt || 0);
-            const qS = Number(cat["SPARE"]?.amt || 0);
-            const qN = Number(wo.additional || 0);
-            const pL = Number(wo.payment_labour || 0);
-            const pS = Number(wo.payment_spare || 0);
-            const pN = Number(wo.payment_non_sor || 0);
+            let rowData = [index + 1, wo.description || "-", wo.location || "-", wo.work_id || "-"];
+            
+            // Masukkan data Quotation
+            dynamicSectionKeys.forEach((key, kIdx) => {
+                const val = Number(cat[key]?.amt || 0);
+                rowData.push(val);
+                dTotals[kIdx] += val;
+            });
 
-            dTotal.qLab += qL; dTotal.qSpa += qS; dTotal.qNon += qN;
-            dTotal.pLab += pL; dTotal.pSpa += pS; dTotal.pNon += pN;
+            // Masukkan data Payment (Jika Claimed)
+            dynamicSectionKeys.forEach((key, kIdx) => {
+                const val = (wo.status === 'Claimed') ? Number(cat[key]?.amt || 0) : 0;
+                rowData.push(val);
+                dTotals[sectionCount + kIdx] += val;
+            });
 
-            const displayStatus = wo.status === 'Claimed' ? (wo.interim_no || "-") : (wo.status || "PENDING");
-            ws3_data.push([
-                index + 1, 
-                wo.description || "-",
-                wo.location || "-", 
-                wo.work_id || "-",
-                qL, qS, 0, qN, pL, pS, 0, pN,
-                formatShortDate(wo.qpb_date),
-                displayStatus
-            ]);
+            rowData.push(formatShortDate(wo.qpb_date));
+            rowData.push(wo.status === 'Claimed' ? `INT ${wo.interim_no}` : (wo.status || "PENDING"));
+            ws3_data.push(rowData);
         });
-    } else {
-        ws3_data.push(["-", "TIADA REKOD KERJA", "-", "-", 0, 0, 0, 0, 0, 0, 0, 0, "-", "-"]);
     }
 
     // 2. MASUKKAN GRAND TOTAL (Selepas loop filteredWO tamat)
