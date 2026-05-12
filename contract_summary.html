@@ -242,8 +242,6 @@ async function startAutoDownload() {
             }
             ws["!cols"] = [{ wch: 8 }, { wch: 40 }, { wch: 3 }, { wch: 25 }];
             for (let i = 0; i < 35; i++) ws["!cols"].push({ wch: 14 });
-            ws['!pageSetup'] = { orientation: 'landscape', paperSize: 9 }; 
-            ws['!printHeader'] = [1, 10]; // Ulang baris 1 hingga 10 (Header maklumat kontrak)
             XLSX.utils.book_append_sheet(wb, ws, "Summary");
 
             // ==========================================
@@ -274,7 +272,7 @@ async function startAutoDownload() {
 
             const getP = (b, t) => t > 0 ? Math.round((b/t)*100) + "%" : "0%";
             // ==========================================
-            // LOGIK PENGIRAAN UNTUK SHEET 2 (END)
+            // LOGIK PENGIRAAN UNTUK SHEET 2
             // ==========================================
 
             let ws2_data = [
@@ -326,114 +324,115 @@ async function startAutoDownload() {
                 }
             }
             ws2["!cols"] = [{ wch: 35 }, { wch: 5 }, { wch: 15 }, { wch: 10 }, { wch: 5 }, { wch: 5 }, { wch: 40 }, { wch: 10 }];
-            ws2['!pageSetup'] = { orientation: 'landscape', paperSize: 9 };
             XLSX.utils.book_append_sheet(wb, ws2, "Budget Usage");
             
             // ==========================================
-            // SHEET 3: LIST WORK ORDER
+            // SHEET 3: LIST WORK ORDER (IKUT PECAHAN DAERAH)
             // ==========================================
-            // Masukkan tajuk berdasarkan gambar (Baris 1 dan Baris 3)
+            
+            // 1. Dapatkan senarai daerah daripada string di database
+            const districtString = c.district || "SEGAMAT,MUAR,BATU PAHAT,KLUANG,MERSING";
+            const daerahList = districtString.split(',').map(d => d.trim());
 
-            let ws3_data = [
-                ["SEGAMAT"], // Row 1
-                [],          // Row 2 (Kosong)
-                ["SENARAI PERMOHONAN KERJA-KERJA KONTRAK PENYELENGGARAAN"], // Row 3
-                [],          // Row 4 (Kosong)
-                // Header Jadual bermula di Row 5
-                ["NO.", "DESCRIPTION", "LOCATION", "WORK ORDER", "QUOTATION", "", "", "", "PAYMENT", "", "", "", "QUOTATION APPROVAL DATE", "STATUS / PAID AS PER INTERIM NO"],
-                ["", "", "", "", "LABOUR CHARGES", "SUPPLY SPARE PARTS", "S.O.R (CONTRACT)", "NON S.O.R", "LABOUR CHARGES", "SUPPLY SPARE PARTS", "S.O.R (CONTRACT)", "NON S.O.R", "", ""], 
-                ["", "", "", "", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "", ""]
-            ];
+            let ws3_data = [];
+            let currentMerges = [];
 
-            // Masukkan data daripada variable 'workorders'
-            workorders.forEach((wo, index) => {
-                const cat = wo.section_category || {};
+            // 2. Loop setiap daerah untuk bina jadual
+            daerahList.forEach((daerah) => {
+                const startRow = ws3_data.length;
+
+                // Tajuk Daerah & Header
+                ws3_data.push([daerah.toUpperCase()]); 
+                ws3_data.push([]);
+                ws3_data.push(["SENARAI PERMOHONAN KERJA-KERJA KONTRAK PENYELENGGARAAN"]);
+                ws3_data.push([]);
                 
-                // Logik untuk menentukan column mana nilai patut masuk (Contoh ringkas)
-                // Anda boleh sesuaikan ikut key database anda
-                let row = [
-                    index + 1,
-                    wo.description || "-",
-                    wo.location || "-",
-                    wo.wo_number || "-",
-                    // QUOTATION SECTION
-                    Number(cat["LABOUR"]?.amt || 0), 
-                    Number(cat["SPARE"]?.amt || 0),
-                    0, // S.O.R
-                    Number(wo.additional || 0), // NON S.O.R
-                    // PAYMENT SECTION (Biasanya sama atau ikut interim)
-                    Number(wo.payment_labour || 0),
-                    Number(wo.payment_spare || 0),
-                    0,
-                    Number(wo.payment_non_sor || 0),
-                    formatShortDate(wo.approval_date),
-                    wo.status === 'Claimed' ? `PAID (INT ${wo.interim_no || ''})` : (wo.status || "PENDING")
-                ];
-                ws3_data.push(row);
+                // Header Jadual
+                ws3_data.push(["NO.", "DESCRIPTION", "LOCATION", "WORK ORDER", "QUOTATION", "", "", "", "PAYMENT", "", "", "", "QUOTATION APPROVAL DATE", "STATUS / PAID AS PER INTERIM NO"]);
+                ws3_data.push(["", "", "", "", "LABOUR CHARGES", "SUPPLY SPARE PARTS", "S.O.R (CONTRACT)", "NON S.O.R", "LABOUR CHARGES", "SUPPLY SPARE PARTS", "S.O.R (CONTRACT)", "NON S.O.R", "", ""]);
+                ws3_data.push(["", "", "", "", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "(RM)", "", ""]);
+
+                // Simpan maklumat merge untuk header daerah ini
+                currentMerges.push({ s: { r: startRow, c: 0 }, e: { r: startRow, c: 13 } }); // Tajuk Daerah
+                currentMerges.push({ s: { r: startRow + 2, c: 0 }, e: { r: startRow + 2, c: 13 } }); // Sub-tajuk
+                currentMerges.push({ s: { r: startRow + 4, c: 0 }, e: { r: startRow + 6, c: 0 } }); // NO.
+                currentMerges.push({ s: { r: startRow + 4, c: 1 }, e: { r: startRow + 6, c: 1 } }); // DESC
+                currentMerges.push({ s: { r: startRow + 4, c: 2 }, e: { r: startRow + 6, c: 2 } }); // LOC
+                currentMerges.push({ s: { r: startRow + 4, c: 3 }, e: { r: startRow + 6, c: 3 } }); // WO
+                currentMerges.push({ s: { r: startRow + 4, c: 4 }, e: { r: startRow + 4, c: 7 } }); // QUOTATION Group
+                currentMerges.push({ s: { r: startRow + 4, c: 8 }, e: { r: startRow + 4, c: 11 } }); // PAYMENT Group
+                currentMerges.push({ s: { r: startRow + 4, c: 12 }, e: { r: startRow + 6, c: 12 } }); // DATE
+                currentMerges.push({ s: { r: startRow + 4, c: 13 }, e: { r: startRow + 6, c: 13 } }); // STATUS
+
+                // 3. Tapis data workorders mengikut daerah semasa
+                const filteredWO = workorders.filter(wo => (wo.district || "").toUpperCase() === daerah.toUpperCase());
+
+                if (filteredWO.length > 0) {
+                    filteredWO.forEach((wo, index) => {
+                        const cat = wo.section_category || {};
+                        ws3_data.push([
+                            index + 1,
+                            wo.description || "-",
+                            wo.location || "-",
+                            wo.wo_number || "-",
+                            Number(cat["LABOUR"]?.amt || 0),
+                            Number(cat["SPARE"]?.amt || 0),
+                            0,
+                            Number(wo.additional || 0),
+                            Number(wo.payment_labour || 0),
+                            Number(wo.payment_spare || 0),
+                            0,
+                            Number(wo.payment_non_sor || 0),
+                            formatShortDate(wo.approval_date),
+                            wo.status === 'Claimed' ? `PAID (INT ${wo.interim_no || ''})` : (wo.status || "PENDING")
+                        ]);
+                    });
+                } else {
+                    ws3_data.push(["", "TIADA REKOD KERJA", "", "", 0, 0, 0, 0, 0, 0, 0, 0, "", ""]);
+                }
+
+                // Jarakkan 3 baris sebelum daerah seterusnya
+                ws3_data.push([], [], []);
             });
 
             const ws3 = XLSX.utils.aoa_to_sheet(ws3_data);
+            ws3["!merges"] = currentMerges;
 
-            // Merging Headers (Ikut format Row 3-5)
-            ws3["!merges"] = [
-                { s: { r: 0, c: 0 }, e: { r: 0, c: 13 } }, 
-                { s: { r: 2, c: 0 }, e: { r: 2, c: 13 } },
-                { s: { r: 4, c: 0 }, e: { r: 6, c: 0 } }, // NO.
-                { s: { r: 4, c: 1 }, e: { r: 6, c: 1 } }, // DESCRIPTION
-                { s: { r: 4, c: 2 }, e: { r: 6, c: 2 } }, // LOCATION
-                { s: { r: 4, c: 3 }, e: { r: 6, c: 3 } }, // WORK ORDER
-                { s: { r: 4, c: 4 }, e: { r: 4, c: 7 } }, // QUOTATION Group
-                { s: { r: 4, c: 8 }, e: { r: 4, c: 11 } }, // PAYMENT Group
-                { s: { r: 4, c: 12 }, e: { r: 6, c: 12 } }, // DATE
-                { s: { r: 4, c: 13 }, e: { r: 6, c: 13 } }  // STATUS
-            ];
-
-            // Styling Sheet 3
-            for (let r = 2; r < ws3_data.length; r++) {
+            // 4. Styling Dinamik untuk Sheet 3
+            for (let r = 0; r < ws3_data.length; r++) {
                 for (let c = 0; c < 14; c++) {
                     const ref = XLSX.utils.encode_cell({ r: r, c: c });
                     if (!ws3[ref]) continue;
                     if (!ws3[ref].s) ws3[ref].s = {};
-                    
-                    // Border & Alignment
-                    ws3[ref].s.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
-                    ws3[ref].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
 
-                    // Header Styling (Grey background)
-                    if (r <= 4) {
+                    const val = ws3[ref].v ? ws3[ref].v.toString() : "";
+
+                    // Styling Header (Background Kelabu)
+                    if (daerahList.includes(val) || val.includes("SENARAI PERMOHONAN") || val === "NO." || val === "DESCRIPTION" || val === "LABOUR CHARGES" || val === "(RM)") {
                         ws3[ref].s.fill = { fgColor: { rgb: "EAEAEA" } };
-                        ws3[ref].s.font = { bold: true, sz: 10 };
+                        ws3[ref].s.font = { bold: true };
+                        ws3[ref].s.alignment = { horizontal: "center", vertical: "center" };
                     }
 
-                    // Warna Column (Ikut Gambar)
-                    if (r >= 2) {
-                        if (c === 4 || c === 8) ws3[ref].s.fill = { fgColor: { rgb: "FFCC99" } }; // Labour (Oren cair)
-                        if (c === 5 || c === 6 || c === 9 || c === 10) ws3[ref].s.fill = { fgColor: { rgb: "FFFF00" } }; // Spare/SOR (Kuning)
-                        if (c === 7 || c === 11) ws3[ref].s.fill = { fgColor: { rgb: "A9A9A9" } }; // Non SOR (Kelabu)
+                    // Border untuk baris yang ada data (kecuali tajuk besar)
+                    if (r > 0 && !daerahList.includes(ws3_data[r][0])) {
+                        ws3[ref].s.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+                        ws3[ref].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
+                        if (c === 1) ws3[ref].s.alignment.horizontal = "left";
                     }
 
-                    // Format Nombor RM
-                    if (r > 4 && c >= 4 && c <= 11) {
-                        ws3[ref].t = 'n';
-                        ws3[ref].z = fmtCurrency;
-                    }
-
-                    // Dalam loop styling ws3
-                    if (r === 0 || r === 2) {
-                        ws3[ref].s.font = { bold: true, sz: 12 };
-                        ws3[ref].s.alignment = { horizontal: "left" };
-                        delete ws3[ref].s.border; // Buang border untuk tajuk atas
-                        continue;
+                    // Warna Column Data (Ikut logic asal anda)
+                    if (r > 6 && typeof ws3[ref].v === 'number') {
+                        if (c === 4 || c === 8) ws3[ref].s.fill = { fgColor: { rgb: "FFCC99" } }; 
+                        if (c === 5 || c === 6 || c === 9 || c === 10) ws3[ref].s.fill = { fgColor: { rgb: "FFFF00" } }; 
+                        if (c === 7 || c === 11) ws3[ref].s.fill = { fgColor: { rgb: "A9A9A9" } }; 
+                        ws3[ref].t = 'n'; ws3[ref].z = fmtCurrency;
                     }
                 }
             }
 
             ws3["!cols"] = [{ wch: 5 }, { wch: 40 }, { wch: 20 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 20 }];
-            ws3['!pageSetup'] = { orientation: 'landscape', paperSize: 9 };
-            ws3['!printHeader'] = [5, 7];
             XLSX.utils.book_append_sheet(wb, ws3, "List Work Order");
-
-            XLSX.writeFile(wb, fileName);
             setTimeout(() => { window.history.back(); }, 2000);
         }
     } catch(err) { 
