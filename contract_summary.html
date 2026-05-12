@@ -431,16 +431,32 @@ async function startAutoDownload() {
     }
                 // 2. MASUKKAN GRAND TOTAL (Selepas loop filteredWO tamat)
                 const totalRowIdx = ws3_data.length;
-                let grandTotalRow = ["GRAND TOTAL", "", "", ""]; 
-                dTotals.forEach(val => {    
-                    grandTotalRow.push(val);     
-                });
-    
-                grandTotalRow.push("", "");
-                ws3_data.push(grandTotalRow);
-                currentMerges.push({ s: { r: totalRowIdx, c: 0 }, e: { r: totalRowIdx, c: 3 } });
-                ws3_data.push([], [], []);
-                });
+
+// total semua quotation + payment
+const grandTotalSum = dTotals.reduce((a, b) => a + b, 0);
+
+// total column keseluruhan Sheet 3
+const totalCols = 4 + (sectionCount * 2) + 2;
+
+// create empty row penuh
+let grandTotalRow = Array(totalCols).fill("");
+
+// label
+grandTotalRow[0] = "GRAND TOTAL";
+
+// 👉 letak TOTAL DI COLUMN STATUS (last column)
+grandTotalRow[totalCols - 1] = grandTotalSum;
+
+// optional: kalau nak kosongkan DATE column
+grandTotalRow[totalCols - 2] = "";
+
+ws3_data.push(grandTotalRow);
+
+// merge kiri (NO + DESC + LOC + WO)
+currentMerges.push({ 
+    s: { r: totalRowIdx, c: 0 }, 
+    e: { r: totalRowIdx, c: 3 } 
+});
 
             const ws3 = XLSX.utils.aoa_to_sheet(ws3_data);
             ws3["!merges"] = currentMerges;
