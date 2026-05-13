@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>User Directory</title>
+
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+<style>
+
+body{
+    margin:0;
+    font-family:-apple-system,sans-serif;
+    background:#f2f2f7;
+}
+
+.header{
+    height:60px;
+    background:white;
+    display:flex;
+    align-items:center;
+    padding:0 15px;
+    gap:15px;
+    box-shadow:0 1px 8px rgba(0,0,0,0.05);
+    position:sticky;
+    top:0;
+    z-index:100;
+}
+
+.back-btn{
+    width:36px;
+    height:36px;
+    border-radius:10px;
+    background:#f2f2f7;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    color:#007AFF;
+}
+
+.container{
+    padding:15px;
+}
+
+.search-box{
+    width:100%;
+    padding:12px;
+    border:none;
+    border-radius:14px;
+    margin-bottom:15px;
+    box-sizing:border-box;
+    font-size:15px;
+}
+
+.staff-card{
+    background:white;
+    border-radius:18px;
+    padding:15px;
+    margin-bottom:10px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    box-shadow:0 2px 8px rgba(0,0,0,0.05);
+}
+
+.staff-info h4{
+    margin:0;
+    font-size:14px;
+}
+
+.staff-info p{
+    margin:3px 0 0;
+    font-size:11px;
+    color:#666;
+}
+
+.action-group{
+    display:flex;
+    gap:8px;
+}
+
+.icon-btn{
+    width:38px;
+    height:38px;
+    border:none;
+    border-radius:12px;
+    color:white;
+    cursor:pointer;
+}
+
+.edit-btn{
+    background:#007AFF;
+}
+
+.delete-btn{
+    background:#FF3B30;
+}
+
+.fab{
+    position:fixed;
+    right:20px;
+    bottom:20px;
+    width:55px;
+    height:55px;
+    border-radius:18px;
+    background:#34C759;
+    color:white;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:20px;
+    cursor:pointer;
+    box-shadow:0 5px 15px rgba(0,0,0,0.2);
+}
+
+</style>
+</head>
+<body>
+
+<div class="header">
+
+    <div class="back-btn" onclick="window.location.href='index.html'">
+        <i class="fa fa-chevron-left"></i>
+    </div>
+
+    <h3 style="margin:0;">User Directory</h3>
+
+</div>
+
+<div class="container">
+
+    <input type="text"
+           id="searchStaff"
+           class="search-box"
+           placeholder="Cari staff..."
+           onkeyup="renderStaff()">
+
+    <div id="staffList"></div>
+
+</div>
+
+<div class="fab" onclick="addStaff()">
+    <i class="fa fa-plus"></i>
+</div>
+
+<script>
+
+const SUPABASE_URL = 'https://fppemnabevbcephyepwx.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48';
+
+const headers = {
+    apikey: SUPABASE_KEY,
+    Authorization: 'Bearer ' + SUPABASE_KEY,
+    'Content-Type':'application/json'
+};
+
+const hierarki = {
+    'KETUA JABATAN': 1,
+    'KETUA SEKSYEN': 2,
+    'EKSEKUTIF KANAN': 3,
+    'EKSEKUTIF': 4,
+    'JURUTEKNIK': 5,
+    'PENYELIA PENTADBIRAN': 6,
+    'PEMBANTU PENTADBIRAN': 7,
+    'KERANI': 8
+};
+
+let staffData = [];
+
+async function loadStaff(){
+
+    try{
+
+        const res = await fetch(
+            `${SUPABASE_URL}/rest/v1/staff?select=*`,
+            { headers }
+        );
+
+        staffData = await res.json();
+
+        renderStaff();
+
+    } catch(err){
+
+        console.error(err);
+
+    }
+}
+
+function renderStaff(){
+
+    const keyword = document.getElementById('searchStaff')
+        .value
+        .toLowerCase();
+
+    let filtered = [...staffData];
+
+    filtered = filtered.filter(s => {
+
+        return (
+            s.nama?.toLowerCase().includes(keyword) ||
+            s.jawatan?.toLowerCase().includes(keyword)
+        );
+
+    });
+
+    filtered.sort((a,b)=>{
+
+        const ra = hierarki[a.jawatan?.toUpperCase()] || 99;
+        const rb = hierarki[b.jawatan?.toUpperCase()] || 99;
+
+        if(ra !== rb) return ra-rb;
+
+        return a.nama.localeCompare(b.nama);
+
+    });
+
+    document.getElementById('staffList').innerHTML = filtered.map(s=>`
+
+        <div class="staff-card">
+
+            <div class="staff-info">
+                <h4>${s.nama.toUpperCase()}</h4>
+                <p>${s.jawatan}</p>
+            </div>
+
+            <div class="action-group">
+
+                <button class="icon-btn edit-btn"
+                        onclick="editStaff(${s.id})">
+
+                    <i class="fa fa-pen"></i>
+
+                </button>
+
+                <button class="icon-btn delete-btn"
+                        onclick="deleteStaff(${s.id}, '${s.nama}')">
+
+                    <i class="fa fa-trash"></i>
+
+                </button>
+
+            </div>
+
+        </div>
+
+    `).join('');
+
+}
+
+async function addStaff(existing = null){
+
+    const nama = prompt(
+        "NAMA STAFF",
+        existing?.nama || ''
+    );
+
+    if(!nama) return;
+
+    const jawatan = prompt(
+        "JAWATAN",
+        existing?.jawatan || ''
+    );
+
+    if(!jawatan) return;
+
+    try{
+
+        if(existing){
+
+            await fetch(
+                `${SUPABASE_URL}/rest/v1/staff?id=eq.${existing.id}`,
+                {
+                    method:'PATCH',
+                    headers,
+                    body:JSON.stringify({
+                        nama,
+                        jawatan
+                    })
+                }
+            );
+
+        } else {
+
+            await fetch(
+                `${SUPABASE_URL}/rest/v1/staff`,
+                {
+                    method:'POST',
+                    headers,
+                    body:JSON.stringify({
+                        nama,
+                        jawatan
+                    })
+                }
+            );
+        }
+
+        loadStaff();
+
+    } catch(err){
+
+        alert(err.message);
+
+    }
+}
+
+function editStaff(id){
+
+    const staff = staffData.find(s=>s.id===id);
+
+    if(staff){
+        addStaff(staff);
+    }
+}
+
+async function deleteStaff(id, nama){
+
+    const ok = confirm(
+        `PADAM ${nama.toUpperCase()} ?`
+    );
+
+    if(!ok) return;
+
+    try{
+
+        await fetch(
+            `${SUPABASE_URL}/rest/v1/staff?id=eq.${id}`,
+            {
+                method:'DELETE',
+                headers
+            }
+        );
+
+        loadStaff();
+
+    } catch(err){
+
+        alert(err.message);
+
+    }
+}
+
+window.onload = loadStaff;
+
+</script>
+
+</body>
+</html>
