@@ -432,20 +432,7 @@ dynamicSectionKeys.forEach(key => {
             });
 
             rowData.push(formatShortDate(wo.qpb_date));
-
-// total semua section
-let totalAllSection = 0;
-
-dynamicSectionKeys.forEach(key => {
-    totalAllSection += Number(cat[key]?.amt || 0);
-});
-
-rowData.push(
-    `${wo.status === 'Claimed' ? `INT ${wo.interim_no}` : (wo.status || "PENDING")} | RM ${totalAllSection.toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-    })}`
-);
+            rowData.push(wo.status === 'Claimed' ? `INT ${wo.interim_no}` : (wo.status || "PENDING"));
             
             ws3_data.push(rowData);
         });
@@ -466,6 +453,16 @@ for (let i = 0; i < sectionCount; i++) {
 for (let i = 0; i < sectionCount; i++) {
     grandTotalRow[4 + sectionCount + i] = dTotals[sectionCount + i] || 0;
 }
+                // TOTAL SEMUA SECTION (quotation + payment)
+let overallGrandTotal = 0;
+
+for (let i = 0; i < sectionCount; i++) {
+    overallGrandTotal += Number(dTotals[i] || 0); // quotation
+    overallGrandTotal += Number(dTotals[sectionCount + i] || 0); // payment
+}
+
+// letak dekat kolum paling hujung
+grandTotalRow[totalCols - 1] = overallGrandTotal;
 
 ws3_data.push(grandTotalRow);
 
@@ -517,36 +514,42 @@ for (let r = 0; r < ws3_data.length; r++) {
         }
 
         // =========================
-        // HEADER STYLE
-        // =========================
-        if (
-            daerahList.includes(val) ||
-            val.includes("SENARAI PERMOHONAN") ||
-            val === "NO." ||
-            val === "DESCRIPTION" ||
-            val === "LOCATION" ||
-            val === "WORK ORDER" ||
-            val === "QUOTATION" ||
-            val === "PAYMENT" ||
-            val === "(RM)" || 
-            val === "QUOTATION APPROVAL DATE" ||
-            val === "STATUS / PAID AS PER INTERIM NO"
-        ) {
+// HEADER STYLE
+// =========================
+if (
+    daerahList.includes(val) ||
+    val.includes("SENARAI PERMOHONAN") ||
+    val === "NO." ||
+    val === "DESCRIPTION" ||
+    val === "LOCATION" ||
+    val === "WORK ORDER" ||
+    val === "QUOTATION" ||
+    val === "PAYMENT" ||
+    val === "(RM)" || 
+    val === "QUOTATION APPROVAL DATE" ||
+    val === "STATUS / PAID AS PER INTERIM NO" ||
 
-            ws3[ref].s.fill = {
-                fgColor: { rgb: "EAEAEA" }
-            };
+    // tambah section description sekali
+    dynamicSectionKeys.some(key => 
+        val === (sections[key]?.desc || key)
+    )
+) {
 
-            ws3[ref].s.font = {
-                bold: true
-            };
+    ws3[ref].s.fill = {
+        fgColor: { rgb: "EAEAEA" } // kelabu
+    };
 
-            ws3[ref].s.alignment = {
-                horizontal: "center",
-                vertical: "center",
-                wrapText: true
-            };
-        }
+    ws3[ref].s.font = {
+        bold: true,
+        color: { rgb: "000000" }
+    };
+
+    ws3[ref].s.alignment = {
+        horizontal: "center",
+        vertical: "center",
+        wrapText: true
+    };
+}
 
         // =========================
         // BORDER
