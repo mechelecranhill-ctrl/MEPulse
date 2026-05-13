@@ -372,8 +372,13 @@ async function startAutoDownload() {
 
     // BARIS 6: Tajuk Seksyen Dinamik (E.g. SECTION C, SECTION D...)
     let h2 = ["", "", "", ""];
-    dynamicSectionKeys.forEach(key => h2.push(key)); // Tajuk untuk Quotation
-    dynamicSectionKeys.forEach(key => h2.push(key)); // Tajuk untuk Payment
+    dynamicSectionKeys.forEach(key => {
+    h2.push(sections[key]?.desc || key);
+});
+
+dynamicSectionKeys.forEach(key => {
+    h2.push(sections[key]?.desc || key);
+});
     h2.push("", "");
     ws3_data.push(h2);
 
@@ -427,7 +432,20 @@ async function startAutoDownload() {
             });
 
             rowData.push(formatShortDate(wo.qpb_date));
-            rowData.push(wo.status === 'Claimed' ? `INT ${wo.interim_no}` : (wo.status || "PENDING"));
+
+// total semua section
+let totalAllSection = 0;
+
+dynamicSectionKeys.forEach(key => {
+    totalAllSection += Number(cat[key]?.amt || 0);
+});
+
+rowData.push(
+    `${wo.status === 'Claimed' ? `INT ${wo.interim_no}` : (wo.status || "PENDING")} | RM ${totalAllSection.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    })}`
+);
             
             ws3_data.push(rowData);
         });
@@ -456,6 +474,11 @@ currentMerges.push({
     s: { r: totalRowIdx, c: 0 },
     e: { r: totalRowIdx, c: 3 }
 });
+                // jarak antara daerah
+ws3_data.push([]);
+ws3_data.push([]);
+ws3_data.push([]);
+                
             });
 
             const ws3 = XLSX.utils.aoa_to_sheet(ws3_data);
