@@ -12,8 +12,11 @@
 <body>
 
 <div class="loader">
-    <h3>Sila Tunggu...</h3>
-    <p>Fail Excel sedang dijana dengan tarikh interim...</p>
+    <h3 id="status-text">Sila Tunggu...</h3>
+    <p id="sub-text">Fail Excel sedang dijana...</p>
+    <button id="download-btn" style="display:none; padding: 15px 25px; background: #28a745; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;">
+        Klik Sini Untuk Muat Turun Fail
+    </button>
 </div>
 
 <script>
@@ -658,45 +661,52 @@ ws3["!cols"] = ws3Cols;
 
             XLSX.utils.book_append_sheet(wb, ws3, "List Work Order");
 
-// ===== PWA SAFE DOWNLOAD =====
+// ===== PWA SAFE DOWNLOAD LOGIC =====
 const wbout = XLSX.write(wb, {
     bookType: 'xlsx',
     type: 'array'
 });
 
-const blob = new Blob(
-    [wbout],
-    {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    }
-);
+const blob = new Blob([wbout], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+});
 
 const url = URL.createObjectURL(blob);
+const btn = document.getElementById('download-btn');
+const statusText = document.getElementById('status-text');
+const subText = document.getElementById('sub-text');
 
-const a = document.createElement("a");
-a.href = url;
-a.download = fileName;
-
-document.body.appendChild(a);
-a.click();
-
-setTimeout(() => {
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    window.history.back();
-}, 1500);
+// Fungsi untuk proses muat turun
+const triggerDownload = () => {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
     
-    } else {   
-        alert("Tiada data kontrak dijumpai.");
-        }
-    } catch(err) { 
-        console.error("Ralat Utama:", err);
-        alert("Ralat memproses data: " + err.message);
-    }
-}
+    setTimeout(() => {
+        document.body.removeChild(a);
+        // Jangan revoke URL terlalu awal pada PWA
+        statusText.innerText = "Selesai!";
+        subText.innerText = "Fail telah dihantar ke sistem muat turun peranti anda.";
+    }, 1000);
+};
 
-startAutoDownload();
+// Logik untuk PWA: Tunjukkan butang kerana auto-click sering disekat
+statusText.innerText = "Fail Sedia!";
+subText.innerText = "Sila klik butang di bawah untuk simpan fail.";
+btn.style.display = "inline-block";
+
+btn.onclick = () => {
+    triggerDownload();
+};
+
+// Cuba trigger secara automatik dahulu (mungkin berjaya di Desktop/Chrome)
+try {
+    triggerDownload();
+} catch (e) {
+    console.log("Auto-download blocked, waiting for user click.");
+}
 </script>
 </body>
 </html>
