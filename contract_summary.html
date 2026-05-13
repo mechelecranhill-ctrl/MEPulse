@@ -623,6 +623,10 @@ if (
                 const secDesc = (sections[secKey]?.desc || secKey).toUpperCase();
 
                 // CHECK ADA PAYMENT / INTERIM
+// =========================
+// HIGHLIGHT ROW CLAIMED
+// =========================
+
 const isPaymentColumn = (
     c >= 4 + sectionCount &&
     c < 4 + (sectionCount * 2)
@@ -630,32 +634,63 @@ const isPaymentColumn = (
 
 const hasInterim = Number(ws3[ref].v || 0) > 0;
 
-// kalau section dah claimed/interim → hijau
-if (isPaymentColumn && hasInterim) {
+// highlight row claimed sahaja
+// EXCLUDE grand total
+if (
+    isPaymentColumn &&
+    hasInterim &&
+    !isGrandTotalRow
+) {
 
-    // highlight satu row penuh
     for (let cc = 0; cc <= currentLastCol; cc++) {
 
-        const rowRef = XLSX.utils.encode_cell({ r: r, c: cc });
+        const rowRef = XLSX.utils.encode_cell({
+            r: r,
+            c: cc
+        });
 
         if (!ws3[rowRef]) continue;
 
         if (!ws3[rowRef].s) ws3[rowRef].s = {};
 
-        ws3[rowRef].s.fill = {
-            fgColor: { rgb: "C6EFCE" } // hijau excel
-        };
+        // jangan overwrite header
+        const rowVal = ws3[rowRef].v
+            ? ws3[rowRef].v.toString()
+            : "";
 
-        ws3[rowRef].s.font = {
-            color: { rgb: "006100" }
-        };
+        const isHeaderCell =
+            rowVal === "NO." ||
+            rowVal === "DESCRIPTION" ||
+            rowVal === "LOCATION" ||
+            rowVal === "WORK ORDER" ||
+            rowVal === "QUOTATION" ||
+            rowVal === "PAYMENT" ||
+            rowVal === "(RM)" ||
+            rowVal === "QUOTATION APPROVAL DATE" ||
+            rowVal === "STATUS / PAID AS PER INTERIM NO";
+
+        if (!isHeaderCell) {
+
+            ws3[rowRef].s.fill = {
+                fgColor: { rgb: "C6EFCE" }
+            };
+
+            ws3[rowRef].s.font = {
+                ...(ws3[rowRef].s.font || {}),
+                color: { rgb: "006100" }
+            };
+        }
     }
 }
                 // LABOUR
                 if (
-                    secDesc.includes("LABOUR") ||
-                    secDesc.includes("WORKMANSHIP")
-                ) {
+                    !isPaymentColumn &&
+                    (
+                        secDesc.includes("LABOUR") ||
+                        secDesc.includes("WORKMANSHIP")
+                    )
+                ) 
+                {
 
                     ws3[ref].s.fill = {
                         fgColor: { rgb: "FFCC99" }
@@ -664,9 +699,12 @@ if (isPaymentColumn && hasInterim) {
 
                 // SPARE / PROVISIONAL
                 else if (
-                    secDesc.includes("SPARE") ||
-                    secDesc.includes("PROVISIONAL")
-                ) {
+    !isPaymentColumn &&
+    (
+        secDesc.includes("SPARE") ||
+        secDesc.includes("PROVISIONAL")
+    )
+) {
 
                     ws3[ref].s.fill = {
                         fgColor: { rgb: "FFFF00" }
@@ -675,13 +713,22 @@ if (isPaymentColumn && hasInterim) {
 
                 // REFURBISHMENT
                 else if (
-                    secDesc.includes("REFURBISHMENT")
-                ) {
+    !isPaymentColumn &&
+    secDesc.includes("REFURBISHMENT")
+) {
 
                     ws3[ref].s.fill = {
                         fgColor: { rgb: "A9A9A9" }
                     };
                 }
+                if (isGrandTotalRow) {
+
+    ws3[ref].s.font = {
+        ...(ws3[ref].s.font || {}),
+        bold: true,
+        color: { rgb: "000000" }
+    };
+}
             }
 
             ws3[ref].t = 'n';
