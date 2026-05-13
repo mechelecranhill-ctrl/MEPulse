@@ -225,20 +225,37 @@
             vertical-align: middle;
             transition: all 0.2s ease;
         }
-        .tag {
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 10px;
-            font-weight: 700;
-            color: white;
-        }
-        .tag.claimed{
-    background: #34C75920;
-    color: #34C759;
+        .tag{
+    padding:5px 10px;
+    border-radius:20px;
+    font-size:10px;
+    font-weight:700;
+    color:white;
+    display:inline-block;
 }
-.tag.pending{
-    background: #007AFF20;
-    color: #007AFF;
+
+/* BLUEFORM */
+.tag.blueform{
+    background:#007AFF20;
+    color:#007AFF;
+}
+
+/* APPROVED */
+.tag.approved{
+    background:#34C75920;
+    color:#34C759;
+}
+
+/* INDENT */
+.tag.indent{
+    background:#00000020;
+    color:#000;
+}
+
+/* CANCEL */
+.tag.cancel{
+    background:#FF3B3020;
+    color:#FF3B30;
 }
         .bf-baki-table{
             margin-left:35px;
@@ -1053,10 +1070,25 @@ function renderTable(data, showArea = true){
         html += `
         <tr>
             <td>
-                <span class="tag ${w.status === 'Claimed' ? 'claimed' : 'pending'}">
-                    ${w.status || 'PENDING'}
-                </span>
-            </td>
+    <select 
+    onchange="updateStatus(${w.id}, this.value)"
+    ${w.status === 'Claimed' ? 'disabled' : ''}
+    style="
+        padding:6px 10px;
+        border-radius:10px;
+        border:1px solid #ddd;
+        font-size:11px;
+        font-weight:700;
+        background:${w.status === 'Claimed' ? '#f1f1f1' : 'white'};
+    "
+>
+        <option value="BLUEFORM" ${w.status === 'BLUEFORM' ? 'selected' : ''}>BLUEFORM</option>
+        <option value="APPROVED" ${w.status === 'APPROVED' ? 'selected' : ''}>APPROVED</option>
+        <option value="INDENT" ${w.status === 'INDENT' ? 'selected' : ''}>INDENT</option>
+        <option value="CANCEL" ${w.status === 'CANCEL' ? 'selected' : ''}>CANCEL</option>
+        <option value="Claimed" ${w.status === 'Claimed' ? 'selected' : ''}>CLAIMED</option>
+    </select>
+</td>
 
             <td><strong>${w.sequence_no || '-'}</strong></td>
             <td><strong>${w.work_id}</strong></td>
@@ -1117,8 +1149,8 @@ function renderMobileCards(data){
     ${w.sequence_no ? w.sequence_no + ' — ' : ''}${w.work_id || '-'}
 </div>
 
-                <span class="tag ${w.status === 'Claimed' ? 'claimed' : 'pending'}">
-                    ${w.status || 'PENDING'}
+                <span class="tag ${(w.status || 'BLUEFORM').toUpperCase()}">
+                    ${w.status || 'BLUEFORM'}
                 </span>
             </div>
 
@@ -2042,6 +2074,36 @@ function printBlueform() {
         return;
     }
     window.location.href = `contract_summary.html?id=${id}`;
+}
+    async function updateStatus(id, status){
+
+    try{
+
+        await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}`,{
+            method:'PATCH',
+            headers,
+            body: JSON.stringify({
+                status: status
+            })
+        });
+
+        /* update local data */
+        const row = allWorks.find(w => Number(w.id) === Number(id));
+
+        if(row){
+            row.status = status;
+        }
+
+        renderTable(currentTableData, currentView !== "DATE");
+        renderMobileCards(currentTableData);
+
+    }catch(e){
+
+        console.error(e);
+        alert("Gagal update status");
+
+    }
+
 }
 </script>
 </body>
