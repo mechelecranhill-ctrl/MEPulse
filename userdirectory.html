@@ -115,7 +115,74 @@ body{
     cursor:pointer;
     box-shadow:0 5px 15px rgba(0,0,0,0.2);
 }
+.tree-group{
+    margin-bottom:25px;
+}
 
+.tree-title{
+    font-size:11px;
+    font-weight:700;
+    color:#666;
+    margin:0 0 10px 8px;
+    letter-spacing:1px;
+}
+
+.tree-wrapper{
+    position:relative;
+    padding-left:20px;
+}
+
+.tree-wrapper::before{
+    content:'';
+    position:absolute;
+    left:8px;
+    top:0;
+    bottom:0;
+    width:2px;
+    background:#d1d1d6;
+}
+
+.staff-card{
+    position:relative;
+    background:white;
+    border-radius:18px;
+    padding:15px;
+    margin-bottom:12px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    box-shadow:0 2px 8px rgba(0,0,0,0.05);
+}
+
+.staff-card::before{
+    content:'';
+    position:absolute;
+    left:-12px;
+    top:50%;
+    width:12px;
+    height:2px;
+    background:#d1d1d6;
+}
+
+.staff-avatar{
+    width:45px;
+    height:45px;
+    border-radius:14px;
+    background:linear-gradient(135deg,#007AFF,#5AC8FA);
+    color:white;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+    font-size:16px;
+    flex-shrink:0;
+}
+
+.staff-left{
+    display:flex;
+    align-items:center;
+    gap:12px;
+}
 </style>
 </head>
 <body>
@@ -218,36 +285,90 @@ function renderStaff(){
 
     });
 
-    document.getElementById('staffList').innerHTML = filtered.map(s=>`
+    let grouped = {};
 
-        <div class="staff-card">
+    filtered.forEach(s=>{
 
-            <div class="staff-info">
-                <h4>${s.nama.toUpperCase()}</h4>
-                <p>${s.jawatan}</p>
+        const jawatan = s.jawatan?.toUpperCase() || 'LAIN-LAIN';
+
+        if(!grouped[jawatan]){
+            grouped[jawatan] = [];
+        }
+
+        grouped[jawatan].push(s);
+
+    });
+
+    let html = '';
+
+    Object.keys(grouped).forEach(jawatan=>{
+
+        html += `
+
+        <div class="tree-group">
+
+            <div class="tree-title">
+                ${jawatan}
             </div>
 
-            <div class="action-group">
+            <div class="tree-wrapper">
 
-                <button class="icon-btn edit-btn"
-                        onclick="editStaff(${s.id})">
+        `;
 
-                    <i class="fa fa-pen"></i>
+        grouped[jawatan].forEach(s=>{
 
-                </button>
+            const initials = s.nama
+                .split(' ')
+                .map(x=>x[0])
+                .join('')
+                .substring(0,2);
 
-                <button class="icon-btn delete-btn"
-                        onclick="deleteStaff(${s.id}, '${s.nama}')">
+            html += `
 
-                    <i class="fa fa-trash"></i>
+            <div class="staff-card">
 
-                </button>
+                <div class="staff-left">
+
+                    <div class="staff-avatar">
+                        ${initials}
+                    </div>
+
+                    <div class="staff-info">
+                        <h4>${s.nama.toUpperCase()}</h4>
+                        <p>${s.jawatan}</p>
+                    </div>
+
+                </div>
+
+                <div class="action-group">
+
+                    <button class="icon-btn edit-btn"
+                            onclick="editStaff(${s.id})">
+
+                        <i class="fa fa-pen"></i>
+
+                    </button>
+
+                    <button class="icon-btn delete-btn"
+                            onclick="deleteStaff(${s.id}, '${s.nama}')">
+
+                        <i class="fa fa-trash"></i>
+
+                    </button>
+
+                </div>
 
             </div>
 
-        </div>
+            `;
 
-    `).join('');
+        });
+
+        html += `</div></div>`;
+
+    });
+
+    document.getElementById('staffList').innerHTML = html;
 
 }
 
