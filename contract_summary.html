@@ -662,51 +662,60 @@ ws3["!cols"] = ws3Cols;
             XLSX.utils.book_append_sheet(wb, ws3, "List Work Order");
 
 // ===== PWA SAFE DOWNLOAD LOGIC =====
-const wbout = XLSX.write(wb, {
-    bookType: 'xlsx',
-    type: 'array'
-});
+            const wbout = XLSX.write(wb, {
+                bookType: 'xlsx',
+                type: 'array'
+            });
 
-const blob = new Blob([wbout], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-});
+            const blob = new Blob([wbout], {
+                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            });
 
-const url = URL.createObjectURL(blob);
-const btn = document.getElementById('download-btn');
-const statusText = document.getElementById('status-text');
-const subText = document.getElementById('sub-text');
+            const url = URL.createObjectURL(blob);
+            const btn = document.getElementById('download-btn');
+            const statusText = document.getElementById('status-text');
+            const subText = document.getElementById('sub-text');
 
-// Fungsi untuk proses muat turun
-const triggerDownload = () => {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    
-    setTimeout(() => {
-        document.body.removeChild(a);
-        // Jangan revoke URL terlalu awal pada PWA
-        statusText.innerText = "Selesai!";
-        subText.innerText = "Fail telah dihantar ke sistem muat turun peranti anda.";
-    }, 1000);
-};
+            // Fungsi untuk proses muat turun
+            const triggerDownload = () => {
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    statusText.innerText = "Selesai!";
+                    subText.innerText = "Fail telah dihantar ke sistem muat turun anda.";
+                }, 1000);
+            };
 
-// Logik untuk PWA: Tunjukkan butang kerana auto-click sering disekat
-statusText.innerText = "Fail Sedia!";
-subText.innerText = "Sila klik butang di bawah untuk simpan fail.";
-btn.style.display = "inline-block";
+            // Paparkan butang untuk PWA
+            statusText.innerText = "Fail Sedia!";
+            subText.innerText = "Sila klik butang di bawah jika muat turun tidak bermula.";
+            btn.style.display = "inline-block";
 
-btn.onclick = () => {
-    triggerDownload();
-};
+            btn.onclick = () => {
+                triggerDownload();
+            };
 
-// Cuba trigger secara automatik dahulu (mungkin berjaya di Desktop/Chrome)
-try {
-    triggerDownload();
-} catch (e) {
-    console.log("Auto-download blocked, waiting for user click.");
+            // Cuba trigger automatik
+            try {
+                triggerDownload();
+            } catch (e) {
+                console.log("Auto-download disekat, menunggu klik pengguna.");
+            }
+
+        } else {   
+            alert("Tiada data kontrak dijumpai.");
+        }
+    } catch(err) { 
+        console.error("Ralat Utama:", err);
+        alert("Ralat memproses data: " + err.message);
+    }
 }
+    startAutoDownload();
 </script>
 </body>
 </html>
