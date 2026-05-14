@@ -3,118 +3,69 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>M&E-Connect | Trello Board</title>
-
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<title>M&E-Connect Trello</title>
 
 <style>
-
 body{
-    font-family:-apple-system,system-ui,sans-serif;
+    font-family:system-ui;
     margin:0;
     padding:15px;
     background:linear-gradient(135deg,#a1c4fd,#c2e9fb);
 }
 
-/* CARD CONTAINER */
-.glass-card{
-    max-width:1200px;
-    margin:auto;
-    background:rgba(255,255,255,0.35);
-    backdrop-filter:blur(20px);
-    border-radius:18px;
-    padding:15px;
-    border:1px solid rgba(255,255,255,0.4);
-}
-
-/* BOARD */
 .board{
     display:flex;
     gap:12px;
     overflow-x:auto;
     padding:10px 0;
-    scroll-snap-type:x mandatory;
 }
 
-/* COLUMN */
 .column{
     min-width:280px;
-    max-width:320px;
     background:rgba(255,255,255,0.6);
     border-radius:16px;
     padding:12px;
     flex-shrink:0;
-    scroll-snap-align:start;
 }
 
-/* TITLE */
-.column h3{
-    margin:0 0 10px 0;
-    font-size:15px;
-}
-
-/* CARD */
 .card{
     background:#fff;
     padding:10px;
-    border-radius:12px;
     margin-bottom:8px;
-    cursor:grab;
+    border-radius:12px;
     border:1px solid #eee;
 }
 
-.card:active{
-    cursor:grabbing;
-    opacity:0.7;
-}
-
-/* INPUT */
-input, select{
+input{
     width:100%;
     padding:10px;
+    margin-top:8px;
     border-radius:10px;
     border:none;
-    margin-top:8px;
-    font-size:13px;
 }
 
 button{
     width:100%;
     padding:10px;
-    border-radius:10px;
-    border:none;
-    background:#007AFF;
-    color:white;
-    font-weight:700;
     margin-top:6px;
+    border:none;
+    border-radius:10px;
+    background:#007AFF;
+    color:#fff;
+    font-weight:700;
 }
-
-/* MOBILE */
-@media(max-width:768px){
-    .column{
-        min-width:85vw;
-    }
-}
-
 </style>
 </head>
 
 <body onload="loadBoard()">
 
-<div class="glass-card">
-
-    <h2>M&E Trello System</h2>
-
-    <div id="board" class="board"></div>
-
-</div>
+<h2>M&E Trello System</h2>
+<div id="board" class="board"></div>
 
 <script>
 
 const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
-
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
+const SB_KEY = "YOUR_KEY";
 
 const headers = {
     apikey: SB_KEY,
@@ -122,11 +73,6 @@ const headers = {
     "Content-Type":"application/json"
 };
 
-let draggedId = null;
-
-/* =========================
-   LOAD BOARD (MAIN FUNCTION)
-========================= */
 async function loadBoard(){
 
 const secRes = await fetch(`${SB_URL}/rest/v1/me_sections?select=*`, {headers});
@@ -138,43 +84,26 @@ board.innerHTML = "";
 for(const sec of sections){
 
 const ures = await fetch(
-`${SB_URL}/rest/v1/units?select=*&section_id=eq.${sec.id}&order=created_at.asc`,
+`${SB_URL}/rest/v1/units?select=*&section_id=eq.${sec.id}&order=id.asc`,
 {headers}
 );
 
 let units = await ures.json();
 
+/* SAFE CHECK (IMPORTANT) */
 if(!Array.isArray(units)){
     console.error("Units error:", units);
     units = [];
 }
 
 board.innerHTML += `
-<div class="column"
-     data-section="${sec.id}"
-     ondrop="drop(event)"
-     ondragover="allowDrop(event)">
+<div class="column">
 
 <h3>${sec.section_name}</h3>
 
 ${units.map(u => `
-<div class="card"
-     draggable="true"
-     ondragstart="drag(event)"
-     data-id="${u.id}">
-
-    <b>${u.unit_name}</b>
-
-    <div style="font-size:11px;color:#666;margin-top:5px;">
-        Status: ${u.status || 'todo'}
-    </div>
-
-    <select onchange="updateStatus(${u.id}, this.value)">
-        <option value="todo">To Do</option>
-        <option value="doing">Doing</option>
-        <option value="done">Done</option>
-    </select>
-
+<div class="card">
+    ${u.unit_name}
 </div>
 `).join('')}
 
@@ -187,71 +116,23 @@ ${units.map(u => `
 
 }
 
-/* =========================
-   ADD UNIT
-========================= */
 async function addUnit(sectionId){
 
 const input = document.getElementById(`unit_${sectionId}`);
 const name = input.value.trim();
 
-if(!name) return alert("Isi unit");
+if(!name) return;
 
 await fetch(`${SB_URL}/rest/v1/units`, {
 method:'POST',
 headers,
 body: JSON.stringify({
 unit_name:name,
-section_id:sectionId,
-status:'todo'
+section_id:sectionId
 })
 });
 
-input.value = "";
-loadBoard();
-
-}
-
-/* =========================
-   UPDATE STATUS
-========================= */
-async function updateStatus(id,status){
-
-await fetch(`${SB_URL}/rest/v1/units?id=eq.${id}`, {
-method:'PATCH',
-headers,
-body: JSON.stringify({status})
-});
-
-loadBoard();
-
-}
-
-/* =========================
-   DRAG DROP
-========================= */
-function drag(ev){
-draggedId = ev.target.dataset.id;
-}
-
-function allowDrop(ev){
-ev.preventDefault();
-}
-
-async function drop(ev){
-
-ev.preventDefault();
-
-const sectionId = ev.currentTarget.dataset.section;
-
-await fetch(`${SB_URL}/rest/v1/units?id=eq.${draggedId}`, {
-method:'PATCH',
-headers,
-body: JSON.stringify({
-section_id: sectionId
-})
-});
-
+input.value="";
 loadBoard();
 
 }
