@@ -6,83 +6,123 @@
 <title>M&E-Connect Trello</title>
 
 <style>
+
 body{
-    font-family:system-ui;
     margin:0;
-    padding:0;
+    font-family:system-ui;
     height:100vh;
     overflow:hidden;
-    background:linear-gradient(135deg,#a1c4fd,#c2e9fb);
-}
-    .glass-card{
-    height:100vh;
-    width:100%;
-    max-width:none;
-    margin:0;
-    border-radius:0;
-    padding:15px;
-    box-sizing:border-box;
+    background:linear-gradient(135deg,#89f7fe,#66a6ff);
 }
 
+/* HEADER */
+.header{
+    height:60px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 15px;
+    color:white;
+    font-weight:800;
+    font-size:18px;
+    backdrop-filter: blur(10px);
+}
+
+/* BOARD */
 .board{
     display:flex;
-    height:calc(100vh - 80px);
+    gap:14px;
+    height:calc(100vh - 60px);
     overflow-x:auto;
-    gap:12px;
-    overflow-x:auto;
-    padding:10px 0;
-    align-items:flex-start;
+    padding:15px;
+    scroll-snap-type:x mandatory;
 }
 
+/* COLUMN */
 .column{
-    min-width:280px;
-    max-width:280px;
-    background:rgba(255,255,255,0.6);
-    border-radius:16px;
+    min-width:300px;
+    max-width:300px;
+    background:rgba(255,255,255,0.25);
+    backdrop-filter: blur(18px);
+    border-radius:18px;
     padding:12px;
     display:flex;
     flex-direction:column;
-    gap:8px;
-    flex-shrink:0;
-    height: fit-content;
-    max-height: 85vh;
-    overflow-y: auto;
+    gap:10px;
+    scroll-snap-align:start;
+    border:1px solid rgba(255,255,255,0.3);
+    box-shadow:0 10px 30px rgba(0,0,0,0.1);
 }
 
+/* COLUMN TITLE */
+.column h3{
+    margin:0;
+    font-size:15px;
+    color:#fff;
+}
+
+/* CARD */
 .card{
-    background:#fff;
-    padding:10px;
-    margin-bottom:8px;
-    border-radius:12px;
-    border:1px solid #eee;
+    background:white;
+    padding:12px;
+    border-radius:14px;
+    border:1px solid rgba(0,0,0,0.05);
+    box-shadow:0 6px 15px rgba(0,0,0,0.08);
+    transition:0.2s;
+    cursor:grab;
 }
 
+.card:hover{
+    transform:translateY(-3px);
+    box-shadow:0 10px 25px rgba(0,0,0,0.15);
+}
+
+/* INPUT */
 input{
     width:100%;
     padding:10px;
-    margin-top:8px;
-    border-radius:10px;
+    border-radius:12px;
     border:none;
+    outline:none;
     box-sizing:border-box;
 }
 
+/* BUTTON */
 button{
     width:100%;
     padding:10px;
-    margin-top:6px;
+    border-radius:12px;
     border:none;
-    border-radius:10px;
-    background:#007AFF;
-    color:#fff;
     font-weight:700;
-    box-sizing:border-box;
+    color:white;
+    background:linear-gradient(135deg,#007AFF,#00c6ff);
+    cursor:pointer;
+    transition:0.2s;
 }
+
+button:hover{
+    transform:scale(1.02);
+}
+
+/* SCROLLBAR */
+.board::-webkit-scrollbar{
+    height:8px;
+}
+
+.board::-webkit-scrollbar-thumb{
+    background:rgba(255,255,255,0.5);
+    border-radius:10px;
+}
+
 </style>
 </head>
 
 <body onload="loadBoard()">
 
-<h2>M&E Trello System</h2>
+<div class="header">
+    M&E CONNECT • TRELL0 SYSTEM
+</div>
+
 <div id="board" class="board"></div>
 
 <script>
@@ -113,11 +153,7 @@ const ures = await fetch(
 
 let units = await ures.json();
 
-/* SAFE CHECK (IMPORTANT) */
-if(!Array.isArray(units)){
-    console.error("Units error:", units);
-    units = [];
-}
+if(!Array.isArray(units)) units = [];
 
 board.innerHTML += `
 <div class="column">
@@ -126,7 +162,7 @@ board.innerHTML += `
 
 ${units.map(u => `
 <div class="card">
-    ${u.unit_name}
+    <b>${u.unit_name}</b>
 </div>
 `).join('')}
 
@@ -146,9 +182,7 @@ const name = input.value.trim();
 
 if(!name) return alert("Isi unit dulu");
 
-try{
-
-const res = await fetch(`${SB_URL}/rest/v1/units`, {
+await fetch(`${SB_URL}/rest/v1/units`, {
 method:'POST',
 headers,
 body: JSON.stringify({
@@ -157,24 +191,11 @@ section_id:sectionId
 })
 });
 
-const text = await res.text();
-console.log("RESPONSE:", text);
-
-if(!res.ok){
-    alert("ERROR: " + text);
-    return;
-}
-
-alert("SUCCESS INSERT");
 input.value="";
 loadBoard();
 
-}catch(err){
-console.error(err);
-alert("NETWORK ERROR");
 }
 
-}
 </script>
 
 </body>
