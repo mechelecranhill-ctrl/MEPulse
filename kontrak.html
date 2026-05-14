@@ -540,9 +540,25 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
             <div class="glass-card">
                 <h3 style="margin-top:0;"><i class="fa-solid fa-gear"></i> Pendaftaran Unit</h3>
                 <form id="unitForm">
-                    <input type="text" id="new_unit_name" placeholder="Cth: INSTRUMENTASI" required>
-                    <button type="submit" class="btn-primary">Simpan Unit</button>
-                </form>
+
+    <label>Pilih Seksyen</label>
+
+    <select id="unit_section_id" required>
+        <option value="">
+            Pilih Seksyen
+        </option>
+    </select>
+
+    <input type="text"
+           id="new_unit_name"
+           placeholder="Cth: INSTRUMENTASI"
+           required>
+
+    <button type="submit"
+            class="btn-primary">
+        Simpan Unit
+    </button>
+</form>
                 <div id="unitListDisplay" style="margin-top:20px; font-size:13px;"></div>
             </div>
         </div>
@@ -561,10 +577,9 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
 
 showPage('registerWorkPage', document.getElementById('menu_registerWorkPage'));
 
-setupFormListeners();
-
-// load kontrak hanya untuk VO
-loadContractsToDropdowns();
+        setupFormListeners();
+        fetchSections();
+        loadContractsToDropdowns();
 
 }
 
@@ -588,7 +603,12 @@ fetchUnits();
             e.preventDefault();
             const unitName = document.getElementById('new_unit_name').value.trim().toUpperCase();
             const res = await fetch(`${SB_URL}/rest/v1/units`, {
-                method: 'POST', headers, body: JSON.stringify({ unit_name: unitName })
+                method: 'POST', headers, body: JSON.stringify({ unit_name: unitName,
+
+    section_id:
+    document.getElementById('unit_section_id').value
+
+})
             });
             if (res.ok) { alert("Unit berjaya disimpan!"); document.getElementById('new_unit_name').value = ''; fetchUnits(); }
         });
@@ -782,6 +802,41 @@ if(existing.length > 0){
         });
 
     } catch (e) { console.error(e); }
+}
+    async function fetchSections(){
+
+try{
+
+const res = await fetch(
+`${SB_URL}/rest/v1/me_sections?select=*`,
+{ headers });
+
+const data = await res.json();
+
+const select =
+document.getElementById('unit_section_id');
+
+if(!select) return;
+
+select.innerHTML =
+'<option value="">Pilih Seksyen</option>';
+
+data.forEach(sec=>{
+
+select.innerHTML += `
+<option value="${sec.id}">
+${sec.section_name}
+</option>
+`;
+
+});
+
+}catch(e){
+
+console.error(e);
+
+}
+
 }
     async function loadContractsToDropdowns() {
         try {
