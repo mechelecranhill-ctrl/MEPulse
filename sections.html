@@ -248,46 +248,66 @@ body:hover .g2{
 }
 
 .splash-text{
-    position:relative;
-    text-align:center;
-}
-
-/* kedua-dua text overlap */
-.short, .full{
-    position:absolute;
-    left:50%;
-    top:50%;
-    transform:translate(-50%,-50%);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:0px;
     font-weight:900;
     color:#111;
-    transition:all 0.8s ease;
+    user-select:none;
     white-space:nowrap;
 }
 
-/* START STATE */
-.short{
+/* semua huruf */
+.splash-text span{
+    display:inline-block;
     font-size:90px;
-    opacity:1;
-}
-
-.full{
-    font-size:28px;
     opacity:0;
-    letter-spacing:2px;
+    transform:translateY(40px) scale(0.5);
+    transition:
+        transform 0.7s cubic-bezier(.2,.8,.2,1),
+        opacity 0.7s ease,
+        letter-spacing 0.7s ease;
 }
 
-/* MORPH STATE */
-#splash.zoom-out .short{
-    opacity:0;
-    transform:translate(-50%,-50%) scale(2);
-    filter:blur(10px);
-}
-
-#splash.zoom-out .full{
+/* initial visible */
+.splash-text .m,
+.splash-text .e,
+.splash-text .amp{
     opacity:1;
-    font-size:22px;
+    transform:translateY(0) scale(1);
+}
+
+/* bila animate */
+#splash.animate .hidden-letter{
+    opacity:1;
+    transform:translateY(0) scale(1);
+}
+
+/* M stretch jadi Mechanical */
+#splash.animate .m{
+    letter-spacing:8px;
+}
+
+/* E stretch jadi Electrical */
+#splash.animate .e{
     letter-spacing:6px;
-    transform:translate(-50%,-50%) scale(1.2);
+}
+
+/* kecilkan full sentence */
+#splash.animate .splash-text span{
+    font-size:28px;
+}
+
+/* spacing */
+.space{
+    width:14px;
+}
+
+/* fade keluar */
+#splash.fade-out{
+    opacity:0;
+    transition:opacity 0.7s ease;
 }
     
 </style>
@@ -295,7 +315,7 @@ body:hover .g2{
 
 <body onload="loadBoard()">
 
-<<div id="splash" onclick="enterApp()">
+<div id="splash" onclick="enterApp()">
     <div class="splash-text">
         <span class="short">M&E</span>
         <span class="full">Mechanical & Electrical Department</span>
@@ -332,18 +352,21 @@ const headers = {
 };
 
 function enterApp(){
+
     const splash = document.getElementById("splash");
 
-    splash.classList.add("zoom-out");
+    splash.classList.add("animate");
 
-    setTimeout(() => {
-        splash.style.transition = "opacity 0.5s ease";
-        splash.style.opacity = "0";
-    }, 900);
+    /* fade keluar */
+    setTimeout(()=>{
+        splash.classList.add("fade-out");
+    },2200);
 
-    setTimeout(() => {
-        splash.style.display = "none";
-    }, 1400);
+    /* remove splash */
+    setTimeout(()=>{
+        splash.style.display="none";
+    },3000);
+
 }
 
 async function loadBoard(){
