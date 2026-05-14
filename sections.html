@@ -94,6 +94,64 @@ input{
     color:#888;
     font-size:13px;
 }
+    .board {
+    display: flex;
+    gap: 15px;
+    overflow-x: auto;
+    padding: 10px 0;
+}
+
+.board-column {
+    min-width: 280px;
+    background: rgba(255,255,255,0.5);
+    backdrop-filter: blur(20px);
+    border-radius: 18px;
+    padding: 15px;
+    border: 1px solid rgba(255,255,255,0.6);
+    flex-shrink: 0;
+}
+
+.board-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #222;
+}
+
+.board-id {
+    font-size: 11px;
+    color: #777;
+    margin-bottom: 10px;
+}
+
+.unit-item {
+    background: white;
+    padding: 10px;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid #eee;
+}
+
+.add-unit input {
+    width: 100%;
+    padding: 10px;
+    border-radius: 10px;
+    border: none;
+    margin-top: 8px;
+}
+
+.add-unit button {
+    width: 100%;
+    margin-top: 6px;
+    padding: 10px;
+    border-radius: 10px;
+    border: none;
+    background: #34C759;
+    color: white;
+    font-weight: 700;
+    cursor: pointer;
+}
 
 </style>
 </head>
@@ -149,7 +207,7 @@ input{
     </div>
 
     <!-- LIST -->
-    <div id="sections_container"></div>
+    <div id="board" class="board"></div>
 
 </div>
 
@@ -175,84 +233,87 @@ const res = await fetch(
 `${SB_URL}/rest/v1/me_sections?select=*&order=section_name.asc`,
 { headers });
 
-const data = await res.json();
+const sections = await res.json();
 
-const container =
-document.getElementById('sections_container');
+const board = document.getElementById('board');
+board.innerHTML = '';
 
-container.innerHTML = '';
+for(const sec of sections){
 
-if(data.length === 0){
+// ambil units
+const ures = await fetch(
+`${SB_URL}/rest/v1/units?select=*&section_id=eq.${sec.id}`,
+{ headers });
 
-container.innerHTML = `
-<div class="empty-state">
-Tiada seksyen lagi. Sila tambah seksyen baru.
+const units = await ures.json();
+
+board.innerHTML += `
+<div class="board-column">
+
+    <div class="board-title">
+        ${sec.section_name}
+    </div>
+
+    <div class="board-id">
+        ID: ${sec.id}
+    </div>
+
+    <div>
+        ${units.map(u => `
+            <div class="unit-item">
+                ${u.unit_name}
+            </div>
+        `).join('')}
+    </div>
+
+    <div class="add-unit">
+
+        <input type="text"
+               id="unit_${sec.id}"
+               placeholder="Tambah unit...">
+
+        <button onclick="addUnit(${sec.id})">
+            + Add Unit
+        </button>
+
+    </div>
+
 </div>
 `;
-
-return;
 
 }
-
-data.forEach(sec=>{
-
-container.innerHTML += `
-<div class="section-item">
-
-<div class="section-name">
-${sec.section_name}
-</div>
-
-<div class="section-id">
-ID: ${sec.id}
-</div>
-
-</div>
-`;
-
-});
 
 }catch(e){
 console.error(e);
 }
 
 }
+    async function addUnit(sectionId){
 
-async function addSection(){
-
-const name =
-document.getElementById('section_name')
-.value
-.trim()
-.toUpperCase();
+const input = document.getElementById(`unit_${sectionId}`);
+const name = input.value.trim().toUpperCase();
 
 if(!name){
-alert("Isi nama seksyen");
+alert("Isi nama unit");
 return;
 }
 
 const res = await fetch(
-`${SB_URL}/rest/v1/me_sections`,
+`${SB_URL}/rest/v1/units`,
 {
 method:'POST',
 headers,
 body: JSON.stringify({
-section_name:name
+unit_name: name,
+section_id: sectionId
 })
 });
 
 if(res.ok){
-
-document.getElementById('section_name').value='';
-
+input.value = '';
 loadSections();
-
-alert("Seksyen berjaya ditambah");
-
 }else{
-
-alert("Gagal tambah seksyen");
-
+alert("Gagal tambah unit");
 }
 
 }
