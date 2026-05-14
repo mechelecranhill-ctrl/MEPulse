@@ -138,11 +138,16 @@ board.innerHTML = "";
 for(const sec of sections){
 
 const ures = await fetch(
-`${SB_URL}/rest/v1/units?section_id=eq.${sec.id}&order=created_at.asc`,
+`${SB_URL}/rest/v1/units?select=*&section_id=eq.${sec.id}&order=created_at.asc`,
 {headers}
 );
 
-const units = await ures.json();
+let units = await ures.json();
+
+if(!Array.isArray(units)){
+    console.error("Units error:", units);
+    units = [];
+}
 
 board.innerHTML += `
 <div class="column"
@@ -165,21 +170,19 @@ ${units.map(u => `
     </div>
 
     <select onchange="updateStatus(${u.id}, this.value)">
-        <option value="todo" ${u.status=='todo'?'selected':''}>To Do</option>
-        <option value="doing" ${u.status=='doing'?'selected':''}>Doing</option>
-        <option value="done" ${u.status=='done'?'selected':''}>Done</option>
+        <option value="todo">To Do</option>
+        <option value="doing">Doing</option>
+        <option value="done">Done</option>
     </select>
 
 </div>
 `).join('')}
 
-<!-- ADD UNIT -->
 <input id="unit_${sec.id}" placeholder="Tambah unit...">
 <button onclick="addUnit(${sec.id})">+ Add Unit</button>
 
 </div>
 `;
-
 }
 
 }
