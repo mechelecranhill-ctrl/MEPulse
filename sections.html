@@ -62,6 +62,38 @@ input{
     margin-top:10px;
     margin-bottom:10px;
 }
+    .section-item{
+    background:rgba(255,255,255,0.9);
+    padding:15px;
+    border-radius:16px;
+    margin-bottom:10px;
+    border:1px solid rgba(255,255,255,0.6);
+    transition:0.2s;
+}
+
+.section-item:hover{
+    transform:translateY(-2px);
+    box-shadow:0 10px 25px rgba(0,0,0,0.08);
+}
+
+.section-name{
+    font-size:15px;
+    font-weight:800;
+    color:#222;
+}
+
+.section-id{
+    font-size:11px;
+    color:#777;
+    margin-top:4px;
+}
+
+.empty-state{
+    text-align:center;
+    padding:30px;
+    color:#888;
+    font-size:13px;
+}
 
 </style>
 </head>
@@ -69,23 +101,55 @@ input{
 
 <div class="glass-card">
 
-    <h2>
-        <i class="fa-solid fa-layer-group"></i>
-        Senarai Seksyen
-    </h2>
+    <div style="text-align:center; margin-bottom:20px;">
 
-    <input type="text"
-           id="section_name"
-           placeholder="Nama Seksyen">
+        <div style="font-size:22px; font-weight:800; color:#333;">
+            M&E-CONNECT
+        </div>
 
-    <button class="btn"
-            onclick="addSection()">
-        Tambah Seksyen
-    </button>
+        <div style="font-size:12px; color:#666;">
+            Pengurusan Seksyen Sistem Kontrak
+        </div>
 
-    <div id="sections_container"
-         style="margin-top:20px;">
     </div>
+
+    <!-- INPUT CARD -->
+    <div style="
+        background:rgba(255,255,255,0.6);
+        padding:15px;
+        border-radius:16px;
+        border:1px solid rgba(255,255,255,0.5);
+        margin-bottom:15px;
+    ">
+
+        <label style="font-size:11px; font-weight:700; color:#555;">
+            NAMA SEKSYEN BARU
+        </label>
+
+        <input type="text"
+               id="section_name"
+               placeholder="Contoh: SEKSYEN SELENGGARA">
+
+        <button class="btn"
+                onclick="addSection()"
+                style="width:100%; margin-top:10px; background:#007AFF;">
+            + Tambah Seksyen
+        </button>
+
+    </div>
+
+    <!-- LIST TITLE -->
+    <div style="
+        font-size:13px;
+        font-weight:700;
+        color:#444;
+        margin-bottom:10px;
+    ">
+        SENARAI SEKSYEN
+    </div>
+
+    <!-- LIST -->
+    <div id="sections_container"></div>
 
 </div>
 
@@ -108,7 +172,7 @@ async function loadSections(){
 try{
 
 const res = await fetch(
-`${SB_URL}/rest/v1/me_sections?select=*`,
+`${SB_URL}/rest/v1/me_sections?select=*&order=section_name.asc`,
 { headers });
 
 const data = await res.json();
@@ -118,10 +182,21 @@ document.getElementById('sections_container');
 
 container.innerHTML = '';
 
+if(data.length === 0){
+
+container.innerHTML = `
+<div class="empty-state">
+Tiada seksyen lagi. Sila tambah seksyen baru.
+</div>
+`;
+
+return;
+
+}
+
 data.forEach(sec=>{
 
 container.innerHTML += `
-
 <div class="section-item">
 
 <div class="section-name">
@@ -133,15 +208,12 @@ ID: ${sec.id}
 </div>
 
 </div>
-
 `;
 
 });
 
 }catch(e){
-
 console.error(e);
-
 }
 
 }
