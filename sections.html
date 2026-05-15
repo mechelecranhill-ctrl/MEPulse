@@ -268,13 +268,56 @@ body:hover .g2{ animation-duration:4s; opacity:0.9; }
 
 .mer-logo{
     width:360px;
-    overflow:visible;
+    height:auto;
 
     filter:
         drop-shadow(0 10px 25px rgba(0,0,0,0.15));
 
+    opacity:0;
+
     animation:
-        floatLogo 4s ease-in-out infinite 1.6s;
+        logoIntro 1s cubic-bezier(.2,.8,.2,1) forwards,
+        floatLogo 4s ease-in-out infinite 1.2s;
+}
+
+@keyframes logoIntro{
+    0%{
+        opacity:0;
+        transform:
+            scale(.7)
+            translateY(30px)
+            rotate(-6deg);
+    }
+
+    60%{
+        opacity:1;
+        transform:
+            scale(1.05)
+            translateY(-4px)
+            rotate(1deg);
+    }
+
+    100%{
+        opacity:1;
+        transform:
+            scale(1)
+            translateY(0)
+            rotate(0deg);
+    }
+}
+
+@keyframes floatLogo{
+    0%{
+        transform:translateY(0px);
+    }
+
+    50%{
+        transform:translateY(-6px);
+    }
+
+    100%{
+        transform:translateY(0px);
+    }
 }
 
 /* BLUE */
@@ -391,55 +434,14 @@ body:hover .g2{ animation-duration:4s; opacity:0.9; }
 
     <div class="logo-wrap">
 
-<svg class="mer-logo" viewBox="0 0 600 220">
+    <object
+        id="logoSvg"
+        type="image/svg+xml"
+        data="logo.svg"
+        class="mer-logo">
+    </object>
 
-    <!-- BLUE -->
-    <g class="blue-part">
-        <polygon 
-            points="40,160 40,40 220,220 140,220"
-            fill="#29b6f6"/>
-            
-        <polygon 
-            points="40,220 40,150 110,220"
-            fill="#29b6f6"/>
-    </g>
-
-    <!-- BLACK -->
-    <g class="black-part">
-
-        <polygon 
-            points="240,40 420,40 420,90 330,90"
-            fill="#000"/>
-
-        <polygon 
-            points="240,40 360,160 420,160 420,220 330,220 240,130"
-            fill="#000"/>
-
-        <polygon 
-            points="330,120 420,120 420,170 380,170"
-            fill="#000"/>
-
-    </g>
-
-    <!-- ORANGE -->
-    <g class="orange-part">
-        <polygon 
-            points="460,100 530,100 600,170 600,220 530,150 460,150"
-            fill="#f15b22"/>
-    </g>
-
-    <!-- GREY -->
-    <rect 
-        class="grey-part"
-        x="530"
-        y="40"
-        width="70"
-        height="70"
-        fill="#9e9e8a"/>
-
-</svg>
-
-    </div>
+</div>
 
     <div class="splash-title">Mechanical &amp; Electrical Department</div>
     <div class="splash-hint">Klik untuk masuk</div>
@@ -524,7 +526,45 @@ async function addUnit(sectionId){
     input.value="";
     loadBoard();
 }
+window.addEventListener("load", ()=>{
 
+    const logo = document.getElementById("logoSvg");
+
+    logo.addEventListener("load", ()=>{
+
+        const svgDoc = logo.contentDocument;
+
+        if(!svgDoc) return;
+
+        const paths = svgDoc.querySelectorAll("path, polygon, rect");
+
+        paths.forEach((el, i)=>{
+
+            el.style.opacity = "0";
+            el.style.transformBox = "fill-box";
+            el.style.transformOrigin = "center";
+
+            el.animate([
+                {
+                    opacity:0,
+                    transform:"translateY(20px) scale(.8)"
+                },
+                {
+                    opacity:1,
+                    transform:"translateY(0) scale(1)"
+                }
+            ],{
+                duration:700,
+                delay:i * 120,
+                easing:"cubic-bezier(.2,.8,.2,1)",
+                fill:"forwards"
+            });
+
+        });
+
+    });
+
+});
 </script>
 
 </body>
