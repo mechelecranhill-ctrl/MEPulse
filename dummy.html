@@ -725,11 +725,9 @@ button:hover{
         <!-- LOGO -->
         <div class="logo-click" onclick="openDashboard()">
 
-    <object
-        type="image/svg+xml"
-        data="logo.svg"
+    <img
+        src="logo.svg"
         class="logo">
-    </object>
 
 </div>
 
@@ -787,6 +785,11 @@ button:hover{
 
 <!-- CONTENT -->
 <div class="content flex">
+
+    <p>By Goodkatz | Water Reveal Version</p>
+
+</div>
+
 <!-- DASHBOARD -->
 <div id="dashboard" class="dashboard">
 
@@ -794,79 +797,167 @@ button:hover{
         Mechanical &amp; Electrical Department
     </div>
 
-    <div id="board" class="board">
-
-        <div class="column">
-            <h3>Administration</h3>
-
-            <div class="card">
-                Staff Management
-            </div>
-
-            <div class="card">
-                Reports
-            </div>
-
-            <input placeholder="Tambah unit">
-
-            <button>
-                + Add Unit
-            </button>
-        </div>
-
-        <div class="column">
-            <h3>Engineering</h3>
-
-            <div class="card">
-                Electrical Team
-            </div>
-
-            <div class="card">
-                Mechanical Team
-            </div>
-
-            <input placeholder="Tambah unit">
-
-            <button>
-                + Add Unit
-            </button>
-        </div>
-
-        <div class="column">
-            <h3>Maintenance</h3>
-
-            <div class="card">
-                Building Services
-            </div>
-
-            <div class="card">
-                Preventive Maintenance
-            </div>
-
-            <input placeholder="Tambah unit">
-
-            <button>
-                + Add Unit
-            </button>
-        </div>
-
-    </div>
+    <div id="board" class="board"></div>
 
 </div>
 
-    <p>By Goodkatz | Water Reveal Version</p>
-
-</div>
 <script>
 
-function openDashboard(){
+const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
+
+const SB_KEY = "PASTE_SUPABASE_KEY_KAT_SINI";
+
+const headers = {
+    apikey: SB_KEY,
+    Authorization: `Bearer ${SB_KEY}`,
+    "Content-Type":"application/json"
+};
+
+let boardLoaded = false;
+
+/* OPEN DASHBOARD */
+
+async function openDashboard(){
 
     const dashboard =
     document.getElementById("dashboard");
 
     dashboard.classList.add("show");
 
+    if(!boardLoaded){
+
+        await loadBoard();
+
+        boardLoaded = true;
+    }
+
 }
+
+/* LOAD BOARD */
+
+async function loadBoard(){
+
+    const secRes = await fetch(
+        `${SB_URL}/rest/v1/me_sections?select=*`,
+        { headers }
+    );
+
+    const sections = await secRes.json();
+
+    const board =
+    document.getElementById("board");
+
+    board.innerHTML = "";
+
+    for(const sec of sections){
+
+        const ures = await fetch(
+            `${SB_URL}/rest/v1/units?select=*&section_id=eq.${sec.id}&order=id.asc`,
+            { headers }
+        );
+
+        let units = await ures.json();
+
+        if(!Array.isArray(units)){
+            units = [];
+        }
+
+        board.innerHTML += `
+
+        <div class="column">
+
+            <h3>${sec.section_name}</h3>
+
+            ${units.map(u => `
+
+                <div class="card">
+                    <b>${u.unit_name}</b>
+                </div>
+
+            `).join('')}
+
+            <input
+                id="unit_${sec.id}"
+                placeholder="Tambah unit...">
+
+            <button onclick="addUnit(${sec.id})">
+
+                + Add Unit
+
+            </button>
+
+        </div>
+
+        `;
+    }
+
+}
+
+/* ADD UNIT */
+
+async function addUnit(sectionId){
+
+    const input =
+    document.getElementById(`unit_${sectionId}`);
+
+    const name =
+    input.value.trim();
+
+    if(!name){
+
+        alert("Isi unit dulu");
+
+        return;
+    }
+
+    await fetch(
+
+        `${SB_URL}/rest/v1/units`,
+
+        {
+            method:'POST',
+
+            headers,
+
+            body: JSON.stringify({
+
+                unit_name:name,
+                section_id:sectionId
+
+            })
+        }
+
+    );
+
+    input.value = "";
+
+    loadBoard();
+
+}
+
+/* REMOVE WATER FX */
+
+setTimeout(()=>{
+
+    const waterScene =
+    document.querySelector(".water-scene");
+
+    if(waterScene){
+
+        waterScene.style.transition =
+        "opacity .8s ease";
+
+        waterScene.style.opacity = "0";
+
+        setTimeout(()=>{
+
+            waterScene.remove();
+
+        },800);
+
+    }
+
+},2600);
 
 </script>
 </body>
