@@ -940,87 +940,98 @@ async function openDashboard(){
 
 async function loadBoard(){
 
-    const secRes = await fetch(
-        `${SB_URL}/rest/v1/me_sections?select=*`,
-        { headers }
-    );
+    try{
 
-    const sections = await secRes.json();
+        const [secRes, unitRes] = await Promise.all([
 
-    const board =
-    document.getElementById("board");
+            fetch(
+                `${SB_URL}/rest/v1/me_sections?select=*`,
+                { headers }
+            ),
 
-    let html = "";
+            fetch(
+                `${SB_URL}/rest/v1/units?select=*&order=id.asc`,
+                { headers }
+            )
 
-    for(const sec of sections){
+        ]);
 
-        const ures = await fetch(
-            `${SB_URL}/rest/v1/units?select=*&section_id=eq.${sec.id}&order=id.asc`,
-            { headers }
-        );
+        const sections = await secRes.json();
+        const allUnits = await unitRes.json();
 
-        let units = await ures.json();
+        const board =
+        document.getElementById("board");
 
-        if(!Array.isArray(units)){
-            units = [];
-        }
+        let html = "";
 
-        const icon =
-        sectionIcons[
-            sec.section_name?.toUpperCase()
-        ] || "default.svg";
+        for(const sec of sections){
 
-        html += `
+            const units = allUnits.filter(
+                u => u.section_id === sec.id
+            );
 
-        <div class="column">
+            const icon =
+            sectionIcons[
+                sec.section_name?.toUpperCase()
+            ] || "default.svg";
 
-            <div class="section-head">
+            html += `
 
-                <img
-                    src="${icon}"
-                    class="section-icon">
+            <div class="column">
 
-                <h3>${sec.section_name}</h3>
+                <div class="section-head">
 
-            </div>
+                    <img
+                        src="${icon}"
+                        class="section-icon">
 
-            <div class="section-actions">
+                    <h3>${sec.section_name}</h3>
 
-                <button
-                    class="dashboard-btn"
-                    onclick="goContract('${sec.section_name}')">
+                </div>
 
-                    <i class="fa fa-arrow-up-right-from-square"></i>
-                    Open Dashboard
+                <div class="section-actions">
+
+                    <button
+                        class="dashboard-btn"
+                        onclick="goContract('${sec.section_name}')">
+
+                        <i class="fa fa-arrow-up-right-from-square"></i>
+                        Open Dashboard
+
+                    </button>
+
+                </div>
+
+                ${units.map(u => `
+
+                    <div class="card">
+                        <b>${u.unit_name}</b>
+                    </div>
+
+                `).join('')}
+
+                <input
+                    id="unit_${sec.id}"
+                    placeholder="Tambah unit...">
+
+                <button onclick="addUnit(${sec.id})">
+
+                    + Add Unit
 
                 </button>
 
             </div>
 
-            ${units.map(u => `
+            `;
+        }
 
-                <div class="card">
-                    <b>${u.unit_name}</b>
-                </div>
+        board.innerHTML = html;
 
-            `).join('')}
+    } catch(err){
 
-            <input
-                id="unit_${sec.id}"
-                placeholder="Tambah unit...">
+        console.error(err);
 
-            <button onclick="addUnit(${sec.id})">
-
-                + Add Unit
-
-            </button>
-
-        </div>
-
-        `;
     }
-
-    board.innerHTML = html;
 
 }
 
