@@ -6,6 +6,9 @@
     <title>M&E-Connect | Direktori Kontrak</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
     <style>
         :root { 
             --ios-blue: #007AFF; --ios-green: #34C759; --ios-orange: #FF9500; --ios-red: #FF3B30; 
@@ -2316,10 +2319,11 @@ async function bulkDownloadBlueform(){
         return;
     }
 
-    const pdfContainer = document.createElement('div');
-    pdfContainer.style.width = '210mm';
-
-    pdfContainer.style.background = 'white';
+    const pdf = new jspdf.jsPDF({
+        orientation:'portrait',
+        unit:'mm',
+        format:'a4'
+    });
 
     for(const [index, cb] of checked.entries()){
 
@@ -2327,62 +2331,34 @@ async function bulkDownloadBlueform(){
 
         await openBlueform(id);
 
-        await new Promise(r=>setTimeout(r,250));
+        await new Promise(r=>setTimeout(r,400));
 
-        const clone =
-            document.querySelector('.a4-container').cloneNode(true);
+        const element = document.querySelector('.a4-container');
 
-clone.style.breakInside = 'avoid';
-clone.style.pageBreakInside = 'avoid';
+        const canvas = await html2canvas(element,{
+            scale:2,
+            useCORS:true,
+            backgroundColor:'#ffffff'
+        });
 
-clone.style.margin = '0';
-clone.style.padding = '1.5cm 2cm 1.6cm 2cm';
+        const imgData = canvas.toDataURL('image/jpeg',1.0);
 
-clone.style.boxSizing = 'border-box';
+        if(index !== 0){
+            pdf.addPage();
+        }
 
-clone.style.overflow = 'hidden';
-
-        if(index !== checked.length - 1){
-    clone.style.breakAfter = 'page';
-}
-
-        pdfContainer.appendChild(clone);
+        pdf.addImage(
+            imgData,
+            'JPEG',
+            0,
+            0,
+            210,
+            297
+        );
 
     }
 
-    const opt = {
-
-        margin: 0,
-
-        filename: 'Bulk_Blueform.pdf',
-
-        image: {
-            type: 'jpeg',
-            quality: 1
-        },
-
-        html2canvas: {
-            scale: 2,
-            useCORS: true,
-            scrollY: 0
-        },
-
-        jsPDF: {
-            unit: 'mm',
-            format: 'a4',
-            orientation: 'portrait'
-        },
-
-        pagebreak: {
-            mode:['css']
-        }
-
-    };
-
-    await html2pdf()
-        .set(opt)
-        .from(pdfContainer)
-        .save();
+    pdf.save('Bulk_Blueform.pdf');
 
 }
 </script>
