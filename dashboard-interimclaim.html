@@ -907,6 +907,12 @@
                 </button>
                 
                 <button class="btn-action" style="background:var(--ios-blue);" onclick="openSummary()">
+                    <button class="btn-action"
+    style="background:var(--ios-green);"
+    onclick="bulkDownloadBlueforms()">
+    <i class="fa-solid fa-file-pdf"></i>
+    Bulk Download BF
+</button>
                     <i class="fa-solid fa-chart-line"></i> Contract Summary
                 </button>
 
@@ -937,6 +943,9 @@
                 <table class="desktop-table">
                 <thead>
                     <tr>
+                        <th>
+<input type="checkbox" id="checkAllBF" onchange="toggleAllBF(this)">
+</th>
                         <th>Status</th>
                         <th>No.</th>
                         <th>ID Kerja</th>
@@ -1242,7 +1251,11 @@ function renderTable(data, showArea = true){
 
         html += `
         <tr>
-            <td>
+    <td>
+        <input type="checkbox"
+            class="bf-check"
+            value="${w.id}">
+    </td>
     <select 
     onchange="updateStatus(${w.id}, this.value)"
     ${(w.interim_no) ? 'disabled' : ''}
@@ -1316,7 +1329,11 @@ function renderMobileCards(data){
 
         html += `
         <div class="mobile-card">
-
+<div style="margin-bottom:8px;">
+    <input type="checkbox"
+        class="bf-check"
+        value="${w.id}">
+</div>
             <div class="mobile-card-header">
                 <div class="mobile-title">
     ${w.sequence_no ? w.sequence_no + ' — ' : ''}${w.work_id || '-'}
@@ -2276,6 +2293,93 @@ function printBlueform() {
         alert("Gagal update status");
 
     }
+        function toggleAllBF(el){
+
+    document.querySelectorAll('.bf-check').forEach(c=>{
+        c.checked = el.checked;
+    });
+
+}
+        async function bulkDownloadBlueforms(){
+
+    const checked = [
+        ...document.querySelectorAll('.bf-check:checked')
+    ];
+
+    if(checked.length === 0){
+        alert("Sila pilih Work Order");
+        return;
+    }
+
+    const wrapper = document.createElement('div');
+
+    wrapper.style.background = 'white';
+
+    document.body.appendChild(wrapper);
+
+    for(const chk of checked){
+
+        const id = chk.value;
+
+        await openBlueformForBulk(id, wrapper);
+
+    }
+
+    const opt = {
+
+        margin: 0,
+        filename: `BLUEFORM_${Date.now()}.pdf`,
+
+        image: {
+            type: 'jpeg',
+            quality: 1
+        },
+
+        html2canvas: {
+            scale: 2,
+            useCORS: true
+        },
+
+        jsPDF: {
+            unit: 'mm',
+            format: 'a4',
+            orientation: 'portrait'
+        },
+
+        pagebreak: {
+            mode: ['css','legacy']
+        }
+    };
+
+    await html2pdf().set(opt).from(wrapper).save();
+
+    wrapper.remove();
+
+}
+        async function openBlueformForBulk(id, wrapper){
+
+    try{
+
+        await openBlueform(id);
+
+        await new Promise(r=>setTimeout(r,300));
+
+        const clone = document.querySelector('.a4-container')
+            .cloneNode(true);
+
+        clone.style.marginBottom = '0';
+
+        clone.style.pageBreakAfter = 'always';
+
+        wrapper.appendChild(clone);
+
+    }catch(e){
+
+        console.error(e);
+
+    }
+
+}
 
 }
 </script>
