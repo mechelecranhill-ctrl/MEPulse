@@ -538,7 +538,9 @@
             });
             const contractBalance=contractAmt-totalClaim;
             let ongoing=0;
-            workorders.filter(w=>w.status!=='CLAIMED').forEach(w=>{
+            workorders
+.filter(w => w.status !== 'CLAIMED' && w.status !== 'CANCEL')
+.forEach(w=>{
                 const cat=w.section_category||{};
                 ongoing+=Number(cat[sec]?.amt||0);
                 if(sec==="PROVISIONAL SUM"&&!cat["PROVISIONAL SUM"]) ongoing+=Number(w.additional||0);
@@ -557,19 +559,50 @@
         interims.forEach(int=>{ const val=Number(int.performance_guarantee_sum||0); pgTotal+=val; pgRow+=`<td style="text-align:right;">${val?formatRM(val):'-'}</td>`; });
         pgRow+=`<td style="text-align:right;">${formatRM(pgTotal)}</td><td colspan="3"></td></tr>`;
         body+=pgRow;
-        let totalOngoingBalance=0;
-        sectionNames.forEach(sec=>{
-            const contractAmt=Number(sections[sec]?.amt||0);
-            let claimed=0;
-            interims.forEach(int=>{ claimed+=Number(int.claim_breakdown?.[sec]?.amt||0); });
-            let ongoing=0;
-            workorders.filter(w=>w.status!=='CLAIMED').forEach(w=>{
-                const cat=w.section_category||{};
-                ongoing+=Number(cat[sec]?.amt||0);
-                if(sec==="PROVISIONAL SUM"&&!cat["PROVISIONAL SUM"]) ongoing+=Number(w.additional||0);
-            });
-            totalOngoingBalance+=contractAmt-claimed-ongoing;
-        });
+        let totalOngoingBalance = 0;
+
+sectionNames.forEach(sec => {
+
+    const contractAmt = Number(sections[sec]?.amt || 0);
+
+    let claimed = 0;
+
+    interims.forEach(int => {
+        claimed += Number(
+            int.claim_breakdown?.[sec]?.amt ||
+            int.claim_breakdown?.[sec]?.amount ||
+            int.claim_breakdown?.[sec]?.value ||
+            0
+        );
+    });
+
+    let ongoing = 0;
+
+    workorders
+    .filter(w => w.status !== 'CLAIMED' && w.status !== 'CANCEL')
+    .forEach(w => {
+
+        const cat = w.section_category || {};
+
+        ongoing += Number(
+            cat?.[sec]?.amt ||
+            cat?.[sec]?.amount ||
+            cat?.[sec]?.value ||
+            0
+        );
+
+        // provisional sum tambahan
+        if(sec === "PROVISIONAL SUM"){
+            ongoing += Number(w.additional || 0);
+        }
+    });
+
+    totalOngoingBalance += (
+        contractAmt -
+        claimed -
+        ongoing
+    );
+});
         totalOngoingBalance+=salvageTotal+pgTotal;
         let totalContract=0;
         sectionNames.forEach(sec=>{ totalContract+=Number(sections[sec]?.amt||0); });
