@@ -392,7 +392,7 @@
             <tr>
                 <td>
                     <select onchange="updateStatus(${w.id}, this.value)"
-                        ${w.interim_no?'disabled':''} style="padding:6px 10px;border-radius:10px;border:1px solid #ddd;font-size:11px;font-weight:700;background:${w.status==='Claimed'?'#f1f1f1':'white'};">
+                        ${w.interim_no?'disabled':''} style="padding:6px 10px;border-radius:10px;border:1px solid #ddd;font-size:11px;font-weight:700;background:${w.status==='CLAIMED'?'#f1f1f1':'white'};">
                         <option value="BLUEFORM" ${w.status==='BLUEFORM'?'selected':''}>BLUEFORM</option>
                         <option value="APPROVED" ${w.status==='APPROVED'?'selected':''}>APPROVED</option>
                         <option value="INDENT" ${w.status==='INDENT'?'selected':''}>INDENT</option>
@@ -413,7 +413,7 @@
                     ${buildSectionBreakdown(w)}
                 </td>
                 <td style="font-weight:bold;color:var(--ios-green);">
-                    RM ${(w.status==='Claimed'?w.amount_spent:0).toLocaleString(undefined,{minimumFractionDigits:2})}
+                    RM ${(w.status==='CLAIMED'?w.amount_spent:0).toLocaleString(undefined,{minimumFractionDigits:2})}
                 </td>
                 <td>${formatTarikhBM(w.qpb_date)}</td>
                 <td>
@@ -538,7 +538,7 @@
             });
             const contractBalance=contractAmt-totalClaim;
             let ongoing=0;
-            workorders.filter(w=>w.status!=='Claimed').forEach(w=>{
+            workorders.filter(w=>w.status!=='CLAIMED').forEach(w=>{
                 const cat=w.section_category||{};
                 ongoing+=Number(cat[sec]?.amt||0);
                 if(sec==="PROVISIONAL SUM"&&!cat["PROVISIONAL SUM"]) ongoing+=Number(w.additional||0);
@@ -606,108 +606,102 @@
     function toggleAllBF(el){
         document.querySelectorAll('.bf-checkbox').forEach(cb=>{ cb.checked=el.checked; });
     }
-    
     async function bulkDownloadBlueform(){
-        const checked = [...document.querySelectorAll('.bf-checkbox:checked')];
-        if(checked.length === 0){
-            alert("Sila pilih Blueform.");
+
+    const checked = [...document.querySelectorAll('.bf-checkbox:checked')];
+
+    if(checked.length === 0){
+        alert("Sila pilih sekurang-kurangnya satu work order.");
         return;
     }
 
-    const loading = document.createElement('div');
-    loading.innerHTML = `
-        <div style="
-            position:fixed;
-            inset:0;
-            background:rgba(0,0,0,0.7);
-            z-index:99999;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            color:white;
-            font-size:18px;
-            font-weight:bold;
-            backdrop-filter:blur(5px);
-        ">
-            Generating Bulk Blueform PDF...
-        </div>
-    `;
-    document.body.appendChild(loading);
+    const pdf = new jspdf.jsPDF('p','mm','a4');
 
-    try{
+    let firstPage = true;
 
-        const pdf = new jspdf.jsPDF({
-            orientation: 'portrait',
-            unit: 'mm',
-            format: 'a4'
+    for(const cb of checked){
+
+        const workId = cb.value;
+
+        const iframe = document.createElement('iframe');
+
+        iframe.style.position = 'fixed';
+        iframe.style.left = '-99999px';
+        iframe.style.top = '0';
+        iframe.style.width = '1200px';
+        iframe.style.height = '2000px';
+        iframe.style.border = 'none';
+
+        iframe.src = `blueform.html?id=${workId}`;
+
+        document.body.appendChild(iframe);
+
+        await new Promise(resolve=>{
+            iframe.onload = ()=> setTimeout(resolve,2500);
         });
 
-        let firstPage = true;
+        const body = iframe.contentWindow.document.documentElement;
 
-        for(const cb of checked){
+        const canvas = await html2canvas(body,{
+            scale:3,
+            useCORS:true,
+            backgroundColor:'#ffffff',
+            scrollY:0,
+            scrollX:0,
+            windowWidth: body.scrollWidth,
+            windowHeight: body.scrollHeight
+        });
 
-    const id = cb.value;
+        const imgData = canvas.toDataURL('image/jpeg',1.0);
 
-    const iframe = document.createElement('iframe');
+        const pdfWidth = 210;
+        const pdfHeight = 297;
 
-    iframe.style.position = 'fixed';
-    iframe.style.left = '-99999px';
-    iframe.style.top = '0';
-    iframe.style.width = '210mm';
-    iframe.style.height = '297mm';
-    iframe.src = `blueform.html?id=${id}`;
+        const imgWidth = pdfWidth;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-    document.body.appendChild(iframe);
+        let heightLeft = imgHeight;
+        let position = 0;
 
-    await new Promise(resolve => {
-        iframe.onload = async () => {
+        if(!firstPage){
+            pdf.addPage();
+        }
 
-            await new Promise(r => setTimeout(r, 2500));
+        firstPage = false;
 
-            const page = iframe.contentDocument.querySelector('.a4-container');
+        pdf.addImage(
+            imgData,
+            'JPEG',
+            0,
+            position,
+            imgWidth,
+            imgHeight
+        );
 
-            const canvas = await html2canvas(page,{
-                scale: 2,
-                useCORS: true,
-                backgroundColor: '#ffffff'
-            });
+        heightLeft -= pdfHeight;
 
-            const imgData = canvas.toDataURL('image/jpeg',1.0);
+        while(heightLeft > 0){
 
-            if(!firstPage){
-                pdf.addPage();
-            }
+            position = - (imgHeight - heightLeft);;
+
+            pdf.addPage();
 
             pdf.addImage(
                 imgData,
                 'JPEG',
                 0,
-                0,
-                210,
-                297
+                position,
+                imgWidth,
+                imgHeight
             );
 
-            firstPage = false;
+            heightLeft -= pdfHeight;
+        }
 
-            iframe.remove();
-
-            resolve();
-        };
-    });
-}
-
-        pdf.save(`Bulk_Blueform_${Date.now()}.pdf`);
-
-        loading.remove();
-
-    }catch(err){
-
-        console.error(err);
-
-        loading.remove();
-
-        alert("Gagal generate bulk PDF.");
+        document.body.removeChild(iframe);
     }
+
+    pdf.save('Bulk_Blueform.pdf');
 }
 
 </script>
