@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="ms">
-<head> 
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blueform | M&E-Connect</title>
+    <title>M&E-Connect | Blueform</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         * { box-sizing: border-box; font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 0; }
@@ -35,6 +35,7 @@
             font-size: 13px;
         }
 
+        /* ── A4 sheet ── */
         .a4-container {
             width: 210mm;
             min-height: 297mm;
@@ -49,7 +50,7 @@
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
-            overflow: visible;
+            overflow: visible !important;
         }
 
         .a4-container::after {
@@ -60,6 +61,62 @@
             pointer-events: none;
         }
 
+        /* ── content area stretches, stops before signature ── */
+        #bf_content {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        #bf_content .bf-row { flex-shrink: 0; }
+
+        /* ── signature block pinned near bottom ── */
+        .bf-signature-grid {
+            position: absolute;
+            bottom: 3cm;
+            left: 2cm;
+            right: 2cm;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            column-gap: 25px;
+            row-gap: 70px;
+            font-size: 10px;
+        }
+
+        .bf-signature-grid strong { font-size: 10px; font-weight: normal; }
+
+        .bf-signature-grid > div {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            min-height: 130px;
+        }
+
+        .bf-signature-grid small {
+            display: block;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .bf-sign-line {
+            border-bottom: 1px dotted #000;
+            width: 80%;
+            margin-top: 4px;
+        }
+
+        /* ── footer note ── */
+        .bf-footer-note {
+            position: absolute;
+            bottom: 0.6cm; left: 1.0cm;
+            font-size: 9px;
+            font-style: italic;
+            color: #000;
+            z-index: 20;
+        }
+
+        /* ── logo ── */
         .bf-logo {
             position: absolute;
             top: 1.3cm; right: 1.3cm;
@@ -67,6 +124,7 @@
             z-index: 10;
         }
 
+        /* ── row layout ── */
         .bf-row {
             display: flex;
             margin-bottom: 4px;
@@ -82,11 +140,7 @@
             font-size: 10px;
         }
 
-        .bf-no {
-            width: 20px;
-            text-align: right;
-        }
-
+        .bf-no { width: 20px; text-align: right; }
         .bf-colon { width: 15px; }
 
         .bf-value {
@@ -96,70 +150,10 @@
             font-weight: bold;
         }
 
-        .bf-baki-table {
-            margin-left: 35px;
-            margin-top: 4px;
-            margin-bottom: 6px;
-        }
-
+        .bf-baki-table { margin-left: 35px; margin-top: 4px; margin-bottom: 6px; }
         .bf-baki-table .bf-row { margin-bottom: 2px !important; }
 
-        .bf-signature-grid {
-            position: absolute;
-            bottom: 3cm;
-            left: 2cm;
-            right: 2cm;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            margin-top: 20px;
-            column-gap: 25px;
-            row-gap: 70px;
-            font-size: 10px;
-        }
-
-        .bf-signature-grid strong { font-size: 10px; font-weight: normal; }
-
-        .bf-signature-grid div {
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
-        }
-
-        .bf-signature-grid small {
-            text-align: left;
-            display: block;
-            font-size: 10px;
-            font-weight: bold;
-        }
-
-        .bf-sign-line {
-            border-bottom: 1px dotted #000;
-            width: 80%;
-            margin-top: 4px;
-        }
-
-        .bf-signature-grid > div { min-height: 130px; }
-
-        #bf_content {
-            flex: 1;
-            min-height: 0;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
-        #bf_content .bf-row { flex-shrink: 0; }
-
-        .bf-footer-note {
-            position: absolute;
-            bottom: 0.6cm; left: 1.0cm;
-            text-align: left;
-            font-size: 9px;
-            font-style: italic;
-            color: #000;
-            z-index: 20;
-        }
-
+        /* ── loading ── */
         #loadingOverlay {
             position: fixed;
             inset: 0;
@@ -184,20 +178,14 @@
 
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        /* ── print ── */
         @media print {
             @page { size: A4; margin: 0; }
 
-            html, body {
-                margin: 0; padding: 0;
-                background: white;
-            }
+            html, body { margin: 0; padding: 0; background: white; display: block; }
 
             .print-tools { display: none !important; }
-
-            body {
-                display: block;
-                padding: 0;
-            }
+            #loadingOverlay { display: none !important; }
 
             .a4-container {
                 width: 210mm !important;
@@ -213,7 +201,10 @@
                 border: 4px double #000 !important;
             }
 
-            #loadingOverlay { display: none !important; }
+            .bf-signature-grid {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr;
+            }
         }
     </style>
 </head>
@@ -288,8 +279,7 @@
         if (!dateStr) return '';
         const bulan = ['JANUARI','FEBRUARI','MAC','APRIL','MEI','JUN','JULAI','OGOS','SEPTEMBER','OKTOBER','NOVEMBER','DISEMBER'];
         const d = new Date(dateStr);
-        const hari = String(d.getDate()).padStart(2, '0');
-        return `${hari} ${bulan[d.getMonth()]} ${d.getFullYear()}`;
+        return `${String(d.getDate()).padStart(2,'0')} ${bulan[d.getMonth()]} ${d.getFullYear()}`;
     }
 
     function getInitials(text) {
@@ -332,7 +322,6 @@
             let provisionalExtra = Number(data.additional || 0);
             let totalWorkValue = totalSection + provisionalExtra;
 
-            /* ambil interims */
             const interimRes = await fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=date_received.asc`, { headers });
             const allInterims = await interimRes.json();
 
@@ -346,11 +335,9 @@
                 }
             }
 
-            /* ambil semua work orders */
             const woRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}`, { headers });
             let allWO = await woRes.json();
 
-            /* area priority */
             const areaPriority = {};
             const areaList = (c.area_code || '').split(',').map(a => a.trim().toUpperCase()).filter(a => a.length > 0);
             areaList.forEach((a, i) => { areaPriority[a] = i + 1; });
@@ -360,7 +347,6 @@
             let totalPG = 0;
             let timeline = [];
 
-            /* sort allWO */
             allWO.sort((a, b) => {
                 const d1 = new Date(a.qpb_date), d2 = new Date(b.qpb_date);
                 if (d1 < d2) return -1;
@@ -373,7 +359,6 @@
                 return aSeq - bSeq;
             });
 
-            /* proses interims */
             allInterims.forEach(int => {
                 const intDate = new Date(int.date_received);
                 if (intDate > cutoffDate) return;
@@ -392,7 +377,6 @@
                 });
             });
 
-            /* proses work orders sebelum WO semasa */
             allWO.filter(w => {
                 if (w.status === "Claimed") return false;
                 if (Number(w.id) === Number(data.id)) return false;
@@ -409,11 +393,9 @@
                 return wSeq <= curSeq;
             }).forEach(wo => {
                 timeline.push({
-                    type:'WORKORDER',
-                    date: wo.qpb_date,
+                    type:'WORKORDER', date:wo.qpb_date,
                     seq: parseInt((wo.sequence_no||'').match(/\d+/)?.[0]||0),
-                    amount: Number(wo.amount_spent || 0),
-                    salvage: 0
+                    amount: Number(wo.amount_spent || 0), salvage: 0
                 });
                 const cat = wo.section_category || {};
                 Object.keys(cat).forEach(sec => {
@@ -428,7 +410,6 @@
                 }
             });
 
-            /* tambah WO semasa */
             const currentSections = data.section_category || {};
             Object.keys(currentSections).forEach(sec => {
                 const amt = Number(currentSections[sec]?.amt || 0);
@@ -440,15 +421,13 @@
                 if (!sectionUsed["PROVISIONAL SUM"]) sectionUsed["PROVISIONAL SUM"] = 0;
                 sectionUsed["PROVISIONAL SUM"] += currentAdd;
             }
+
             timeline.push({
-                type:'WORKORDER',
-                date: data.qpb_date,
+                type:'WORKORDER', date:data.qpb_date,
                 seq: parseInt((data.sequence_no||'').match(/\d+/)?.[0]||0),
-                amount: totalWorkValue,
-                salvage: 0
+                amount: totalWorkValue, salvage: 0
             });
 
-            /* sort timeline */
             timeline.sort((a, b) => {
                 const d1 = new Date(a.date), d2 = new Date(b.date);
                 if (d1 < d2) return -1;
@@ -458,7 +437,6 @@
                 return 0;
             });
 
-            /* kira baki kontrak */
             let bakiKontrak = Number(c.contract_sum || 0);
             timeline.forEach(t => {
                 if (t.type === 'INTERIM') {
@@ -470,7 +448,6 @@
                 }
             });
 
-            /* build dynamic section HTML */
             const tpl = JSON.parse(localStorage.getItem(`bf_sections_${c.id}`) || '{}');
             let dynamicHtml = '';
             let currentRow = 6;
@@ -482,22 +459,21 @@
                 const sumValue = b[key]?.amt || 0;
                 let workValue = Number(s[key]?.amt || 0);
                 dynamicHtml += `
-                    <div class="grp-dyn-${idx}">
-                        <hr style="border:0.5px solid #000;margin:8px 0;">
-                        <div class="bf-row">
-                            <div class="bf-label"><span class="bf-no">${currentRow++}</span><span>${label.toUpperCase().includes('SUM') ? label : label + ' Sum'}</span></div>
-                            <div class="bf-colon">:</div>
-                            <div class="bf-value">RM ${Number(sumValue).toLocaleString(undefined,{minimumFractionDigits:2})}</div>
-                        </div>
-                        <div class="bf-row">
-                            <div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Anggaran Kerja (${getInitials(label)})</span></div>
-                            <div class="bf-colon">:</div>
-                            <div class="bf-value">RM ${workValue.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
-                        </div>
-                    </div>`;
+                <div class="grp-dyn-${idx}">
+                    <hr style="border:0.5px solid #000;margin:8px 0;">
+                    <div class="bf-row">
+                        <div class="bf-label"><span class="bf-no">${currentRow++}</span><span>${label.toUpperCase().includes('SUM') ? label : label + ' Sum'}</span></div>
+                        <div class="bf-colon">:</div>
+                        <div class="bf-value">RM ${Number(sumValue).toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+                    </div>
+                    <div class="bf-row">
+                        <div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Anggaran Kerja (${getInitials(label)})</span></div>
+                        <div class="bf-colon">:</div>
+                        <div class="bf-value">RM ${workValue.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+                    </div>
+                </div>`;
             });
 
-            /* baki section rows */
             const bakiRows = Object.keys(b).map(sec => {
                 let label = (b[sec].desc || '').toUpperCase();
                 if (label.includes('GENERAL') || label.includes('PRELIMINARIES')) label = 'G&P';
@@ -563,7 +539,6 @@
         }
     }
 
-    /* init */
     window.onload = () => {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id');
