@@ -610,15 +610,108 @@
         document.querySelectorAll('.bf-checkbox').forEach(cb=>{ cb.checked=el.checked; });
     }
 
-    async function bulkDownloadBlueform(){
-        const checked=[...document.querySelectorAll('.bf-checkbox:checked')];
-        if(checked.length===0){ alert("Sila pilih Blueform."); return; }
-        alert(`${checked.length} Blueform dipilih.\n\nSetiap blueform akan dibuka dalam tab baru untuk dicetak/simpan PDF secara berasingan.`);
-        for(const cb of checked){
-            window.open(`blueform.html?id=${cb.value}`, '_blank');
-            await new Promise(r=>setTimeout(r,300));
-        }
+    <script>
+async function bulkDownloadBlueform(){
+
+    const checked = [...document.querySelectorAll('.bf-checkbox:checked')];
+
+    if(checked.length === 0){
+        alert("Sila pilih Blueform.");
+        return;
     }
+
+    const loading = document.createElement('div');
+    loading.innerHTML = `
+        <div style="
+            position:fixed;
+            inset:0;
+            background:rgba(0,0,0,0.7);
+            z-index:99999;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            color:white;
+            font-size:18px;
+            font-weight:bold;
+            backdrop-filter:blur(5px);
+        ">
+            Generating Bulk Blueform PDF...
+        </div>
+    `;
+    document.body.appendChild(loading);
+
+    try{
+
+        const pdf = new jspdf.jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
+        });
+
+        let firstPage = true;
+
+        for(const cb of checked){
+
+            const id = cb.value;
+
+            const response = await fetch(`blueform.html?id=${id}`);
+            const html = await response.text();
+
+            const tempDiv = document.createElement('div');
+            tempDiv.style.position = 'fixed';
+            tempDiv.style.left = '-99999px';
+            tempDiv.style.top = '0';
+            tempDiv.innerHTML = html;
+
+            document.body.appendChild(tempDiv);
+
+            await new Promise(r => setTimeout(r, 1200));
+
+            const page = tempDiv.querySelector('.a4-container');
+
+            const canvas = await html2canvas(page,{
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff'
+            });
+
+            const imgData = canvas.toDataURL('image/jpeg',1.0);
+
+            const pdfWidth = 210;
+            const pdfHeight = 297;
+
+            if(!firstPage){
+                pdf.addPage();
+            }
+
+            pdf.addImage(
+                imgData,
+                'JPEG',
+                0,
+                0,
+                pdfWidth,
+                pdfHeight
+            );
+
+            firstPage = false;
+
+            tempDiv.remove();
+        }
+
+        pdf.save(`Bulk_Blueform_${Date.now()}.pdf`);
+
+        loading.remove();
+
+    }catch(err){
+
+        console.error(err);
+
+        loading.remove();
+
+        alert("Gagal generate bulk PDF.");
+    }
+}
+
 </script>
 </body>
 </html>
