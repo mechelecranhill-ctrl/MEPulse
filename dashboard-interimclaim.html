@@ -2420,9 +2420,16 @@ async function bulkDownloadBlueform(){
         const original = document.querySelector('#blueformPage .a4-container');
         const clone = original.cloneNode(true);
 
+        /*
+         * Wrap clone dalam page wrapper yang:
+         * - height: 297mm tepat (tidak overflow ke halaman berikut)
+         * - overflow: hidden (kandungan tidak terpotong keluar)
+         * - position: relative (supaya bf-signature-grid absolute kekal dalam page)
+         * - page-break-after: always (print satu halaman satu)
+         */
         clone.style.cssText = `
             width: 210mm;
-            min-height: 297mm;
+            height: 297mm;
             margin: 0;
             background: white;
             padding: 1.5cm 2cm 1.6cm 2cm;
@@ -2433,9 +2440,25 @@ async function bulkDownloadBlueform(){
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
-            overflow: visible;
+            overflow: hidden;
             box-shadow: 0 4px 30px rgba(0,0,0,0.4);
+            page-break-after: always;
+            page-break-inside: avoid;
+            flex-shrink: 0;
         `;
+
+        /* pastikan bf_content dalam clone tidak overflow */
+        const bfContent = clone.querySelector('#bf_content');
+        if(bfContent){
+            bfContent.style.cssText = `
+                flex: 1;
+                min-height: 0;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+            `;
+        }
 
         container.appendChild(clone);
 
