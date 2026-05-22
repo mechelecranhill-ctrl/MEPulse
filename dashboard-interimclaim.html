@@ -2325,46 +2325,85 @@ async function bulkDownloadBlueform(){
         return;
     }
 
-    const pdf = new jspdf.jsPDF({
-        orientation:'portrait',
-        unit:'mm',
-        format:'a4'
-    });
+    const previewWindow = window.open('', '_blank');
 
-    for(const [index, cb] of checked.entries()){
+    previewWindow.document.write(`
+    <html>
+    <head>
+        <title>Bulk Blueform Preview</title>
+
+        <style>
+
+            body{
+                margin:0;
+                background:#e5e5e5;
+                font-family:Arial,sans-serif;
+            }
+
+            .print-page{
+                width:210mm;
+                min-height:297mm;
+
+                margin:20px auto;
+
+                background:white;
+
+                position:relative;
+
+                page-break-after:always;
+            }
+
+            @media print{
+
+                body{
+                    background:white;
+                }
+
+                .print-page{
+                    margin:0 auto;
+                    box-shadow:none;
+                    page-break-after:always;
+                }
+
+            }
+
+        </style>
+    </head>
+
+    <body id="bulkWrapper"></body>
+
+    </html>
+    `);
+
+    previewWindow.document.close();
+
+    const wrapper =
+        previewWindow.document.getElementById('bulkWrapper');
+
+    for(const cb of checked){
 
         const id = cb.value;
 
         await openBlueform(id);
 
-        await new Promise(r=>setTimeout(r,400));
+        await new Promise(r=>setTimeout(r,300));
 
-        const element = document.querySelector('.a4-container');
+        const clone =
+            document.querySelector('.a4-container').cloneNode(true);
 
-        const canvas = await html2canvas(element,{
-            scale:2,
-            useCORS:true,
-            backgroundColor:'#ffffff'
-        });
+        clone.classList.add('print-page');
 
-        const imgData = canvas.toDataURL('image/jpeg',1.0);
-
-        if(index !== 0){
-            pdf.addPage();
-        }
-
-        pdf.addImage(
-            imgData,
-            'JPEG',
-            0,
-            0,
-            210,
-            297
-        );
+        wrapper.appendChild(clone);
 
     }
 
-    pdf.save('Bulk_Blueform.pdf');
+    setTimeout(()=>{
+
+        previewWindow.focus();
+
+        previewWindow.print();
+
+    },800);
 
 }
 </script>
