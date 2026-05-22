@@ -646,22 +646,25 @@
 
         for(const cb of checked){
 
-            const id = cb.value;
+    const id = cb.value;
 
-            const response = await fetch(`blueform.html?id=${id}`);
-            const html = await response.text();
+    const iframe = document.createElement('iframe');
 
-            const tempDiv = document.createElement('div');
-            tempDiv.style.position = 'fixed';
-            tempDiv.style.left = '-99999px';
-            tempDiv.style.top = '0';
-            tempDiv.innerHTML = html;
+    iframe.style.position = 'fixed';
+    iframe.style.left = '-99999px';
+    iframe.style.top = '0';
+    iframe.style.width = '210mm';
+    iframe.style.height = '297mm';
+    iframe.src = `blueform.html?id=${id}`;
 
-            document.body.appendChild(tempDiv);
+    document.body.appendChild(iframe);
 
-            await new Promise(r => setTimeout(r, 1200));
+    await new Promise(resolve => {
+        iframe.onload = async () => {
 
-            const page = tempDiv.querySelector('.a4-container');
+            await new Promise(r => setTimeout(r, 2500));
+
+            const page = iframe.contentDocument.querySelector('.a4-container');
 
             const canvas = await html2canvas(page,{
                 scale: 2,
@@ -670,9 +673,6 @@
             });
 
             const imgData = canvas.toDataURL('image/jpeg',1.0);
-
-            const pdfWidth = 210;
-            const pdfHeight = 297;
 
             if(!firstPage){
                 pdf.addPage();
@@ -683,14 +683,18 @@
                 'JPEG',
                 0,
                 0,
-                pdfWidth,
-                pdfHeight
+                210,
+                297
             );
 
             firstPage = false;
 
-            tempDiv.remove();
-        }
+            iframe.remove();
+
+            resolve();
+        };
+    });
+}
 
         pdf.save(`Bulk_Blueform_${Date.now()}.pdf`);
 
