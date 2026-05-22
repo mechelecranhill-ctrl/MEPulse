@@ -538,13 +538,24 @@
             });
             const contractBalance=contractAmt-totalClaim;
             let ongoing=0;
-            workorders
-.filter(w => w.status !== 'CLAIMED' && w.status !== 'CANCEL')
+
+workorders
+.filter(w =>
+    !w.interim_no &&
+    w.status !== 'CLAIMED' &&
+    w.status !== 'CANCEL'
+)
 .forEach(w=>{
-                const cat=w.section_category||{};
-                ongoing+=Number(cat[sec]?.amt||0);
-                if(sec==="PROVISIONAL SUM"&&!cat["PROVISIONAL SUM"]) ongoing+=Number(w.additional||0);
-            });
+
+    const cat=w.section_category||{};
+
+    ongoing+=Number(cat[sec]?.amt||0);
+
+    if(sec==="PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]){
+        ongoing+=Number(w.additional||0);
+    }
+
+});
             const afterWO=contractBalance-ongoing;
             row+=`<td style="text-align:right;">${formatRM(totalClaim)}</td><td style="text-align:right;">${formatRM(contractBalance)}</td><td style="text-align:right;">${formatRM(ongoing)}</td><td style="text-align:right;font-weight:bold;color:${afterWO<0?'red':'black'};">${formatRM(afterWO)}</td></tr>`;
             body+=row;
@@ -585,10 +596,11 @@ sectionNames.forEach(sec => {
     let ongoing = 0;
 
     workorders
-    .filter(w =>
-        w.status !== 'CLAIMED' &&
-        w.status !== 'CANCEL'
-    )
+.filter(w =>
+    !w.interim_no &&
+    w.status !== 'CLAIMED' &&
+    w.status !== 'CANCEL'
+)
     .forEach(w => {
 
         const cat = w.section_category || {};
