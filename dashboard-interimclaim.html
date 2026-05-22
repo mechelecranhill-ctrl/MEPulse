@@ -559,27 +559,36 @@
         interims.forEach(int=>{ const val=Number(int.performance_guarantee_sum||0); pgTotal+=val; pgRow+=`<td style="text-align:right;">${val?formatRM(val):'-'}</td>`; });
         pgRow+=`<td style="text-align:right;">${formatRM(pgTotal)}</td><td colspan="3"></td></tr>`;
         body+=pgRow;
-        let totalOngoingBalance = 0;
+        // ===== ONGOING CONTRACT BALANCE (FOLLOW BLUEFORM LOGIC) =====
+
+let totalOngoingBalance = 0;
 
 sectionNames.forEach(sec => {
 
     const contractAmt = Number(sections[sec]?.amt || 0);
 
+    // total claimed from interims
     let claimed = 0;
 
     interims.forEach(int => {
+
         claimed += Number(
             int.claim_breakdown?.[sec]?.amt ||
             int.claim_breakdown?.[sec]?.amount ||
             int.claim_breakdown?.[sec]?.value ||
             0
         );
+
     });
 
+    // ongoing WO only (exclude claimed & cancel)
     let ongoing = 0;
 
     workorders
-    .filter(w => w.status !== 'CLAIMED' && w.status !== 'CANCEL')
+    .filter(w =>
+        w.status !== 'CLAIMED' &&
+        w.status !== 'CANCEL'
+    )
     .forEach(w => {
 
         const cat = w.section_category || {};
@@ -591,19 +600,27 @@ sectionNames.forEach(sec => {
             0
         );
 
-        // provisional sum tambahan
+        // additional provisional sum
         if(sec === "PROVISIONAL SUM"){
             ongoing += Number(w.additional || 0);
         }
+
     });
 
-    totalOngoingBalance += (
+    const balance = (
         contractAmt -
         claimed -
         ongoing
     );
+
+    totalOngoingBalance += balance;
+
 });
-        totalOngoingBalance+=salvageTotal+pgTotal;
+
+// add back salvage + PG
+totalOngoingBalance += salvageTotal;
+totalOngoingBalance += pgTotal;
+        
         let totalContract=0;
         sectionNames.forEach(sec=>{ totalContract+=Number(sections[sec]?.amt||0); });
         let totalClaim=0;
@@ -648,7 +665,11 @@ sectionNames.forEach(sec => {
         return;
     }
 
-    const pdf = new jspdf.jsPDF('p','mm','a4');
+    const pdf = new jspdf.jsPDF({
+        orientation:'p',
+        unit:'mm',
+        format:'a4'
+    });
 
     let firstPage = true;
 
@@ -661,8 +682,8 @@ sectionNames.forEach(sec => {
         iframe.style.position = 'fixed';
         iframe.style.left = '-99999px';
         iframe.style.top = '0';
-        iframe.style.width = '1200px';
-        iframe.style.height = '2000px';
+        iframe.style.width = '210mm';
+        iframe.style.height = '297mm';
         iframe.style.border = 'none';
 
         iframe.src = `blueform.html?id=${workId}`;
@@ -670,31 +691,21 @@ sectionNames.forEach(sec => {
         document.body.appendChild(iframe);
 
         await new Promise(resolve=>{
-            iframe.onload = ()=> setTimeout(resolve,2500);
+            iframe.onload = ()=> setTimeout(resolve,2000);
         });
 
-        const body = iframe.contentWindow.document.documentElement;
+        const doc = iframe.contentWindow.document;
 
-        const canvas = await html2canvas(body,{
-            scale:3,
+        // ambil hanya A4 container
+        const target = doc.querySelector('.a4-container');
+
+        const canvas = await html2canvas(target,{
+            scale:2,
             useCORS:true,
-            backgroundColor:'#ffffff',
-            scrollY:0,
-            scrollX:0,
-            windowWidth: body.scrollWidth,
-            windowHeight: body.scrollHeight
+            backgroundColor:'#ffffff'
         });
 
         const imgData = canvas.toDataURL('image/jpeg',1.0);
-
-        const pdfWidth = 210;
-        const pdfHeight = 297;
-
-        const imgWidth = pdfWidth;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-        let heightLeft = imgHeight;
-        let position = 0;
 
         if(!firstPage){
             pdf.addPage();
@@ -706,30 +717,10 @@ sectionNames.forEach(sec => {
             imgData,
             'JPEG',
             0,
-            position,
-            imgWidth,
-            imgHeight
+            0,
+            210,
+            297
         );
-
-        heightLeft -= pdfHeight;
-
-        while(heightLeft > 0){
-
-            position = - (imgHeight - heightLeft);;
-
-            pdf.addPage();
-
-            pdf.addImage(
-                imgData,
-                'JPEG',
-                0,
-                position,
-                imgWidth,
-                imgHeight
-            );
-
-            heightLeft -= pdfHeight;
-        }
 
         document.body.removeChild(iframe);
     }
