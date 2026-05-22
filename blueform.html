@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blueform | M&E-Connect</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 0; }
+
+        body {
+            background: #2c2c2e;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px 20px 60px;
+        }
+
+        .print-tools {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn-action {
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            color: white;
+            font-size: 13px;
+        }
+
+        .a4-container {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            background: white;
+            padding: 1.5cm 2cm 1.6cm 2cm;
+            position: relative;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            font-size: 11px;
+            color: black;
+            line-height: 1.3;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            overflow: visible;
+        }
+
+        .a4-container::after {
+            content: "";
+            position: absolute;
+            top: 1cm; left: 1cm; right: 1cm; bottom: 1cm;
+            border: 4px double #000;
+            pointer-events: none;
+        }
+
+        .bf-logo {
+            position: absolute;
+            top: 1.3cm; right: 1.3cm;
+            width: 40px; height: auto;
+            z-index: 10;
+        }
+
+        .bf-row {
+            display: flex;
+            margin-bottom: 4px;
+            align-items: flex-start;
+        }
+
+        .bf-label {
+            width: 220px;
+            display: flex;
+            gap: 8px;
+            font-weight: normal;
+            text-transform: uppercase;
+            font-size: 10px;
+        }
+
+        .bf-no {
+            width: 20px;
+            text-align: right;
+        }
+
+        .bf-colon { width: 15px; }
+
+        .bf-value {
+            flex: 1;
+            min-height: 14px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .bf-baki-table {
+            margin-left: 35px;
+            margin-top: 4px;
+            margin-bottom: 6px;
+        }
+
+        .bf-baki-table .bf-row { margin-bottom: 2px !important; }
+
+        .bf-signature-grid {
+            position: absolute;
+            bottom: 3cm;
+            left: 2cm;
+            right: 2cm;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            margin-top: 20px;
+            column-gap: 25px;
+            row-gap: 70px;
+            font-size: 10px;
+        }
+
+        .bf-signature-grid strong { font-size: 10px; font-weight: normal; }
+
+        .bf-signature-grid div {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+
+        .bf-signature-grid small {
+            text-align: left;
+            display: block;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .bf-sign-line {
+            border-bottom: 1px dotted #000;
+            width: 80%;
+            margin-top: 4px;
+        }
+
+        .bf-signature-grid > div { min-height: 130px; }
+
+        #bf_content {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        #bf_content .bf-row { flex-shrink: 0; }
+
+        .bf-footer-note {
+            position: absolute;
+            bottom: 0.6cm; left: 1.0cm;
+            text-align: left;
+            font-size: 9px;
+            font-style: italic;
+            color: #000;
+            z-index: 20;
+        }
+
+        #loadingOverlay {
+            position: fixed;
+            inset: 0;
+            background: #2c2c2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            z-index: 9999;
+            font-size: 14px;
+            gap: 12px;
+        }
+
+        .spinner {
+            width: 36px; height: 36px;
+            border: 3px solid rgba(255,255,255,0.2);
+            border-top-color: #34C759;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media print {
+            @page { size: A4; margin: 0; }
+
+            html, body {
+                margin: 0; padding: 0;
+                background: white;
+            }
+
+            .print-tools { display: none !important; }
+
+            body {
+                display: block;
+                padding: 0;
+            }
+
+            .a4-container {
+                width: 210mm !important;
+                min-height: 297mm !important;
+                margin: 0 auto !important;
+                padding: 1.5cm 2cm 1.6cm 2cm !important;
+                display: flex !important;
+                flex-direction: column;
+                box-shadow: none !important;
+            }
+
+            .a4-container::after {
+                border: 4px double #000 !important;
+            }
+
+            #loadingOverlay { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="loadingOverlay">
+    <div class="spinner"></div>
+    <span>Memuatkan Blueform...</span>
+</div>
+
+<div class="print-tools">
+    <button class="btn-action" style="background:#555;" onclick="history.back()">
+        <i class="fa fa-arrow-left"></i> Kembali
+    </button>
+    <button class="btn-action" style="background:#34C759;" onclick="window.print()">
+        <i class="fa fa-print"></i> Cetak / Simpan PDF
+    </button>
+</div>
+
+<div class="a4-container" id="a4Page">
+    <img src="RSAJ.png" class="bf-logo" alt="RSAJ Logo"
+        onerror="this.src='https://upload.wikimedia.org/wikipedia/en/thumb/3/3d/Ranhill_SAJ_logo.svg/1200px-Ranhill_SAJ_logo.svg.png'">
+
+    <div id="bf_title" style="text-align:center;font-weight:bold;margin-top:0.7cm;margin-bottom:12px;padding:0 50px;font-size:10px;">
+        PERMOHONAN KERJA-KERJA S.O.R / TAMBAHAN DALAM KONTRAK PENYELENGGARAAN
+    </div>
+
+    <div id="bf_content"></div>
+
+    <div class="bf-signature-grid">
+        <div>
+            <strong>Dimohon Oleh:</strong>
+            <div style="height:70px;"></div>
+            <div class="bf-sign-line"></div>
+            <small id="bf_executive_unit">Eksekutif</small>
+        </div>
+        <div>
+            <strong>Disemak Oleh:</strong>
+            <div style="height:70px;"></div>
+            <div class="bf-sign-line"></div>
+            <small>Ketua Seksyen Selenggara</small>
+        </div>
+        <div>
+            <strong>Disahkan Oleh:</strong>
+            <div style="height:70px;"></div>
+            <div class="bf-sign-line"></div>
+            <small>Ketua Mekanikal & Elektrikal</small>
+        </div>
+        <div>
+            <strong>Disokong Oleh:</strong>
+            <div style="height:70px;"></div>
+            <div class="bf-sign-line"></div>
+            <small>Ketua Bahagian Operasi & Penyelenggaraan</small>
+        </div>
+    </div>
+
+    <div class="bf-footer-note">
+        * Sebutharga dan Work Order telah disemak sepenuhnya oleh Pihak Daerah
+    </div>
+</div>
+
+<script>
+    const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
+    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
+    const headers = {
+        'apikey': SB_KEY,
+        'Authorization': `Bearer ${SB_KEY}`,
+        'Content-Type': 'application/json'
+    };
+
+    function formatTarikhBM(dateStr) {
+        if (!dateStr) return '';
+        const bulan = ['JANUARI','FEBRUARI','MAC','APRIL','MEI','JUN','JULAI','OGOS','SEPTEMBER','OKTOBER','NOVEMBER','DISEMBER'];
+        const d = new Date(dateStr);
+        const hari = String(d.getDate()).padStart(2, '0');
+        return `${hari} ${bulan[d.getMonth()]} ${d.getFullYear()}`;
+    }
+
+    function getInitials(text) {
+        const ignore = ['AND','OF','THE','&','DAN'];
+        return text.toUpperCase().replace(/[^A-Z\s]/g,'').split(/\s+/)
+            .filter(w => w.length > 0 && !ignore.includes(w))
+            .map(w => w[0]).join('.');
+    }
+
+    function formatLocation(loc) {
+        if (!loc) return '';
+        let txt = loc.toUpperCase().trim();
+        txt = txt.replace(/\bKAMPUNG\b/g, 'KG');
+        if (txt.includes('BPH') || txt.includes('RESERVOIR')) return txt;
+        if (!txt.startsWith('LRA')) txt = 'LRA ' + txt;
+        return txt;
+    }
+
+    async function loadBlueform(workOrderId) {
+        try {
+            const res = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${workOrderId}&select=*,contract(*,units(unit_name))`, { headers });
+            const result = await res.json();
+            const data = result[0];
+
+            if (!data) {
+                document.getElementById('loadingOverlay').innerHTML = '<span style="color:#FF3B30;">Work Order tidak dijumpai.</span>';
+                return;
+            }
+
+            const seq = data.sequence_no || '';
+            const c = data.contract;
+            const refPrefix = c.reference || 'RSAJ/M&E/IP/11-';
+            let formattedRef = seq.replace(/([A-Z]{2,4}\d+)$/i, ' - $1');
+            const unitName = (c.units?.unit_name || '').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+            const b = c.contract_sections_breakdown || {};
+            const s = data.section_category ?? {};
+
+            let totalSection = 0;
+            Object.values(s).forEach(sec => { totalSection += Number(sec?.amt || 0); });
+            let provisionalExtra = Number(data.additional || 0);
+            let totalWorkValue = totalSection + provisionalExtra;
+
+            /* ambil interims */
+            const interimRes = await fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=date_received.asc`, { headers });
+            const allInterims = await interimRes.json();
+
+            let cutoffDate = new Date(data.qpb_date);
+
+            if (data.status === "Claimed") {
+                for (const int of allInterims) {
+                    const cat = int.claim_breakdown || {};
+                    const found = Object.values(cat).some(sec => Number(sec?.work_order_id) === Number(data.id));
+                    if (found) { cutoffDate = new Date(int.date_received); break; }
+                }
+            }
+
+            /* ambil semua work orders */
+            const woRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}`, { headers });
+            let allWO = await woRes.json();
+
+            /* area priority */
+            const areaPriority = {};
+            const areaList = (c.area_code || '').split(',').map(a => a.trim().toUpperCase()).filter(a => a.length > 0);
+            areaList.forEach((a, i) => { areaPriority[a] = i + 1; });
+
+            let sectionUsed = {};
+            let totalSalvage = 0;
+            let totalPG = 0;
+            let timeline = [];
+
+            /* sort allWO */
+            allWO.sort((a, b) => {
+                const d1 = new Date(a.qpb_date), d2 = new Date(b.qpb_date);
+                if (d1 < d2) return -1;
+                if (d1 > d2) return 1;
+                const aRank = areaPriority[(a.area_code||'').toUpperCase()] ?? 999;
+                const bRank = areaPriority[(b.area_code||'').toUpperCase()] ?? 999;
+                if (aRank !== bRank) return aRank - bRank;
+                const aSeq = parseInt((a.sequence_no||'').match(/\d+/)?.[0]||0);
+                const bSeq = parseInt((b.sequence_no||'').match(/\d+/)?.[0]||0);
+                return aSeq - bSeq;
+            });
+
+            /* proses interims */
+            allInterims.forEach(int => {
+                const intDate = new Date(int.date_received);
+                if (intDate > cutoffDate) return;
+                const salvage = Number(int.salvage_value || 0);
+                const pg = Number(int.performance_guarantee_sum || 0);
+                totalSalvage += salvage;
+                totalPG += pg;
+                const cat = int.claim_breakdown || {};
+                let amt = 0;
+                Object.values(cat).forEach(s => { amt += Number(s?.amt || s?.amount || s?.value || 0); });
+                timeline.push({ type:'INTERIM', date:int.date_received, amount:amt, salvage, pg });
+                Object.keys(cat).forEach(sec => {
+                    const val = Number(cat[sec]?.amt || cat[sec]?.amount || cat[sec]?.value || 0);
+                    if (!sectionUsed[sec]) sectionUsed[sec] = 0;
+                    sectionUsed[sec] += val;
+                });
+            });
+
+            /* proses work orders sebelum WO semasa */
+            allWO.filter(w => {
+                if (w.status === "Claimed") return false;
+                if (Number(w.id) === Number(data.id)) return false;
+                if (!w.qpb_date) return false;
+                const woDate = new Date(w.qpb_date);
+                if (woDate < cutoffDate) return true;
+                if (woDate > cutoffDate) return false;
+                const wRank = areaPriority[(w.area_code||'').toUpperCase()] || 99;
+                const curRank = areaPriority[(data.area_code||'').toUpperCase()] || 99;
+                if (wRank < curRank) return true;
+                if (wRank > curRank) return false;
+                const wSeq = parseInt((w.sequence_no||'').match(/\d+/)?.[0]||0);
+                const curSeq = parseInt((data.sequence_no||'').match(/\d+/)?.[0]||0);
+                return wSeq <= curSeq;
+            }).forEach(wo => {
+                timeline.push({
+                    type:'WORKORDER',
+                    date: wo.qpb_date,
+                    seq: parseInt((wo.sequence_no||'').match(/\d+/)?.[0]||0),
+                    amount: Number(wo.amount_spent || 0),
+                    salvage: 0
+                });
+                const cat = wo.section_category || {};
+                Object.keys(cat).forEach(sec => {
+                    const amt = Number(cat[sec]?.amt || 0);
+                    if (!sectionUsed[sec]) sectionUsed[sec] = 0;
+                    sectionUsed[sec] += amt;
+                });
+                const add = Number(wo.additional || 0);
+                if (add > 0) {
+                    if (!sectionUsed["PROVISIONAL SUM"]) sectionUsed["PROVISIONAL SUM"] = 0;
+                    sectionUsed["PROVISIONAL SUM"] += add;
+                }
+            });
+
+            /* tambah WO semasa */
+            const currentSections = data.section_category || {};
+            Object.keys(currentSections).forEach(sec => {
+                const amt = Number(currentSections[sec]?.amt || 0);
+                if (!sectionUsed[sec]) sectionUsed[sec] = 0;
+                sectionUsed[sec] += amt;
+            });
+            const currentAdd = Number(data.additional || 0);
+            if (currentAdd > 0) {
+                if (!sectionUsed["PROVISIONAL SUM"]) sectionUsed["PROVISIONAL SUM"] = 0;
+                sectionUsed["PROVISIONAL SUM"] += currentAdd;
+            }
+            timeline.push({
+                type:'WORKORDER',
+                date: data.qpb_date,
+                seq: parseInt((data.sequence_no||'').match(/\d+/)?.[0]||0),
+                amount: totalWorkValue,
+                salvage: 0
+            });
+
+            /* sort timeline */
+            timeline.sort((a, b) => {
+                const d1 = new Date(a.date), d2 = new Date(b.date);
+                if (d1 < d2) return -1;
+                if (d1 > d2) return 1;
+                if (a.type !== b.type) return a.type === 'INTERIM' ? -1 : 1;
+                if (a.type === 'WORKORDER') return (a.seq||0) - (b.seq||0);
+                return 0;
+            });
+
+            /* kira baki kontrak */
+            let bakiKontrak = Number(c.contract_sum || 0);
+            timeline.forEach(t => {
+                if (t.type === 'INTERIM') {
+                    bakiKontrak -= t.amount;
+                    bakiKontrak += (t.salvage || 0);
+                    bakiKontrak += (t.pg || 0);
+                } else if (t.type === 'WORKORDER') {
+                    bakiKontrak -= t.amount;
+                }
+            });
+
+            /* build dynamic section HTML */
+            const tpl = JSON.parse(localStorage.getItem(`bf_sections_${c.id}`) || '{}');
+            let dynamicHtml = '';
+            let currentRow = 6;
+
+            Object.keys(b).sort().forEach((key, idx) => {
+                const label = b[key]?.desc || tpl[key]?.label || key;
+                const active = tpl[key]?.active ?? true;
+                if (!active) return;
+                const sumValue = b[key]?.amt || 0;
+                let workValue = Number(s[key]?.amt || 0);
+                dynamicHtml += `
+                    <div class="grp-dyn-${idx}">
+                        <hr style="border:0.5px solid #000;margin:8px 0;">
+                        <div class="bf-row">
+                            <div class="bf-label"><span class="bf-no">${currentRow++}</span><span>${label.toUpperCase().includes('SUM') ? label : label + ' Sum'}</span></div>
+                            <div class="bf-colon">:</div>
+                            <div class="bf-value">RM ${Number(sumValue).toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+                        </div>
+                        <div class="bf-row">
+                            <div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Anggaran Kerja (${getInitials(label)})</span></div>
+                            <div class="bf-colon">:</div>
+                            <div class="bf-value">RM ${workValue.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+                        </div>
+                    </div>`;
+            });
+
+            /* baki section rows */
+            const bakiRows = Object.keys(b).map(sec => {
+                let label = (b[sec].desc || '').toUpperCase();
+                if (label.includes('GENERAL') || label.includes('PRELIMINARIES')) label = 'G&P';
+                else if (label.includes('PREVENTIVE')) label = 'PREVENTIVE MAINTENANCE';
+                else if (label.includes('PROACTIVE')) label = 'PROACTIVE MAINTENANCE';
+                label = label.replace(/CHARGES/g,'').trim();
+                const contractAmt = Number(b[sec]?.amt || 0);
+                const usedAmt = Number(sectionUsed[sec] || 0);
+                const baki = contractAmt - usedAmt;
+                return `<div class="bf-row" style="font-size:9px;">
+                    <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">${label}</span></div>
+                    <div class="bf-colon">:</div>
+                    <div class="bf-value">RM ${baki.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+                </div>`;
+            }).join('');
+
+            const locationText = formatLocation(data.location);
+
+            const html = `
+                <div class="bf-row"><div class="bf-label"><span class="bf-no">1</span><span>   No. Rujukan</span></div><div class="bf-colon">:</div><div class="bf-value">${refPrefix}${formattedRef}</div></div>
+                <div class="bf-row"><div class="bf-label"><span class="bf-no">2</span><span>   No. Work Order</span></div><div class="bf-colon">:</div><div class="bf-value">${data.work_id}</div></div>
+                <div class="bf-row"><div class="bf-label"><span class="bf-no">3</span><span>   No. Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value">${c.contract_code}</div></div>
+                <div class="bf-row"><div class="bf-label"><span class="bf-no">4</span><span>   Nama Kontraktor</span></div><div class="bf-colon">:</div><div class="bf-value">${c.contractor}</div></div>
+                <div class="bf-row"><div class="bf-label"><span class="bf-no">5</span><span>   Tempoh Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value">${formatTarikhBM(c.contract_start)} ~ ${formatTarikhBM(c.contract_end)}</div></div>
+
+                ${dynamicHtml}
+
+                <div class="bf-row">
+                    <div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Anggaran Kerja (<i>Tambahan</i>)</span></div>
+                    <div class="bf-colon">:</div>
+                    <div class="bf-value">RM ${provisionalExtra.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+                </div>
+                <hr style="border:0.5px solid #000;margin:8px 0;">
+                <div class="bf-row"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Jumlah Harga Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value">RM ${Number(c.contract_sum||0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+                <div style="margin-top:8px;">
+                    <div class="bf-row"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>BAKI</span></div><div class="bf-colon">:</div><div class="bf-value"></div></div>
+                    <div class="bf-baki-table">
+                        ${bakiRows}
+                        <div class="bf-row" style="font-size:9px;">
+                            <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">SALVAGE VALUE</span></div>
+                            <div class="bf-colon">:</div>
+                            <div class="bf-value">RM ${totalSalvage.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+                        </div>
+                        <div class="bf-row" style="font-size:9px;">
+                            <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">PERFORMANCE GUARANTEE</span></div>
+                            <div class="bf-colon">:</div>
+                            <div class="bf-value">RM ${totalPG.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bf-row" style="margin-top:8px;"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Baki Harga Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value" style="font-weight:bold;">RM ${bakiKontrak.toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+                <hr style="border:0.5px solid #000;margin:8px 0;">
+                <div class="bf-row"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Tajuk Kerja</span></div><div class="bf-colon">:</div><div class="bf-value">${data.description.toUpperCase()} DI ${locationText} (RM ${totalWorkValue.toLocaleString(undefined,{minimumFractionDigits:2})})</div></div>
+            `;
+
+            document.getElementById('bf_content').innerHTML = html;
+            document.getElementById('bf_executive_unit').innerText = unitName ? `Eksekutif ${unitName}` : 'Eksekutif';
+            document.getElementById('loadingOverlay').style.display = 'none';
+
+        } catch (e) {
+            console.error(e);
+            document.getElementById('loadingOverlay').innerHTML = '<span style="color:#FF3B30;">Ralat memuatkan data.</span>';
+        }
+    }
+
+    /* init */
+    window.onload = () => {
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get('id');
+        if (id) {
+            loadBlueform(id);
+        } else {
+            document.getElementById('loadingOverlay').innerHTML = '<span style="color:#FF3B30;">Tiada ID work order.</span>';
+        }
+    };
+</script>
+</body>
+</html>
