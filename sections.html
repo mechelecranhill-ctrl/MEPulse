@@ -3,195 +3,65 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard M&E</title>
 
-<title>M&E Dashboard</title>
-
-<link href="https://fonts.googleapis.com/css?family=Lato:300,400&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
 <style>
 
-body{
-    margin:0;
-    font-family:'Lato',sans-serif;
-    overflow:hidden;
-}
-
-/* BACKGROUND */
-.dashboard{
-    position:fixed;
-    inset:0;
-    display:flex;
-    flex-direction:column;
-    background:
-    linear-gradient(60deg,#0b3d91,#0077b6,#00b4d8);
-}
-
-/* TOP BAR */
-.topbar{
-    height:60px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    position:relative;
+/* HEADER SIMPLE */
+.header{
+    height:200px;
+    background:linear-gradient(60deg,#0b3d91,#0077b6,#00b4d8);
     color:white;
-    font-weight:700;
-    font-size:18px;
-}
-
-.back-btn{
-    position:absolute;
-    left:15px;
-    width:36px;
-    height:36px;
     display:flex;
-    align-items:center;
     justify-content:center;
-    border-radius:10px;
-    background:rgba(255,255,255,.15);
-    color:white;
-    cursor:pointer;
+    align-items:center;
+    font-size:24px;
 }
 
-/* BOARD */
-.board{
-    flex:1;
-    display:flex;
-    gap:18px;
+/* CONTENT */
+.content{
     padding:20px;
-    overflow-x:auto;
-    scroll-snap-type:x mandatory;
 }
 
-/* COLUMN */
-.column{
-    flex:0 0 300px;
-    background:rgba(255,255,255,.55);
-    border-radius:20px;
-    padding:16px;
-    backdrop-filter:blur(20px);
-    scroll-snap-align:center;
-}
-
-/* SECTION TITLE */
-.section-head{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    margin-bottom:10px;
-}
-
-.section-icon{
-    width:40px;
-}
-
-/* CARD */
-.card{
-    background:rgba(255,255,255,.7);
-    padding:10px;
-    border-radius:12px;
-    margin-top:8px;
-}
-
-/* BUTTON */
 button{
-    width:100%;
-    margin-top:10px;
     padding:10px;
     border:none;
-    border-radius:12px;
+    border-radius:10px;
     background:#0077b6;
     color:white;
     cursor:pointer;
 }
 
-button:hover{
-    transform:scale(1.02);
-}
-
 </style>
-
 </head>
 
 <body>
 
-<div class="dashboard">
+<div class="header">
+    M&E DASHBOARD
+</div>
 
-    <!-- TOP -->
-    <div class="topbar">
+<div class="content">
 
-        <div class="back-btn" onclick="history.back()">
-            <i class="fa fa-chevron-left"></i>
-        </div>
+    <h3>Welcome</h3>
 
-        M&E Dashboard
-    </div>
-
-    <!-- BOARD -->
-    <div id="board" class="board"></div>
+    <button onclick="logout()">Logout</button>
 
 </div>
 
 <script>
 
-const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
-
-const SB_KEY = "YOUR_KEY_HERE";
-
-const headers = {
-    apikey: SB_KEY,
-    Authorization: `Bearer ${SB_KEY}`,
-    "Content-Type":"application/json"
-};
-
-const sectionIcons = {
-    "SEKSYEN SELENGGARA": "mainhelm.png",
-    "SEKSYEN PENGURUSAN ASET & KEWANGAN": "assethelm.png",
-    "SEKSYEN PEMATUHAN PERATURAN": "safehelm.png",
-    "SEKSYEN PROJEK & PERKHIDMATAN TEKNIKAL": "projecthelm.png"
-};
-
-async function loadBoard(){
-
-    const [secRes, unitRes] = await Promise.all([
-
-        fetch(`${SB_URL}/rest/v1/me_sections?select=*`, { headers }),
-        fetch(`${SB_URL}/rest/v1/units?select=*&order=id.asc`, { headers })
-
-    ]);
-
-    const sections = await secRes.json();
-    const unitsAll = await unitRes.json();
-
-    let html = "";
-
-    for(const sec of sections){
-
-        const units = unitsAll.filter(u => u.section_id === sec.id);
-
-        html += `
-        <div class="column">
-
-            <div class="section-head">
-                <img src="${sectionIcons[sec.section_name?.toUpperCase()] || 'default.svg'}"
-                     class="section-icon">
-                <h3>${sec.section_name}</h3>
-            </div>
-
-            ${units.map(u => `
-                <div class="card">
-                    ${u.unit_name}
-                </div>
-            `).join('')}
-
-        </div>
-        `;
-    }
-
-    document.getElementById("board").innerHTML = html;
+// CHECK LOGIN
+if(!localStorage.getItem("me_loggedin")){
+    window.location.href = "index.html";
 }
 
-loadBoard();
+function logout(){
+    localStorage.removeItem("me_loggedin");
+    window.location.href = "index.html";
+}
 
 </script>
 
