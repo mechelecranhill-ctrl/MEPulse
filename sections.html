@@ -3,64 +3,276 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard M&E</title>
 
+<title>Mechanical & Electrical Department</title>
+
+<link href="https://fonts.googleapis.com/css?family=Lato:300,400&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
 <style>
 
-/* HEADER SIMPLE */
+body{
+    margin:0;
+    overflow-x:hidden;
+    font-family:'Lato',sans-serif;
+    background:#fff;
+}
+
+/* HEADER */
 .header{
-    height:200px;
+    position:relative;
+    text-align:center;
     background:linear-gradient(60deg,#0b3d91,#0077b6,#00b4d8);
     color:white;
+}
+
+/* FLEX */
+.flex{
     display:flex;
     justify-content:center;
     align-items:center;
-    font-size:24px;
+    text-align:center;
+}
+
+/* HEADER AREA */
+.inner-header{
+    position:relative;
+    z-index:20; 
+    height:65vh;
+    width:100%;
+    margin:0;
+    padding:0;
+    flex-direction:column;
+}
+
+/* TITLE */
+h1{
+    font-weight:300;
+    letter-spacing:2px;
+    font-size:48px;
+    margin-top:20px;
 }
 
 /* CONTENT */
 .content{
-    padding:20px;
+    position:relative;
+    height:20vh;
+    text-align:center;
+    background:white;
 }
 
+p{
+    letter-spacing:1px;
+    font-size:14px;
+    color:#333;
+}
+
+/* DASHBOARD */
+.dashboard{
+    position:fixed;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+
+    opacity:0;
+    visibility:hidden;
+    transform:translateY(40px);
+
+    transition:.8s ease;
+    z-index:999;
+
+    overflow:hidden;
+}
+
+.dashboard.show{
+    opacity:1;
+    visibility:visible;
+    transform:translateY(0);
+}
+
+/* BOARD */
+.board{
+    flex:1;
+    display:flex;
+    gap:18px;
+    overflow-x:auto;
+    padding:25px;
+}
+
+/* COLUMN */
+.column{
+    flex:0 0 300px;
+    background:rgba(255,255,255,.55);
+    backdrop-filter:blur(20px);
+    border-radius:28px;
+    padding:18px;
+}
+
+/* CARD */
+.card{
+    background:rgba(255,255,255,.65);
+    border-radius:18px;
+    padding:14px;
+    margin-top:10px;
+}
+
+/* BUTTON */
 button{
-    padding:10px;
+    width:100%;
+    margin-top:10px;
+    padding:12px;
     border:none;
-    border-radius:10px;
-    background:#0077b6;
+    border-radius:16px;
+    background:linear-gradient(135deg,#0077b6,#00b4d8);
     color:white;
+    font-weight:700;
     cursor:pointer;
 }
 
+/* INPUT */
+input{
+    width:100%;
+    margin-top:12px;
+    padding:12px;
+    border-radius:14px;
+    border:none;
+    outline:none;
+}
+
 </style>
+
 </head>
 
 <body>
 
+<!-- HEADER -->
 <div class="header">
-    M&E DASHBOARD
+
+    <div class="inner-header flex">
+
+        <h1>M&E Connect</h1>
+
+    </div>
+
 </div>
 
-<div class="content">
+<!-- CONTENT -->
+<div class="content flex">
+    <p>M&E | Mechanical & Electrical Department</p>
+</div>
 
-    <h3>Welcome</h3>
+<!-- DASHBOARD -->
+<div id="dashboard" class="dashboard">
 
-    <button onclick="logout()">Logout</button>
+    <div style="padding:15px;">
+        <button onclick="window.location.href='index.html'">
+            Back
+        </button>
+    </div>
+
+    <div id="board" class="board"></div>
 
 </div>
 
 <script>
 
-// CHECK LOGIN
-if(!localStorage.getItem("me_loggedin")){
-    window.location.href = "index.html";
+const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
+
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
+
+
+const headers = {
+    apikey: SB_KEY,
+    Authorization: `Bearer ${SB_KEY}`,
+    "Content-Type":"application/json"
+};
+
+let boardLoaded = false;
+
+const sectionIcons = {
+    "SEKSYEN SELENGGARA": "mainhelm.png",
+    "SEKSYEN PENGURUSAN ASET & KEWANGAN": "assethelm.png",
+    "SEKSYEN PEMATUHAN PERATURAN": "safehelm.png",
+    "SEKSYEN PROJEK & PERKHIDMATAN TEKNIKAL": "projecthelm.png"
+};
+
+/* AUTO OPEN DASHBOARD (NO LOGIN) */
+window.addEventListener("load", () => {
+    openDashboard();
+});
+
+async function openDashboard(){
+
+    document.getElementById("dashboard").classList.add("show");
+
+    if(!boardLoaded){
+        await loadBoard();
+        boardLoaded = true;
+    }
 }
 
-function logout(){
-    localStorage.removeItem("me_loggedin");
-    window.location.href = "index.html";
+async function loadBoard(){
+
+    const [secRes, unitRes] = await Promise.all([
+        fetch(`${SB_URL}/rest/v1/me_sections?select=*`, { headers }),
+        fetch(`${SB_URL}/rest/v1/units?select=*&order=id.asc`, { headers })
+    ]);
+
+    const sections = await secRes.json();
+    const allUnits = await unitRes.json();
+
+    const board = document.getElementById("board");
+
+    let html = "";
+
+    for(const sec of sections){
+
+        const units = allUnits.filter(u => u.section_id === sec.id);
+
+        html += `
+        <div class="column">
+
+            <h3>${sec.section_name}</h3>
+
+            <button onclick="goContract('${sec.section_name}')">
+                Open Dashboard
+            </button>
+
+            ${units.map(u => `
+                <div class="card">${u.unit_name}</div>
+            `).join('')}
+
+            <input id="unit_${sec.id}" placeholder="Tambah unit...">
+            <button onclick="addUnit(${sec.id})">Add Unit</button>
+
+        </div>`;
+    }
+
+    board.innerHTML = html;
+}
+
+async function addUnit(sectionId){
+
+    const input = document.getElementById(`unit_${sectionId}`);
+    const name = input.value.trim();
+
+    if(!name) return alert("Isi unit dulu");
+
+    await fetch(`${SB_URL}/rest/v1/units`, {
+        method:'POST',
+        headers,
+        body: JSON.stringify({
+            unit_name:name,
+            section_id:sectionId
+        })
+    });
+
+    input.value = "";
+    loadBoard();
+}
+
+function goContract(sectionName){
+    window.location.href = `dashboard-contract.html?section=${encodeURIComponent(sectionName)}`;
 }
 
 </script>
