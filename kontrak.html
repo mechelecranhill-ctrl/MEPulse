@@ -295,9 +295,6 @@
             <div id="menu_voPage" class="menu-item" onclick="showPage('voPage', this)">
                 <i class="fa-solid fa-triangle-exclamation" style="margin-right:12px;"></i> Variation Order (VO)
             </div>
-            <div id="menu_settingsPage" class="menu-item" onclick="showPage('settingsPage', this)">
-                <i class="fa-solid fa-gear" style="margin-right:12px;"></i> Tetapan Unit
-            </div>
         </div>
     </div>
 
@@ -539,13 +536,6 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
         <div id="settingsPage" class="page">
             <div class="glass-card">
                 <h3 style="margin-top:0;"><i class="fa-solid fa-gear"></i> Pendaftaran Unit</h3>
-                <form id="unitForm">
-                    <input type="text" id="new_unit_name" placeholder="Cth: INSTRUMENTASI" required>
-                    <button type="submit" class="btn-primary">Simpan Unit</button>
-                </form>
-                <div id="unitListDisplay" style="margin-top:20px; font-size:13px;"></div>
-            </div>
-        </div>
 
     </div>
 
@@ -583,16 +573,7 @@ fetchUnits();
 
 }
     function setupFormListeners() {
-        // Unit Form
-        document.getElementById('unitForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const unitName = document.getElementById('new_unit_name').value.trim().toUpperCase();
-            const res = await fetch(`${SB_URL}/rest/v1/units`, {
-                method: 'POST', headers, body: JSON.stringify({ unit_name: unitName })
-            });
-            if (res.ok) { alert("Unit berjaya disimpan!"); document.getElementById('new_unit_name').value = ''; fetchUnits(); }
-        });
-
+ 
         // Contract Form
         document.getElementById('contractForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -756,32 +737,52 @@ if(existing.length > 0){
 }
 
     async function fetchUnits() {
-    try {
-        const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
+
+    try{
+
+        const res = await fetch(
+            `${SB_URL}/rest/v1/units?select=*`,
+            { headers }
+        );
+
         const units = await res.json();
 
         const admin = document.getElementById('c_unit_id');
         const wUnit = document.getElementById('w_unit_id');
         const iUnit = document.getElementById('i_unit_id');
 
-        const unitList = document.getElementById('unitListDisplay');
+        if(admin)
+            admin.innerHTML =
+                '<option value="">Pilih Unit</option>';
 
-        if(admin) admin.innerHTML = '<option value="">Pilih Unit</option>';
-        if(wUnit) wUnit.innerHTML = '<option value="">Pilih Unit</option>';
-        if(iUnit) iUnit.innerHTML = '<option value="">Pilih Unit</option>';
+        if(wUnit)
+            wUnit.innerHTML =
+                '<option value="">Pilih Unit</option>';
 
-        unitList.innerHTML = '<strong>Senarai Unit:</strong><br>';
+        if(iUnit)
+            iUnit.innerHTML =
+                '<option value="">Pilih Unit</option>';
 
-        units.forEach(u => {
+        units.forEach(u=>{
 
-            if(admin) admin.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
-            if(wUnit) wUnit.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
-            if(iUnit) iUnit.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
+            if(admin)
+                admin.innerHTML +=
+                `<option value="${u.id}">${u.unit_name}</option>`;
 
-            unitList.innerHTML += `• ${u.unit_name}<br>`;
+            if(wUnit)
+                wUnit.innerHTML +=
+                `<option value="${u.id}">${u.unit_name}</option>`;
+
+            if(iUnit)
+                iUnit.innerHTML +=
+                `<option value="${u.id}">${u.unit_name}</option>`;
+
         });
 
-    } catch (e) { console.error(e); }
+    }catch(e){
+        console.error(e);
+    }
+
 }
     async function loadContractsToDropdowns() {
         try {
