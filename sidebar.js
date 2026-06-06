@@ -12,8 +12,10 @@ class AppSidebar extends HTMLElement {
             </div>
 
             <button class="hamburger" id="hamburger" aria-label="Menu">
-                ☰
-            </button>
+    <span></span>
+    <span></span>
+    <span></span>
+</button>
         `;
 
         this.cacheDOM();
@@ -51,11 +53,15 @@ class AppSidebar extends HTMLElement {
     toggle() {
         this.sidebar.classList.toggle("active");
         this.overlay.classList.toggle("active");
+
+this.btn.classList.toggle("active");
     }
 
     close() {
         this.sidebar.classList.remove("active");
         this.overlay.classList.remove("active");
+
+this.btn.classList.remove("active");
     }
 
     logout() {
