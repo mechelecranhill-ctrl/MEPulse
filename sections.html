@@ -144,7 +144,11 @@ p {
 .board::-webkit-scrollbar { display: none; }
 .board { scrollbar-width: none; }
 
-.column{
+.column{    
+    display:flex;
+    flex-direction:column;
+    height:fit-content;
+    min-height:220px;
     width:100%;
     min-width:0;
     box-sizing:border-box;
@@ -161,12 +165,33 @@ p {
     max-height:85vh;
     overflow-y:auto;
 }
+.units-container{
+    max-height:0;
+    overflow:hidden;
+    transition:max-height .35s ease;
+}
 
+.column.open .units-container{
+    max-height:500px;
+}
 .section-head {
+    cursor:pointer;
+    user-select:none;
     display: flex;
     align-items: center;
     gap: 12px;
     margin-bottom: 15px;
+}
+    .section-head::after{
+    content:"▼";
+    margin-left:auto;
+    font-size:12px;
+    color:#0b3d91;
+    transition:.3s;
+}
+
+.column.open .section-head::after{
+    transform:rotate(180deg);
 }
 
 .section-icon {
@@ -353,7 +378,7 @@ async function loadBoard(){
 
             html += `
             <div class="column">
-                <div class="section-head">
+                <div class="section-head" onclick="toggleSection(this)">
                     <img src="${icon}" class="section-icon" alt="icon">
                     <h3>${sec.section_name}</h3>
                 </div>
@@ -419,7 +444,18 @@ function goContract(sectionName){
     const encoded = encodeURIComponent(sectionName);
     window.location.href = `dashboard-contract.html?section=${encoded}`;
 }
+function toggleSection(el){
 
+    const column = el.closest('.column');
+
+    document.querySelectorAll('.column').forEach(c=>{
+        if(c !== column){
+            c.classList.remove('open');
+        }
+    });
+
+    column.classList.toggle('open');
+}
 </script>
 
 </body>
