@@ -1,55 +1,75 @@
 class AppSidebar extends HTMLElement {
-    connectedCallback(){
+    connectedCallback() {
         this.innerHTML = `
-<div class="overlay" id="overlay"></div>
+            <div class="overlay" id="overlay"></div>
 
-<div class="sidebar" id="sidebar">
-    <h3>M&E Menu</h3>
+            <div class="sidebar" id="sidebar">
+                <h3>M&E Menu</h3>
 
-    <a href="sections.html"> Home</a>
-    <a href="#" id="dashboardBtn"> Dashboard</a>
-    <a href="#" id="logoutBtn"> Logout</a>
-</div>
+                <a href="sections.html">Home</a>
+                <a href="#" id="dashboardBtn">Dashboard</a>
+                <a href="#" id="logoutBtn">Logout</a>
+            </div>
 
-<div class="hamburger" id="hamburger">☰</div>
-`;
+            <button class="hamburger" id="hamburger" aria-label="Menu">
+                ☰
+            </button>
+        `;
 
-        this.init();
+        this.cacheDOM();
+        this.bindEvents();
     }
 
-    init(){
-        const sidebar = this.querySelector("#sidebar");
-        const overlay = this.querySelector("#overlay");
-        const btn = this.querySelector("#hamburger");
+    cacheDOM() {
+        this.sidebar = this.querySelector("#sidebar");
+        this.overlay = this.querySelector("#overlay");
+        this.btn = this.querySelector("#hamburger");
+        this.logoutBtn = this.querySelector("#logoutBtn");
+        this.dashboardBtn = this.querySelector("#dashboardBtn");
+    }
 
-        const toggle = () => {
-            sidebar.classList.toggle("active");
-            overlay.classList.toggle("active");
-        };
-const logoutBtn = this.querySelector("#logoutBtn");
+    bindEvents() {
+        this.btn.addEventListener("click", () => this.toggle());
+        this.overlay.addEventListener("click", () => this.close());
 
-logoutBtn.onclick = (e) => {
-    e.preventDefault();
+        this.logoutBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            this.logout();
+        });
 
-    // clear session / storage (kalau ada)
-    localStorage.removeItem("me_user");
-    sessionStorage.clear();
+        this.dashboardBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            this.goDashboard();
+        });
 
-    window.location.href = "login.html";
-};
-const dashboardBtn = this.querySelector("#dashboardBtn");
+        // ESC close (UX upgrade)
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") this.close();
+        });
+    }
 
-dashboardBtn.onclick = (e) => {
-    e.preventDefault();
+    toggle() {
+        this.sidebar.classList.toggle("active");
+        this.overlay.classList.toggle("active");
+    }
 
-    // contoh default section (boleh ubah ikut app state)
-    const section = localStorage.getItem("current_section") || "GENERAL";
+    close() {
+        this.sidebar.classList.remove("active");
+        this.overlay.classList.remove("active");
+    }
 
-    window.location.href = `dashboard-contract.html?section=${encodeURIComponent(section)}`;
-};
+    logout() {
+        localStorage.removeItem("me_user");
+        sessionStorage.clear();
+        window.location.href = "login.html";
+    }
 
-        btn.onclick = toggle;
-        overlay.onclick = toggle;
+    goDashboard() {
+        const section =
+            localStorage.getItem("current_section") || "GENERAL";
+
+        window.location.href =
+            `dashboard-contract.html?section=${encodeURIComponent(section)}`;
     }
 }
 
