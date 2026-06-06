@@ -13,12 +13,19 @@ class AppSidebar extends HTMLElement {
 
             <button class="hamburger" id="hamburger" aria-label="Menu">
     <input type="checkbox" id="menuToggle">
-    <svg viewBox="0 0 32 32">
-        <path class="line line-top-bottom"
-              d="M27 10H5C2.8 10 1 8.2 1 6C1 3.8 2.8 2 5 2C7.2 2 9 3.8 9 6V26C9 28.2 7.2 30 5 30" />
-        <path class="line"
-              d="M7 16H25" />
-    </svg>
+<svg viewBox="0 0 32 32">
+    <path class="line line-top-bottom"
+          d="M27 10 13 10C10.8 10 9 8.2 9 6
+             9 3.5 10.8 2 13 2
+             15.2 2 17 3.8 17 6
+             L17 26C17 28.2 18.8 30 21 30
+             23.2 30 25 28.2 25 26
+             25 23.8 23.2 22 21 22
+             L7 22" />
+
+    <path class="line"
+          d="M7 16 27 16" />
+</svg>
 </button>
         `;
 
@@ -56,18 +63,18 @@ this.checkbox = this.querySelector("#menuToggle");
     }
 
     toggle() {
-        this.sidebar.classList.toggle("active");
-        this.overlay.classList.toggle("active");
+    const isOpen = this.sidebar.classList.toggle("active");
+    this.overlay.classList.toggle("active");
 
-this.checkbox.checked = !this.checkbox.checked;
-    }
+    this.checkbox.checked = isOpen;
+}
 
-    close() {
-        this.sidebar.classList.remove("active");
-        this.overlay.classList.remove("active");
+close() {
+    this.sidebar.classList.remove("active");
+    this.overlay.classList.remove("active");
 
-this.checkbox.checked = false;
-    }
+    this.checkbox.checked = false;
+}
 
     logout() {
         localStorage.removeItem("me_user");
