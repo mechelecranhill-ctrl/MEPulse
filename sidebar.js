@@ -30,6 +30,7 @@ class AppSidebar extends HTMLElement {
         this.sidebar = this.querySelector("#sidebar");
         this.overlay = this.querySelector("#overlay");
         this.btn = this.querySelector("#hamburger");
+this.checkbox = this.querySelector("#menuToggle");
         this.logoutBtn = this.querySelector("#logoutBtn");
         this.dashboardBtn = this.querySelector("#dashboardBtn");
     }
@@ -58,14 +59,14 @@ class AppSidebar extends HTMLElement {
         this.sidebar.classList.toggle("active");
         this.overlay.classList.toggle("active");
 
-this.btn.classList.toggle("active");
+this.checkbox.checked = !this.checkbox.checked;
     }
 
     close() {
         this.sidebar.classList.remove("active");
         this.overlay.classList.remove("active");
 
-this.btn.classList.remove("active");
+this.checkbox.checked = false;
     }
 
     logout() {
