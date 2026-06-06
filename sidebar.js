@@ -12,9 +12,13 @@ class AppSidebar extends HTMLElement {
             </div>
 
             <button class="hamburger" id="hamburger" aria-label="Menu">
-    <span></span>
-    <span></span>
-    <span></span>
+    <input type="checkbox" id="menuToggle">
+    <svg viewBox="0 0 32 32">
+        <path class="line line-top-bottom"
+              d="M27 10H5C2.8 10 1 8.2 1 6C1 3.8 2.8 2 5 2C7.2 2 9 3.8 9 6V26C9 28.2 7.2 30 5 30" />
+        <path class="line"
+              d="M7 16H25" />
+    </svg>
 </button>
         `;
 
