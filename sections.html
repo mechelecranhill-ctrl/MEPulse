@@ -301,9 +301,12 @@ button:hover { transform: scale(1.02); }
 }
 
 </style>
+    
+    <link rel="stylesheet" href="style.css">
 
-<link rel="stylesheet" href="style.css">
-<script src="sidebar.js" defer></script>
+    <script src="auth.js"></script>
+    <script src="session.js"></script>
+    <script src="sidebar.js" defer></script>
 
 
 </head>
@@ -338,18 +341,6 @@ const sectionIcons = {
     "SEKSYEN PROJEK & PERKHIDMATAN TEKNIKAL": "projecthelm.png"
 };
 
-window.addEventListener("DOMContentLoaded", () => {
-
-    const loggedIn = localStorage.getItem("loggedIn");
-
-    if(loggedIn !== "true"){
-        window.location.replace("login.html");
-        return;
-    }
-
-    openDashboard();
-});
-
 async function openDashboard(){
     const dashboard = document.getElementById("dashboard");
     dashboard.classList.add("show");
@@ -367,7 +358,7 @@ async function loadBoard(){
         ]);
 
         if (!secRes.ok || !unitRes.ok) {
-            throw new Error("Gagal mengambil data dari Supabase");
+            throw new Error("Unable to retrieve data from database");
         }
 
         const sections = await secRes.json();
@@ -414,7 +405,14 @@ async function loadBoard(){
 }
 
 async function addUnit(sectionId){
-    const input = document.getElementById(`unit_${sectionId}`);
+
+    if(!isAdmin){
+        alert("Access denied");
+        return;
+    }
+
+    const input =
+    document.getElementById(`unit_${sectionId}`);
     const name = input.value.trim();
 
     if(!name){
