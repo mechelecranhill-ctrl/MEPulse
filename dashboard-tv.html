@@ -101,11 +101,9 @@
 
         .staf-info { flex-grow: 1; min-width: 0; padding-right: 15px; }
         .staf-nama { font-weight: 900; font-size: 20px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #334155; }
-        
-        /* BESARKAN SEDIKIT JAWATAN */
+
         .staf-jawatan { font-size: 14.5px; color: #94a3b8; text-transform: uppercase; }
 
-        /* KECILKAN KOTAK (HORIZONTAL) & BESARKAN TULISAN */
         .badge { 
             font-size: 11px; 
             font-weight: 800; 
@@ -156,16 +154,15 @@
 </div>
 
 <div class="main-panel">
-    <div id="mainList">Memuatkan...</div>
+    <div id="mainList">Retrieving</div>
 </div>
 
 <script>
-    const S_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
-    const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48'; 
+    const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
 
     const HIERARKI = { 'KETUA JABATAN': 1, 'KETUA SEKSYEN': 2, 'EKSEKUTIF KANAN': 3, 'EKSEKUTIF': 4, 'JURUTEKNIK': 5, 'PENYELIA PENTADBIRAN': 6, 'PEMBANTU PENTADBIRAN': 7, 'KERANI': 8 };
 
-    // FUNGSI SHORTFORM UNTUK TV
     function getShortForm(sebab) {
         if (!sebab) return "HADIR";
         const s = sebab.toUpperCase();
@@ -183,38 +180,37 @@
         const list = document.getElementById('mainList');
         try {
             const [rS, rA] = await Promise.all([
-                fetch(`${S_URL}/rest/v1/staff?select=*`, { headers: { 'apikey': S_KEY, 'Authorization': `Bearer ${S_KEY}` } }),
-                fetch(`${S_URL}/rest/v1/attendance?select=*`, { headers: { 'apikey': S_KEY, 'Authorization': `Bearer ${S_KEY}` } })
+                fetch(`${S_URL}/rest/v1/staff?select=*`, { headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` } }),
+                fetch(`${S_URL}/rest/v1/attendance?select=*`, { headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` } })
             ]);
             const staff = await rS.json();
             const att = await rA.json();
             const sekarang = new Date();
             const hariIni = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate());
 
-            staff.sort((a, b) => (HIERARKI[a.jawatan?.toUpperCase()] || 99) - (HIERARKI[b.jawatan?.toUpperCase()] || 99) || a.nama.localeCompare(b.nama));
+            staff.sort((a, b) => (HIERARKI[a.position?.toUpperCase()] || 99) - (HIERARKI[b.position?.toUpperCase()] || 99) || a.name.localeCompare(b.name));
 
             let htmlOutput = "";
             let counts = { hadir: 0, kerja: 0, cuti: 0 };
 
             staff.forEach((s, index) => {
-                const sNama = (s.nama || "").toUpperCase().trim();
+                const sNama = (s.name || "").toUpperCase().trim();
                 const record = att.find(a => {
-                    if(!a.tarikh_mula || !a.tarikh_akhir) return false;
-                    const tM = a.tarikh_mula.split('-');
-                    const tA = a.tarikh_akhir.split('-');
+                    if(!a.start_date || !a.end_date) return false;
+                    const tM = a.start_date.split('-');
+                    const tA = a.end_date.split('-');
                     const dM = new Date(tM[0], tM[1]-1, tM[2]);
                     const dA = new Date(tA[0], tA[1]-1, tA[2]);
-                    return (a.nama || "").toUpperCase().trim() === sNama && hariIni >= dM && hariIni <= dA;
+                    return (a.name || "").toUpperCase().trim() === sNama && hariIni >= dM && hariIni <= dA;
                 });
 
                 let statusText = "HADIR";
                 let cls = "hadir";
 
                 if (record) {
-                    const sebabRaw = record.sebab.toUpperCase();
-                    statusText = getShortForm(record.sebab);
+                    const sebabRaw = record.reason.toUpperCase();
+                    statusText = getShortForm(record.reason);
                     
-                    // Logic warna mengikut kategori
                     if (sebabRaw.includes("CUTI") || sebabRaw.includes("HALFDAY")) {
                         cls = "cuti";
                     } else {
