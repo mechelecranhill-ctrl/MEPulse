@@ -1,37 +1,34 @@
 const SESSION_TIMEOUT = 15 * 60 * 1000;
 
-function resetSessionTimer(){
-
-    clearTimeout(window.sessionTimer);
-
-    window.sessionTimer = setTimeout(() => {
-
-        localStorage.removeItem("loggedIn");
-        localStorage.removeItem("userId");
-        localStorage.removeItem("role");
-
-        alert("Session Timeout");
-
-        window.location.replace("login.html");
-
-    }, SESSION_TIMEOUT);
+function updateActivity(){
+    localStorage.setItem(
+        "lastActivity",
+        Date.now()
+    );
 }
 
 [
     "mousemove",
     "mousedown",
-    "click",
-    "scroll",
     "keydown",
+    "scroll",
     "touchstart"
 ].forEach(event => {
-
-    document.addEventListener(
-        event,
-        resetSessionTimer,
-        true
-    );
-
+    document.addEventListener(event, updateActivity, true);
 });
 
-resetSessionTimer();
+updateActivity();
+
+setInterval(() => {
+
+    const last =
+        Number(localStorage.getItem("lastActivity")) || 0;
+
+    if(Date.now() - last > SESSION_TIMEOUT){
+
+        localStorage.clear();
+
+        window.location.replace("login.html");
+    }
+
+}, 5000);
