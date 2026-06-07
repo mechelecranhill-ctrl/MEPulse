@@ -651,39 +651,72 @@ const headers = {
     "Content-Type":"application/json"
 };
 
-function login(){
+async function login(){
 
     const user =
-    document.getElementById("username")
-    .value.trim();
+    document.getElementById("username").value.trim();
 
     const pass =
-    document.getElementById("password")
-    .value.trim();
+    document.getElementById("password").value.trim();
 
     const remember =
     document.getElementById("rememberMe").checked;
 
+    // =========================
+    // 1. MASTER ADMIN (@dm1n)
+    // =========================
     if(user === "@dm1n" && pass === "@AnakAnakSyurga1"){
 
         localStorage.setItem("loggedIn","true");
+        localStorage.setItem("userId", "@dm1n");
+        localStorage.setItem("role", "admin");
+        localStorage.setItem("staff_name", "System Admin");
 
-        localStorage.setItem("userId",user);
+        window.location.href = "sections.html";
+        return;
+    }
 
-        localStorage.setItem("role","admin");
+    // =========================
+    // 2. STAFF FROM SUPABASE
+    // =========================
+    try {
+
+        const res = await fetch(
+            `${SB_URL}/rest/v1/staff?employee_id=eq.${user}&select=*`,
+            { headers }
+        );
+
+        const data = await res.json();
+
+        if(data.length === 0){
+            alert("User tidak wujud");
+            return;
+        }
+
+        const staff = data[0];
+
+        if(staff.password !== pass){
+            alert("Password salah");
+            return;
+        }
+
+        // LOGIN SUCCESS STAFF
+        localStorage.setItem("loggedIn","true");
+        localStorage.setItem("userId", staff.employee_id);
+        localStorage.setItem("role", staff.position);
+        localStorage.setItem("staff_name", staff.name);
 
         if(remember){
             localStorage.setItem("me_user", user);
-        }else{
+        } else {
             localStorage.removeItem("me_user");
         }
 
         window.location.href = "sections.html";
 
-    }else{
-
-        alert("Login gagal");
-
+    } catch(err){
+        console.error(err);
+        alert("Server error");
     }
 }
 function forgotPassword(){
