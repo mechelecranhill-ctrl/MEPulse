@@ -51,7 +51,6 @@
         .status-kerja { background: #007AFF; } 
         .status-cuti { background: #FF3B30; } 
 
-        /* Gaya butang header */
         .btn-group { display: flex; gap: 8px; }
 
         .refresh-btn { 
@@ -66,7 +65,6 @@
             font-weight: bold; font-size: 12px;
         }
 
-        /* Gaya butang response baru */
         .res-btn {
             background: #34C759; color: white; border: none;
             padding: 8px 12px; border-radius: 10px; cursor: pointer;
@@ -105,12 +103,12 @@
 </div>
 
 <script>
-    const S_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
-    const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48'; 
+    const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
 
     async function fetchAllStatus() {
         const list = document.getElementById('mainList');
-        list.innerHTML = "<div style='text-align:center; padding:20px;'>MENYEMAK DATABASE...</div>";
+        list.innerHTML = "<div style='text-align:center; padding:20px;'>CHECKING DATABASE</div>";
 
         const hierarki = {
             'KETUA JABATAN': 1, 'KETUA SEKSYEN': 2, 'EKSEKUTIF KANAN': 3,
@@ -119,13 +117,13 @@
         };
 
         try {
-            const resS = await fetch(S_URL + '/rest/v1/staff?select=*', {
-                headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY }
+            const resS = await fetch(SB_URL + '/rest/v1/staff?select=*', {
+                headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
             });
             let allStaff = await resS.json();
 
-            const resA = await fetch(S_URL + '/rest/v1/attendance?select=*', {
-                headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY }
+            const resA = await fetch(SB_URL + '/rest/v1/attendance?select=*', {
+                headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
             });
             const allAtt = await resA.json();
 
@@ -133,20 +131,20 @@
             const hariIni = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate());
 
             allStaff.sort((a, b) => {
-                const jA = (a.jawatan || "").toUpperCase().trim();
-                const jB = (b.jawatan || "").toUpperCase().trim();
+                const jA = (a.position || "").toUpperCase().trim();
+                const jB = (b.position || "").toUpperCase().trim();
                 return (hierarki[jA] || 99) - (hierarki[jB] || 99) || a.nama.localeCompare(b.nama);
             });
 
             list.innerHTML = "";
 
             allStaff.forEach(staf => {
-                const sNama = (staf.nama || "").toUpperCase().trim();
+                const sNama = (staf.name || "").toUpperCase().trim();
 
                 const record = allAtt.find(a => {
                     const namaAtt = (a.nama || "").toUpperCase().trim();
-                    const tMulaParts = a.tarikh_mula.split('-');
-                    const tAkhirParts = a.tarikh_akhir.split('-');
+                    const tMulaParts = a.start_date.split('-');
+                    const tAkhirParts = a.end_date.split('-');
                     const tMula = new Date(tMulaParts[0], tMulaParts[1] - 1, tMulaParts[2]);
                     const tAkhir = new Date(tAkhirParts[0], tAkhirParts[1] - 1, tAkhirParts[2]);
                     return namaAtt === sNama && hariIni >= tMula && hariIni <= tAkhir;
@@ -154,13 +152,13 @@
 
                 let sText = "HADIR";
                 let sClass = "status-hadir";
-                let sSub = (staf.jawatan || "").toUpperCase();
+                let sSub = (staf.position || "").toUpperCase();
                 let deleteButtonHtml = "";
 
                 if (record) {
-                    sText = (record.sebab || "LUAR").toUpperCase();
+                    sText = (record.reason || "LUAR").toUpperCase();
                     sClass = (sText.includes("CUTI") || sText.includes("SAKIT") || sText.includes("HALFDAY")) ? "status-cuti" : "status-kerja";
-                    sSub = sSub + " • SEHINGGA: " + record.tarikh_akhir;
+                    sSub = sSub + " • SEHINGGA: " + record.end_date;
 
                     deleteButtonHtml = `<button class="delete-btn" onclick="padamRekod('${sNama}', '${record.tarikh_mula}')">
                                             <i class="fa-solid fa-xmark"></i> HADIR
