@@ -275,7 +275,7 @@
                     <div style="display: flex; flex-direction: column; overflow: hidden;">
                         <div style="display:flex; justify-content:space-between; align-items:center; flex-shrink: 0; margin-bottom: 8px;">
                             <h3 style="margin:0; font-size: 16px;">Section Dipilih</h3>
-                            <button class="manage-btn" onclick="toggleSelector()"><i class="fa fa-cog"></i> Urus</button>
+                            <button id="manageBtn"class="manage-btn"onclick="toggleSelector()"><i class="fa fa-cog"></i> Setting</button>
                         </div>
                         <div id="sectionSelector" style="display:none; background: #f9f9fb; padding: 10px; border-radius: 15px; margin-bottom: 10px; border: 1px dashed #ccc;">
                             <div id="fullSectionList"></div>
@@ -288,6 +288,11 @@
     </div>
     
 <script>
+
+    const role = localStorage.getItem("role");
+    const isAdmin =
+    role === "admin" ||
+    role === "@dm1n";
     
     const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
     const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
@@ -300,7 +305,14 @@
 
     Chart.register(ChartDataLabels);
 
-    window.onload = () => fetchUnits();
+    window.onload = () => {
+        fetchUnits();
+        
+        if(!isAdmin){
+        const btn = document.getElementById("manageBtn");
+        if(btn) btn.style.display = "none";
+        }
+    };
 
     function filterContracts() {
         const query = document.getElementById('contractSearch').value.toLowerCase();
@@ -527,6 +539,12 @@
     }
 
     async function toggleSection(s) {
+
+        
+    if(!isAdmin){
+        alert("Access denied");
+        return;
+    }
         if(selectedSections.includes(s)) selectedSections = selectedSections.filter(x => x !== s);
         else selectedSections.push(s);
         renderUI();
@@ -544,6 +562,19 @@
 
     const id = currentContract.id;
     window.location.href = `dashboard-interimclaim.html?id=${id}`;
+}
+    function toggleSelector() {
+
+    if(!isAdmin){
+        alert("Access denied");
+        return;
+    }
+
+    const el = document.getElementById('sectionSelector');
+    el.style.display =
+        el.style.display === 'none'
+            ? 'block'
+            : 'none';
 }
 
 </script>
