@@ -133,7 +133,8 @@
             allStaff.sort((a, b) => {
                 const jA = (a.position || "").toUpperCase().trim();
                 const jB = (b.position || "").toUpperCase().trim();
-                return (hierarki[jA] || 99) - (hierarki[jB] || 99) || a.nama.localeCompare(b.nama);
+                return (hierarki[jA] || 99) - (hierarki[jB] || 99) ||
+                    (a.name || "").localeCompare(b.name || "");
             });
 
             list.innerHTML = "";
@@ -142,7 +143,7 @@
                 const sNama = (staf.name || "").toUpperCase().trim();
 
                 const record = allAtt.find(a => {
-                    const namaAtt = (a.nama || "").toUpperCase().trim();
+                    const namaAtt = (a.name || "").toUpperCase().trim();
                     const tMulaParts = a.start_date.split('-');
                     const tAkhirParts = a.end_date.split('-');
                     const tMula = new Date(tMulaParts[0], tMulaParts[1] - 1, tMulaParts[2]);
@@ -160,9 +161,11 @@
                     sClass = (sText.includes("CUTI") || sText.includes("SAKIT") || sText.includes("HALFDAY")) ? "status-cuti" : "status-kerja";
                     sSub = sSub + " • SEHINGGA: " + record.end_date;
 
-                    deleteButtonHtml = `<button class="delete-btn" onclick=padamRekod('${sNama}', '${record.start_date}')
-                                            <i class="fa-solid fa-xmark"></i> HADIR
-                                        </button>`;
+                    deleteButtonHtml = `
+<button class="delete-btn"
+        onclick="padamRekod('${sNama}','${record.start_date}')">
+    <i class="fa-solid fa-xmark"></i> HADIR
+</button>`;
                 }
 
                 list.innerHTML += `
@@ -189,7 +192,7 @@
         try {
             const res = await fetch(`${SB_URL}/rest/v1/attendance?name=eq.${nama}&start_date=eq.${tarikh}`, {
                 method: 'DELETE',
-                headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY }
+                headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
             });
 
             if (res.ok) {
