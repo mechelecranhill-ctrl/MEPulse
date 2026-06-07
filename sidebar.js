@@ -76,11 +76,13 @@ close() {
     this.checkbox.checked = false;
 }
 
-    logout() {
-        localStorage.removeItem("me_user");
-        sessionStorage.clear();
-        window.location.href = "login.html";
-    }
+logout() {
+
+    localStorage.clear();
+    sessionStorage.clear();
+
+    window.location.replace("login.html");
+}
 
     goDashboard() {
         const section =
