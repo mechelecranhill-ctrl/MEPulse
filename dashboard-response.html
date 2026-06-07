@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOG DATA KEHADIRAN | DESKTOP MODE</title>
+    <title>Daily Attendance Logs</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         * { box-sizing: border-box; }
@@ -13,7 +13,7 @@
             margin: 0; padding: 0;
             height: 100vh;
             width: 100vw;
-            overflow: hidden; /* Desktop mode: No scrolling */
+            overflow: hidden;
             color: #1d1d1f;
         }
 
@@ -48,7 +48,7 @@
             background: #fff;
             border: 1px solid #e5e5ea;
             border-radius: 16px;
-            overflow-y: auto; /* Jika data terlampau banyak, hanya kawasan ini skrol */
+            overflow-y: auto;
             box-shadow: 0 4px 20px rgba(0,0,0,0.05);
         }
 
@@ -83,7 +83,6 @@
 
         tr:hover { background-color: #f9f9fb; }
 
-        /* Badge Styles */
         .badge {
             padding: 6px 14px;
             border-radius: 8px;
@@ -109,11 +108,11 @@
 <div class="desktop-wrapper">
     <div class="header-section">
         <div class="title-group">
-            <h2><i class="fa-solid fa-database" style="color: #007AFF;"></i> LOG RESPONSE KEHADIRAN</h2>
-            <p id="statsInfo">Memuatkan data dari database...</p>
+            <h2><i class="fa-solid fa-database" style="color: #007AFF;"></i> Attendance Response Log</h2>
+            <p id="statsInfo">Retrieving data from database</p>
         </div>
         <button class="btn-back" onclick="window.location.href='index.html'">
-            <i class="fa-solid fa-house"></i> KEMBALI KE MENU
+            <i class="fa-solid fa-house"></i> Return to menu
         </button>
     </div>
 
@@ -121,24 +120,24 @@
         <table id="responseTable">
             <thead>
                 <tr>
-                    <th>Nama Kakitangan</th>
-                    <th>Jawatan</th>
-                    <th>Sebab / Aktiviti</th>
-                    <th>Tarikh Mula</th>
-                    <th>Tarikh Akhir</th>
-                    <th>Waktu Input (Log)</th>
+                    <th>Name</th>
+                    <th>Position</th>
+                    <th>Reason / Activity</th>
+                    <th>Date Start</th>
+                    <th>Date End</th>
+                    <th>Input Time (Log)</th>
                 </tr>
             </thead>
             <tbody id="tableBody">
                 </tbody>
         </table>
-        <div id="loadingOverlay"><i class="fas fa-spinner fa-spin"></i> MENYEMAK DATABASE...</div>
+        <div id="loadingOverlay"><i class="fas fa-spinner fa-spin"></i> CHECKING DATABASE</div>
     </div>
 </div>
 
 <script>
-    const S_URL = 'https://fppemnabevbcephyepwx.supabase.co'; 
-    const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcGVtbmFiZXZiY2VwaHllcHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMTE1NzEsImV4cCI6MjA4NzY4NzU3MX0.0C51CdBQv7KkpJoIAHYe6NWveBJsyXyPpHVFvd6eP48'; 
+    const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
 
     async function loadDesktopData() {
         const tbody = document.getElementById('tableBody');
@@ -146,38 +145,42 @@
         const stats = document.getElementById('statsInfo');
 
         try {
-            // Susun ikut yang paling baru dihantar
-            const res = await fetch(S_URL + '/rest/v1/attendance?select=*&order=created_at.desc', {
-                headers: { 'apikey': S_KEY, 'Authorization': 'Bearer ' + S_KEY }
+            const res = await fetch(SB_URL + '/rest/v1/attendance?select=*&order=created_at.desc', {
+                headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
             });
             const data = await res.json();
             
             overlay.style.display = 'none';
             tbody.innerHTML = "";
-            stats.innerText = `JUMLAH REKOD: ${data.length} ENTRI DIJUMPAI`;
+            stats.innerText = `RECORD FOUND: ${data.length} ENTRY RETRIEVED`;
 
             data.forEach(item => {
-                const isCuti = (item.sebab.toUpperCase().match(/CUTI|SAKIT|HALFDAY/));
+                const isCuti = ((item.reason || "").toUpperCase().match(/CUTI|SAKIT|HALFDAY/));
                 const badgeClass = isCuti ? "bg-red" : "bg-blue";
                 
-                // Format waktu created_at
                 const logDate = new Date(item.created_at).toLocaleString('ms-MY');
 
                 const row = `
-                    <tr>
-                        <td style="font-weight:bold; color:#000;">${item.nama.toUpperCase()}</td>
-                        <td>${item.jawatan}</td>
-                        <td><span class="badge ${badgeClass}">${item.sebab.toUpperCase()}</span></td>
-                        <td>${item.tarikh_mula}</td>
-                        <td>${item.tarikh_akhir}</td>
-                        <td class="timestamp">${logDate}</td>
-                    </tr>
-                `;
+    <tr>
+        <td style="font-weight:bold; color:#000;">
+            ${(item.name || "").toUpperCase()}
+        </td>
+        <td>${item.position || ""}</td>
+        <td>
+            <span class="badge ${badgeClass}">
+                ${(item.reason || "").toUpperCase()}
+            </span>
+        </td>
+        <td>${item.start_date || ""}</td>
+        <td>${item.end_date || ""}</td>
+        <td class="timestamp">${logDate}</td>
+    </tr>
+`;
                 tbody.innerHTML += row;
             });
 
         } catch (err) {
-            overlay.innerHTML = "<span style='color:red;'>RALAT DATABASE: GAGAL MENGAMBIL DATA.</span>";
+            overlay.innerHTML = "<span style='color:red;'>DATABASE ERROR. UNABLE TO RETRIEVE DATA</span>";
         }
     }
 
