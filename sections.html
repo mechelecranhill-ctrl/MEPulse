@@ -283,7 +283,6 @@ button:hover { transform: scale(1.02); }
     position: relative;
     background: transparent;
 }
-
 .dashboard-top h3 {
     margin: 0;
     font-size: 18px;
@@ -294,8 +293,6 @@ button:hover { transform: scale(1.02); }
     width: 100%;
     box-sizing: border-box;
 }
-
-/* MOBILE RESPONSIVE */
 @media(max-width: 768px) {
     .content { height: 30vh; }
     h1 { font-size: 24px; }
@@ -320,6 +317,9 @@ button:hover { transform: scale(1.02); }
 </div>
 
 <script>
+const currentUser = localStorage.getItem("userId");
+const isAdmin = currentUser === "@dm1n";
+    
 const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
 
@@ -338,12 +338,18 @@ const sectionIcons = {
     "SEKSYEN PROJEK & PERKHIDMATAN TEKNIKAL": "projecthelm.png"
 };
 
-/* AUTOMATIC TRIGGER ON LOAD */
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener("DOMContentLoaded", () => {
+
+    const loggedIn = localStorage.getItem("loggedIn");
+
+    if(loggedIn !== "true"){
+        window.location.replace("login.html");
+        return;
+    }
+
     openDashboard();
 });
 
-/* OPEN DASHBOARD */
 async function openDashboard(){
     const dashboard = document.getElementById("dashboard");
     dashboard.classList.add("show");
@@ -353,8 +359,6 @@ async function openDashboard(){
         boardLoaded = true;
     }
 }
-
-/* LOAD BOARD */
 async function loadBoard(){
     try {
         const [secRes, unitRes] = await Promise.all([
@@ -395,9 +399,9 @@ async function loadBoard(){
                         </div>
                     `).join('')}
                 </div>
-
-                <input id="unit_${sec.id}" placeholder="Tambah unit...">
-                <button onclick="addUnit(${sec.id})">+ Add Unit</button>
+                
+                ${isAdmin ? `<input id="unit_${sec.id}" placeholder="Tambah unit +"><button onclick="addUnit(${sec.id})">+ Add Unit</button>` : ``}
+            
             </div>
             `;
         }
@@ -409,13 +413,12 @@ async function loadBoard(){
     }
 }
 
-/* ADD UNIT */
 async function addUnit(sectionId){
     const input = document.getElementById(`unit_${sectionId}`);
     const name = input.value.trim();
 
     if(!name){
-        alert("Isi nama unit terlebih dahulu");
+        alert("Insert unit name first");
         return;
     }
 
@@ -431,12 +434,12 @@ async function addUnit(sectionId){
 
         if(response.ok) {
             input.value = "";
-            await loadBoard(); // Muat semula data selepas berjaya tambah
+            await loadBoard();
         } else {
-            alert("Gagal menambah unit. Sila semak kebenaran RLS Supabase.");
+            alert("Unable to add unit. Check RLS permission.");
         }
     } catch (err) {
-        console.error("Ralat ketika menambah data:", err);
+        console.error("Error adding data: ", err);
     }
 }
 
