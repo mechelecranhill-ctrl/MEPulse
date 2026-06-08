@@ -1072,14 +1072,27 @@ i.value = '';
 calcInterimManualTotal();
 
 }
-    function addWorkOrdersToList() {
-        const area = document.getElementById('i_paste_area');
-        const rawIds = area.value.split(/\r?\n|,|\t/);
-        const cleanIds = rawIds.map(s => s.trim()).filter(s => s !== "" && !attachedWorkOrders.includes(s));
-        attachedWorkOrders = [...attachedWorkOrders, ...cleanIds];
-        area.value = '';
-        renderIDTags();
-    }
+function addWorkOrdersToList() {
+
+    const area = document.getElementById('i_paste_area');
+
+    const rawIds = area.value.split(/\r?\n|,|\t/);
+
+    const cleanIds = rawIds
+        .map(s => s.trim())
+        .filter(s => s !== '')
+        .map(id => id.startsWith('C ') ? id : `C ${id}`)
+        .filter(id => !attachedWorkOrders.includes(id));
+
+    attachedWorkOrders = [
+        ...attachedWorkOrders,
+        ...cleanIds
+    ];
+
+    area.value = '';
+
+    renderIDTags();
+}
 
     function renderIDTags() {
         const container = document.getElementById('i_id_list_tags');
@@ -1219,18 +1232,37 @@ body: JSON.stringify(payload)
 
 if(res.ok){
 
-for(let id of attachedWorkOrders){
+for (let workId of attachedWorkOrders) {
 
-await fetch(
-`${SB_URL}/rest/v1/work_orders?work_id=ilike.%${encodeURIComponent(id)}%`,
-{
-method:'PATCH',
-headers,
-body: JSON.stringify({
-interim_no:iNo,
-status:'Claimed'
-})
-});
+    const findRes = await fetch(
+        `${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}&select=id`,
+        { headers }
+    );
+
+    const rows = await findRes.json();
+
+    if (rows.length > 0) {
+
+        await fetch(
+            `${SB_URL}/rest/v1/work_orders?id=eq.${rows[0].id}`,
+            {
+                method: 'PATCH',
+                headers,
+                body: JSON.stringify({
+                    interim_no: iNo,
+                    status: 'Claimed'
+                })
+            }
+        );
+
+    } else {
+
+        console.warn(
+            'Work Order tidak dijumpai:',
+            workId
+        );
+
+    }
 
 }
 
