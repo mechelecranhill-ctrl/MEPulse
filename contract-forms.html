@@ -713,8 +713,9 @@ document.querySelectorAll('.w_sec_amt').forEach(i => {
 
 });
 
-// SEMAK jika work order sudah wujud
-const workIdValue = "C " + document.getElementById('w_id_num').value.trim();
+const workIdValue = normalizeWorkId(
+    document.getElementById('w_id_num').value
+);
 
 const checkRes = await fetch(
 `${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}`,
@@ -994,6 +995,21 @@ document.getElementById('total_display').innerText =
 `RM ${total.toLocaleString(undefined,{minimumFractionDigits:2})}`;
     }
 
+    function normalizeWorkId(raw){
+
+    let id = (raw || '').trim().toUpperCase();
+
+    // K123456 atau K 123456
+    if(id.startsWith('K')){
+        return id.replace(/^K\s*/, 'K');
+    }
+
+    // selain K dianggap C
+    id = id.replace(/^C\s*/, '');
+
+    return `C ${id}`;
+}
+
 function onInterimContractSelect(skipReset = false) {
 
 const opt = document.getElementById('i_contract_id').selectedOptions[0];
@@ -1081,7 +1097,7 @@ function addWorkOrdersToList() {
     const cleanIds = rawIds
         .map(s => s.trim())
         .filter(s => s !== '')
-        .map(id => id.startsWith('C ') ? id : `C ${id}`)
+        .map(id => normalizeWorkId(id))
         .filter(id => !attachedWorkOrders.includes(id));
 
     attachedWorkOrders = [
@@ -1363,7 +1379,7 @@ detectTimer = setTimeout(async ()=>{
 
 const contractId = document.getElementById('w_contract_id').value;
 const num = document.getElementById('w_id_num').value.trim();
-const workId = "C " + num;
+const workId = normalizeWorkId(num);
 
 onContractSelect();
 
