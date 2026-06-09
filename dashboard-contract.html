@@ -44,9 +44,69 @@
             box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
         }
         .mobile-usage-btn { display: none; } 
-        
 
+        /* =============================================
+           GLASS HEADER
+        ============================================= */
+        .glass-header { 
+            width: 100%; height: 60px; 
+            background:
+                radial-gradient(circle at top, rgba(255,255,255,.15), transparent 35%),
+                linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%);
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 1px 10px rgba(0,0,0,0.05); z-index: 1000; flex-shrink: 0;
+            position: relative;
+            padding: 0 60px; /* ruang untuk fab kiri kanan */
+            box-sizing: border-box;
+        }
+
+        /* =============================================
+           UNIT NAV — DESKTOP: full wrap centered, no scroll
+        ============================================= */
+        .unit-container-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+
+        .unit-container {
+            display: flex;
+            flex-wrap: wrap;         /* wrap supaya papar semua */
+            justify-content: center; /* tengah */
+            gap: 8px;
+            padding: 0;
+            /* tiada overflow scroll, tiada snap, tiada fade */
+        }
+
+        /* pseudo-elements untuk snap — desktop tak perlu */
+        .unit-container::before,
+        .unit-container::after {
+            display: none;
+        }
+
+        .unit-pill { 
+            padding: 8px 16px;
+            border-radius: 15px;     
+            background: rgba(255,255,255,.2);
+            color: white;
+            border: none; 
+            cursor: pointer; 
+            font-weight: 600; 
+            font-size: 12px; 
+            white-space: nowrap; 
+            transition: 0.3s;
+        }
+        .unit-pill.active { 
+            background: white;
+            color: #0b3d91; 
+        }
+
+        /* =============================================
+           MOBILE ONLY
+        ============================================= */
         @media (max-width: 768px) {
+
             #panel-vendor, 
             .next-container { 
                 display: none !important; 
@@ -72,26 +132,22 @@
             }
 
             .analysis-container {
-    position: fixed;
-    top: 60px;
-    left: 0;
-    right: 0;
-    bottom: 0;
+                position: fixed;
+                top: 60px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                width: auto;
+                height: auto;
+                box-sizing: border-box;
+                padding: 10px;
+                background: #f2f2f7;
+                z-index: 1500;
+                transform: translateX(100%);
+                transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                overflow-x: hidden;
+            }
 
-    width: auto;
-    height: auto;
-
-    box-sizing: border-box;
-    padding: 10px;
-
-    background: #f2f2f7;
-    z-index: 1500;
-
-    transform: translateX(100%);
-    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-
-    overflow-x: hidden;
-}
             body.analysis-active .analysis-container { 
                 transform: translateX(0);
             }
@@ -100,44 +156,63 @@
             }
 
             #analysis-panel {
-                border-radius: 20px 20px 0 0 !important; height: 100%; 
-min-width:0;
+                border-radius: 20px 20px 0 0 !important;
+                height: 100%; 
+                min-width: 0;
             }
             .health-grid {
-                grid-template-columns: 1fr !important; overflow-y: auto !important; 
-min-width:0;
+                grid-template-columns: 1fr !important;
+                overflow-y: auto !important; 
+                min-width: 0;
             }
             .chart-box {
-                min-height: 250px; flex-shrink: 0; 
-min-width:0;
-            }      
+                min-height: 250px;
+                flex-shrink: 0; 
+                min-width: 0;
+            }
 
-    .unit-container-wrapper {
-        margin: 0;
-        -webkit-mask-image: none;
-        mask-image: none;
-    }
+            /* Mobile: unit nav scroll + snap + fade tepi */
+            .glass-header {
+                padding: 0 10px; /* kurangkan padding, bagi ruang scroll */
+            }
 
-    .unit-container {
-        justify-content: flex-start;
-        padding-left: 16px;
-        padding-right: 16px;
-        overflow-x: auto;
-        scroll-behavior: smooth; 
-  }
+            .unit-container-wrapper {
+                flex: 1;
+                overflow: hidden;
+                /* fade tepi kiri kanan */
+                -webkit-mask-image: linear-gradient(to right, transparent 0%, black 30px, black calc(100% - 30px), transparent 100%);
+                mask-image: linear-gradient(to right, transparent 0%, black 30px, black calc(100% - 30px), transparent 100%);
+            }
 
+            .unit-container {
+                flex-wrap: nowrap;           /* jangan wrap — scroll mendatar */
+                justify-content: flex-start;
+                overflow-x: auto;
+                scroll-behavior: smooth;
+                scroll-snap-type: x mandatory;
+                scroll-padding: 0 50%;
+                scrollbar-width: none;
+                padding: 0 16px;
+            }
+
+            .unit-container::-webkit-scrollbar { display: none; }
+
+            /* pseudo-elements untuk centering snap mobile */
+            .unit-container::before,
+            .unit-container::after {
+                display: block;
+                content: "";
+                flex: 0 0 50%;
+            }
+
+            .unit-pill {
+                scroll-snap-align: center;
+            }
         }
 
-        .glass-header { 
-            width: 100%; height: 60px; 
-            background:
-                radial-gradient(circle at top, rgba(255,255,255,.15), transparent 35%),
-                linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%);
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 1px 10px rgba(0,0,0,0.05); z-index: 1000; flex-shrink: 0;
-            position: relative;
-        }
-
+        /* =============================================
+           LAIN-LAIN (sama macam asal)
+        ============================================= */
         .nav-btn {
             position: absolute;
             background: #e5e5ea;
@@ -184,44 +259,6 @@ min-width:0;
             transition: 0.2s;
         }
 
-.unit-container-wrapper {
-    flex: 1;
-display: flex;
-justify-content: center;
-    overflow: hidden;
-    margin: 0 50px;
-    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 55px, black calc(100% - 55px), transparent 100%);
-    mask-image: linear-gradient(to right, transparent 0%, black 55px, black calc(100% - 55px), transparent 100%);
-}
-
-.unit-container { display: flex; gap: 8px; overflow-x: auto; padding: 0 20px;     padding: 0 16px;
-    scroll-snap-type: x mandatory; scrollbar-width: none;
-scroll-padding: 0 50%;}
-
-.unit-container::before,
-.unit-container::after {
-    content: "";
-    flex: 0 0 50%;
-}
-
-        .unit-pill { 
-            padding: 8px 16px;
-scroll-snap-align: center;
-border-radius: 15px;     
-            background: rgba(255,255,255,.2);
-            color: white;
-            border: none; 
-            cursor: pointer; 
-            font-weight: 600; 
-            font-size: 12px; 
-            white-space: nowrap; 
-            transition: 0.3s;
-        }
-        .unit-pill.active { 
-            background: white;
-            color: #0b3d91; 
-        }
-
         .fab { 
             position: fixed; top: 12px; right: 20px; width: 35px; height: 35px; 
             background: var(--ios-blue); color: white; border-radius: 10px;
@@ -256,9 +293,7 @@ border-radius: 15px;
         
     </style>
 
-    
     <link rel="stylesheet" href="style.css">
-
     <script src="auth.js"></script>
     <script src="session.js"></script>
     <script src="sidebar.js" defer></script>
@@ -314,7 +349,7 @@ border-radius: 15px;
                     <div style="display: flex; flex-direction: column; overflow: hidden;">
                         <div style="display:flex; justify-content:space-between; align-items:center; flex-shrink: 0; margin-bottom: 8px;">
                             <h3 style="margin:0; font-size: 16px;">Sections</h3>
-                            <button id="manageBtn"class="manage-btn"onclick="toggleSelector()"><i class="fa fa-cog"></i> Setting</button>
+                            <button id="manageBtn" class="manage-btn" onclick="toggleSelector()"><i class="fa fa-cog"></i> Setting</button>
                         </div>
                         <div id="sectionSelector" style="display:none; background: #f9f9fb; padding: 10px; border-radius: 15px; margin-bottom: 10px; border: 1px dashed #ccc;">
                             <div id="fullSectionList"></div>
@@ -329,9 +364,7 @@ border-radius: 15px;
 <script>
 
     const role = localStorage.getItem("role");
-    const isAdmin =
-    role === "admin" ||
-    role === "@dm1n";
+    const isAdmin = role === "admin" || role === "@dm1n";
     
     const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
     const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
@@ -346,25 +379,19 @@ border-radius: 15px;
 
     window.onload = () => {
         fetchUnits();
-        
         if(!isAdmin){
-        const btn = document.getElementById("manageBtn");
-        if(btn) btn.style.display = "none";
+            const btn = document.getElementById("manageBtn");
+            if(btn) btn.style.display = "none";
         }
     };
 
     function filterContracts() {
         const query = document.getElementById('contractSearch').value.toLowerCase();
         const cards = document.querySelectorAll('.c-card');
-        
         cards.forEach(card => {
             const code = card.querySelector('h4').innerText.toLowerCase();
             const name = card.querySelector('.sub-text').innerText.toLowerCase();
-            if (code.includes(query) || name.includes(query)) {
-                card.style.display = 'block';
-            } else {
-                card.style.display = 'none';
-            }
+            card.style.display = (code.includes(query) || name.includes(query)) ? 'block' : 'none';
         });
     }
 
@@ -384,24 +411,19 @@ border-radius: 15px;
     async function fetchContracts(unitId, btn) {
         document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
         btn.classList.add('active');
-centerActiveUnit(btn);
+        centerActiveUnit(btn);
         document.getElementById('contractSearch').value = '';
-            /* CLOSE CURRENT ANALYSIS */
-    document.body.classList.remove('analysis-active');
-
-    document.getElementById('analysis-panel').style.display = 'none';
-
-    currentContract = null;
-    currentWO = [];
-
-    document.getElementById('panel-title').innerText = 'Analisis';
-    document.getElementById('panel-vendor').innerText = '';
+        document.body.classList.remove('analysis-active');
+        document.getElementById('analysis-panel').style.display = 'none';
+        currentContract = null;
+        currentWO = [];
+        document.getElementById('panel-title').innerText = 'Analisis';
+        document.getElementById('panel-vendor').innerText = '';
         
         try {
             const res = await fetch(`${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}&order=contract_start.asc`, { headers });
             const data = await res.json();
             const list = document.getElementById('contractList');
-
             list.innerHTML = data.map(c => `
                 <div class="c-card" id="card-${c.id}" onclick='selectCard(${c.id}); openAnalysis(${JSON.stringify(c)})'>
                     <h4>${c.contract_code}</h4>
@@ -468,16 +490,12 @@ centerActiveUnit(btn);
                 
                 let totalInterimClaim = 0;
                 currentInterims.forEach(int => {
-                    if (int.claim_breakdown?.[s]) {
-                        totalInterimClaim += (int.claim_breakdown[s].amt || 0);
-                    }
+                    if (int.claim_breakdown?.[s]) totalInterimClaim += (int.claim_breakdown[s].amt || 0);
                 });
 
                 let totalPendingWO = 0;
                 currentWO.forEach(wo => {
-                    if (!wo.interim_no && wo.section_category?.[s]) {
-                        totalPendingWO += (wo.section_category[s].amt || 0);
-                    }
+                    if (!wo.interim_no && wo.section_category?.[s]) totalPendingWO += (wo.section_category[s].amt || 0);
                 });
 
                 const used = totalInterimClaim + totalPendingWO;
@@ -491,17 +509,8 @@ centerActiveUnit(btn);
                 mainContainer.innerHTML += `
                     <div class="section-row">
                         <div style="display:flex; justify-content:space-between; align-items:start;">
-                        <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">
-                        ${s}: ${sections[s].desc || s}
-                        </div>
-                        
-                        ${
-                            isAdmin
-                            ? `<i class="fa fa-times-circle"
-                            style="color:#ccc; cursor:pointer;"
-                            onclick="toggleSection('${s}')"></i>`
-                            : ``
-                        }
+                            <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">${s}: ${sections[s].desc || s}</div>
+                            ${isAdmin ? `<i class="fa fa-times-circle" style="color:#ccc; cursor:pointer;" onclick="toggleSection('${s}')"></i>` : ``}
                         </div>
                         <div class="avg-stats">
                             <div class="avg-item">BUDGET: RM ${budget.toLocaleString()}</div>
@@ -515,7 +524,6 @@ centerActiveUnit(btn);
                             <div class="prog-bar-fill" data-width="${Math.min(100, progressPercent)}%" style="background:${color}"></div>
                         </div>
                     </div>
-
                 `;
             });
 
@@ -550,8 +558,7 @@ centerActiveUnit(btn);
                 return (!wo.interim_no && wo.section_category?.[s]) ? sum + (wo.section_category[s].amt || 0) : sum;
             }, 0);
 
-            const used = interimAmt + pendingWOAmt;
-            actualAvgData.push((used / monthsElapsed).toFixed(2));
+            actualAvgData.push(((interimAmt + pendingWOAmt) / monthsElapsed).toFixed(2));
         });
 
         if (myChart) {
@@ -582,18 +589,8 @@ centerActiveUnit(btn);
         }
     }
 
-    function toggleSelector() {
-        const el = document.getElementById('sectionSelector');
-        el.style.display = el.style.display === 'none' ? 'block' : 'none';
-    }
-
     async function toggleSection(s) {
-
-        
-    if(!isAdmin){
-        alert("Access denied");
-        return;
-    }
+        if(!isAdmin){ alert("Access denied"); return; }
         if(selectedSections.includes(s)) selectedSections = selectedSections.filter(x => x !== s);
         else selectedSections.push(s);
         renderUI();
@@ -603,36 +600,24 @@ centerActiveUnit(btn);
             body: JSON.stringify({ selected_sections: selectedSections })
         });
     }
-    function goToUsage(){
-    if(!currentContract){
-        alert("Please choose a contract");
-        return;
-    }
 
-    const id = currentContract.id;
-    window.location.href = `dashboard-usageschedule.html?id=${id}`;
-}
     function toggleSelector() {
-
-    if(!isAdmin){
-        alert("Access denied");
-        return;
+        if(!isAdmin){ alert("Access denied"); return; }
+        const el = document.getElementById('sectionSelector');
+        el.style.display = el.style.display === 'none' ? 'block' : 'none';
     }
 
-    const el = document.getElementById('sectionSelector');
-    el.style.display =
-        el.style.display === 'none'
-            ? 'block'
-            : 'none';
-}
+    function goToUsage(){
+        if(!currentContract){ alert("Please choose a contract"); return; }
+        window.location.href = `dashboard-usageschedule.html?id=${currentContract.id}`;
+    }
 
-function centerActiveUnit(btn) {
-    btn.scrollIntoView({
-        behavior: "smooth",
-        inline: "center",
-        block: "nearest"
-    });
-}
+    function centerActiveUnit(btn) {
+        /* Mobile: snap scroll. Desktop: tiada kesan (wrapper tak overflow) */
+        if(window.innerWidth <= 768) {
+            btn.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+        }
+    }
 </script>
 </body>
 </html>
