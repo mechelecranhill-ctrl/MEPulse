@@ -618,6 +618,46 @@
             btn.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
         }
     }
+let touchStartX = 0;
+let touchEndX = 0;
+
+const contractSidebar = document.querySelector('.contract-sidebar');
+
+contractSidebar.addEventListener('touchstart', e => {
+    touchStartX = e.changedTouches[0].screenX;
+}, { passive: true });
+
+contractSidebar.addEventListener('touchend', e => {
+    touchEndX = e.changedTouches[0].screenX;
+    handleUnitSwipe();
+}, { passive: true });
+
+function handleUnitSwipe() {
+
+    if(window.innerWidth > 768) return;
+
+    const diff = touchStartX - touchEndX;
+
+    // minimum swipe distance
+    if(Math.abs(diff) < 60) return;
+
+    const units = [...document.querySelectorAll('.unit-pill')];
+    const activeIndex = units.findIndex(btn =>
+        btn.classList.contains('active')
+    );
+
+    if(activeIndex === -1) return;
+
+    // swipe left -> next unit
+    if(diff > 0 && activeIndex < units.length - 1) {
+        units[activeIndex + 1].click();
+    }
+
+    // swipe right -> previous unit
+    if(diff < 0 && activeIndex > 0) {
+        units[activeIndex - 1].click();
+    }
+}
 </script>
 </body>
 </html>
