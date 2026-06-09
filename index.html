@@ -365,7 +365,9 @@ async function loadStaff() {
         staffData = await res.json();
         const jSel = document.getElementById('jawatan');
         jSel.innerHTML = '<option value="">Choose Position</option>';
-        const uniqueJawatan = [...new Set(staffData.map(s => s.jawatan.toUpperCase().trim()))];
+        const uniqueJawatan = [...new Set(
+    staffData.map(s => s.position.toUpperCase().trim())
+)];
         uniqueJawatan.sort((a, b) => (hierarki[a] || 99) - (hierarki[b] || 99));
         uniqueJawatan.forEach(j => {
             const opt = document.createElement('option');
@@ -382,11 +384,13 @@ function filterNames() {
     if (selJ) {
         nSel.disabled = false;
         staffData
-            .filter(s => s.jawatan.toUpperCase().trim() === selJ)
+            .filter(s => s.position.toUpperCase().trim() === selJ)
+.sort((a, b) => a.name.localeCompare(b.name))
             .sort((a, b) => a.nama.localeCompare(b.nama))
             .forEach(s => {
                 const opt = document.createElement('option');
-                opt.value = s.nama; opt.innerText = s.nama.toUpperCase();
+                opt.value = s.name;
+opt.innerText = s.name.toUpperCase();
                 nSel.appendChild(opt);
             });
     } else { nSel.disabled = true; }
@@ -405,24 +409,40 @@ document.getElementById('attendanceForm').onsubmit = async (e) => {
     btn.innerText = "Mengemaskini...";
 
     try {
-        const checkRes = await fetch(`${SB_URL}/rest/v1/attendance?nama=eq.${nama}&tarikh_mula=eq.${t1}`, {
-            headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-        });
+        const checkRes = await fetch(
+`${SB_URL}/rest/v1/attendance?name=eq.${nama}&start_date=eq.${t1}`,
+{
+    headers:{
+        'apikey':SB_KEY,
+        'Authorization':'Bearer '+SB_KEY
+    }
+});
         const existing = await checkRes.json();
 
         if (existing.length > 0) {
             const sahkan = confirm(`REKOD UNTUK ${nama.toUpperCase()} PADA ${t1} SUDAH ADA. GANTI?`);
             if (!sahkan) { btn.disabled = false; btn.innerText = "Hantar Rekod"; return; }
-            await fetch(`${SB_URL}/rest/v1/attendance?nama=eq.${nama}&tarikh_mula=eq.${t1}`, {
-                method: 'DELETE',
-                headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-            });
+            await fetch(
+`${SB_URL}/rest/v1/attendance?name=eq.${nama}&start_date=eq.${t1}`,
+{
+    method:'DELETE',
+    headers:{
+        'apikey':SB_KEY,
+        'Authorization':'Bearer '+SB_KEY
+    }
+});
         }
 
         const res = await fetch(SB_URL + '/rest/v1/attendance', {
             method: 'POST',
             headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nama, jawatan, sebab, tarikh_mula: t1, tarikh_akhir: t2 })
+            body: JSON.stringify({
+    name: nama,
+    position: jawatan,
+    reason: sebab,
+    start_date: t1,
+    end_date: t2
+})
         });
 
         if (res.ok) {
