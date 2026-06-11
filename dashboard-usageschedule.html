@@ -1588,6 +1588,7 @@ return `${hari} ${bulanText} ${tahun}`;
         let sectionUsed = {};
         let totalSalvage = 0;
         let totalPG = 0;
+        let totalTax = 0;
         let timeline = [];
 
         allInterims.forEach(int => {
@@ -1595,12 +1596,14 @@ return `${hari} ${bulanText} ${tahun}`;
             if(intDate > cutoffDate) return;
             const salvage = Number(int.salvage_value || 0);
             const pg = Number(int.performance_guarantee_sum || 0);
+const tax = Number(int.tax || 0);
             totalSalvage += salvage;
             totalPG += pg;
+    totalTax += tax;
             const cat = int.claim_breakdown || {};
             let amt = 0;
             Object.values(cat).forEach(s=>{ amt += Number(s?.amt || s?.amount || s?.value || 0); });
-            timeline.push({ type:'INTERIM', date:int.date_received, amount:amt, salvage:salvage, pg:pg });
+            timeline.push({ type:'INTERIM', date:int.date_received, amount:amt, salvage:salvage, pg:pg, tax:tax });
             Object.keys(cat).forEach(sec => {
                 const val = Number(cat[sec]?.amt || cat[sec]?.amount || cat[sec]?.value || 0);
                 if(!sectionUsed[sec]) sectionUsed[sec] = 0;
@@ -1681,6 +1684,7 @@ return `${hari} ${bulanText} ${tahun}`;
                 bakiKontrak -= t.amount;
                 bakiKontrak += (t.salvage || 0);
                 bakiKontrak += (t.pg || 0);
+bakiKontrak -= (t.tax || 0);
             } else if(t.type === 'WORKORDER'){
                 bakiKontrak -= t.amount;
             }
