@@ -633,6 +633,25 @@ loadContractsToDropdowns();
         centerActiveForm(activeBtn);
             }
     }
+
+function formatCurrencyInput(input) {
+    // Ambil digit sahaja
+    let digits = input.value.replace(/\D/g, '');
+    if (!digits) digits = '0';
+
+    // Tukar kepada nilai sebenar (bahagi 100)
+    let val = parseInt(digits) / 100;
+
+    // Paparan formatted
+    input.value = val.toLocaleString('en-MY', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+
+    // Simpan nilai sebenar dalam dataset untuk hantar ke DB
+    input.dataset.rawValue = val.toFixed(2);
+}
+
     function setupFormListeners() {
  
         // Contract Form
@@ -740,13 +759,13 @@ let additionalTotal = 0;
 
 document.querySelectorAll('.w_sec_amt').forEach(i => {
 
-    const base = parseFloat(i.value) || 0;
+    const base = parseFloat(i.dataset.rawValue || 0);
 
-    const extraInput = document.querySelector(
-        `.w_sec_extra[data-sec="${i.dataset.sec}"]`
-    );
+const extraInput = document.querySelector(
+    `.w_sec_extra[data-sec="${i.dataset.sec}"]`
+);
 
-    const extra = parseFloat(extraInput?.value) || 0;
+const extra = parseFloat(extraInput?.dataset.rawValue || 0);
 
     // section_category hanya simpan amt
     breakdown[i.dataset.sec] = {
@@ -973,20 +992,18 @@ container.innerHTML += `
 <label>${sec}</label>
 <span class="sec-desc">${b[sec].desc}</span>
 
-<input type="number"
+<input type="text"
 class="w_sec_amt"
 data-sec="${sec}"
-placeholder="Cost"
-oninput="calcTotalWork()"
-step="0.01">
+placeholder="0.00"
+oninput="formatCurrencyInput(this); calcTotalWork()">
 
 ${isProvisional ? `
-<input type="number"
+<input type="text"
 class="w_sec_extra"
 data-sec="${sec}"
-placeholder="Additional Cost"
-oninput="calcTotalWork()"
-step="0.01">
+placeholder="0.00"
+oninput="formatCurrencyInput(this); calcTotalWork()">
 ` : ``}
 
 </div>
@@ -1029,11 +1046,10 @@ step="0.01">
 let total = 0;
 
 document.querySelectorAll('.w_sec_amt').forEach(i=>{
-    total += parseFloat(i.value) || 0;
+    total += parseFloat(i.dataset.rawValue || 0);
 });
-
 document.querySelectorAll('.w_sec_extra').forEach(i=>{
-    total += parseFloat(i.value) || 0;
+    total += parseFloat(i.dataset.rawValue || 0);
 });
 
 document.getElementById('total_display').innerText =
@@ -1089,12 +1105,11 @@ ${sec}
 ${sections[sec].desc || ''}
 </span>
 
-<input type="number"
+<input type="text"
 class="i_sec_claim_val"
 data-sec="${sec}"
-placeholder="RM 0.00"
-step="0.01"
-oninput="calcInterimManualTotal()">
+placeholder="0.00"
+oninput="formatCurrencyInput(this); calcInterimManualTotal()">
 
 </div>
 `;
@@ -1129,8 +1144,8 @@ document.getElementById('i_tax_amount').value = 0;
 attachedWorkOrders = [];
 renderIDTags();
 
-document.querySelectorAll('.i_sec_claim_val').forEach(i=>{
-i.value = '';
+document.querySelectorAll('.i_sec_claim_val').forEach(input => {
+    total += parseFloat(input.dataset.rawValue || 0);
 });
 
 calcInterimManualTotal();
@@ -1234,7 +1249,7 @@ let total = 0;
 const breakdown = {};
 
 document.querySelectorAll('.i_sec_claim_val').forEach(i=>{
-    const val = parseFloat(i.value) || 0;
+    const val = parseFloat(i.dataset.rawValue || 0);
 
     if(val > 0){
         breakdown[i.dataset.sec] = { amt: val };
