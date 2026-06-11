@@ -408,25 +408,50 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
 
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
 
-            <div>
-                <label>Salvage Value (RM)</label>
-                <input type="number"
-                       id="i_salvage"
-                       value="0"
-                       step="0.01"
-                       oninput="calcInterimManualTotal()">
-            </div>
+    <div>
+        <label>Salvage Value (RM)</label>
+        <input type="number"
+               id="i_salvage"
+               value="0"
+               step="0.01"
+               oninput="calcInterimManualTotal()">
+    </div>
 
-            <div>
-                <label>Performance Guarantee (RM)</label>
-                <input type="number"
-                       id="i_pg_sum"
-                       value="0"
-                       step="0.01"
-                       oninput="calcInterimManualTotal()">
-            </div>
+    <div>
+        <label>Performance Guarantee (RM)</label>
+        <input type="number"
+               id="i_pg_sum"
+               value="0"
+               step="0.01"
+               oninput="calcInterimManualTotal()">
+    </div>
 
-        </div>
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">
+
+    <div>
+        <label>Tax Rate (%)</label>
+        <input type="number"
+               id="i_tax_rate"
+               value="0"
+               step="1"
+               placeholder="Example: 6"
+               oninput="calcInterimManualTotal()">
+    </div>
+
+    <div>
+        <label>Tax Amount (RM)</label>
+        <input type="number"
+               id="i_tax_amount"
+               value="0"
+               step="0.01"
+               readonly
+               style="background:rgba(0,0,0,0.05); color:#555; cursor:not-allowed;">
+    </div>
+
+</div>
+
 
         <div id="i_section_inputs_container"
              style="margin-top:15px;
@@ -961,7 +986,7 @@ container.innerHTML += `
 <input type="number"
 class="w_sec_amt"
 data-sec="${sec}"
-placeholder="Work Cost"
+placeholder="Cost"
 oninput="calcTotalWork()"
 step="0.01">
 
@@ -1108,6 +1133,9 @@ document.getElementById('i_no').value = '';
 document.getElementById('i_date_received').value = '';
 document.getElementById('i_salvage').value = 0;
 document.getElementById('i_pg_sum').value = 0;
+document.getElementById('i_tax_rate').value = 0;
+document.getElementById('i_tax_amount').value = 0;
+
 
 attachedWorkOrders = [];
 renderIDTags();
@@ -1160,33 +1188,49 @@ function addWorkOrdersToList() {
 
     function calcInterimManualTotal() {
 
-let total = 0;
+    let total = 0;
 
-document.querySelectorAll('.i_sec_claim_val').forEach(input => {
-    total += parseFloat(input.value) || 0;
-});
+    document.querySelectorAll('.i_sec_claim_val').forEach(input => {
+        total += parseFloat(input.value) || 0;
+    });
 
-const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
-const pg = parseFloat(document.getElementById('i_pg_sum').value) || 0;
+    const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
+    const pg = parseFloat(document.getElementById('i_pg_sum').value) || 0;
+    const taxRate = parseFloat(document.getElementById('i_tax_rate').value) || 0;
 
-const net = total - salvage - pg;
+    // Kira amaun cukai berdasarkan (Total - Salvage - PG) atau terus dari Total mengikut polisi syarikat anda.
+    // Di sini dikira daripada baki selepas ditolak salvage & pg:
+    const baseForTax = total - salvage - pg;
+    const taxAmount = baseForTax > 0 ? (baseForTax * (taxRate / 100)) : 0;
+    
+    // Set nilai paparan input Tax Amount (Read-only)
+    document.getElementById('i_tax_amount').value = taxAmount.toFixed(2);
 
-document.getElementById('i_total_display').innerHTML = `
-<span style="font-size:12px; color:#666;">Total Claims</span><br>
-<span style="font-size:20px; color:var(--ios-orange); font-weight:800;">
-RM ${total.toLocaleString(undefined,{minimumFractionDigits:2})}
-</span>
+    // Kira jumlah bersih akhir (Nett)
+    const net = baseForTax + taxAmount;
 
-<br><br>
+    document.getElementById('i_total_display').innerHTML = `
+        <span style="font-size:12px; color:#666;">Total Claims</span><br>
+        <span style="font-size:20px; color:var(--ios-orange); font-weight:800;">
+        RM ${total.toLocaleString(undefined,{minimumFractionDigits:2})}
+        </span>
 
-<span style="font-size:12px; color:#666;">Nett Claims After Subtraction</span><br>
-<span style="font-size:20px; color:var(--ios-blue); font-weight:800;">
-RM ${net.toLocaleString(undefined,{minimumFractionDigits:2})}
-</span>
-`;
+        <br><br>
 
-return total;
+        <span style="font-size:12px; color:#666;">Tax Amount (${taxRate}%)</span><br>
+        <span style="font-size:16px; color:#555; font-weight:600;">
+        RM ${taxAmount.toLocaleString(undefined,{minimumFractionDigits:2})}
+        </span>
 
+        <br><br>
+
+        <span style="font-size:12px; color:#666;">Nett Claims After Subtraction & Tax</span><br>
+        <span style="font-size:20px; color:var(--ios-blue); font-weight:800;">
+        RM ${net.toLocaleString(undefined,{minimumFractionDigits:2})}
+        </span>
+    `;
+
+    return total;
 }
 
 async function submitInterim(){
