@@ -520,7 +520,12 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
                     <label>Unit</label>
                     <select id="c_unit_id" required></select>
                     <label>Kod Kontrak</label>
-                    <input type="text" id="c_code" placeholder="Cth: RSAJ/KP/T/57/2024" required>
+                    <input type="text"
+id="c_code"
+placeholder="RSAJ/KP/T/57/2024"
+required
+oninput="autoDetectContract()">
+
                     <label>Tajuk Kontrak</label>
                     <textarea id="c_name" placeholder="Tajuk Kontrak" required></textarea>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -578,6 +583,8 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
 
     let attachedWorkOrders = []; 
     let currentInterimId = null;
+let currentContractId = null;
+let contractDetectTimer = null;
 
     function initApp() {
 
@@ -638,10 +645,35 @@ insurance_no: document.getElementById('c_insurance_no').value,
                 contract_sections_breakdown: sections,
                 contract_sum: calculateContractSum()
             };
-            const res = await fetch(`${SB_URL}/rest/v1/contract`, { method: 'POST', headers, body: JSON.stringify(payload) });
+            let res;
+
+if(currentContractId){
+
+res = await fetch(
+`${SB_URL}/rest/v1/contract?id=eq.${currentContractId}`,
+{
+method:'PATCH',
+headers,
+body: JSON.stringify(payload)
+});
+
+}else{
+
+res = await fetch(
+`${SB_URL}/rest/v1/contract`,
+{
+method:'POST',
+headers,
+body: JSON.stringify(payload)
+});
+
+}
             if (res.ok) { 
-    alert("Kontrak berjaya didaftar!"); 
-    location.reload(); 
+    alert(
+currentContractId
+? "Kontrak berjaya dikemaskini!"
+: "Kontrak berjaya didaftar!"
+); 
 }
         });
 
@@ -1087,6 +1119,7 @@ i.value = '';
 calcInterimManualTotal();
 
 }
+
 function addWorkOrdersToList() {
 
     const area = document.getElementById('i_paste_area');
@@ -1155,6 +1188,7 @@ RM ${net.toLocaleString(undefined,{minimumFractionDigits:2})}
 return total;
 
 }
+
 async function submitInterim(){
 
 const cId = document.getElementById('i_contract_id').value;
@@ -1543,6 +1577,157 @@ console.error(e);
 }
 
 },500);
+
+}
+
+function autoDetectContract(){
+
+clearTimeout(contractDetectTimer);
+
+contractDetectTimer = setTimeout(async ()=>{
+
+const code =
+document.getElementById('c_code').value.trim();
+
+if(!code){
+
+currentContractId = null;
+
+document.querySelector('#contractForm button[type="submit"]')
+.innerHTML = 'Daftar Kontrak';
+
+return;
+}
+
+try{
+
+const res = await fetch(
+`${SB_URL}/rest/v1/contract?contract_code=eq.${encodeURIComponent(code)}&select=*`,
+{ headers }
+);
+
+const data = await res.json();
+
+if(data.length === 0){
+
+currentContractId = null;
+
+document.querySelector('#contractForm button[type="submit"]')
+.innerHTML = 'Daftar Kontrak';
+
+return;
+}
+
+const c = data[0];
+
+currentContractId = c.id;
+
+document.getElementById('c_unit_id').value =
+c.unit_id || '';
+
+document.getElementById('c_name').value =
+c.contract_name || '';
+
+document.getElementById('c_start').value =
+c.contract_start || '';
+
+document.getElementById('c_end').value =
+c.contract_end || '';
+
+document.getElementById('c_contractor').value =
+c.contractor || '';
+
+document.getElementById('c_insurance_no').value =
+c.insurance_no || '';
+
+document.getElementById('c_pg_total').value =
+c.performance_guarantee_total || 0;
+
+document.getElementById('c_dist').value =
+c.district || '';
+
+document.getElementById('c_area').value =
+c.area_code || '';
+
+loadContractSections(
+c.contract_sections_breakdown || {}
+);
+
+document.querySelector('#contractForm button[type="submit"]')
+.innerHTML = 'Update Kontrak';
+
+console.log("Existing Contract Loaded");
+
+}catch(e){
+
+console.error(e);
+
+}
+
+},500);
+
+}
+
+function loadContractSections(sections){
+
+const container =
+document.getElementById('b_inputs');
+
+container.innerHTML = '';
+
+Object.keys(sections).forEach(sec=>{
+
+const item = sections[sec];
+
+container.innerHTML += `
+<div class="sec-input-wrapper"
+style="
+background:rgba(255,255,255,0.2);
+padding:10px;
+border-radius:10px;
+margin-bottom:5px;
+position:relative;
+">
+
+<div onclick="
+this.parentElement.remove();
+reIndexSections();
+calculateContractSum();
+"
+style="
+position:absolute;
+right:10px;
+top:10px;
+color:red;
+cursor:pointer;
+">
+✕
+</div>
+
+<strong class="sec-label">${sec}</strong>
+
+<input type="text"
+class="b_n"
+value="${sec}"
+hidden>
+
+<input type="text"
+class="b_d"
+value="${item.desc || ''}"
+placeholder="Keterangan">
+
+<input type="number"
+class="b_v"
+value="${item.amt || 0}"
+step="0.01"
+oninput="calculateContractSum()">
+
+</div>
+`;
+
+});
+
+calculateContractSum();
 
 }
     function centerActiveForm(btn) {
