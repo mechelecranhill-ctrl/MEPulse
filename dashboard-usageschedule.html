@@ -1096,7 +1096,6 @@
     }
 });
 
-    // --- TEMPLATE MANAGER LOGIC ---
     async function openTemplate() {
     const id = currentContractId;
     if(!id){ alert("Tiada kontrak dipilih."); return; }
@@ -1105,7 +1104,7 @@
     const data = await res.json();
     const contract = data[0];
     const sections = contract.contract_sections_breakdown || {};
-    const saved = contract.selected_sections || {};
+    const saved = contract.selected_sections || [];
     const savedPrefix = contract.reference || 'RSAJ/M&E/IP/11-';
 
     document.getElementById('refPrefixInput').value = savedPrefix;
@@ -1115,19 +1114,19 @@
 
     Object.keys(sections).forEach(key => {
         const desc = sections[key]?.desc || '';
-        const label = saved[key]?.label || desc;
-        const active = saved[key]?.active ?? true;
+        const active = Array.isArray(saved) ? saved.includes(key) : (saved[key]?.active ?? true);
 
         const div = document.createElement('div');
         div.className = 'modal-row';
         div.innerHTML = `
             <span style="font-size:12px;font-weight:700;">${key} — ${desc}</span>
-            <span style="font-size:12px;color:#555;">${label}</span>
+            <span style="font-size:12px;color:#555;">${desc}</span>
             <span style="font-size:12px;">${active ? '✅' : '❌'}</span>
         `;
         container.appendChild(div);
     });
- document.getElementById('templateModal').style.display = 'flex';
+
+    document.getElementById('templateModal').style.display = 'flex';
 }
 
 async function saveTemplate() {
@@ -1666,7 +1665,8 @@ bakiKontrak -= (t.tax || 0);
         const refPrefix = c.reference || 'RSAJ/M&E/IP/11-';
         let formattedRef = seq.replace(/([A-Z]{2,4}\d+)$/i, ' - $1');
         const unitName = (c.units?.unit_name || '').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
-        const tpl = c.selected_sections || {};
+        const tpl = contract.selected_sections || [];
+const active = Array.isArray(tpl) ? tpl.includes(key) : (tpl[key]?.active ?? true);
 
         let dynamicHtml = '';
         let currentRow = 6;
