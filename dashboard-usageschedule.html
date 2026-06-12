@@ -892,13 +892,7 @@
                     value="RSAJ/M&E/IP/11-"
                     style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; font-size:12px;">
             </div>     
-            <p style="font-size: 11px; color: #666;">Tambah label paparan dan key yang sepadan dengan JSON dalam database.</p>   
-            <div style="display: grid; grid-template-columns: 1fr 1fr 40px; gap: 10px; font-weight: bold; margin-bottom: 10px; font-size: 12px;">
-                <span>Section (Auto)</span>
-                <span>Label Borang</span>
-                <span></span> 
-            </div>
-
+            
             <div id="dynamicRowsContainer"></div>
 
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
@@ -1037,12 +1031,7 @@
     let areaPriority = {};
     let currentTableData = [];
     let currentContractId = null;
-    let bfSections = JSON.parse(localStorage.getItem('bf_sections_v2')) || {
-        "LABOUR CHARGES": { label: "Labour Charges", active: true },
-        "SUPPLY SPARE PART": { label: "Supply Spare Part", active: true },
-        "PROVISIONAL SUM": { label: "Provisional Sum", active: true }
-    };
-
+    
     window.onload = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const contractId = urlParams.get('id');
@@ -1109,74 +1098,52 @@
 
     // --- TEMPLATE MANAGER LOGIC ---
     async function openTemplate() {
-
     const id = currentContractId;
+    if(!id){ alert("Tiada kontrak dipilih."); return; }
 
-if(!id){
-    alert("Tiada kontrak dipilih.");
-    return;
-}
     const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, { headers });
     const data = await res.json();
     const contract = data[0];
     const sections = contract.contract_sections_breakdown || {};
-        const saved = JSON.parse(localStorage.getItem(`bf_sections_${id}`) || '{}');
-    const container = document.getElementById('dynamicRowsContainer');
+    const saved = contract.selected_sections || {};
     const savedPrefix = contract.reference || 'RSAJ/M&E/IP/11-';
-        document.getElementById('refPrefixInput').value = savedPrefix;
-    container.innerHTML = '';
-    Object.keys(sections).forEach(key => {
-    const desc = sections[key]?.desc || '';
-    const display = `${key} — ${desc}`;
-    const label = saved[key]?.label || desc;
-    const active = saved[key]?.active ?? true;
-    addTemplateRow(display, label, active, key);
-    });
-    document.getElementById('templateModal').style.display = 'flex';
-}
-    function addTemplateRow(display, label, active, realKey) {
-    const container = document.getElementById('dynamicRowsContainer');
-    const div = document.createElement('div');
-    div.className = 'modal-row';
-    div.innerHTML = `
-<input type="text" value="${display}" readonly style="background:#f5f5f5;font-weight:bold;">
-<input type="text" class="tpl-label" value="${label}" placeholder="Label untuk borang (optional)">
-<label style="display:flex;align-items:center;font-size:11px;">
-<input type="checkbox" class="tpl-active" ${active ? 'checked' : ''}>
-</label>
-`;
-        div.dataset.key = realKey;
-        container.appendChild(div);
-} 
-    async function saveTemplate() {
-        const rows = document.querySelectorAll('#dynamicRowsContainer .modal-row');
-        let obj = {};        
-        rows.forEach(r => {
-            const key = r.dataset.key;
-            const label = r.querySelector('.tpl-label').value;
-            const active = r.querySelector('.tpl-active').checked;
-    obj[key] = {
-        label: label || key,
-        active: active
-    };
 
-});
-        const id = currentContractId;
-        /* simpan template section */
-        localStorage.setItem(`bf_sections_${id}`, JSON.stringify(obj));        
-        /* ambil prefix */
-        const prefix = document.getElementById('refPrefixInput').value;
-        /* hantar ke database contract.reference */
-        await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, {
-            method:'PATCH',
-            headers,
-            body: JSON.stringify({  
-                reference: prefix
-            })
-        });
-        alert("Template berjaya disimpan!");        
-        closeTemplate();       
-    }
+    document.getElementById('refPrefixInput').value = savedPrefix;
+
+    const container = document.getElementById('dynamicRowsContainer');
+    container.innerHTML = '';
+
+    Object.keys(sections).forEach(key => {
+        const desc = sections[key]?.desc || '';
+        const label = saved[key]?.label || desc;
+        const active = saved[key]?.active ?? true;
+
+        const div = document.createElement('div');
+        div.className = 'modal-row';
+        div.innerHTML = `
+            <span style="font-size:12px;font-weight:700;">${key} — ${desc}</span>
+            <span style="font-size:12px;color:#555;">${label}</span>
+            <span style="font-size:12px;">${active ? '✅' : '❌'}</span>
+        `;
+        container.appendChild(div);
+    });
+ document.getElementById('templateModal').style.display = 'flex';
+}
+
+async function saveTemplate() {
+    const id = currentContractId;
+    const prefix = document.getElementById('refPrefixInput').value;
+
+    await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ reference: prefix })
+    });
+
+    alert("Prefix berjaya disimpan!");
+    closeTemplate();
+}
+    
     function closeTemplate() { document.getElementById('templateModal').style.display = 'none'; }
     // ============================
     // SORT WORK ORDER BY AREA + SEQUENCE
@@ -1699,7 +1666,7 @@ bakiKontrak -= (t.tax || 0);
         const refPrefix = c.reference || 'RSAJ/M&E/IP/11-';
         let formattedRef = seq.replace(/([A-Z]{2,4}\d+)$/i, ' - $1');
         const unitName = (c.units?.unit_name || '').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
-        const tpl = JSON.parse(localStorage.getItem(`bf_sections_${c.id}`) || '{}');
+        const tpl = c.selected_sections || {};
 
         let dynamicHtml = '';
         let currentRow = 6;
