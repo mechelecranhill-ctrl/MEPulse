@@ -758,6 +758,16 @@ body: JSON.stringify(payload)
 }
             if (res.ok) {
 
+if(currentContractId){
+
+    await updateWorkOrderSequenceNumbers(
+        currentContractId,
+        document.getElementById('c_dist').value,
+        document.getElementById('c_area').value
+    );
+
+}
+
 alert(
 currentContractId
 ? "Kontrak berjaya dikemaskini!"
@@ -2066,6 +2076,79 @@ calculateContractSum();
 });
 
 calculateContractSum();
+
+}
+
+async function updateWorkOrderSequenceNumbers(
+    contractId,
+    districtText,
+    areaText
+){
+
+    const districts = districtText
+        .split(',')
+        .map(x => x.trim().toUpperCase());
+
+    const areas = areaText
+        .split(',')
+        .map(x => x.trim().toUpperCase());
+
+    const res = await fetch(
+        `${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&select=*`,
+        { headers }
+    );
+
+    const works = await res.json();
+
+    for(const district of districts){
+
+        const districtWorks = works
+            .filter(w =>
+                (w.district || '').trim().toUpperCase()
+                === district
+            )
+            .sort((a,b)=>{
+
+                const aNum =
+                    parseInt(
+                        (a.sequence_no || '')
+                        .replace(/\D/g,'')
+                    ) || 0;
+
+                const bNum =
+                    parseInt(
+                        (b.sequence_no || '')
+                        .replace(/\D/g,'')
+                    ) || 0;
+
+                return aNum - bNum;
+            });
+
+        const index = districts.indexOf(district);
+
+        const areaCode =
+            areas[index] || 'WO';
+
+        for(let i=0;i<districtWorks.length;i++){
+
+            const newSeq =
+                areaCode +
+                String(i + 1).padStart(3,'0');
+
+            await fetch(
+                `${SB_URL}/rest/v1/work_orders?id=eq.${districtWorks[i].id}`,
+                {
+                    method:'PATCH',
+                    headers,
+                    body: JSON.stringify({
+                        sequence_no:newSeq
+                    })
+                }
+            );
+
+        }
+
+    }
 
 }
     function centerActiveForm(btn) {
