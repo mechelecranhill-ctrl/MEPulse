@@ -676,7 +676,6 @@ function formatCurrencyInput(input) {
         w.querySelector('.b_v').dataset.rawValue || 0
     ),
     desc: w.querySelector('.b_d').value
-};
                 };
             });
             const payload = {
@@ -784,8 +783,9 @@ const extra = parseFloat(extraInput?.dataset.rawValue || 0);
 
     // section_category hanya simpan amt
     breakdown[i.dataset.sec] = {
-        amt: base
-    };
+    amt: base,
+    extra: extra
+};
 
     totalAmount += base;
     additionalTotal += extra;
@@ -1052,24 +1052,61 @@ oninput="formatCurrencyInput(this); calcTotalWork()">
 }
 
     function addB() {
-        const container = document.getElementById('b_inputs');
-        const nextLetter = String.fromCharCode(65 + container.querySelectorAll('.sec-input-wrapper').length);
-        const name = `SECTION ${nextLetter}`;
-        const d = document.createElement('div'); 
-        d.className = "sec-input-wrapper"; d.style = "background:rgba(255,255,255,0.2); padding:10px; border-radius:10px; margin-bottom:5px; position:relative;";
-        d.innerHTML = `<div onclick="this.parentElement.remove(); reIndexSections(); calculateContractSum();" style="position:absolute; right:10px; top:10px; color:red; cursor:pointer;">✕</div>
-            <strong class="sec-label">${name}</strong><input type="text" class="b_n" value="${name}" hidden>
-            <input type="text" class="b_d" placeholder="Description" required><input type="text"
-class="b_v"
-value="${Number(item.amt || 0).toLocaleString('en-MY',{
-    minimumFractionDigits:2,
-    maximumFractionDigits:2
-})}"
-data-raw-value="${item.amt || 0}"
-oninput="formatCurrencyInput(this); calculateContractSum()">
-        container.appendChild(d);
-    }
 
+    const container = document.getElementById('b_inputs');
+
+    const nextLetter =
+        String.fromCharCode(
+            65 + container.querySelectorAll('.sec-input-wrapper').length
+        );
+
+    const name = `SECTION ${nextLetter}`;
+
+    const d = document.createElement('div');
+
+    d.className = "sec-input-wrapper";
+
+    d.style =
+        "background:rgba(255,255,255,0.2); padding:10px; border-radius:10px; margin-bottom:5px; position:relative;";
+
+    d.innerHTML = `
+        <div onclick="
+            this.parentElement.remove();
+            reIndexSections();
+            calculateContractSum();
+        "
+        style="
+            position:absolute;
+            right:10px;
+            top:10px;
+            color:red;
+            cursor:pointer;
+        ">✕</div>
+
+        <strong class="sec-label">${name}</strong>
+
+        <input type="text"
+               class="b_n"
+               value="${name}"
+               hidden>
+
+        <input type="text"
+               class="b_d"
+               placeholder="Description"
+               required>
+
+        <input type="text"
+               class="b_v"
+               data-raw-value="0"
+               value="0.00"
+               oninput="
+                    formatCurrencyInput(this);
+                    calculateContractSum();
+               ">
+    `;
+
+    container.appendChild(d);
+}
     function reIndexSections() {
         document.querySelectorAll('.sec-input-wrapper').forEach((w, i) => {
             const name = `SECTION ${String.fromCharCode(65 + i)}`;
@@ -1816,7 +1853,11 @@ placeholder="Description">
 
 <input type="text"
 class="b_v"
-placeholder="0.00"
+data-raw-value="${item.amt || 0}"
+value="${Number(item.amt || 0).toLocaleString('en-MY',{
+    minimumFractionDigits:2,
+    maximumFractionDigits:2
+})}"
 required
 oninput="
 formatCurrencyInput(this);
