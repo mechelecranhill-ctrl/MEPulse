@@ -748,13 +748,18 @@ body: JSON.stringify(payload)
 });
 
 }
-            if (res.ok) { 
-    alert(
+            if (res.ok) {
+
+alert(
 currentContractId
 ? "Kontrak berjaya dikemaskini!"
 : "Kontrak berjaya didaftar!"
-); 
+);
+
+location.reload();
+
 }
+
         });
 
         // Work Order Form
@@ -1179,16 +1184,18 @@ document.getElementById('total_display').innerText =
 
     function normalizeWorkId(raw){
 
+raw = (raw || '').trim().toUpperCase();
+
+const match = raw.match(/^([CK])?\s*(\d+)$/);
+
+if(!match) return '';
+
 const prefix =
-document.getElementById('w_id_prefix')?.value || 'C';
+match[1] ||
+document.getElementById('w_id_prefix')?.value ||
+'C';
 
-const num =
-(raw || '')
-.replace(/\D/g,'');
-
-if(!num) return '';
-
-return `${prefix} ${num}`;
+return `${prefix} ${match[2]}`;
 
 }
 
@@ -1590,10 +1597,10 @@ amt += value;
 }
 
 });
-            const targetSec = document.getElementById('vo_target_sec').value;
-
             if(!cId) return alert("Sila pilih kontrak!");
-            if(!voName || isNaN(amt) || !targetSec) return alert("Sila isi Nama VO, Section dan Amaun!");
+            if(!voName || isNaN(amt)){
+    return alert("Sila isi Nama VO dan Amaun!");
+}
 
             // 1. Ambil data kontrak terkini
             const resGet = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { headers });
@@ -1906,6 +1913,19 @@ if(data.length === 0){
 
 currentContractId = null;
 
+document.getElementById('c_name').value = '';
+document.getElementById('c_start').value = '';
+document.getElementById('c_end').value = '';
+document.getElementById('c_contractor').value = '';
+document.getElementById('c_insurance_no').value = '';
+document.getElementById('c_pg_total').value = '';
+
+document.querySelector('#contractForm button[type="submit"]')
+.innerHTML = 'Register Contract';
+
+return;
+}
+
 document.querySelector('#contractForm button[type="submit"]')
 .innerHTML = 'Register Contract';
 
@@ -1963,6 +1983,10 @@ console.error(e);
 }
 
 function loadContractSections(sections){
+
+if(!sections){
+    sections = {};
+}
 
 const container =
 document.getElementById('b_inputs');
