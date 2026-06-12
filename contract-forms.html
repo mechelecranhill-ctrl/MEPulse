@@ -586,7 +586,7 @@ oninput="autoDetectContract()">
                             <strong class="sec-label">SECTION A</strong>
                             <input type="text" class="b_n" value="SECTION A" hidden>
                             <input type="text" class="b_d" placeholder="Description" required>
-                            <input <input type="text"
+                            <input type="text"
 class="b_v"
 placeholder="0.00"
 required
@@ -672,8 +672,11 @@ function formatCurrencyInput(input) {
             const sections = {};
             document.querySelectorAll('.sec-input-wrapper').forEach(w => {
                 sections[w.querySelector('.b_n').value] = {
-                    amt: parseFloat(w.querySelector('.b_v').value) || 0,
-                    desc: w.querySelector('.b_d').value
+    amt: parseFloat(
+        w.querySelector('.b_v').dataset.rawValue || 0
+    ),
+    desc: w.querySelector('.b_d').value
+};
                 };
             });
             const payload = {
@@ -1028,11 +1031,25 @@ oninput="formatCurrencyInput(this); calcTotalWork()">
 }
 
     function calculateContractSum() {
-        let total = 0;
-        document.querySelectorAll('.b_v').forEach(input => total += parseFloat(input.value) || 0);
-        document.getElementById('c_sum_display').innerText = `RM ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
-        return total;
-    }
+
+    let total = 0;
+
+    document.querySelectorAll('.b_v').forEach(input => {
+
+        total += parseFloat(
+            input.dataset.rawValue || 0
+        );
+
+    });
+
+    document.getElementById('c_sum_display').innerText =
+        `RM ${total.toLocaleString('en-MY',{
+            minimumFractionDigits:2,
+            maximumFractionDigits:2
+        })}`;
+
+    return total;
+}
 
     function addB() {
         const container = document.getElementById('b_inputs');
@@ -1042,7 +1059,14 @@ oninput="formatCurrencyInput(this); calcTotalWork()">
         d.className = "sec-input-wrapper"; d.style = "background:rgba(255,255,255,0.2); padding:10px; border-radius:10px; margin-bottom:5px; position:relative;";
         d.innerHTML = `<div onclick="this.parentElement.remove(); reIndexSections(); calculateContractSum();" style="position:absolute; right:10px; top:10px; color:red; cursor:pointer;">✕</div>
             <strong class="sec-label">${name}</strong><input type="text" class="b_n" value="${name}" hidden>
-            <input type="text" class="b_d" placeholder="Description" required><input type="number" class="b_v" placeholder="Total Value (RM)" step="0.01" required oninput="calculateContractSum()">`;
+            <input type="text" class="b_d" placeholder="Description" required><input type="text"
+class="b_v"
+value="${Number(item.amt || 0).toLocaleString('en-MY',{
+    minimumFractionDigits:2,
+    maximumFractionDigits:2
+})}"
+data-raw-value="${item.amt || 0}"
+oninput="formatCurrencyInput(this); calculateContractSum()">
         container.appendChild(d);
     }
 
@@ -1501,8 +1525,19 @@ if(amt){
     amt.value = Number(amt.dataset.rawValue).toLocaleString('en-MY', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 if(extra){
-    extra.dataset.rawValue = '0';
-    extra.value = '0.00';
+
+    const extraVal =
+        w.section_category?.[sec]?.extra || 0;
+
+    extra.dataset.rawValue = extraVal;
+
+    extra.value = Number(extraVal).toLocaleString(
+        'en-MY',
+        {
+            minimumFractionDigits:2,
+            maximumFractionDigits:2
+        }
+    );
 }
 
 });
@@ -1779,11 +1814,14 @@ class="b_d"
 value="${item.desc || ''}"
 placeholder="Description">
 
-<input type="number"
+<input type="text"
 class="b_v"
-value="${item.amt || 0}"
-step="0.01"
-oninput="calculateContractSum()">
+placeholder="0.00"
+required
+oninput="
+formatCurrencyInput(this);
+calculateContractSum();
+">
 
 </div>
 `;
