@@ -523,13 +523,33 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
                 <select id="vo_contract_id" onchange="onVOContractSelect()" required><option value="">Choose Contract</option></select>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div><label>VO Name</label><input type="text" id="vo_name" placeholder="Example: PPJHK NO. 1" required></div>
-                    <label>Cost Breakdown Section</label>
-<select id="vo_target_sec" required>
-    <option value="">Choose Contract First</option>
-</select>
-                </div>
-                <label>VO Value (RM)</label>
-                <input type="text" id="vo_amt" placeholder="0.00" required oninput="formatCurrencyInput(this)">
+                    <label>Cost Breakdown</label>
+
+<div id="vo_sections_container"
+     class="funding-grid">
+</div>
+
+<div style="
+margin-top:15px;
+padding:10px;
+background:rgba(255,59,48,0.08);
+border-radius:12px;
+display:flex;
+justify-content:space-between;
+">
+
+<strong>Total VO:</strong>
+
+<span id="vo_total_display"
+      style="
+      color:var(--ios-red);
+      font-weight:800;
+      ">
+RM 0.00
+</span>
+
+</div>
+
                 <label>Description</label>
                 <textarea id="vo_desc" rows="3" placeholder="Description"></textarea>
                 <button onclick="submitVO()" class="btn-primary" style="background:var(--ios-red);">Submit Variation Order</button>
@@ -1452,33 +1472,112 @@ alert(err);
 
 }
 
-    // --- VO LOGIC ---
-    function onVOContractSelect() {
-        const opt = document.getElementById('vo_contract_id').selectedOptions[0];
-        const sSec = document.getElementById('vo_target_sec');
-        
-        // Reset dropdown section
-        sSec.innerHTML = '<option value="">Choose Section</option>';
-        
-        if(opt && opt.dataset.b) {
-            try {
-                const sections = JSON.parse(opt.dataset.b);
-                Object.keys(sections).sort().forEach(sec => {
-                    sSec.innerHTML += `<option value="${sec}">${sec}</option>`;
-                });
-            } catch (e) {
-                console.error("Ralat parsing JSON:", e);
-            }
-        }
-    }
+    function onVOContractSelect(){
+
+const opt =
+document.getElementById('vo_contract_id')
+.selectedOptions[0];
+
+const container =
+document.getElementById('vo_sections_container');
+
+container.innerHTML = '';
+
+if(!opt || !opt.dataset.b) return;
+
+const sections =
+JSON.parse(opt.dataset.b);
+
+Object.keys(sections)
+.sort()
+.forEach(sec=>{
+
+container.innerHTML += `
+<div class="funding-item">
+
+<label>${sec}</label>
+
+<span class="sec-desc">
+${sections[sec].desc || ''}
+</span>
+
+<input
+type="text"
+class="vo_sec_amt"
+data-sec="${sec}"
+placeholder="0.00"
+oninput="
+formatCurrencyInput(this);
+calcVOTotal();
+">
+
+</div>
+`;
+
+});
+
+calcVOTotal();
+
+}
+
+function calcVOTotal(){
+
+let total = 0;
+
+document
+.querySelectorAll('.vo_sec_amt')
+.forEach(i=>{
+
+total +=
+parseFloat(
+i.dataset.rawValue || 0
+);
+
+});
+
+document.getElementById(
+'vo_total_display'
+).innerHTML =
+
+`RM ${total.toLocaleString(
+undefined,
+{
+minimumFractionDigits:2
+}
+)}`;
+
+return total;
+
+}
 
     async function submitVO() {
         try {
             const cId = document.getElementById('vo_contract_id').value;
             const voName = document.getElementById('vo_name').value.trim().toUpperCase();
-            const amt = parseFloat(
-document.getElementById('vo_amt').dataset.rawValue || 0
+            let amt = 0;
+
+const breakdown = {};
+
+document
+.querySelectorAll('.vo_sec_amt')
+.forEach(i=>{
+
+const value =
+parseFloat(
+i.dataset.rawValue || 0
 );
+
+if(value > 0){
+
+breakdown[i.dataset.sec] = {
+amt:value
+};
+
+amt += value;
+
+}
+
+});
             const targetSec = document.getElementById('vo_target_sec').value;
 
             if(!cId) return alert("Sila pilih kontrak!");
@@ -1494,11 +1593,16 @@ document.getElementById('vo_amt').dataset.rawValue || 0
             let vBreak = contract.vo_breakdown || {};
             
             // 2. Tambah rekod VO baru ke dalam breakdown
-            vBreak[voName] = { 
-                amt: amt, 
-                sec: targetSec,
-                desc: document.getElementById('vo_desc').value 
-            };
+            vBreak[voName] = {
+
+amt: amt,
+
+breakdown: breakdown,
+
+desc:
+document.getElementById('vo_desc').value
+
+};
             
             // 3. Kemaskini (PATCH) data ke Supabase
             const resUpd = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { 
