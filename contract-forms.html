@@ -323,12 +323,25 @@ color: #0b3d91;
 
 <div>
 <label>Work Order Id</label>
-<input 
-type="text" 
-id="w_id_num" 
+
+<div style="display:flex;gap:8px;">
+
+<select id="w_id_prefix"
+        onchange="autoDetectWork()"
+        style="width:80px;flex-shrink:0;">
+    <option value="C">C</option>
+    <option value="K">K</option>
+</select>
+
+<input
+type="text"
+id="w_id_num"
 placeholder="123456"
 required
 oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
+
+</div>
+
 </div>
 
 <div>
@@ -1166,18 +1179,17 @@ document.getElementById('total_display').innerText =
 
     function normalizeWorkId(raw){
 
-    let id = (raw || '').trim().toUpperCase();
+const prefix =
+document.getElementById('w_id_prefix')?.value || 'C';
 
-    if(id.startsWith('K')){
+const num =
+(raw || '')
+.replace(/\D/g,'');
 
-        const num = id.replace(/^K\s*/, '');
+if(!num) return '';
 
-        return `K ${num}`;
-    }
+return `${prefix} ${num}`;
 
-    id = id.replace(/^C\s*/, '');
-
-    return `C ${id}`;
 }
 
 function onInterimContractSelect(skipReset = false) {
@@ -1672,6 +1684,22 @@ if(data.length === 0){
 }
 
 const w = data[0];
+
+if(w.work_id){
+
+const parts = w.work_id.split(' ');
+
+if(parts.length > 1){
+
+document.getElementById('w_id_prefix').value =
+parts[0];
+
+document.getElementById('w_id_num').value =
+parts[1];
+
+}
+
+}
 
 document.getElementById('w_qpb_date').value = w.qpb_date || '';
 document.getElementById('w_location').value = w.location || '';
