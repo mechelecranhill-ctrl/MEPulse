@@ -1,335 +1,182 @@
 <!DOCTYPE html>
-<html lang="ms">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Contract Closing</title>
-
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<title>Left Hidden Wheel</title>
 
 <style>
-body{
+*{
     margin:0;
-    font-family:-apple-system,system-ui,sans-serif;
-    background:linear-gradient(60deg,#0b3d91,#0077b6,#00b4d8);
-    min-height:100vh;
-    padding:20px;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Inter,system-ui;
 }
 
-.glass{
-    background:rgba(255,255,255,0.18);
-    backdrop-filter:blur(14px);
+body{
+    height:100vh;
+    background:#07111f;
+    overflow:hidden;
+}
+
+/* WRAPPER */
+.stage{
+    position:relative;
+    width:100%;
+    height:100vh;
+    display:flex;
+    align-items:center;
+}
+
+/* WHEEL (FULL CIRCLE) */
+.wheel{
+    position:absolute;
+    width:600px;
+    height:600px;
+    border-radius:50%;
+
+    /* 👇 KEY PART: push half keluar kiri */
+    left:-300px;
+    top:50%;
+    transform:translateY(-50%) rotate(0deg);
+
+    transition:transform 0.6s cubic-bezier(.22,1,.36,1);
+}
+
+/* OUTER GLOW */
+.wheel::before{
+    content:"";
+    position:absolute;
+    inset:40px;
+    border-radius:50%;
+    border:1px solid rgba(56,189,248,0.15);
+}
+
+/* ITEM */
+.item{
+    position:absolute;
+    width:110px;
+    height:110px;
+
     border-radius:18px;
-    padding:18px;
-    max-width:900px;
-    margin:auto;
-    border:1px solid rgba(255,255,255,0.25);
+    background:rgba(255,255,255,0.06);
+    border:1px solid rgba(255,255,255,0.08);
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    text-align:center;
+
+    color:white;
+    font-weight:600;
+
+    backdrop-filter:blur(14px);
+    transition:0.3s;
 }
 
-label{
-    font-size:11px;
-    font-weight:700;
-    color:#444;
-    margin-top:10px;
-    display:block;
+.item.active{
+    background:rgba(56,189,248,0.2);
+    border-color:rgba(56,189,248,0.5);
+    transform:scale(1.15);
 }
 
-input,select,textarea{
-    width:100%;
-    padding:12px;
-    border-radius:12px;
-    border:1px solid rgba(255,255,255,0.4);
-    background:rgba(255,255,255,0.35);
-    outline:none;
-    margin-top:5px;
+/* RIGHT PANEL */
+.panel{
+    position:absolute;
+    right:80px;
+    color:white;
 }
 
-.grid{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:10px;
+.panel h1{
+    font-size:42px;
 }
 
-.card{
-    background:rgba(255,255,255,0.25);
-    padding:12px;
-    border-radius:14px;
+.panel p{
+    opacity:0.6;
 }
-
-.btn{
-    width:100%;
-    padding:14px;
-    border:none;
-    border-radius:14px;
-    font-weight:700;
-    cursor:pointer;
-    margin-top:10px;
-}
-
-.primary{background:#007AFF;color:white;}
-.green{background:#34C759;color:white;}
-
-.timeline div{
-    padding:6px 0;
-    font-size:12px;
-}
-
-.badge{
-    padding:6px 10px;
-    border-radius:999px;
-    font-size:11px;
-    font-weight:700;
-}
-
 </style>
 </head>
 
 <body>
 
-<div class="glass">
+<div class="stage">
 
-<h2><i class="fa fa-circle-check"></i> Contract Closing</h2>
-
-<!-- CONTRACT SELECT -->
-<label>Unit</label>
-<select id="unit" onchange="loadContracts()"></select>
-
-<label>Contract</label>
-<select id="contract" onchange="loadClosing()"></select>
-
-<!-- SUMMARY -->
-<div class="grid" style="margin-top:15px;">
-
-<div class="card">
-<div>Contract Value</div>
-<strong id="cv">RM 0.00</strong>
-</div>
-
-<div class="card">
-<div>Total VO</div>
-<strong id="vo">RM 0.00</strong>
-</div>
-
-<div class="card">
-<div>Total Interim</div>
-<strong id="ti">RM 0.00</strong>
-</div>
-
-<div class="card">
-<div>Balance</div>
-<strong id="bal">RM 0.00</strong>
-</div>
+    <div class="wheel" id="wheel"></div>
 
 </div>
 
-<!-- CPC / CMGD -->
-<div class="grid" style="margin-top:15px;">
-
-<div>
-<label>CPC Date</label>
-<input type="date" id="cpc" onchange="calcDLP()">
-</div>
-
-<div>
-<label>CMGD Date</label>
-<input type="date" id="cmgd" onchange="calcDLP()">
-</div>
-
-</div>
-
-<div class="card" style="margin-top:10px;">
-<b>DLP Days:</b> <span id="dlp">0</span>
-</div>
-
-<!-- FINAL -->
-<label>Final Account</label>
-<input type="number" id="final">
-
-<label>Retention Released</label>
-<input type="number" id="retention">
-
-<label>PG Released</label>
-<input type="number" id="pg">
-
-<label>Remarks</label>
-<textarea id="remarks"></textarea>
-
-<!-- TIMELINE -->
-<div class="card timeline" style="margin-top:15px;">
-<div>✔ Contract Registered</div>
-<div>✔ Work Orders</div>
-<div>✔ Interim</div>
-<div>✔ VO</div>
-<div id="t_cpc">○ CPC</div>
-<div id="t_cmgd">○ CMGD</div>
-<div id="t_close">○ CLOSED</div>
-</div>
-
-<!-- ACTION -->
-<button class="btn green" onclick="saveClosing()">Save Closing</button>
-
+<div class="panel">
+    <h1 id="title">M&E</h1>
+    <p>Left Hidden Wheel Menu</p>
 </div>
 
 <script>
-const SB = "https://ywmsvowroxzhrjwrhsru.supabase.co";
-const KEY = "YOUR_ANON_KEY";
 
-const headers = {
-"apikey": KEY,
-"Authorization": "Bearer "+KEY,
-"Content-Type":"application/json"
-};
+const wheel = document.getElementById("wheel");
+const title = document.getElementById("title");
 
-let currentId = null;
-let contractData = null;
+const items = ["M&E","CM","PM","Asset","Reports","Export","Analytics","Logs"];
 
-async function loadUnits(){
-const res = await fetch(SB+"/rest/v1/units?select=*",{headers});
-const data = await res.json();
+let angle = 0;
+let index = 0;
 
-document.getElementById('unit').innerHTML =
-'<option value="">Choose</option>';
+const radius = 220;
 
-data.forEach(u=>{
-document.getElementById('unit').innerHTML +=
-`<option value="${u.id}">${u.unit_name}</option>`;
-});
-}
+/* BUILD CIRCLE */
+items.forEach((name, i) => {
 
-async function loadContracts(){
-const unit = document.getElementById('unit').value;
+    const el = document.createElement("div");
+    el.className = "item";
+    el.innerText = name;
 
-const res = await fetch(
-SB+"/rest/v1/contract?unit_id=eq."+unit+"&select=*",
-{headers}
-);
+    const theta = (i / items.length) * Math.PI * 2;
 
-const data = await res.json();
+    const x = Math.cos(theta) * radius;
+    const y = Math.sin(theta) * radius;
 
-const sel = document.getElementById('contract');
-sel.innerHTML = '<option value="">Choose</option>';
+    el.style.left = `calc(50% + ${x}px - 55px)`;
+    el.style.top  = `calc(50% + ${y}px - 55px)`;
 
-data.forEach(c=>{
-const opt = document.createElement('option');
-opt.value = c.id;
-opt.text = c.contract_code;
-opt.dataset.data = JSON.stringify(c);
-sel.appendChild(opt);
-});
-}
-
-async function loadClosing(){
-
-const id = document.getElementById('contract').value;
-
-if(!id) return;
-
-const cRes = await fetch(
-SB+"/rest/v1/contract?id=eq."+id,
-{headers}
-);
-
-const cData = await cRes.json();
-contractData = cData[0];
-
-// CONTRACT VALUE
-document.getElementById('cv').innerText =
-"RM "+(contractData.contract_sum||0).toLocaleString();
-
-// VO
-document.getElementById('vo').innerText =
-"RM "+(contractData.total_vo_amount||0).toLocaleString();
-
-// INTERIM SUM (simple fallback)
-document.getElementById('ti').innerText =
-"RM 0.00";
-
-document.getElementById('bal').innerText =
-"RM "+(
-(contractData.contract_sum||0)
-+(contractData.total_vo_amount||0)
-).toLocaleString();
-
-// CHECK EXISTING CLOSING
-const res = await fetch(
-SB+"/rest/v1/contract_closing?contract_id=eq."+id,
-{headers}
-);
-
-const data = await res.json();
-
-if(data.length>0){
-const d = data[0];
-currentId = d.id;
-
-document.getElementById('cpc').value = d.cpc_date||"";
-document.getElementById('cmgd').value = d.cmgd_date||"";
-document.getElementById('final').value = d.final_account||0;
-document.getElementById('retention').value = d.retention_released||0;
-document.getElementById('pg').value = d.pg_released||0;
-document.getElementById('remarks').value = d.remarks||"";
-
-calcDLP();
-}
-}
-
-function calcDLP(){
-const cpc = new Date(document.getElementById('cpc').value);
-const cmgd = new Date(document.getElementById('cmgd').value);
-
-if(!cpc || !cmgd || isNaN(cpc) || isNaN(cmgd)) return;
-
-const diff = Math.ceil((cmgd-cpc)/(1000*60*60*24));
-
-document.getElementById('dlp').innerText = diff;
-
-// timeline
-document.getElementById('t_cpc').innerText = "✔ CPC";
-document.getElementById('t_cmgd').innerText = "✔ CMGD";
-document.getElementById('t_close').innerText = "○ CLOSED";
-}
-
-async function saveClosing(){
-
-const payload = {
-contract_id: document.getElementById('contract').value,
-cpc_date: document.getElementById('cpc').value,
-cmgd_date: document.getElementById('cmgd').value,
-dlp_days: parseInt(document.getElementById('dlp').innerText||0),
-contract_value: contractData?.contract_sum||0,
-total_vo: contractData?.total_vo_amount||0,
-revised_contract_value:
-(contractData?.contract_sum||0)+(contractData?.total_vo_amount||0),
-final_account: parseFloat(document.getElementById('final').value||0),
-retention_released: parseFloat(document.getElementById('retention').value||0),
-pg_released: parseFloat(document.getElementById('pg').value||0),
-remarks: document.getElementById('remarks').value,
-status: "CPC"
-};
-
-let url = SB+"/rest/v1/contract_closing";
-let method = "POST";
-
-if(currentId){
-url += "?id=eq."+currentId;
-method = "PATCH";
-}
-
-const res = await fetch(url,{
-method,
-headers,
-body: JSON.stringify(payload)
+    wheel.appendChild(el);
 });
 
-if(res.ok){
-alert("Closing saved!");
-location.reload();
-}else{
-alert("Error saving closing");
-}
+const itemEls = document.querySelectorAll(".item");
+
+function update(){
+    itemEls.forEach(i => i.classList.remove("active"));
+    itemEls[index].classList.add("active");
+    title.innerText = items[index];
 }
 
-loadUnits();
+update();
+
+let lock = false;
+
+/* SCROLL ROTATION */
+window.addEventListener("wheel", (e)=>{
+
+    if(lock) return;
+    lock = true;
+
+    const step = 360 / items.length;
+
+    if(e.deltaX > 0 || e.deltaY > 0){
+        angle -= step;
+        index = (index + 1) % items.length;
+    } else {
+        angle += step;
+        index = (index - 1 + items.length) % items.length;
+    }
+
+    wheel.style.transform =
+        `translateY(-50%) rotate(${angle}deg)`;
+
+    update();
+
+    setTimeout(()=> lock = false, 600);
+
+}, {passive:true});
+
 </script>
 
 </body>
