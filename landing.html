@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ultra Control Wheel V2</title>
+<title>Ultra Control Wheel V3 (Fixed)</title>
 
 <style>
 *{
@@ -28,7 +28,7 @@ body{
     align-items:center;
 }
 
-/* WHEEL (HALF HIDDEN LEFT) */
+/* WHEEL */
 .wheel{
     position:absolute;
     width:650px;
@@ -36,12 +36,11 @@ body{
     left:-325px;
     top:50%;
     transform:translateY(-50%) rotate(0deg);
-
     transition:transform 0.7s cubic-bezier(.22,1,.36,1);
     transform-origin:center center;
 }
 
-/* GLOW RING */
+/* GLOW */
 .wheel::before{
     content:"";
     position:absolute;
@@ -56,22 +55,16 @@ body{
     position:absolute;
     width:120px;
     height:120px;
-transform-origin:center;
-
     border-radius:18px;
     background:rgba(255,255,255,0.06);
     border:1px solid rgba(255,255,255,0.08);
-
     display:flex;
     justify-content:center;
     align-items:center;
     text-align:center;
-
     color:white;
     font-weight:600;
-
     backdrop-filter:blur(14px);
-
     transition:0.3s;
     opacity:0.5;
     transform:scale(0.9);
@@ -83,9 +76,10 @@ transform-origin:center;
     border-color:rgba(56,189,248,0.6);
     box-shadow:0 0 25px rgba(56,189,248,0.25);
     opacity:1;
+    transform:scale(1.25);
 }
 
-/* RIGHT PANEL */
+/* PANEL */
 .panel{
     position:absolute;
     right:80px;
@@ -110,7 +104,7 @@ transform-origin:center;
 
 <div class="panel">
     <h1 id="title">M&E</h1>
-    <p>Ultra Control Wheel V2</p>
+    <p>Ultra Control Wheel V3</p>
 </div>
 
 <script>
@@ -126,6 +120,7 @@ const radius = 240;
 const stepAngle = 360 / items.length;
 
 let index = 0;
+let angle = 0;
 let lock = false;
 
 /* CREATE ITEMS */
@@ -138,11 +133,10 @@ items.forEach((name)=>{
 
 const itemEls = document.querySelectorAll(".item");
 
-/* POSITION */
+/* POSITION ITEMS */
 function positionItems(){
     itemEls.forEach((el,i)=>{
         const theta = (i/items.length)*Math.PI*2;
-
         const x = Math.cos(theta)*radius;
         const y = Math.sin(theta)*radius;
 
@@ -151,77 +145,71 @@ function positionItems(){
     });
 }
 
-/* UPDATE */
+/* UPDATE ACTIVE */
 function update(){
     itemEls.forEach(el => el.classList.remove("active"));
     itemEls[index].classList.add("active");
     title.innerText = items[index];
 }
 
-/* SNAP */
-function snap(){
-
-    const targetAngle = index * stepAngle;
-
-    let diff = targetAngle - angle;
-
-if(diff > 180) diff -= 360;
-if(diff < -180) diff += 360;
-
-angle += diff;
+/* RENDER (FIXED CORE) */
+function render(){
 
     wheel.style.transform =
-        `translateY(-50%) rotate(${-angle}deg)`;
+        `translateY(-50%) rotate(${angle}deg)`;
 
     itemEls.forEach(el=>{
-        el.style.transform = `rotate(${angle}deg) scale(0.9)`;
+        el.style.transform =
+            `rotate(${-angle}deg) scale(0.9)`;
     });
 
     itemEls[index].style.transform =
-        `rotate(${angle}deg) scale(1.25)`;
+        `rotate(${-angle}deg) scale(1.25)`;
 }
 
-/* NAV FUNCTION */
+/* NEXT */
 function next(){
     index = (index + 1) % items.length;
+    angle -= stepAngle;
     update();
-    snap();
+    render();
 }
 
+/* PREV */
 function prev(){
     index = (index - 1 + items.length) % items.length;
+    angle += stepAngle;
     update();
-    snap();
+    render();
 }
 
-/* =========================
-   1. MOUSE / TRACKPAD WHEEL
-========================= */
+/* MOUSE WHEEL (BUFFER SMOOTH) */
+let scrollBuffer = 0;
 
 window.addEventListener("wheel",(e)=>{
 
     if(lock) return;
     lock = true;
 
-    const delta = e.deltaY + e.deltaX;
+    scrollBuffer += e.deltaY;
 
-    if(delta > 0){
-        index = (index + 1) % items.length;
-    } else {
-        index = (index - 1 + items.length) % items.length;
+    const threshold = 80;
+
+    if(scrollBuffer > threshold){
+        next();
+        scrollBuffer = 0;
     }
 
-    update();
-    snap();
+    if(scrollBuffer < -threshold){
+        prev();
+        scrollBuffer = 0;
+    }
 
-    setTimeout(()=> lock = false, 180);
+    setTimeout(()=> lock = false, 120);
 
 },{passive:true});
 
-
-/* =========================
-   2. TOUCH / DRAG SUPPORT
-========================= */
+/* TOUCH */
 let startX = 0;
 
 window.addEventListener("touchstart",(e)=>{
@@ -234,21 +222,15 @@ window.addEventListener("touchend",(e)=>{
 
     if(Math.abs(diff) < 40) return;
 
-    if(diff > 0){
-        next();
-    }else{
-        prev();
-    }
+    if(diff > 0) next();
+    else prev();
 
 });
 
-
 /* INIT */
-let angle = 0;
-
 positionItems();
 update();
-snap();
+render();
 
 });
 
