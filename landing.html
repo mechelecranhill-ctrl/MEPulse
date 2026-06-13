@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wheel Menu UI</title>
+<title>Left Hidden Wheel</title>
 
 <style>
 *{
@@ -17,34 +17,46 @@ body{
     height:100vh;
     background:#07111f;
     overflow:hidden;
+}
+
+/* WRAPPER */
+.stage{
+    position:relative;
+    width:100%;
+    height:100vh;
     display:flex;
-    justify-content:center;
     align-items:center;
 }
 
-/* OUTER MASK (half hidden left) */
-.mask{
-    position:relative;
-    width:520px;
-    height:520px;
-    overflow:hidden;
-    left:-200px; /* separuh keluar kiri */
-}
-
-/* WHEEL */
+/* WHEEL (FULL CIRCLE) */
 .wheel{
     position:absolute;
-    width:520px;
-    height:520px;
+    width:600px;
+    height:600px;
     border-radius:50%;
+
+    /* 👇 KEY PART: push half keluar kiri */
+    left:-300px;
+    top:50%;
+    transform:translateY(-50%) rotate(0deg);
+
     transition:transform 0.6s cubic-bezier(.22,1,.36,1);
+}
+
+/* OUTER GLOW */
+.wheel::before{
+    content:"";
+    position:absolute;
+    inset:40px;
+    border-radius:50%;
+    border:1px solid rgba(56,189,248,0.15);
 }
 
 /* ITEM */
 .item{
     position:absolute;
-    width:100px;
-    height:100px;
+    width:110px;
+    height:110px;
 
     border-radius:18px;
     background:rgba(255,255,255,0.06);
@@ -59,17 +71,16 @@ body{
     font-weight:600;
 
     backdrop-filter:blur(14px);
-
     transition:0.3s;
 }
 
 .item.active{
     background:rgba(56,189,248,0.2);
     border-color:rgba(56,189,248,0.5);
-    transform:scale(1.2);
+    transform:scale(1.15);
 }
 
-/* CENTER INFO */
+/* RIGHT PANEL */
 .panel{
     position:absolute;
     right:80px;
@@ -88,19 +99,88 @@ body{
 
 <body>
 
-<div class="mask">
+<div class="stage">
+
     <div class="wheel" id="wheel"></div>
+
 </div>
 
 <div class="panel">
     <h1 id="title">M&E</h1>
-    <p>Wheel Menu Navigation</p>
+    <p>Left Hidden Wheel Menu</p>
 </div>
 
 <script>
+
 const wheel = document.getElementById("wheel");
 const title = document.getElementById("title");
 
+const items = ["M&E","CM","PM","Asset","Reports","Export","Analytics","Logs"];
+
+let angle = 0;
+let index = 0;
+
+const radius = 220;
+
+/* BUILD CIRCLE */
+items.forEach((name, i) => {
+
+    const el = document.createElement("div");
+    el.className = "item";
+    el.innerText = name;
+
+    const theta = (i / items.length) * Math.PI * 2;
+
+    const x = Math.cos(theta) * radius;
+    const y = Math.sin(theta) * radius;
+
+    el.style.left = `calc(50% + ${x}px - 55px)`;
+    el.style.top  = `calc(50% + ${y}px - 55px)`;
+
+    wheel.appendChild(el);
+});
+
+const itemEls = document.querySelectorAll(".item");
+
+function update(){
+    itemEls.forEach(i => i.classList.remove("active"));
+    itemEls[index].classList.add("active");
+    title.innerText = items[index];
+}
+
+update();
+
+let lock = false;
+
+/* SCROLL ROTATION */
+window.addEventListener("wheel", (e)=>{
+
+    if(lock) return;
+    lock = true;
+
+    const step = 360 / items.length;
+
+    if(e.deltaX > 0 || e.deltaY > 0){
+        angle -= step;
+        index = (index + 1) % items.length;
+    } else {
+        angle += step;
+        index = (index - 1 + items.length) % items.length;
+    }
+
+    wheel.style.transform =
+        `translateY(-50%) rotate(${angle}deg)`;
+
+    update();
+
+    setTimeout(()=> lock = false, 600);
+
+}, {passive:true});
+
+</script>
+
+</body>
+</html>
 const items = ["M&E","CM","PM","Asset","Reports","Export","Analytics","Logs"];
 
 let angle = 0;
