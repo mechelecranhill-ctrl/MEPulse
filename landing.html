@@ -56,6 +56,7 @@ body{
     position:absolute;
     width:120px;
     height:120px;
+transform-origin:center
 
     border-radius:18px;
     background:rgba(255,255,255,0.06);
@@ -163,12 +164,11 @@ function snap(){
 
     const targetAngle = -index * stepAngle;
 
-    // normalize current angle
-    let current = wheel._angle || 0;
+    let current = wheel._angle;
+    if (current === undefined) current = 0;
 
     let diff = targetAngle - current;
 
-    // 🔥 force shortest rotation path
     if(diff > 180) diff -= 360;
     if(diff < -180) diff += 360;
 
@@ -178,6 +178,17 @@ function snap(){
 
     wheel.style.transform =
         `translateY(-50%) rotate(${current}deg)`;
+
+    // 🔥 IMPORTANT: counter rotate items
+    const itemEls = document.querySelectorAll(".item");
+
+    itemEls.forEach(el=>{
+        el.style.transform = `rotate(${-current}deg) scale(0.9)`;
+    });
+
+    // active scale override
+    itemEls[index].style.transform =
+        `rotate(${-current}deg) scale(1.25)`;
 }
 
 /* NAV FUNCTION */
