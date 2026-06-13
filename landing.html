@@ -151,7 +151,7 @@ function positionItems(){
     });
 }
 
-/* ACTIVE */
+/* UPDATE */
 function update(){
     itemEls.forEach(el => el.classList.remove("active"));
     itemEls[index].classList.add("active");
@@ -165,31 +165,68 @@ function snap(){
         `translateY(-50%) rotate(${angle}deg)`;
 }
 
-/* INIT */
-positionItems();
-update();
-snap();
+/* NAV FUNCTION */
+function next(){
+    index = (index + 1) % items.length;
+    update();
+    snap();
+}
 
-/* SCROLL (FIXED) */
+function prev(){
+    index = (index - 1 + items.length) % items.length;
+    update();
+    snap();
+}
+
+/* =========================
+   1. MOUSE / TRACKPAD WHEEL
+========================= */
 window.addEventListener("wheel",(e)=>{
-
-    e.preventDefault(); // penting untuk desktop smooth
 
     if(lock) return;
     lock = true;
 
-    if(e.deltaY > 0 || e.deltaX > 0){
-        index = (index + 1) % items.length;
-    } else {
-        index = (index - 1 + items.length) % items.length;
-    }
+    const delta = e.deltaY + e.deltaX;
 
-    update();
-    snap();
+    if(delta > 0){
+        next();
+    }else{
+        prev();
+    }
 
     setTimeout(()=> lock = false, 250);
 
-},{passive:false});
+},{passive:true});
+
+
+/* =========================
+   2. TOUCH / DRAG SUPPORT
+========================= */
+let startX = 0;
+
+window.addEventListener("touchstart",(e)=>{
+    startX = e.touches[0].clientX;
+});
+
+window.addEventListener("touchend",(e)=>{
+
+    const diff = startX - e.changedTouches[0].clientX;
+
+    if(Math.abs(diff) < 40) return;
+
+    if(diff > 0){
+        next();
+    }else{
+        prev();
+    }
+
+});
+
+
+/* INIT */
+positionItems();
+update();
+snap();
 
 });
 
