@@ -120,102 +120,73 @@ const title = document.getElementById("title");
 const items = ["M&E","CM","PM","Asset","Reports","Export","Analytics","Logs"];
 
 const radius = 240;
+const stepAngle = 360 / items.length;
 
-let angle = 0;
-let velocity = 0;
 let index = 0;
-
-/* CREATE ITEMS */
-items.forEach((name,i)=>{
-
-    const el = document.createElement("div");
-    el.className = "item";
-    el.innerText = name;
-
-    const theta = (i/items.length)*Math.PI*2;
-
-    const x = Math.cos(theta)*radius;
-    const y = Math.sin(theta)*radius;
-
-    el.style.left = `calc(50% + ${x}px - 60px)`;
-    el.style.top  = `calc(50% + ${y}px - 60px)`;
-
-    wheel.appendChild(el);
-});
+let angle = 0;
+let lock = false;
 
 const itemEls = document.querySelectorAll(".item");
 
-/* UPDATE ACTIVE */
-function updateActive(){
+/* POSITION FIXED CIRCLE */
+function positionItems(){
 
-    itemEls.forEach(el=>{
-        el.classList.remove("active");
+    itemEls.forEach((el,i)=>{
+        const theta = (i/items.length)*Math.PI*2;
+
+        const x = Math.cos(theta)*radius;
+        const y = Math.sin(theta)*radius;
+
+        el.style.left = `calc(50% + ${x}px - 60px)`;
+        el.style.top  = `calc(50% + ${y}px - 60px)`;
     });
+}
 
+/* UPDATE ACTIVE */
+function update(){
+    itemEls.forEach(el=>el.classList.remove("active"));
     itemEls[index].classList.add("active");
     title.innerText = items[index];
 }
 
-updateActive();
+/* SNAP ROTATION */
+function snap(){
+    angle = -index * stepAngle;
 
-/* PHYSICS LOOP (INERTIA) */
-function animate(){
-    angle += velocity;
-    velocity *= 0.92; // friction
+    wheel.style.transition =
+        "transform 0.7s cubic-bezier(.22,1,.36,1)";
 
     wheel.style.transform =
         `translateY(-50%) rotate(${angle}deg)`;
 
-    requestAnimationFrame(animate);
+    setTimeout(()=>{
+        wheel.style.transition = "transform 0.15s linear";
+    },700);
 }
-animate();
+
+/* INIT */
+positionItems();
+update();
+snap();
 
 /* SCROLL CONTROL */
-let lock = false;
-
 window.addEventListener("wheel",(e)=>{
 
     if(lock) return;
     lock = true;
 
-    const step = (Math.PI*2)/items.length;
-
     if(e.deltaY > 0 || e.deltaX > 0){
-        velocity -= 0.35;
         index = (index + 1) % items.length;
     } else {
-        velocity += 0.35;
         index = (index - 1 + items.length) % items.length;
     }
 
-    updateActive();
+    update();
+    snap();
 
-    setTimeout(()=> lock = false, 180);
+    setTimeout(()=> lock = false, 250);
 
 },{passive:true});
-
-/* TOUCH SUPPORT */
-let startX = 0;
-
-window.addEventListener("touchstart",(e)=>{
-    startX = e.touches[0].clientX;
-});
-
-window.addEventListener("touchend",(e)=>{
-    const diff = startX - e.changedTouches[0].clientX;
-
-    if(Math.abs(diff)<40) return;
-
-    if(diff>0){
-        velocity -= 0.35;
-        index = (index + 1) % items.length;
-    }else{
-        velocity += 0.35;
-        index = (index - 1 + items.length) % items.length;
-    }
-
-    updateActive();
-});
 
 </script>
 
