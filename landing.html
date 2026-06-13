@@ -3,162 +3,167 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wheel Menu UI</title>
 
 <style>
 *{
     margin:0;
     padding:0;
     box-sizing:border-box;
+    font-family:Inter,system-ui;
 }
 
 body{
     height:100vh;
     background:#07111f;
     overflow:hidden;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+/* OUTER MASK (half hidden left) */
+.mask{
     position:relative;
+    width:520px;
+    height:520px;
+    overflow:hidden;
+    left:-200px; /* separuh keluar kiri */
 }
 
 /* WHEEL */
 .wheel{
     position:absolute;
-    width:500px;
-    height:500px;
-
-    left:-250px; /* separuh tersembunyi */
-    top:50%;
-
-    transform:translateY(-50%) rotate(0deg);
-    transition:transform .6s cubic-bezier(.22,1,.36,1);
-
+    width:520px;
+    height:520px;
     border-radius:50%;
-    border:1px solid rgba(255,255,255,.08);
+    transition:transform 0.6s cubic-bezier(.22,1,.36,1);
 }
 
-/* CENTER RING */
-.wheel::before{
-    content:"";
-    position:absolute;
-    inset:40px;
-    border-radius:50%;
-    border:1px solid rgba(56,189,248,.15);
-}
-
-/* ITEMS */
+/* ITEM */
 .item{
     position:absolute;
-    width:90px;
-    height:90px;
+    width:100px;
+    height:100px;
 
-    border-radius:20px;
-    background:rgba(255,255,255,.06);
-    border:1px solid rgba(255,255,255,.08);
+    border-radius:18px;
+    background:rgba(255,255,255,0.06);
+    border:1px solid rgba(255,255,255,0.08);
 
     display:flex;
-    align-items:center;
     justify-content:center;
+    align-items:center;
+    text-align:center;
 
     color:white;
     font-weight:600;
-    backdrop-filter:blur(20px);
+
+    backdrop-filter:blur(14px);
+
+    transition:0.3s;
 }
 
-/* 4 posisi */
-.item:nth-child(1){
-    right:-45px;
-    top:50%;
-    transform:translateY(-50%);
+.item.active{
+    background:rgba(56,189,248,0.2);
+    border-color:rgba(56,189,248,0.5);
+    transform:scale(1.2);
 }
 
-.item:nth-child(2){
-    top:-45px;
-    left:50%;
-    transform:translateX(-50%);
-}
-
-.item:nth-child(3){
-    left:-45px;
-    top:50%;
-    transform:translateY(-50%);
-}
-
-.item:nth-child(4){
-    bottom:-45px;
-    left:50%;
-    transform:translateX(-50%);
-}
-
-/* TITLE */
+/* CENTER INFO */
 .panel{
     position:absolute;
     right:80px;
-    top:50%;
-    transform:translateY(-50%);
     color:white;
 }
 
 .panel h1{
-    font-size:48px;
+    font-size:42px;
 }
 
 .panel p{
-    opacity:.7;
+    opacity:0.6;
 }
 </style>
 </head>
+
 <body>
 
-<div class="wheel" id="wheel">
-
-    <div class="item">M&E</div>
-    <div class="item">CM</div>
-    <div class="item">PM</div>
-    <div class="item">Asset</div>
-
+<div class="mask">
+    <div class="wheel" id="wheel"></div>
 </div>
 
 <div class="panel">
     <h1 id="title">M&E</h1>
-    <p>Scroll untuk rotate carousel</p>
+    <p>Wheel Menu Navigation</p>
 </div>
 
 <script>
-const wheel = document.getElementById('wheel');
-const title = document.getElementById('title');
+const wheel = document.getElementById("wheel");
+const title = document.getElementById("title");
 
-const items = [
-    "M&E",
-    "CM",
-    "PM",
-    "Asset"
-];
+const items = ["M&E","CM","PM","Asset","Reports","Export","Analytics","Logs"];
 
+let angle = 0;
 let index = 0;
-let rotation = 0;
+
+const radius = 190;
+
+/* CREATE ITEMS IN CIRCLE */
+items.forEach((name, i) => {
+
+    const el = document.createElement("div");
+    el.className = "item";
+    el.innerText = name;
+
+    const theta = (i / items.length) * Math.PI * 2;
+
+    const x = Math.cos(theta) * radius;
+    const y = Math.sin(theta) * radius;
+
+    el.style.left = `calc(50% + ${x}px - 50px)`;
+    el.style.top  = `calc(50% + ${y}px - 50px)`;
+
+    wheel.appendChild(el);
+});
+
+const itemEls = document.querySelectorAll(".item");
+
+/* UPDATE ACTIVE ITEM */
+function updateActive(){
+
+    itemEls.forEach((el, i) => {
+        el.classList.remove("active");
+    });
+
+    itemEls[index].classList.add("active");
+    title.innerText = items[index];
+}
+
+updateActive();
+
+/* SCROLL CONTROL */
 let lock = false;
 
-window.addEventListener('wheel',(e)=>{
+window.addEventListener("wheel", (e) => {
 
     if(lock) return;
     lock = true;
 
-    if(e.deltaY > 0){
-        rotation += 90;
+    if(e.deltaX > 0 || e.deltaY > 0){
+        angle -= (360 / items.length);
         index = (index + 1) % items.length;
-    }else{
-        rotation -= 90;
+    } else {
+        angle += (360 / items.length);
         index = (index - 1 + items.length) % items.length;
     }
 
-    wheel.style.transform =
-        `translateY(-50%) rotate(${rotation}deg)`;
+    wheel.style.transform = `rotate(${angle}deg)`;
 
-    title.textContent = items[index];
+    updateActive();
 
-    setTimeout(()=>{
-        lock = false;
-    },600);
+    setTimeout(() => lock = false, 600);
 
-});
+}, {passive:true});
 </script>
 
 </body>
