@@ -3,363 +3,348 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ocean Control Room SaaS</title>
+<title>Ocean Control Room V2 Ultra</title>
 
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 
 <style>
 :root{
-    --bg1:#020617;
-    --bg2:#030b1a;
-    --sea:#0ea5e9;
-    --deep:#022c43;
-    --glass:rgba(255,255,255,0.05);
-    --stroke:rgba(255,255,255,0.08);
-    --text:#eaf6ff;
-    --muted:#8aa4c2;
-    --danger:#ff4d6d;
-    --warn:#ffcc66;
-    --good:#2ee59d;
+  --bg:#020617;
+  --sea1:#0ea5e9;
+  --sea2:#022c43;
+  --glass:rgba(255,255,255,0.05);
+  --stroke:rgba(255,255,255,0.08);
+  --text:#eaf6ff;
+  --muted:#8aa4c2;
+  --good:#2ee59d;
+  --warn:#ffcc66;
+  --danger:#ff4d6d;
 }
 
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-    font-family:Inter, system-ui;
-}
+*{margin:0;padding:0;box-sizing:border-box;font-family:Inter,system-ui;}
 
 body{
-    background:
-    radial-gradient(circle at 20% 20%, rgba(14,165,233,0.12), transparent 40%),
-    radial-gradient(circle at 80% 10%, rgba(2,132,199,0.12), transparent 40%),
-    linear-gradient(180deg,var(--bg1),var(--bg2));
-    color:var(--text);
-    overflow:hidden;
+  background:radial-gradient(circle at 20% 20%, rgba(14,165,233,0.15), transparent 40%),
+             linear-gradient(180deg,#020617,#020b1a);
+  color:var(--text);
+  overflow:hidden;
 }
 
-/* ===== SONAR EFFECT ===== */
-.sonar{
-    position:fixed;
-    width:500px;
-    height:500px;
-    border-radius:50%;
-    border:2px solid rgba(14,165,233,0.15);
-    top:50%;
-    left:50%;
-    transform:translate(-50%,-50%);
-    animation:expand 6s infinite;
+/* ===== OCEAN WAVES ===== */
+canvas{
+  position:fixed;
+  bottom:0;
+  left:0;
+  width:100%;
+  height:40%;
+  z-index:0;
+  opacity:0.4;
 }
 
-.sonar::after{
-    content:"";
-    position:absolute;
-    width:100%;
-    height:100%;
-    border-radius:50%;
-    border:2px solid rgba(14,165,233,0.1);
-    animation:expand2 6s infinite;
+/* ===== RADAR ===== */
+.radar{
+  position:fixed;
+  width:420px;
+  height:420px;
+  border-radius:50%;
+  border:1px solid rgba(14,165,233,0.2);
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  z-index:0;
 }
 
-@keyframes expand{
-    0%{transform:translate(-50%,-50%) scale(0.2); opacity:0;}
-    40%{opacity:1;}
-    100%{transform:translate(-50%,-50%) scale(2); opacity:0;}
+.radar::before{
+  content:"";
+  position:absolute;
+  width:100%;
+  height:100%;
+  border-radius:50%;
+  background:conic-gradient(from 0deg, transparent 0 80%, rgba(14,165,233,0.2));
+  animation:spin 4s linear infinite;
 }
 
-@keyframes expand2{
-    0%{transform:scale(0.3); opacity:0;}
-    50%{opacity:0.6;}
-    100%{transform:scale(2.2); opacity:0;}
+@keyframes spin{
+  to{transform:rotate(360deg);}
 }
 
-/* ===== GRID LAYOUT ===== */
+/* ===== APP LAYOUT ===== */
 .app{
-    display:grid;
-    grid-template-columns:260px 1fr 320px;
-    height:100vh;
+  display:grid;
+  grid-template-columns:260px 1fr 320px;
+  height:100vh;
+  position:relative;
+  z-index:2;
 }
 
-/* ===== SIDEBAR ===== */
+/* SIDEBAR */
 .sidebar{
-    background:rgba(255,255,255,0.03);
-    border-right:1px solid var(--stroke);
-    backdrop-filter:blur(20px);
-    padding:20px;
+  background:rgba(255,255,255,0.03);
+  border-right:1px solid var(--stroke);
+  backdrop-filter:blur(20px);
+  padding:20px;
 }
 
 .logo{
-    font-size:18px;
-    font-weight:700;
-    color:var(--sea);
-    margin-bottom:20px;
+  font-size:18px;
+  font-weight:700;
+  color:var(--sea1);
+  margin-bottom:20px;
 }
 
 .nav a{
-    display:flex;
-    gap:10px;
-    padding:12px;
-    border-radius:12px;
-    text-decoration:none;
-    color:var(--muted);
-    margin-bottom:6px;
-    transition:0.2s;
+  display:flex;
+  gap:10px;
+  padding:12px;
+  border-radius:12px;
+  text-decoration:none;
+  color:var(--muted);
+  margin-bottom:6px;
 }
 
 .nav a:hover{
-    background:rgba(14,165,233,0.08);
-    color:var(--text);
+  background:rgba(14,165,233,0.08);
+  color:var(--text);
 }
 
-/* ===== CENTER DASH ===== */
+/* CENTER */
 .center{
-    padding:20px;
-    position:relative;
-    overflow:hidden;
+  padding:20px;
 }
 
-/* TOP BAR */
-.topbar{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:20px;
-}
-
+/* STATUS BAR */
 .status{
-    display:flex;
-    gap:10px;
-    align-items:center;
-    color:var(--muted);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:15px;
 }
 
 .dot{
-    width:10px;
-    height:10px;
-    border-radius:50%;
-    background:var(--good);
-    box-shadow:0 0 12px var(--good);
-    animation:pulse 1.5s infinite;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:var(--good);
+  box-shadow:0 0 12px var(--good);
+  animation:pulse 1.5s infinite;
 }
 
 @keyframes pulse{
-    0%{transform:scale(1);opacity:1;}
-    50%{transform:scale(1.4);opacity:0.6;}
-    100%{transform:scale(1);opacity:1;}
+  0%{transform:scale(1);}
+  50%{transform:scale(1.4);}
+  100%{transform:scale(1);}
 }
 
 /* KPI */
 .kpi{
-    display:grid;
-    grid-template-columns:repeat(4,1fr);
-    gap:12px;
-    margin-bottom:20px;
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:12px;
+  margin-bottom:20px;
 }
 
 .card{
-    background:var(--glass);
-    border:1px solid var(--stroke);
-    border-radius:16px;
-    padding:16px;
-    backdrop-filter:blur(16px);
-    position:relative;
-    overflow:hidden;
+  background:var(--glass);
+  border:1px solid var(--stroke);
+  padding:14px;
+  border-radius:14px;
+  backdrop-filter:blur(16px);
 }
 
-.card::before{
-    content:"";
-    position:absolute;
-    width:200%;
-    height:200%;
-    top:-50%;
-    left:-50%;
-    background:radial-gradient(circle,rgba(14,165,233,0.08),transparent 60%);
-}
+.card h2{font-size:20px;}
+.card p{color:var(--muted);font-size:12px;}
 
-.card h2{font-size:22px;}
-.card p{color:var(--muted);font-size:13px;}
-
-/* MODULE GRID */
+/* MODULES */
 .modules{
-    display:grid;
-    grid-template-columns:repeat(3,1fr);
-    gap:12px;
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;
 }
 
 .module{
-    background:rgba(255,255,255,0.04);
-    border:1px solid var(--stroke);
-    border-radius:14px;
-    padding:16px;
-    transition:0.2s;
+  background:rgba(255,255,255,0.04);
+  border:1px solid var(--stroke);
+  padding:14px;
+  border-radius:14px;
+  cursor:pointer;
+  transition:0.2s;
 }
 
 .module:hover{
-    transform:translateY(-3px);
-    border-color:rgba(14,165,233,0.3);
-    box-shadow:0 0 20px rgba(14,165,233,0.08);
+  transform:translateY(-3px);
+  border-color:rgba(14,165,233,0.35);
+  box-shadow:0 0 18px rgba(14,165,233,0.1);
 }
 
-/* ALERT */
-.alert{
-    margin-top:14px;
-    padding:14px;
-    border-radius:14px;
-    border:1px solid var(--stroke);
-    background:rgba(255,255,255,0.03);
+/* ALERT CONSOLE */
+.console{
+  margin-top:15px;
+  background:rgba(0,0,0,0.35);
+  border:1px solid var(--stroke);
+  border-radius:14px;
+  padding:14px;
+  font-family:monospace;
+  font-size:12px;
+  color:#9fe7ff;
+  height:140px;
+  overflow:auto;
 }
 
-.badge{
-    display:inline-block;
-    padding:3px 8px;
-    border-radius:999px;
-    font-size:11px;
-    margin-top:8px;
-}
-
-.danger{background:rgba(255,77,109,0.15); color:var(--danger);}
-.warn{background:rgba(255,204,102,0.15); color:var(--warn);}
-.good{background:rgba(46,229,157,0.12); color:var(--good);}
-
-/* ===== RIGHT PANEL ===== */
+/* RIGHT PANEL */
 .right{
-    background:rgba(255,255,255,0.02);
-    border-left:1px solid var(--stroke);
-    padding:20px;
-    backdrop-filter:blur(20px);
+  background:rgba(255,255,255,0.02);
+  border-left:1px solid var(--stroke);
+  padding:20px;
+  backdrop-filter:blur(20px);
 }
 
-.feed{
-    margin-top:10px;
-}
-
-.item{
-    padding:10px 0;
-    border-bottom:1px solid var(--stroke);
-    color:var(--muted);
-    font-size:13px;
+.feed div{
+  padding:10px 0;
+  border-bottom:1px solid var(--stroke);
+  color:var(--muted);
+  font-size:13px;
 }
 
 /* MOBILE */
 @media(max-width:1000px){
-    .app{
-        grid-template-columns:1fr;
-    }
-    .sidebar,.right{
-        display:none;
-    }
-    body{overflow:auto;}
-    .kpi{grid-template-columns:repeat(2,1fr);}
-    .modules{grid-template-columns:1fr 1fr;}
+  .app{grid-template-columns:1fr;}
+  .sidebar,.right{display:none;}
+  body{overflow:auto;}
+  .kpi{grid-template-columns:repeat(2,1fr);}
+  .modules{grid-template-columns:1fr 1fr;}
 }
 </style>
 </head>
 
 <body>
 
-<!-- SONAR -->
-<div class="sonar"></div>
+<!-- RADAR -->
+<div class="radar"></div>
+
+<!-- WAVES -->
+<canvas id="wave"></canvas>
 
 <div class="app">
 
 <!-- SIDEBAR -->
 <div class="sidebar">
-    <div class="logo">🌊 Ocean Control</div>
-
-    <div class="nav">
-        <a href="#"><i class="fas fa-gauge"></i> Command Deck</a>
-        <a href="#"><i class="fas fa-file-contract"></i> Contracts</a>
-        <a href="#"><i class="fas fa-screwdriver-wrench"></i> Maintenance</a>
-        <a href="#"><i class="fas fa-bolt"></i> Electrical Grid</a>
-        <a href="#"><i class="fas fa-box"></i> Assets</a>
-        <a href="#"><i class="fas fa-chart-line"></i> Analytics</a>
-    </div>
+  <div class="logo">🌊 Ocean V2 Ultra</div>
+  <div class="nav">
+    <a href="#"><i class="fas fa-gauge"></i> Command Core</a>
+    <a href="#"><i class="fas fa-file-contract"></i> Contracts</a>
+    <a href="#"><i class="fas fa-screwdriver-wrench"></i> Maintenance</a>
+    <a href="#"><i class="fas fa-bolt"></i> Electrical Grid</a>
+    <a href="#"><i class="fas fa-chart-line"></i> Analytics</a>
+    <a href="#"><i class="fas fa-box"></i> Assets</a>
+  </div>
 </div>
 
 <!-- CENTER -->
 <div class="center">
 
-<div class="topbar">
-    <div>
-        <h2>Command Center</h2>
-        <div class="status">
-            <div class="dot"></div>
-            <small>All Systems Operational</small>
-        </div>
-    </div>
+<div class="status">
+  <div>
+    <h2>Ocean Control Core</h2>
+    <small style="color:var(--muted)">Deep System Monitoring Active</small>
+  </div>
 
-    <i class="fas fa-bell"></i>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <div class="dot"></div>
+    <small>LIVE</small>
+  </div>
 </div>
 
 <!-- KPI -->
 <div class="kpi">
-
-<div class="card">
-<h2>24</h2>
-<p>Active Contracts</p>
-</div>
-
-<div class="card">
-<h2>7</h2>
-<p>Maintenance Nodes</p>
-</div>
-
-<div class="card">
-<h2>3</h2>
-<p>Critical Alerts</p>
-</div>
-
-<div class="card">
-<h2>97%</h2>
-<p>System Stability</p>
-</div>
-
+  <div class="card"><h2>24</h2><p>Contracts</p></div>
+  <div class="card"><h2>7</h2><p>Maintenance Nodes</p></div>
+  <div class="card"><h2>3</h2><p>Critical Alerts</p></div>
+  <div class="card"><h2>97%</h2><p>System Stability</p></div>
 </div>
 
 <!-- MODULES -->
-<h3 style="margin-bottom:10px;">System Modules</h3>
+<h3>Command Modules</h3>
+<br>
 
 <div class="modules">
-
-<div class="module"><i class="fas fa-file-contract"></i> Contracts</div>
-<div class="module"><i class="fas fa-screwdriver-wrench"></i> Maintenance</div>
-<div class="module"><i class="fas fa-bolt"></i> Electrical</div>
-<div class="module"><i class="fas fa-box"></i> Assets</div>
-<div class="module"><i class="fas fa-chart-line"></i> Reports</div>
-<div class="module"><i class="fas fa-file-export"></i> Export</div>
-
+  <div class="module"><i class="fas fa-file-contract"></i> Contracts</div>
+  <div class="module"><i class="fas fa-screwdriver-wrench"></i> Maintenance</div>
+  <div class="module"><i class="fas fa-bolt"></i> Electrical</div>
+  <div class="module"><i class="fas fa-box"></i> Assets</div>
+  <div class="module"><i class="fas fa-chart-line"></i> Reports</div>
+  <div class="module"><i class="fas fa-file-export"></i> Export</div>
 </div>
 
-<div class="alert">
-<h4>🌊 Deep System Alert</h4>
-<p>AHU vibration anomaly detected in offshore subsystem layer.</p>
-<span class="badge warn">Monitoring</span>
-</div>
-
-<div class="alert">
-<h4>🚨 Critical Wave Event</h4>
-<p>Contract MEC-2026-014 approaching expiry threshold.</p>
-<span class="badge danger">Urgent</span>
+<!-- CONSOLE -->
+<div class="console" id="console">
+> SYSTEM ONLINE...<br>
+> OCEAN CORE SYNCHRONIZED<br>
+> CONTRACT ENGINE STABLE<br>
+> MAINTENANCE NODES ACTIVE<br>
+> ELECTRICAL GRID NOMINAL<br>
 </div>
 
 </div>
 
 <!-- RIGHT -->
 <div class="right">
-
-<h3>Live Activity Stream</h3>
-
+<h3>Live Feed</h3>
+<br>
 <div class="feed">
-<div class="item">✔ Contract updated (live)</div>
-<div class="item">⚡ Electrical grid stabilized</div>
-<div class="item">🌊 Maintenance wave scheduled</div>
-<div class="item">📄 Report generated</div>
-<div class="item">👷 Technician closed work order</div>
+  <div>✔ Contract updated live</div>
+  <div>⚡ Grid stabilized</div>
+  <div>🌊 Maintenance wave queued</div>
+  <div>📄 Report generated</div>
+  <div>👷 Technician closed work order</div>
+</div>
 </div>
 
 </div>
 
-</div>
+<script>
+/* ===== WAVES ===== */
+const canvas = document.getElementById("wave");
+const ctx = canvas.getContext("2d");
+
+function resize(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener("resize", resize);
+
+let t = 0;
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  ctx.beginPath();
+  for(let x=0;x<canvas.width;x++){
+    let y = Math.sin((x*0.01)+t)*20 + Math.cos((x*0.02)+t)*10 + canvas.height*0.8;
+    ctx.lineTo(x,y);
+  }
+
+  ctx.strokeStyle="rgba(56,189,248,0.25)";
+  ctx.stroke();
+
+  t += 0.02;
+  requestAnimationFrame(draw);
+}
+draw();
+
+/* ===== CONSOLE LOGGING ===== */
+const log = document.getElementById("console");
+setInterval(()=>{
+  const msgs = [
+    "SYSTEM HEARTBEAT OK",
+    "DATA STREAM SYNCED",
+    "OCEAN NODE STABLE",
+    "MAINTENANCE CHECK COMPLETE"
+  ];
+  log.innerHTML += "<br>> " + msgs[Math.floor(Math.random()*msgs.length)];
+  log.scrollTop = log.scrollHeight;
+},3000);
+</script>
 
 </body>
 </html>
