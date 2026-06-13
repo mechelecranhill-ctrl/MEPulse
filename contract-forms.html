@@ -618,7 +618,28 @@ oninput="autoDetectContract()">
 
 </div>
                     <label>District</label>
-                    <input type="text" id="c_dist" oninput="this.value=this.value.toUpperCase()" placeholder="SEGAMAT, MUAR, BATU PAHAT, KLUANG, MERSING" required>
+                    <label>District Preset</label>
+
+<div style="display:flex; gap:8px; margin-bottom:8px;">
+    <button type="button" onclick="setRegion('UTARA')" class="btn-primary" style="background:#007AFF;">
+        UTARA
+    </button>
+
+    <button type="button" onclick="setRegion('SELATAN')" class="btn-primary" style="background:#34C759;">
+        SELATAN
+    </button>
+
+    <button type="button" onclick="clearDistricts()" class="btn-primary" style="background:#8e8e93;">
+        CLEAR
+    </button>
+</div>
+
+<div id="district_checklist"
+     style="display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:10px; background:rgba(255,255,255,0.2); border-radius:10px;">
+</div>
+
+<input type="hidden" id="c_dist">
+
                     <label>Area Code</label>
                     <input type="text" id="c_area" placeholder="SGT,MR,BP,KLG,MRS" required>
                     <label>Sections</label>
@@ -654,6 +675,25 @@ oninput="formatCurrencyInput(this); calculateContractSum()">
 let currentContractId = null;
 let contractDetectTimer = null;
 
+const REGION_MAP = {
+    UTARA: [
+        "SEGAMAT",
+        "MUAR",
+        "BATU PAHAT",
+        "KLUANG",
+        "MERSING"
+    ],
+    SELATAN: [
+        "KOTA TINGGI UTARA",
+        "KOTA TINGGI SELATAN",
+        "JOHOR BAHRU BARAT",
+        "JOHOR BAHRU TIMUR",
+        "ISKANDAR PUTERI"
+    ]
+};
+
+let selectedDistricts = new Set();
+
     function initApp() {
 
 fetchUnits();
@@ -663,6 +703,7 @@ showPage(
 );
 
 setupFormListeners();
+renderDistrictChecklist();
 
 }
 
@@ -686,6 +727,53 @@ setupFormListeners();
             }
     }
 
+function renderDistrictChecklist() {
+    const container = document.getElementById('district_checklist');
+    container.innerHTML = '';
+
+    const all = [...REGION_MAP.UTARA, ...REGION_MAP.SELATAN];
+
+    all.forEach(d => {
+        const checked = selectedDistricts.has(d);
+
+        const div = document.createElement('label');
+        div.style = "font-size:11px; display:flex; align-items:center; gap:6px;";
+
+        div.innerHTML = `
+            <input type="checkbox"
+                   ${checked ? "checked" : ""}
+                   onchange="toggleDistrict('${d}', this.checked)">
+            ${d}
+        `;
+
+        container.appendChild(div);
+    });
+
+    syncDistrictInput();
+}
+
+function toggleDistrict(district, state) {
+    if(state) {
+        selectedDistricts.add(district);
+    } else {
+        selectedDistricts.delete(district);
+    }
+    syncDistrictInput();
+}
+function setRegion(region) {
+    REGION_MAP[region].forEach(d => selectedDistricts.add(d));
+    renderDistrictChecklist();
+}
+
+function clearDistricts() {
+    selectedDistricts.clear();
+    renderDistrictChecklist();
+}
+
+function syncDistrictInput() {
+    document.getElementById('c_dist').value =
+        [...selectedDistricts].join(', ');
+}
 function formatCurrencyInput(input) {
     // Ambil digit sahaja
     let digits = input.value.replace(/\D/g, '');
