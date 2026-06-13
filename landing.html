@@ -37,7 +37,8 @@ body{
     top:50%;
     transform:translateY(-50%) rotate(0deg);
 
-    transition:transform 0.15s linear;
+    transition:transform 0.7s cubic-bezier(.22,1,.36,1);
+    transform-origin:center center;
 }
 
 /* GLOW RING */
@@ -123,12 +124,23 @@ const radius = 240;
 const stepAngle = 360 / items.length;
 
 let index = 0;
-let angle = 0;
 let lock = false;
+
+/* =========================
+   1. CREATE ITEMS
+========================= */
+items.forEach((name)=>{
+    const el = document.createElement("div");
+    el.className = "item";
+    el.innerText = name;
+    wheel.appendChild(el);
+});
 
 const itemEls = document.querySelectorAll(".item");
 
-/* POSITION FIXED CIRCLE */
+/* =========================
+   2. POSITION ITEMS (CIRCLE)
+========================= */
 function positionItems(){
 
     itemEls.forEach((el,i)=>{
@@ -142,26 +154,23 @@ function positionItems(){
     });
 }
 
-/* UPDATE ACTIVE */
+/* =========================
+   3. UPDATE ACTIVE ITEM
+========================= */
 function update(){
-    itemEls.forEach(el=>el.classList.remove("active"));
+    itemEls.forEach(el => el.classList.remove("active"));
     itemEls[index].classList.add("active");
     title.innerText = items[index];
 }
 
-/* SNAP ROTATION */
+/* =========================
+   4. SNAP ROTATION
+========================= */
 function snap(){
-    angle = -index * stepAngle;
-
-    wheel.style.transition =
-        "transform 0.7s cubic-bezier(.22,1,.36,1)";
+    const angle = -index * stepAngle;
 
     wheel.style.transform =
         `translateY(-50%) rotate(${angle}deg)`;
-
-    setTimeout(()=>{
-        wheel.style.transition = "transform 0.15s linear";
-    },700);
 }
 
 /* INIT */
@@ -169,7 +178,9 @@ positionItems();
 update();
 snap();
 
-/* SCROLL CONTROL */
+/* =========================
+   5. SCROLL CONTROL
+========================= */
 window.addEventListener("wheel",(e)=>{
 
     if(lock) return;
