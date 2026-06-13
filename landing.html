@@ -3,10 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Center Circle</title>
 
 <style>
-
 *{
     margin:0;
     padding:0;
@@ -14,57 +12,154 @@
 }
 
 body{
-    min-height:100vh;
+    height:100vh;
     background:#07111f;
     overflow:hidden;
     position:relative;
 }
 
-/* BULATAN SEPARUH KELIHATAN */
-.circle{
+/* WHEEL */
+.wheel{
     position:absolute;
+    width:500px;
+    height:500px;
 
-    width:300px;
-    height:300px;
-
-    left:-150px;      /* separuh keluar skrin */
+    left:-250px; /* separuh tersembunyi */
     top:50%;
 
-    transform:translateY(-50%);
+    transform:translateY(-50%) rotate(0deg);
+    transition:transform .6s cubic-bezier(.22,1,.36,1);
 
     border-radius:50%;
+    border:1px solid rgba(255,255,255,.08);
+}
 
-    background:
-        radial-gradient(
-            circle at 30% 30%,
-            rgba(255,255,255,0.25),
-            rgba(255,255,255,0.05) 40%,
-            rgba(255,255,255,0.02)
-        );
+/* CENTER RING */
+.wheel::before{
+    content:"";
+    position:absolute;
+    inset:40px;
+    border-radius:50%;
+    border:1px solid rgba(56,189,248,.15);
+}
 
-    border:1px solid rgba(255,255,255,0.1);
+/* ITEMS */
+.item{
+    position:absolute;
+    width:90px;
+    height:90px;
 
-    backdrop-filter:blur(20px);
-
-    box-shadow:
-        0 0 60px rgba(56,189,248,0.2),
-        inset 0 0 40px rgba(56,189,248,0.1);
+    border-radius:20px;
+    background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.08);
 
     display:flex;
-    justify-content:center;
     align-items:center;
+    justify-content:center;
 
     color:white;
-    font-size:24px;
     font-weight:600;
+    backdrop-filter:blur(20px);
+}
+
+/* 4 posisi */
+.item:nth-child(1){
+    right:-45px;
+    top:50%;
+    transform:translateY(-50%);
+}
+
+.item:nth-child(2){
+    top:-45px;
+    left:50%;
+    transform:translateX(-50%);
+}
+
+.item:nth-child(3){
+    left:-45px;
+    top:50%;
+    transform:translateY(-50%);
+}
+
+.item:nth-child(4){
+    bottom:-45px;
+    left:50%;
+    transform:translateX(-50%);
+}
+
+/* TITLE */
+.panel{
+    position:absolute;
+    right:80px;
+    top:50%;
+    transform:translateY(-50%);
+    color:white;
+}
+
+.panel h1{
+    font-size:48px;
+}
+
+.panel p{
+    opacity:.7;
 }
 </style>
 </head>
 <body>
 
-<div class="circle">
-    M&E
+<div class="wheel" id="wheel">
+
+    <div class="item">M&E</div>
+    <div class="item">CM</div>
+    <div class="item">PM</div>
+    <div class="item">Asset</div>
+
 </div>
+
+<div class="panel">
+    <h1 id="title">M&E</h1>
+    <p>Scroll untuk rotate carousel</p>
+</div>
+
+<script>
+const wheel = document.getElementById('wheel');
+const title = document.getElementById('title');
+
+const items = [
+    "M&E",
+    "CM",
+    "PM",
+    "Asset"
+];
+
+let index = 0;
+let rotation = 0;
+let lock = false;
+
+window.addEventListener('wheel',(e)=>{
+
+    if(lock) return;
+    lock = true;
+
+    if(e.deltaY > 0){
+        rotation += 90;
+        index = (index + 1) % items.length;
+    }else{
+        rotation -= 90;
+        index = (index - 1 + items.length) % items.length;
+    }
+
+    wheel.style.transform =
+        `translateY(-50%) rotate(${rotation}deg)`;
+
+    title.textContent = items[index];
+
+    setTimeout(()=>{
+        lock = false;
+    },600);
+
+});
+</script>
 
 </body>
 </html>
