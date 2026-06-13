@@ -638,9 +638,8 @@ oninput="autoDetectContract()">
         Pilih Daerah
     </div>
 
-    <div id="district_pills"
-         style="display:flex; flex-wrap:wrap; gap:6px;"></div>
-</div>
+    <div id="district_utara"></div>
+<div id="district_selatan" style="margin-top:10px;"></div>
 
 <input type="hidden" id="c_dist">
 <input type="hidden" id="c_area">
@@ -747,17 +746,18 @@ renderDistrictChecklist();
     }
 
 function renderDistrictChecklist() {
-    const container = document.getElementById('district_pills');
-    container.innerHTML = '';
 
-    const all = [...REGION_MAP.UTARA, ...REGION_MAP.SELATAN];
+    const utaraContainer = document.getElementById('district_utara');
+    const selatanContainer = document.getElementById('district_selatan');
 
-    all.forEach(d => {
+    utaraContainer.innerHTML = '';
+    selatanContainer.innerHTML = '';
+
+    function createBtn(d) {
         const active = selectedDistricts.has(d);
 
         const btn = document.createElement('button');
         btn.type = "button";
-
         btn.innerText = d;
 
         btn.style = `
@@ -767,13 +767,34 @@ function renderDistrictChecklist() {
             font-size:11px;
             cursor:pointer;
             transition:0.2s;
+            margin:3px;
             background:${active ? '#007AFF' : 'rgba(255,255,255,0.3)'};
             color:${active ? 'white' : '#333'};
         `;
 
         btn.onclick = () => toggleDistrict(d, !selectedDistricts.has(d));
 
-        container.appendChild(btn);
+        return btn;
+    }
+
+    // ===== UTARA ROW =====
+    const utaraTitle = document.createElement('div');
+    utaraTitle.innerText = "UTARA";
+    utaraTitle.style = "font-size:11px;font-weight:700;margin:5px 0;";
+    utaraContainer.appendChild(utaraTitle);
+
+    REGION_MAP.UTARA.forEach(d => {
+        utaraContainer.appendChild(createBtn(d));
+    });
+
+    // ===== SELATAN ROW =====
+    const selatanTitle = document.createElement('div');
+    selatanTitle.innerText = "SELATAN";
+    selatanTitle.style = "font-size:11px;font-weight:700;margin:5px 0;";
+    selatanContainer.appendChild(selatanTitle);
+
+    REGION_MAP.SELATAN.forEach(d => {
+        selatanContainer.appendChild(createBtn(d));
     });
 
     syncDistrictInput();
