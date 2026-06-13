@@ -198,20 +198,31 @@ function prev(){
 /* =========================
    1. MOUSE / TRACKPAD WHEEL
 ========================= */
+let scrollBuffer = 0;
+
 window.addEventListener("wheel",(e)=>{
 
     if(lock) return;
     lock = true;
 
-    const delta = e.deltaY + e.deltaX;
+    scrollBuffer += e.deltaY + e.deltaX;
 
-    if(delta > 0){
-        next();
-    }else{
-        prev();
+    const threshold = 80; // sensitivity control
+
+    if(scrollBuffer > threshold){
+        index = (index + 1) % items.length;
+        scrollBuffer = 0;
     }
 
-    setTimeout(()=> lock = false, 250);
+    if(scrollBuffer < -threshold){
+        index = (index - 1 + items.length) % items.length;
+        scrollBuffer = 0;
+    }
+
+    update();
+    snap();
+
+    setTimeout(()=> lock = false, 120);
 
 },{passive:true});
 
