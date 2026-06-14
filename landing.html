@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ultra Wheel FIXED</title>
+<title>Ultra Control Wheel V3 (Fixed)</title>
 
 <style>
 *{
@@ -13,34 +13,34 @@
     font-family:Inter,system-ui;
 }
 
-html,body{
-    width:100%;
-    height:100%;
-    overflow:hidden;
+body{
+    height:100vh;
     background:radial-gradient(circle at center,#0b1a2b,#050816);
+    overflow:hidden;
 }
 
-/* CENTER STAGE (IMPORTANT FIX) */
+/* STAGE */
 .stage{
     position:relative;
     width:100%;
-    height:100%;
+    height:100vh;
     display:flex;
-    justify-content:center;
     align-items:center;
 }
 
-/* WHEEL CENTERED (NO NEGATIVE LEFT ANYMORE) */
+/* WHEEL */
 .wheel{
     position:absolute;
-    width:min(600px, 90vmin);
-    height:min(600px, 90vmin);
-    border-radius:50%;
-    transform:rotate(0deg);
+    width:min(650px, 90vw);
+    height:min(650px, 90vw);
+    left:calc(-1 * min(325px, 45vw));
+    top:50%;
+    transform:translateY(-50%) rotate(0deg);
     transition:transform 0.7s cubic-bezier(.22,1,.36,1);
+    transform-origin:center center;
 }
 
-/* glow */
+/* GLOW */
 .wheel::before{
     content:"";
     position:absolute;
@@ -53,20 +53,21 @@ html,body{
 /* ITEM */
 .item{
     position:absolute;
-    width:110px;
-    height:110px;
+    width:120px;
+    height:120px;
     border-radius:18px;
     background:rgba(255,255,255,0.06);
     border:1px solid rgba(255,255,255,0.08);
     display:flex;
     justify-content:center;
     align-items:center;
+    text-align:center;
     color:white;
     font-weight:600;
-    backdrop-filter:blur(12px);
+    backdrop-filter:blur(14px);
+    transition:0.3s;
     opacity:0.5;
     transform:scale(0.9);
-    transition:0.3s;
 }
 
 /* ACTIVE */
@@ -81,19 +82,40 @@ html,body{
 /* PANEL */
 .panel{
     position:absolute;
-    right:20px;
-    top:20px;
+    right:80px;
     color:white;
-    text-align:right;
 }
 
 .panel h1{
-    font-size:32px;
+    font-size:46px;
 }
 
-/* MOBILE FIX */
-@media(max-width:768px){
-    .panel h1{font-size:24px;}
+.panel p{
+    opacity:0.6;
+}
+
+@media (max-width:768px){
+
+    .wheel{
+        width:500px;
+        height:500px;
+        left:-250px;
+    }
+
+    .item{
+        width:90px;
+        height:90px;
+        font-size:14px;
+    }
+
+    .panel{
+        right:20px;
+        max-width:45vw;
+    }
+
+    .panel h1{
+        font-size:28px;
+    }
 }
 </style>
 </head>
@@ -106,7 +128,7 @@ html,body{
 
 <div class="panel">
     <h1 id="title">M&E</h1>
-    <p>Ultra Wheel</p>
+    <p>Section</p>
 </div>
 
 <script>
@@ -122,17 +144,25 @@ let index = 0;
 let angle = 0;
 let lock = false;
 
+let radius = getRadius();
+let itemSize = getItemSize();
+
 const stepAngle = 360 / items.length;
 
-/* RESPONSIVE RADIUS (IMPORTANT FIX) */
 function getRadius(){
-    return Math.min(window.innerWidth, window.innerHeight) * 0.28;
+    const w = window.innerWidth;
+    return w < 480 ? 130 :
+           w < 768 ? 170 : 240;
 }
 
-let radius = getRadius();
+function getItemSize(){
+    const w = window.innerWidth;
+    return w < 480 ? 80 :
+           w < 768 ? 95 : 120;
+}
 
 /* CREATE ITEMS */
-items.forEach(name=>{
+items.forEach((name)=>{
     const el = document.createElement("div");
     el.className = "item";
     el.innerText = name;
@@ -141,15 +171,18 @@ items.forEach(name=>{
 
 const itemEls = document.querySelectorAll(".item");
 
-/* POSITION */
+/* POSITION (IMPORTANT FIX) */
 function positionItems(){
     itemEls.forEach((el,i)=>{
         const theta = (i/items.length)*Math.PI*2;
         const x = Math.cos(theta)*radius;
         const y = Math.sin(theta)*radius;
 
-        el.style.left = `calc(50% + ${x}px - 55px)`;
-        el.style.top  = `calc(50% + ${y}px - 55px)`;
+        el.style.width = itemSize + "px";
+        el.style.height = itemSize + "px";
+
+        el.style.left = `calc(50% + ${x}px - ${itemSize/2}px)`;
+        el.style.top  = `calc(50% + ${y}px - ${itemSize/2}px)`;
     });
 }
 
@@ -162,16 +195,20 @@ function update(){
 
 /* RENDER */
 function render(){
-    wheel.style.transform = `rotate(${angle}deg)`;
+
+    wheel.style.transform =
+        `translateY(-50%) rotate(${angle}deg)`;
 
     itemEls.forEach(el=>{
-        el.style.transform = `rotate(${-angle}deg) scale(0.9)`;
+        el.style.transform =
+            `rotate(${-angle}deg) scale(0.9)`;
     });
 
-    itemEls[index].style.transform = `rotate(${-angle}deg) scale(1.25)`;
+    itemEls[index].style.transform =
+        `rotate(${-angle}deg) scale(1.25)`;
 }
 
-/* NEXT/PREV */
+/* NAV */
 function next(){
     index = (index + 1) % items.length;
     angle -= stepAngle;
@@ -187,43 +224,54 @@ function prev(){
 }
 
 /* SCROLL */
-let buffer = 0;
+let scrollBuffer = 0;
 
 window.addEventListener("wheel",(e)=>{
+
     if(lock) return;
     lock = true;
 
-    buffer += e.deltaY;
+    scrollBuffer += e.deltaY;
 
-    if(buffer > 60){
+    const threshold = 80;
+
+    if(scrollBuffer > threshold){
         next();
-        buffer = 0;
+        scrollBuffer = 0;
     }
 
-    if(buffer < -60){
+    if(scrollBuffer < -threshold){
         prev();
-        buffer = 0;
+        scrollBuffer = 0;
     }
 
-    setTimeout(()=>lock=false,120);
+    setTimeout(()=> lock = false, 120);
+
 },{passive:true});
 
 /* TOUCH */
 let startX = 0;
 
-window.addEventListener("touchstart",e=>{
+window.addEventListener("touchstart",(e)=>{
     startX = e.touches[0].clientX;
 });
 
-window.addEventListener("touchend",e=>{
+window.addEventListener("touchend",(e)=>{
+
     const diff = startX - e.changedTouches[0].clientX;
-    if(Math.abs(diff)<40) return;
-    diff>0 ? next() : prev();
+
+    if(Math.abs(diff) < 40) return;
+
+    if(diff > 0) next();
+    else prev();
 });
 
-/* RESIZE FIX */
-window.addEventListener("resize",()=>{
+/* RESIZE FIX (IMPORTANT) */
+window.addEventListener("resize", () => {
+
     radius = getRadius();
+    itemSize = getItemSize();
+
     positionItems();
     render();
 });
@@ -234,6 +282,7 @@ update();
 render();
 
 });
+
 </script>
 
 </body>
