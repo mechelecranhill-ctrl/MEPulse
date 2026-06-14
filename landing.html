@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ultra Control Wheel V3 (Fixed)</title>
+<title>Ultra Wheel FIXED</title>
 
 <style>
 *{
@@ -13,34 +13,34 @@
     font-family:Inter,system-ui;
 }
 
-body{
-    height:100vh;
-    background:radial-gradient(circle at center,#0b1a2b,#050816);
+html,body{
+    width:100%;
+    height:100%;
     overflow:hidden;
+    background:radial-gradient(circle at center,#0b1a2b,#050816);
 }
 
-/* STAGE */
+/* CENTER STAGE (IMPORTANT FIX) */
 .stage{
     position:relative;
     width:100%;
-    height:100vh;
+    height:100%;
     display:flex;
+    justify-content:center;
     align-items:center;
 }
 
-/* WHEEL */
+/* WHEEL CENTERED (NO NEGATIVE LEFT ANYMORE) */
 .wheel{
     position:absolute;
-    width:min(650px, 90vw);
-    height:min(650px, 90vw);
-    left:calc(-1 * min(325px, 45vw));
-    top:50%;
-    transform:translateY(-50%) rotate(0deg);
+    width:min(600px, 90vmin);
+    height:min(600px, 90vmin);
+    border-radius:50%;
+    transform:rotate(0deg);
     transition:transform 0.7s cubic-bezier(.22,1,.36,1);
-    transform-origin:center center;
 }
 
-/* GLOW */
+/* glow */
 .wheel::before{
     content:"";
     position:absolute;
@@ -53,21 +53,20 @@ body{
 /* ITEM */
 .item{
     position:absolute;
-    width:120px;
-    height:120px;
+    width:110px;
+    height:110px;
     border-radius:18px;
     background:rgba(255,255,255,0.06);
     border:1px solid rgba(255,255,255,0.08);
     display:flex;
     justify-content:center;
     align-items:center;
-    text-align:center;
     color:white;
     font-weight:600;
-    backdrop-filter:blur(14px);
-    transition:0.3s;
+    backdrop-filter:blur(12px);
     opacity:0.5;
     transform:scale(0.9);
+    transition:0.3s;
 }
 
 /* ACTIVE */
@@ -82,40 +81,19 @@ body{
 /* PANEL */
 .panel{
     position:absolute;
-    right:80px;
+    right:20px;
+    top:20px;
     color:white;
+    text-align:right;
 }
 
 .panel h1{
-    font-size:46px;
+    font-size:32px;
 }
 
-.panel p{
-    opacity:0.6;
-}
-
-@media (max-width:768px){
-
-    .wheel{
-        width:500px;
-        height:500px;
-        left:-250px;
-    }
-
-    .item{
-        width:90px;
-        height:90px;
-        font-size:14px;
-    }
-
-    .panel{
-        right:20px;
-        max-width:45vw;
-    }
-
-    .panel h1{
-        font-size:28px;
-    }
+/* MOBILE FIX */
+@media(max-width:768px){
+    .panel h1{font-size:24px;}
 }
 </style>
 </head>
@@ -128,7 +106,7 @@ body{
 
 <div class="panel">
     <h1 id="title">M&E</h1>
-    <p>Section</p>
+    <p>Ultra Wheel</p>
 </div>
 
 <script>
@@ -144,25 +122,17 @@ let index = 0;
 let angle = 0;
 let lock = false;
 
-let radius = getRadius();
-let itemSize = getItemSize();
-
 const stepAngle = 360 / items.length;
 
+/* RESPONSIVE RADIUS (IMPORTANT FIX) */
 function getRadius(){
-    const w = window.innerWidth;
-    return w < 480 ? 130 :
-           w < 768 ? 170 : 240;
+    return Math.min(window.innerWidth, window.innerHeight) * 0.28;
 }
 
-function getItemSize(){
-    const w = window.innerWidth;
-    return w < 480 ? 80 :
-           w < 768 ? 95 : 120;
-}
+let radius = getRadius();
 
 /* CREATE ITEMS */
-items.forEach((name)=>{
+items.forEach(name=>{
     const el = document.createElement("div");
     el.className = "item";
     el.innerText = name;
@@ -171,18 +141,15 @@ items.forEach((name)=>{
 
 const itemEls = document.querySelectorAll(".item");
 
-/* POSITION (IMPORTANT FIX) */
+/* POSITION */
 function positionItems(){
     itemEls.forEach((el,i)=>{
         const theta = (i/items.length)*Math.PI*2;
         const x = Math.cos(theta)*radius;
         const y = Math.sin(theta)*radius;
 
-        el.style.width = itemSize + "px";
-        el.style.height = itemSize + "px";
-
-        el.style.left = `calc(50% + ${x}px - ${itemSize/2}px)`;
-        el.style.top  = `calc(50% + ${y}px - ${itemSize/2}px)`;
+        el.style.left = `calc(50% + ${x}px - 55px)`;
+        el.style.top  = `calc(50% + ${y}px - 55px)`;
     });
 }
 
@@ -195,20 +162,16 @@ function update(){
 
 /* RENDER */
 function render(){
-
-    wheel.style.transform =
-        `translateY(-50%) rotate(${angle}deg)`;
+    wheel.style.transform = `rotate(${angle}deg)`;
 
     itemEls.forEach(el=>{
-        el.style.transform =
-            `rotate(${-angle}deg) scale(0.9)`;
+        el.style.transform = `rotate(${-angle}deg) scale(0.9)`;
     });
 
-    itemEls[index].style.transform =
-        `rotate(${-angle}deg) scale(1.25)`;
+    itemEls[index].style.transform = `rotate(${-angle}deg) scale(1.25)`;
 }
 
-/* NAV */
+/* NEXT/PREV */
 function next(){
     index = (index + 1) % items.length;
     angle -= stepAngle;
@@ -224,54 +187,43 @@ function prev(){
 }
 
 /* SCROLL */
-let scrollBuffer = 0;
+let buffer = 0;
 
 window.addEventListener("wheel",(e)=>{
-
     if(lock) return;
     lock = true;
 
-    scrollBuffer += e.deltaY;
+    buffer += e.deltaY;
 
-    const threshold = 80;
-
-    if(scrollBuffer > threshold){
+    if(buffer > 60){
         next();
-        scrollBuffer = 0;
+        buffer = 0;
     }
 
-    if(scrollBuffer < -threshold){
+    if(buffer < -60){
         prev();
-        scrollBuffer = 0;
+        buffer = 0;
     }
 
-    setTimeout(()=> lock = false, 120);
-
+    setTimeout(()=>lock=false,120);
 },{passive:true});
 
 /* TOUCH */
 let startX = 0;
 
-window.addEventListener("touchstart",(e)=>{
+window.addEventListener("touchstart",e=>{
     startX = e.touches[0].clientX;
 });
 
-window.addEventListener("touchend",(e)=>{
-
+window.addEventListener("touchend",e=>{
     const diff = startX - e.changedTouches[0].clientX;
-
-    if(Math.abs(diff) < 40) return;
-
-    if(diff > 0) next();
-    else prev();
+    if(Math.abs(diff)<40) return;
+    diff>0 ? next() : prev();
 });
 
-/* RESIZE FIX (IMPORTANT) */
-window.addEventListener("resize", () => {
-
+/* RESIZE FIX */
+window.addEventListener("resize",()=>{
     radius = getRadius();
-    itemSize = getItemSize();
-
     positionItems();
     render();
 });
@@ -282,7 +234,6 @@ update();
 render();
 
 });
-
 </script>
 
 </body>
