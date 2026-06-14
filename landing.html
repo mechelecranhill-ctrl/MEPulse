@@ -31,9 +31,9 @@ body{
 /* WHEEL */
 .wheel{
     position:absolute;
-    width:650px;
-    height:650px;
-    left:-325px;
+    width:min(650px, 90vw);
+    height:min(650px, 90vw);
+    left:calc(-1 * min(325px, 45vw));
     top:50%;
     transform:translateY(-50%) rotate(0deg);
     transition:transform 0.7s cubic-bezier(.22,1,.36,1);
@@ -93,6 +93,30 @@ body{
 .panel p{
     opacity:0.6;
 }
+
+@media (max-width:768px){
+
+    .wheel{
+        width:500px;
+        height:500px;
+        left:-250px;
+    }
+
+    .item{
+        width:90px;
+        height:90px;
+        font-size:14px;
+    }
+
+    .panel{
+        right:20px;
+        max-width:45vw;
+    }
+
+    .panel h1{
+        font-size:28px;
+    }
+}
 </style>
 </head>
 
@@ -104,7 +128,7 @@ body{
 
 <div class="panel">
     <h1 id="title">M&E</h1>
-    <p>Ultra Control Wheel V3</p>
+    <p>Section</p>
 </div>
 
 <script>
@@ -116,12 +140,17 @@ const title = document.getElementById("title");
 
 const items = ["M&E","CM","PM","Asset","Reports","Export","Analytics","Logs"];
 
-const radius = 240;
-const stepAngle = 360 / items.length;
-
 let index = 0;
 let angle = 0;
 let lock = false;
+let radius = getRadius();
+
+function getRadius(){
+    return window.innerWidth < 480 ? 140 :
+           window.innerWidth < 768 ? 180 : 240;
+}
+
+const stepAngle = 360 / items.length;
 
 /* CREATE ITEMS */
 items.forEach((name)=>{
@@ -133,7 +162,7 @@ items.forEach((name)=>{
 
 const itemEls = document.querySelectorAll(".item");
 
-/* POSITION ITEMS */
+/* POSITION */
 function positionItems(){
     itemEls.forEach((el,i)=>{
         const theta = (i/items.length)*Math.PI*2;
@@ -145,14 +174,14 @@ function positionItems(){
     });
 }
 
-/* UPDATE ACTIVE */
+/* UPDATE */
 function update(){
     itemEls.forEach(el => el.classList.remove("active"));
     itemEls[index].classList.add("active");
     title.innerText = items[index];
 }
 
-/* RENDER (FIXED CORE) */
+/* RENDER */
 function render(){
 
     wheel.style.transform =
@@ -183,7 +212,7 @@ function prev(){
     render();
 }
 
-/* MOUSE WHEEL (BUFFER SMOOTH) */
+/* SCROLL */
 let scrollBuffer = 0;
 
 window.addEventListener("wheel",(e)=>{
@@ -224,7 +253,13 @@ window.addEventListener("touchend",(e)=>{
 
     if(diff > 0) next();
     else prev();
+});
 
+/* RESIZE FIX */
+window.addEventListener("resize", () => {
+    radius = getRadius();
+    positionItems();
+    render();
 });
 
 /* INIT */
