@@ -831,8 +831,10 @@ oninput="formatCurrencyInput(this); calculateContractSum()">
 
     let attachedWorkOrders = []; 
     let currentInterimId = null;
-let currentContractId = null;
-let contractDetectTimer = null;
+    let currentContractId = null;
+    let contractDetectTimer = null;
+    let originalContractDistrict = '';
+    let originalContractArea = '';
 
 const REGION_MAP = {
     UTARA: [
@@ -1056,12 +1058,26 @@ body: JSON.stringify(payload)
 
 if(currentContractId){
 
-    await updateWorkOrderSequenceNumbers(
-        currentContractId,
-        document.getElementById('c_dist').value,
-        document.getElementById('c_area').value
-    );
+    const newDistrict = document.getElementById('c_dist').value || '';
+    const newArea = document.getElementById('c_area').value || '';
 
+    const districtChanged =
+        newDistrict !== originalContractDistrict;
+
+    const areaChanged =
+        newArea !== originalContractArea;
+
+    if(districtChanged || areaChanged){
+
+        await updateWorkOrderSequenceNumbers(
+            currentContractId,
+            newDistrict,
+            newArea
+        );
+
+        originalContractDistrict = newDistrict;
+        originalContractArea = newArea;
+    }
 }
 
 alert(
@@ -2254,6 +2270,9 @@ return;
 
 const c = data[0];
 
+    originalContractDistrict = c.district || '';
+originalContractArea = c.area_code || '';
+
 currentContractId = c.id;
 
 document.getElementById('c_unit_id').value =
@@ -2437,24 +2456,26 @@ async function updateWorkOrderSequenceNumbers(
         const areaCode =
             areas[index] || 'WO';
 
-        for(let i=0;i<districtWorks.length;i++){
+        await Promise.all(
+    districtWorks.map((work, i) => {
 
-            const newSeq =
-                areaCode +
-                String(i + 1).padStart(3,'0');
+        const newSeq =
+            areaCode +
+            String(i + 1).padStart(3,'0');
 
-            await fetch(
-                `${SB_URL}/rest/v1/work_orders?id=eq.${districtWorks[i].id}`,
-                {
-                    method:'PATCH',
-                    headers,
-                    body: JSON.stringify({
-                        sequence_no:newSeq
-                    })
-                }
-            );
+        return fetch(
+            `${SB_URL}/rest/v1/work_orders?id=eq.${work.id}`,
+            {
+                method:'PATCH',
+                headers,
+                body: JSON.stringify({
+                    sequence_no:newSeq
+                })
+            }
+        );
 
-        }
+    })
+);
 
     }
 
