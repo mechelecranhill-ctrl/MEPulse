@@ -214,6 +214,38 @@ z-index:2;
     opacity:.7;
     line-height:1.6;
 }
+    /* MOBILE */
+@media (max-width:768px){
+
+    .panel{
+        display:none;
+    }
+
+    .info-card{
+        position:fixed;
+        left:20px;
+        right:20px;
+        top:auto;
+        bottom:20px;
+        width:auto;
+
+        opacity:0;
+        visibility:hidden;
+
+        transform:translateY(40px);
+
+        transition:
+            opacity .3s ease,
+            transform .3s ease,
+            visibility .3s;
+    }
+
+    .info-card.show-mobile{
+        opacity:1;
+        visibility:visible;
+        transform:translateY(0);
+    }
+}
 </style>
 </head>
 
@@ -287,6 +319,8 @@ let index = 0;
 let angle = 0;
 let lock = false;
 
+    const isMobile = window.innerWidth <= 768;
+
 /* CREATE ITEMS */
 items.forEach((name)=>{
     const el = document.createElement("div");
@@ -296,6 +330,19 @@ items.forEach((name)=>{
 });
 
 const itemEls = document.querySelectorAll(".item");
+
+    itemEls.forEach((el,i)=>{
+
+    el.addEventListener("click",()=>{
+
+        if(!isMobile) return;
+
+        if(i !== index) return;
+
+        card.classList.add("show-mobile");
+    });
+
+});
 
 /* POSITION ITEMS */
 function positionItems(){
@@ -320,11 +367,18 @@ function update(){
     cardTitle.innerText = items[index].title;
     cardDesc.innerText = items[index].desc;
 
-    card.classList.remove("show");
+    if(isMobile){
+        card.classList.remove("show-mobile");
+    }
 
-    void card.offsetWidth;
+    if(!isMobile){
 
-    card.classList.add("show");
+        card.classList.remove("show");
+
+        void card.offsetWidth;
+
+        card.classList.add("show");
+    }
 }
 
 /* RENDER (FIXED CORE) */
@@ -402,6 +456,24 @@ window.addEventListener("touchend",(e)=>{
 
 });
 
+    document.addEventListener("click",(e)=>{
+
+    if(!isMobile) return;
+
+    if(
+        !card.contains(e.target) &&
+        !e.target.closest(".item")
+    ){
+        card.classList.remove("show-mobile");
+    }
+
+});
+
+    if(isMobile){
+    card.classList.remove("show");
+    card.classList.remove("show-mobile");
+}
+    
 /* INIT */
 positionItems();
 update();
