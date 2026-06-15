@@ -247,9 +247,18 @@ z-index:2;
     }
 }
 </style>
+
+    <link rel="stylesheet" href="style.css">
+
+<script src="auth.js"></script>
+<script src="session.js"></script>
+<script src="sidebar.js" defer></script>
+    
 </head>
 
 <body>
+
+    <app-sidebar></app-sidebar>
 
 <div class="stage">
     <div class="wheel" id="wheel"></div>
@@ -269,51 +278,36 @@ z-index:2;
 
 <script>
 
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener("DOMContentLoaded", async () => {
 
+    if(typeof checkSession === "function"){
+        await checkSession();
+    }
+
+    loadSections();
+});
+    
+    const role = localStorage.getItem("role");
+const isAdmin = role === "admin";
+
+const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
+const SB_KEY = "...";
+
+const headers = {
+    apikey: SB_KEY,
+    Authorization: `Bearer ${SB_KEY}`
+};
 const wheel = document.getElementById("wheel");
 const title = document.getElementById("title");
     const card = document.getElementById("infoCard");
 const cardTitle = document.getElementById("cardTitle");
 const cardDesc = document.getElementById("cardDesc");
 
-const items = [
-    {
-        title:"M&E",
-        desc:"Mechanical & Electrical management dashboard."
-    },
-    {
-        title:"CM",
-        desc:"Contract management and monitoring system."
-    },
-    {
-        title:"PM",
-        desc:"Preventive maintenance scheduling and tracking."
-    },
-    {
-        title:"Asset",
-        desc:"Asset register and lifecycle management."
-    },
-    {
-        title:"Reports",
-        desc:"Generate reports and statistics instantly."
-    },
-    {
-        title:"Export",
-        desc:"Export data into PDF, Excel and CSV."
-    },
-    {
-        title:"Analytics",
-        desc:"Performance insights and trend analysis."
-    },
-    {
-        title:"Logs",
-        desc:"System activity logs and audit trails."
-    }
-];
+let items = [];
+let itemEls = [];
+let stepAngle = 0;
 
 const radius = 240;
-const stepAngle = 360 / items.length;
 
 let index = 0;
 let angle = 0;
@@ -321,15 +315,73 @@ let lock = false;
 
     const isMobile = window.innerWidth <= 768;
 
-/* CREATE ITEMS */
-items.forEach((name)=>{
-    const el = document.createElement("div");
-    el.className = "item";
-    el.innerText = name.title;
-    wheel.appendChild(el);
-});
+    async function loadSections(){
 
-const itemEls = document.querySelectorAll(".item");
+    try{
+
+        const res = await fetch(
+            `${SB_URL}/rest/v1/me_sections?select=*`,
+            { headers }
+        );
+
+        items = await res.json();
+
+        items = items.map(sec => ({
+            title: sec.section_name,
+            desc: sec.section_name
+        }));
+
+        stepAngle = 360 / items.length;
+
+        createWheel();
+
+    }catch(err){
+        console.error(err);
+    }
+}
+
+function createWheel(){
+
+    wheel.innerHTML = "";
+
+    items.forEach(item=>{
+
+        const el = document.createElement("div");
+
+        el.className = "item";
+        el.innerText = item.title;
+
+        wheel.appendChild(el);
+    });
+
+    itemEls = document.querySelectorAll(".item");
+
+    itemEls.forEach((el,i)=>{
+
+        el.addEventListener("click",()=>{
+
+            if(isMobile){
+
+                index = i;
+
+                angle = -(stepAngle * i);
+
+                update();
+                render();
+
+                card.classList.add("show-mobile");
+            }
+
+        });
+
+    });
+
+    positionItems();
+    update();
+    render();
+}
+
+let itemEls = [];
 
     itemEls.forEach((el,i)=>{
 
@@ -473,13 +525,6 @@ window.addEventListener("touchend",(e)=>{
     card.classList.remove("show");
     card.classList.remove("show-mobile");
 }
-    
-/* INIT */
-positionItems();
-update();
-render();
-
-});
 
 </script>
 
