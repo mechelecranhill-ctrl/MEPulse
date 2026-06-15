@@ -270,10 +270,13 @@ z-index:2;
 </div>
 
     <div class="info-card" id="infoCard">
-    <h2 id="cardTitle">M&E</h2>
-    <p id="cardDesc">
-        Mechanical & Electrical management dashboard.
-    </p>
+    <h2 id="cardTitle"></h2>
+
+    <div id="cardDesc"></div>
+
+    <button id="openBtn">
+        Open Dashboard
+    </button>
 </div>
 
 <script>
@@ -315,17 +318,26 @@ let lock = false;
 
     try{
 
-        const res = await fetch(
-            `${SB_URL}/rest/v1/me_sections?select=*`,
-            { headers }
-        );
+        const [secRes, unitRes] = await Promise.all([
+    fetch(`${SB_URL}/rest/v1/me_sections?select=*`, { headers }),
+    fetch(`${SB_URL}/rest/v1/units?select=*`, { headers })
+]);
 
-        items = await res.json();
+const sections = await secRes.json();
+const units = await unitRes.json();
 
-        items = items.map(sec => ({
-            title: sec.section_name,
-            desc: sec.section_name
-        }));
+items = sections.map(sec => {
+
+    const sectionUnits =
+        units.filter(u => u.section_id === sec.id);
+
+    return {
+        id: sec.id,
+        title: sec.section_name,
+        desc: `${sectionUnits.length} Unit`,
+        units: sectionUnits
+    };
+});
 
         stepAngle = 360 / items.length;
 
@@ -413,7 +425,16 @@ function update(){
     title.innerText = items[index].title;
 
     cardTitle.innerText = items[index].title;
-    cardDesc.innerText = items[index].desc;
+
+cardDesc.innerHTML =
+`
+${items[index].desc}
+<br><br>
+
+${items[index].units.map(unit =>
+    `• ${unit.unit_name}`
+).join("<br>")}
+`;
 
     if(isMobile){
         card.classList.remove("show-mobile");
