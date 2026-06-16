@@ -356,9 +356,6 @@ const radius = isMobile ? 180 : 240;
 let index = 0;
 let angle = 0;
 let lock = false;
-let itemEls = [];
-let items = [];
-let stepAngle = 0;
 
     async function loadSections(){
 
@@ -398,58 +395,97 @@ function createWheel(){
 
     wheel.innerHTML = "";
 
-    items.forEach((item,i)=>{
+    items.forEach(item=>{
 
-        const el = document.createElement("div");
-        el.className = "item";
+    const el = document.createElement("div");
+    el.className = "item";
 
-        const sectionName = item.title.toUpperCase();
+    const sectionName = item.title.toUpperCase();
 
-        if(sectionName.includes("SELENGGARA")){
-            el.innerHTML = `<img src="MaintHelm.png" class="section-helm">`;
-        }
-        else if(sectionName.includes("PEMATUHAN")){
-            el.innerHTML = `<img src="CompHelm.png" class="section-helm">`;
-        }
-        else if(sectionName.includes("ASET")){
-            el.innerHTML = `<img src="AssetFinHelm.png" class="section-helm">`;
-        }
-        else if(sectionName.includes("PROJEK")){
-            el.innerHTML = `<img src="ProjectsHelm.png" class="section-helm">`;
-        }
-        else{
-            el.innerText = item.title;
-        }
+    if(sectionName.includes("SELENGGARA")){
+        el.innerHTML =
+            `<img src="MaintHelm.png" class="section-helm">`;
+    }
+    else if(sectionName.includes("PEMATUHAN")){
+        el.innerHTML =
+            `<img src="CompHelm.png" class="section-helm">`;
+    }
+    else if(sectionName.includes("ASET")){
+        el.innerHTML =
+            `<img src="AssetFinHelm.png" class="section-helm">`;
+    }
+    else if(sectionName.includes("PROJEK")){
+        el.innerHTML =
+            `<img src="ProjectsHelm.png" class="section-helm">`;
+    }
+    else{
+        el.innerText = item.title;
+    }
 
-        el.addEventListener("click", () => {
-    if (!isMobile) return;
+    wheel.appendChild(el);
+});
+
+    itemEls = document.querySelectorAll(".item");
+
+    itemEls.forEach((el,i)=>{
+
+        el.addEventListener("click",()=>{
+
+            if(isMobile){
 
     index = i;
     angle = -(stepAngle * i);
 
-    wheel.style.transition = "none";
-    wheel.offsetHeight;
-
     update();
     render();
 
+    // HIDE WHEEL + OTHER ITEMS
     document.body.classList.add("hide-wheel");
 
-    requestAnimationFrame(() => {
-        card.classList.add("show-mobile");
-    });
-});
+    // show card
+    card.classList.add("show-mobile");
+}
 
-        wheel.appendChild(el);
-    });
+        });
 
-    itemEls = document.querySelectorAll(".item");
+    });
 
     positionItems();
     update();
     render();
 }
 
+let itemEls = [];
+
+    itemEls.forEach((el,i)=>{
+
+    el.addEventListener("click", () => {
+
+    if (!isMobile) return;
+
+    index = i;
+    angle = -(stepAngle * i);
+
+    // ❌ FREEZE ANIMATION FIRST
+    wheel.style.transition = "none";
+
+    // force repaint (VERY IMPORTANT)
+    wheel.offsetHeight;
+
+    // update state first (no animation lag)
+    update();
+
+    // render instantly (no transition)
+    render();
+
+    // hide wheel AFTER state stable
+    document.body.classList.add("hide-wheel");
+
+    // show card with delay (smooth fade)
+    requestAnimationFrame(() => {
+        card.classList.add("show-mobile");
+    });
+});
 
 /* POSITION ITEMS */
 function positionItems(){
@@ -526,9 +562,6 @@ function render(){
     itemEls[index].style.transform =
         `rotate(${-angle}deg) scale(1.25)`;
 }
-setTimeout(() => {
-    wheel.style.transition = "transform 0.7s cubic-bezier(.22,1,.36,1)";
-}, 50);
 
 /* NEXT */
 function next(){
