@@ -459,15 +459,32 @@ let itemEls = [];
 
     itemEls.forEach((el,i)=>{
 
-    el.addEventListener("click",()=>{
+    el.addEventListener("click", () => {
 
-        if(!isMobile) return;
+    if (!isMobile) return;
 
-        if(i !== index) return;
+    index = i;
+    angle = -(stepAngle * i);
 
+    // ❌ FREEZE ANIMATION FIRST
+    wheel.style.transition = "none";
+
+    // force repaint (VERY IMPORTANT)
+    wheel.offsetHeight;
+
+    // update state first (no animation lag)
+    update();
+
+    // render instantly (no transition)
+    render();
+
+    // hide wheel AFTER state stable
+    document.body.classList.add("hide-wheel");
+
+    // show card with delay (smooth fade)
+    requestAnimationFrame(() => {
         card.classList.add("show-mobile");
     });
-
 });
 
 /* POSITION ITEMS */
@@ -528,6 +545,8 @@ document.getElementById("openBtn").onclick = () => {
     window.location.href =
         `dashboard-contract.html?section=${encoded}`;
 }
+
+wheel.style.transition = "none";
 
 /* RENDER (FIXED CORE) */
 function render(){
