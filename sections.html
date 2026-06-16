@@ -356,6 +356,9 @@ const radius = isMobile ? 180 : 240;
 let index = 0;
 let angle = 0;
 let lock = false;
+let itemEls = [];
+let items = [];
+let stepAngle = 0;
 
     async function loadSections(){
 
@@ -395,60 +398,53 @@ function createWheel(){
 
     wheel.innerHTML = "";
 
-    items.forEach(item=>{
+    items.forEach((item,i)=>{
 
-    const el = document.createElement("div");
-    el.className = "item";
+        const el = document.createElement("div");
+        el.className = "item";
 
-    const sectionName = item.title.toUpperCase();
+        const sectionName = item.title.toUpperCase();
 
-    if(sectionName.includes("SELENGGARA")){
-        el.innerHTML =
-            `<img src="MaintHelm.png" class="section-helm">`;
-    }
-    else if(sectionName.includes("PEMATUHAN")){
-        el.innerHTML =
-            `<img src="CompHelm.png" class="section-helm">`;
-    }
-    else if(sectionName.includes("ASET")){
-        el.innerHTML =
-            `<img src="AssetFinHelm.png" class="section-helm">`;
-    }
-    else if(sectionName.includes("PROJEK")){
-        el.innerHTML =
-            `<img src="ProjectsHelm.png" class="section-helm">`;
-    }
-    else{
-        el.innerText = item.title;
-    }
+        if(sectionName.includes("SELENGGARA")){
+            el.innerHTML = `<img src="MaintHelm.png" class="section-helm">`;
+        }
+        else if(sectionName.includes("PEMATUHAN")){
+            el.innerHTML = `<img src="CompHelm.png" class="section-helm">`;
+        }
+        else if(sectionName.includes("ASET")){
+            el.innerHTML = `<img src="AssetFinHelm.png" class="section-helm">`;
+        }
+        else if(sectionName.includes("PROJEK")){
+            el.innerHTML = `<img src="ProjectsHelm.png" class="section-helm">`;
+        }
+        else{
+            el.innerText = item.title;
+        }
 
-    wheel.appendChild(el);
-});
+        el.addEventListener("click", () => {
 
-    itemEls = document.querySelectorAll(".item");
+            if (!isMobile) return;
 
-    itemEls.forEach((el,i)=>{
+            index = i;
+            angle = -(stepAngle * i);
 
-        el.addEventListener("click",()=>{
+            wheel.style.transition = "none";
+            wheel.offsetHeight;
 
-            if(isMobile){
+            update();
+            render();
 
-    index = i;
-    angle = -(stepAngle * i);
+            document.body.classList.add("hide-wheel");
 
-    update();
-    render();
-
-    // HIDE WHEEL + OTHER ITEMS
-    document.body.classList.add("hide-wheel");
-
-    // show card
-    card.classList.add("show-mobile");
-}
-
+            requestAnimationFrame(() => {
+                card.classList.add("show-mobile");
+            });
         });
 
+        wheel.appendChild(el);
     });
+
+    itemEls = document.querySelectorAll(".item");
 
     positionItems();
     update();
@@ -465,9 +461,6 @@ let itemEls = [];
 
     index = i;
     angle = -(stepAngle * i);
-
-    // ❌ FREEZE ANIMATION FIRST
-    wheel.style.transition = "none";
 
     // force repaint (VERY IMPORTANT)
     wheel.offsetHeight;
