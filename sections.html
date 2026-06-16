@@ -23,7 +23,7 @@ font-family:Inter,system-ui;
 --input-bg: rgba(255, 255, 255, 0.4);
 }
 
-* {
+• {
 box-sizing: border-box;
 -webkit-tap-highlight-color: transparent;
 font-family: Inter, system-ui;
@@ -86,6 +86,15 @@ transition:transform 0.7s cubic-bezier(.22,1,.36,1);
 transform-origin:center center;
 }
 
+.wheel::before{
+content:"";
+position:absolute;
+inset:60px;
+border-radius:50%;
+border:1px solid rgba(56,189,248,0.15);
+box-shadow:0 0 60px rgba(56,189,248,0.08);
+}
+
 .item{
 position:absolute;
 width:120px;
@@ -119,6 +128,8 @@ z-index:2;
 right:80px;
 color:white;
 }
+.panel h1{ font-size:46px; }
+.panel p{ opacity:0.6; }
 
 .info-card{
 position:absolute;
@@ -133,16 +144,19 @@ border:1px solid rgba(255,255,255,0.12);
 backdrop-filter:blur(18px);
 color:white;
 opacity:0;
-}
-
-.info-card.show{
-animation:fadeInRight .45s ease forwards;
+animation:none;
 }
 
 @keyframes fadeInRight{
 from{ opacity:0; transform:translateY(-50%) translateX(50px); }
 to{ opacity:1; transform:translateY(-50%) translateX(0); }
 }
+.info-card.show{
+animation:fadeInRight .45s ease forwards;
+}
+
+.info-card h2{ margin-bottom:10px; font-size:22px; }
+.info-card p{ opacity:.7; line-height:1.6; }
 
 .unit-card{
 padding:10px 14px;
@@ -157,22 +171,94 @@ color:white;
 width:160px;
 height:160px;
 object-fit:contain;
+pointer-events:none;
 }
 
+.item.active .section-helm{
+transform:scale(1.15);
+filter:
+drop-shadow(0 0 10px rgba(56,189,248,.8))
+drop-shadow(0 0 20px rgba(56,189,248,.5));
+}
+
+/* ── FLOATING HELM ── /
 .floating-helm{
 position:fixed;
+object-fit:contain;
 z-index:1001;
 pointer-events:none;
+/ transition hanya untuk top/left/width/height */
 transition:
 top 0.5s cubic-bezier(.22,1,.36,1),
 left 0.5s cubic-bezier(.22,1,.36,1),
 width 0.5s cubic-bezier(.22,1,.36,1),
 height 0.5s cubic-bezier(.22,1,.36,1);
+filter:
+drop-shadow(0 0 10px rgba(56,189,248,.8))
+drop-shadow(0 0 20px rgba(56,189,248,.5));
+}
+
+/* ── MOBILE ── */
+@media (max-width:768px){
+
+.panel{ display:none; }
+
+.info-card{
+position:fixed;
+left:20px;
+right:20px;
+top:auto;
+bottom:20px;
+width:auto;
+opacity:0;
+visibility:hidden;
+transform:translateY(40px);
+transition:
+opacity .35s ease,
+transform .35s ease,
+visibility .35s;
+}
+
+.info-card.show-mobile{
+opacity:1;
+visibility:visible;
+transform:translateY(0);
+}
+
+/* ruang atas card untuk floating helm */
+.info-card.has-helm{
+padding-top:16px;
+margin-top:0;
+}
+
+body.hide-wheel .wheel{
+opacity:0;
+transform:translateY(-50%) scale(0.6);
+pointer-events:none;
+transition:0.4s ease;
+}
+
+body.hide-wheel .item{
+opacity:0;
+transition:0.3s ease;
+}
+
+/* item aktif pun sembunyikan — PNG dah jadi floating */
+body.hide-wheel .item.active{
+opacity:0 !important;
+}
 }
 </style>
+
+<link rel="stylesheet" href="style.css">
+<script src="auth.js"></script>
+<script src="session.js"></script>
+<script src="sidebar.js" defer></script>
 </head>
 
 <body>
+
+<app-sidebar></app-sidebar>
 
 <div class="stage">
 <div class="wheel" id="wheel"></div>
@@ -196,11 +282,11 @@ loadSections();
 });
 
 const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
-    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
 
 const headers = {
 apikey: SB_KEY,
-Authorization: `Bearer ${SB_KEY}`
+Authorization: 'Bearer ${SB_KEY}`
 };
 
 const wheel = document.getElementById("wheel");
@@ -215,11 +301,13 @@ const radius = isMobile ? 180 : 240;
 let index = 0;
 let baseAngle = 0;
 let stepAngle = 0;
+let lock = false;
+
 let items = [];
 let itemEls = [];
 let currentFloating = null;
 
-/* HELM */
+/* ================= HELM ================= */
 function getHelmSrc(name){
 const n = name.toUpperCase();
 if(n.includes("SELENGGARA")) return "MaintHelm.png";
@@ -229,12 +317,12 @@ if(n.includes("PROJEK")) return "ProjectsHelm.png";
 return null;
 }
 
-/* LOAD */
+/* ================= LOAD ================= */
 async function loadSections(){
 const [secRes, unitRes] = await Promise.all([
-fetch(`${SB_URL}/rest/v1/me_sections?select=*`, { headers }),
-fetch(`${SB_URL}/rest/v1/units?select=*`, { headers })
-]);
+fetch(`${SB_URL}/rest/v1/me_sections?select=*', { headers }), 
+fetch('${SB_URL}/rest/v1/units?select=*', { headers })
+ ]);
 
 const sections = await secRes.json();
 const units = await unitRes.json();
@@ -249,7 +337,7 @@ stepAngle = 360 / items.length;
 createWheel();
 }
 
-/* WHEEL */
+/* ================= WHEEL ================= */
 function createWheel(){
 wheel.innerHTML = "";
 
@@ -258,7 +346,11 @@ const el = document.createElement("div");
 el.className = "item";
 
 const src = getHelmSrc(item.title);
-el.innerHTML = src ? `<img src="${src}" class="section-helm">` : item.title;
+if(src){
+el.innerHTML = <img src="${src}" class="section-helm">`;
+}else{
+el.innerText = item.title;
+}
 
 wheel.appendChild(el);
 });
@@ -271,18 +363,24 @@ el.addEventListener("click", () => {
 if(!isMobile) return;
 
 index = i;
+
 update();
 render();
 
-const img = el.querySelector("img");
+dismissFloating();
+
+const img = el.querySelector(".section-helm");
 if(!img) return;
 
 const r = img.getBoundingClientRect();
+
+document.body.classList.add("hide-wheel");
 
 const fl = document.createElement("img");
 fl.src = img.src;
 fl.className = "floating-helm";
 
+fl.style.transition = "none";
 fl.style.top = r.top + "px";
 fl.style.left = r.left + "px";
 fl.style.width = r.width + "px";
@@ -292,18 +390,21 @@ document.body.appendChild(fl);
 currentFloating = fl;
 
 requestAnimationFrame(() => {
+requestAnimationFrame(() => {
+
+fl.style.transition = "";
+
+const cardH = card.offsetHeight || 220;
+const cardTop = window.innerHeight - cardH - 20;
+
 fl.style.left = (window.innerWidth/2 - r.width/2) + "px";
-fl.style.top = "200px";
+fl.style.top = (cardTop - r.height - 12) + "px";
+});
 });
 
 setTimeout(() => {
-card.classList.add("show");
+card.classList.add("show-mobile");
 }, 120);
-
-document.getElementById("openBtn").onclick = () => {
-window.location.href = `dashboard-contract.html?section=${encodeURIComponent(items[index].title)}`;
-};
-
 });
 });
 
@@ -312,19 +413,30 @@ update();
 render();
 }
 
-/* POSITION */
+/* ================= HELPERS ================= */
+function isCardOpen(){
+return card.classList.contains("show-mobile");
+}
+
+function dismissFloating(){
+if(currentFloating){
+currentFloating.remove();
+currentFloating = null;
+}
+}
+
+/* ================= POSITION ================= */
 function positionItems(){
 itemEls.forEach((el, i) => {
 const theta = (i / items.length) * Math.PI * 2;
 const x = Math.cos(theta) * radius;
 const y = Math.sin(theta) * radius;
 
-el.style.left = `calc(50% + ${x}px - 60px)`;
-el.style.top = `calc(50% + ${y}px - 60px)`;
+el.style.left = calc(50% + ${x}px - 60px); el.style.top =calc(50% + ${y}px - 60px);
 });
 }
 
-/* UPDATE */
+/* ================= UPDATE ================= */
 function update(){
 itemEls.forEach(e => e.classList.remove("active"));
 itemEls[index].classList.add("active");
@@ -335,23 +447,29 @@ title.innerText = item.title;
 cardTitle.innerText = item.title;
 
 cardDesc.innerHTML =
-`<div style="margin-bottom:10px">${item.units.length} Unit</div>` +
-item.units.map(u => `<div class="unit-card">${u.unit_name}</div>`).join("");
+<div style="margin-bottom:10px"&gt;${item.units.length} Unit</div>+ item.units.map(u =&gt;<div class="unit-card">${u.unit_name}&lt;/div>).join("");
+
+document.getElementById("openBtn").onclick =
+() => goContract(item.title);
+
+if(!isMobile){
+card.classList.add("show");
+}
 }
 
-/* RENDER */
+/* ================= RENDER ================= */
 function render(){
-wheel.style.transform = `translateY(-50%) rotate(${baseAngle}deg)`;
+wheel.style.transform = translateY(-50%) rotate(${baseAngle}deg)`;
 
 itemEls.forEach(el => {
-el.style.transform = `rotate(${-baseAngle}deg) scale(0.9)`;
+el.style.transform = rotate(${-baseAngle}deg) scale(0.9)`;
 });
 
 itemEls[index].style.transform =
-`rotate(${-baseAngle}deg) scale(1.25)`;
+rotate(${-baseAngle}deg) scale(1.25)`;
 }
 
-/* NAV */
+/* ================= NAV ================= */
 function next(){
 index = (index + 1) % items.length;
 baseAngle -= stepAngle;
@@ -363,7 +481,56 @@ index = (index - 1 + items.length) % items.length;
 baseAngle += stepAngle;
 update(); render();
 }
-</script>
 
+/* ================= WHEEL SCROLL ================= */
+let buffer = 0;
+
+window.addEventListener("wheel", e => {
+if(lock) return;
+lock = true;
+
+buffer += e.deltaY;
+
+if(buffer > 80){ next(); buffer = 0; }
+if(buffer < -80){ prev(); buffer = 0; }
+
+setTimeout(() => lock = false, 120);
+}, { passive:true });
+
+/* ================= SWIPE (FIXED) ================= */
+let startX = 0;
+
+window.addEventListener("touchstart", e => {
+if(isCardOpen()) return;
+startX = e.touches[0].clientX;
+}, { passive:true });
+
+window.addEventListener("touchend", e => {
+if(isCardOpen()) return;
+
+const diff = startX - e.changedTouches[0].clientX;
+if(Math.abs(diff) < 40) return;
+
+if(diff > 0) next();
+else prev();
+}, { passive:true });
+
+/* ================= OUTSIDE CLICK ================= */
+document.addEventListener("click", e => {
+if(!isMobile) return;
+
+if(!card.contains(e.target) && !e.target.closest(".item")){
+card.classList.remove("show-mobile");
+document.body.classList.remove("hide-wheel");
+dismissFloating();
+}
+});
+
+/* ================= CONTRACT ================= */
+function goContract(name){
+window.location.href =
+'dashboard-contract.html?section=${encodeURIComponent(name)}`;
+}
+</script>
 </body>
 </html>
