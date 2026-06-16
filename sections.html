@@ -310,7 +310,7 @@ let stepAngle = 0;
 let items     = [];
 let itemEls   = [];
 
-let currentFloating = null;
+let cardOpen = false;
 
 /* ── HELM SRC ── */
 function getHelmSrc(sectionName){
@@ -419,6 +419,7 @@ requestAnimationFrame(() => {
 
 setTimeout(() => {
   card.classList.add("show-mobile");
+  cardOpen = true;
 }, 120);
 
     });
@@ -514,10 +515,15 @@ window.addEventListener("wheel", (e) => {
 /* ── SWIPE ── */
 let startX = 0;
 window.addEventListener("touchstart", (e) => { startX = e.touches[0].clientX; });
-window.addEventListener("touchend",   (e) => {
+window.addEventListener("touchend", (e) => {
+
+  if(cardOpen) return; // 🔥 STOP SWIPE bila card open
+
   const diff = startX - e.changedTouches[0].clientX;
   if(Math.abs(diff) < 40) return;
-  if(diff > 0) next(); else prev();
+
+  if(diff > 0) next();
+  else prev();
 });
 
 /* ── DISMISS ON TAP LUAR ── */
@@ -525,8 +531,10 @@ document.addEventListener("click", (e) => {
   if(!isMobile) return;
   if(!card.contains(e.target) && !e.target.closest(".item")){
     card.classList.remove("show-mobile");
-    document.body.classList.remove("hide-wheel");
-    dismissFloating();
+document.body.classList.remove("hide-wheel");
+dismissFloating();
+
+cardOpen = false;
   }
 });
 
