@@ -293,91 +293,87 @@ body::before{
 <script>
 
 window.addEventListener("DOMContentLoaded", async () => {
-  if(typeof checkSession === "function") await checkSession();
+  if (typeof checkSession === "function") await checkSession();
   loadSections();
 });
 
 const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
+    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
 
 const headers = {
   apikey: SB_KEY,
   Authorization: `Bearer ${SB_KEY}`
 };
 
-const wheel     = document.getElementById("wheel");
-const title     = document.getElementById("title");
-const card      = document.getElementById("infoCard");
+const wheel = document.getElementById("wheel");
+const title = document.getElementById("title");
+const card = document.getElementById("infoCard");
 const cardTitle = document.getElementById("cardTitle");
-const cardDesc  = document.getElementById("cardDesc");
-const openBtn   = document.getElementById("openBtn");
+const cardDesc = document.getElementById("cardDesc");
+const openBtn = document.getElementById("openBtn");
 
 const isMobile = window.innerWidth <= 768;
-const radius   = isMobile ? 180 : 240;
+const radius = isMobile ? 180 : 240;
 
-let index     = 0;
+let index = 0;
 let baseAngle = 0;
 let stepAngle = 0;
-let lock      = false;
-let items     = [];
-let itemEls   = [];
+
+let items = [];
+let itemEls = [];
 let currentFloating = null;
 
-// track section aktif untuk button
-let activeSection = "";
-
-/* ── HELM SRC ── */
+/* ================= HELM ================= */
 function getHelmSrc(name){
   const n = name.toUpperCase();
   if(n.includes("SELENGGARA")) return "MaintHelm.png";
-  if(n.includes("PEMATUHAN"))  return "CompHelm.png";
-  if(n.includes("ASET"))       return "AssetFinHelm.png";
-  if(n.includes("PROJEK"))     return "ProjectsHelm.png";
+  if(n.includes("PEMATUHAN")) return "CompHelm.png";
+  if(n.includes("ASET")) return "AssetFinHelm.png";
+  if(n.includes("PROJEK")) return "ProjectsHelm.png";
   return null;
 }
 
-/* ── BUTTON — satu tempat sahaja ── */
-openBtn.addEventListener("click", () => {
-  if(!activeSection) return;
-  window.location.href = `dashboard-contract.html?section=${encodeURIComponent(activeSection)}`;
-});
-
-/* ── LOAD ── */
+/* ================= LOAD ================= */
 async function loadSections(){
-  try{
+  try {
     const [secRes, unitRes] = await Promise.all([
       fetch(`${SB_URL}/rest/v1/me_sections?select=*`, { headers }),
-      fetch(`${SB_URL}/rest/v1/units?select=*`,       { headers })
+      fetch(`${SB_URL}/rest/v1/units?select=*`, { headers })
     ]);
+
     const sections = await secRes.json();
-    const units    = await unitRes.json();
+    const units = await unitRes.json();
 
     items = sections.map(sec => ({
-      id:    sec.id,
+      id: sec.id,
       title: sec.section_name,
       units: units.filter(u => u.section_id === sec.id)
     }));
 
     stepAngle = 360 / items.length;
     createWheel();
-  }catch(err){
-    console.error(err);
+
+  } catch (err) {
+    console.error("Load error:", err);
   }
 }
 
-/* ── CREATE WHEEL ── */
+/* ================= WHEEL ================= */
 function createWheel(){
   wheel.innerHTML = "";
 
   items.forEach(item => {
-    const el  = document.createElement("div");
+    const el = document.createElement("div");
     el.className = "item";
+
     const src = getHelmSrc(item.title);
+
     if(src){
       el.innerHTML = `<img src="${src}" class="section-helm">`;
     } else {
       el.innerText = item.title;
     }
+
     wheel.appendChild(el);
   });
 
@@ -385,149 +381,109 @@ function createWheel(){
 
   itemEls.forEach((el, i) => {
     el.addEventListener("click", () => {
-      if(!isMobile) return;
-
       index = i;
       update();
       render();
-
-      dismissFloating();
-
-      const img = el.querySelector(".section-helm");
-      document.body.classList.add("hide-wheel");
-
-      if(img){
-        const r = img.getBoundingClientRect();
-
-        const fl = document.createElement("img");
-        fl.src       = img.src;
-        fl.className = "floating-helm";
-
-        // letak kat posisi asal — tanpa transition
-        fl.style.transition = "none";
-        fl.style.top    = r.top    + "px";
-        fl.style.left   = r.left   + "px";
-        fl.style.width  = r.width  + "px";
-        fl.style.height = r.height + "px";
-
-        document.body.appendChild(fl);
-        currentFloating = fl;
-
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            fl.style.transition = "";
-
-            const cardH   = card.offsetHeight || 220;
-            const cardTop = window.innerHeight - cardH - 20;
-
-            fl.style.left = (window.innerWidth / 2 - r.width  / 2) + "px";
-            fl.style.top  = (cardTop - r.height - 12) + "px";
-          });
-        });
-      }
-
-      setTimeout(() => card.classList.add("show-mobile"), 120);
     });
   });
 
-  positionItems();
   update();
   render();
 }
 
-/* ── DISMISS FLOATING ── */
-function dismissFloating(){
-  if(currentFloating){ currentFloating.remove(); currentFloating = null; }
-}
-
-/* ── POSITION ITEMS ── */
-function positionItems(){
-  itemEls.forEach((el, i) => {
-    const theta = (i / items.length) * Math.PI * 2;
-    const x = Math.cos(theta) * radius;
-    const y = Math.sin(theta) * radius;
-    el.style.left = `calc(50% + ${x}px - 60px)`;
-    el.style.top  = `calc(50% + ${y}px - 60px)`;
-  });
-}
-
-/* ── UPDATE ── */
+/* ================= UPDATE ================= */
 function update(){
   itemEls.forEach(e => e.classList.remove("active"));
-  itemEls[index].classList.add("active");
+  if(itemEls[index]) itemEls[index].classList.add("active");
 
-  const item    = items[index];
-  activeSection = item.title;  // simpan untuk button
+  const item = items[index];
+  if(!item) return;
 
-  title.innerText     = item.title;
+  title.innerText = item.title;
   cardTitle.innerText = item.title;
 
   cardDesc.innerHTML =
     `<div style="margin-bottom:10px">${item.units.length} Unit</div>` +
-    item.units.map(u => `<div class="unit-card">${u.unit_name}</div>`).join("");
+    item.units.map(u =>
+      `<div class="unit-card">${u.unit_name}</div>`
+    ).join("");
 
-  // desktop: restart animation
-  if(!isMobile){
-    card.classList.remove("show");
-    void card.offsetWidth;
-    card.classList.add("show");
-  }
-
-  // mobile: tutup card bila tukar section
-  if(isMobile){
-    card.classList.remove("show-mobile");
-  }
+  openBtn.onclick = () => goContract(item.title);
 }
 
-/* ── RENDER ── */
+/* ================= RENDER ================= */
 function render(){
   wheel.style.transform = `translateY(-50%) rotate(${baseAngle}deg)`;
+
   itemEls.forEach(el => {
     el.style.transform = `rotate(${-baseAngle}deg) scale(0.9)`;
   });
-  itemEls[index].style.transform = `rotate(${-baseAngle}deg) scale(1.25)`;
+
+  if(itemEls[index]){
+    itemEls[index].style.transform =
+      `rotate(${-baseAngle}deg) scale(1.25)`;
+  }
 }
 
-/* ── NEXT / PREV ── */
-function next(){ index=(index+1)%items.length; baseAngle-=stepAngle; update(); render(); }
-function prev(){ index=(index-1+items.length)%items.length; baseAngle+=stepAngle; update(); render(); }
+/* ================= NAV ================= */
+function next(){
+  index = (index + 1) % items.length;
+  baseAngle -= stepAngle;
+  update();
+  render();
+}
 
-/* ── SCROLL ── */
+function prev(){
+  index = (index - 1 + items.length) % items.length;
+  baseAngle += stepAngle;
+  update();
+  render();
+}
+
+/* ================= SCROLL ================= */
 let buffer = 0;
+let lock = false;
+
 window.addEventListener("wheel", e => {
   if(lock) return;
   lock = true;
-  buffer += e.deltaY;
-  if(buffer >  80){ next(); buffer=0; }
-  if(buffer < -80){ prev(); buffer=0; }
-  setTimeout(() => lock=false, 120);
-}, { passive:true });
 
-/* ── SWIPE ── */
+  buffer += e.deltaY;
+
+  if(buffer > 80){
+    next();
+    buffer = 0;
+  }
+
+  if(buffer < -80){
+    prev();
+    buffer = 0;
+  }
+
+  setTimeout(() => lock = false, 120);
+}, { passive: true });
+
+/* ================= TOUCH ================= */
 let startX = 0;
-const isCardOpen = () => card.classList.contains("show-mobile");
 
 window.addEventListener("touchstart", e => {
-  if(isCardOpen()) return;
   startX = e.touches[0].clientX;
-}, { passive:true });
+}, { passive: true });
 
 window.addEventListener("touchend", e => {
-  if(isCardOpen()) return;
   const diff = startX - e.changedTouches[0].clientX;
-  if(Math.abs(diff) < 40) return;
-  if(diff > 0) next(); else prev();
-}, { passive:true });
 
-/* ── DISMISS ON TAP LUAR ── */
-document.addEventListener("click", e => {
-  if(!isMobile) return;
-  if(!card.contains(e.target) && !e.target.closest(".item")){
-    card.classList.remove("show-mobile");
-    document.body.classList.remove("hide-wheel");
-    dismissFloating();
-  }
-});
+  if(Math.abs(diff) < 40) return;
+
+  if(diff > 0) next();
+  else prev();
+}, { passive: true });
+
+/* ================= BUTTON NAV ================= */
+function goContract(name){
+  window.location.href =
+    `dashboard-contract.html?section=${encodeURIComponent(name)}`;
+}
 
 </script>
 </body>
