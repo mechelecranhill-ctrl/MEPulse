@@ -277,14 +277,13 @@ body.hide-wheel .item{
     transition:0.3s ease;
 }
 
-/* only active item show */
 body.hide-wheel .item.active{
-    opacity:1;
-    position:fixed;
-    left:50%;
-    top:30%;
-    transform:translateX(-50%) scale(1.4) !important;
-    z-index:999;
+    position: fixed !important;
+    left: 50%;
+    top: 25%;
+    transform: translate(-50%, 0) scale(1.4) !important;
+    z-index: 9999;
+    transition: all 0.4s ease;
 }
 
 }
@@ -393,7 +392,24 @@ function createWheel() {
             el.innerText = item.title;
         }
 
-        el.addEventListener("click", () => onSelect(i));
+        el.addEventListener("click",()=>{
+
+if(isMobile){
+
+index = i;
+angle = -(stepAngle * i);
+
+update();
+render();
+
+// 🔥 delay sikit supaya CSS sempat apply
+setTimeout(()=>{
+    document.body.classList.add("hide-wheel");
+    card.classList.add("show-mobile");
+}, 50);
+
+}
+});
 
         wheel.appendChild(el);
     });
@@ -468,19 +484,21 @@ function update() {
     }
 }
 
-function render() {
-    wheel.style.transform = `translateY(-50%) rotate(${angle}deg)`;
+function render(){
 
-    itemEls.forEach(el => {
-        el.style.transform = `rotate(${-angle}deg) scale(0.9)`;
-    });
+wheel.style.transform =
+`translateY(-50%) rotate(${angle}deg)`;
 
-    itemEls[index].style.transform = `rotate(${-angle}deg) scale(1.25)`;
-}
+itemEls.forEach((el, i)=>{
+    if(i === index) return; // 🔥 IMPORTANT: skip active item
 
-/* restore transition after interaction */
-function restoreTransition() {
-    wheel.style.transition = "transform 0.7s cubic-bezier(.22,1,.36,1)";
+    el.style.transform =
+    `rotate(${-angle}deg) scale(0.9)`;
+});
+
+// active item jangan di-rotate paksa
+itemEls[index].style.transform =
+`rotate(${-angle}deg) scale(1.25)`;
 }
 
 function next() {
