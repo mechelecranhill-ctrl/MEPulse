@@ -336,10 +336,16 @@ function getHelmSrc(name){
     return null;
 }
 
-/* ── BUTTON REDIRECT ── */
-openBtn.addEventListener("click", () => {
-    if(!activeSection) return;
-    window.location.href = `dashboard-contract.html?section=${encodeURIComponent(activeSection)}`;
+/* ── BUTTON REDIRECT (DIPERBAIKI) ── */
+openBtn.addEventListener("click", (e) => {
+    e.stopPropagation(); // Elak trigger dismiss card pada mobile
+    if(!activeSection) {
+        alert("Sila pilih seksyen terlebih dahulu.");
+        return;
+    }
+    const targetUrl = `dashboard-contract.html?section=${encodeURIComponent(activeSection)}`;
+    console.log("Redirecting to:", targetUrl); // Semakan log pembangunan
+    window.location.href = targetUrl;
 });
 
 /* ── LOAD DATA ── */
@@ -384,9 +390,21 @@ function createWheel(){
     itemEls = document.querySelectorAll(".item");
 
     itemEls.forEach((el, i) => {
-        el.addEventListener("click", () => {
-            if(!isMobile) return;
+        el.addEventListener("click", (e) => {
+            // PEMBETULAN DESKTOP: Klik roda terus menukar pilihan tanpa sekatan mobile sahaja
+            if(!isMobile) {
+                // Kira putaran animasi roda ke item terklik pada desktop
+                let diff = i - index;
+                if (diff > items.length / 2) diff -= items.length;
+                if (diff < -items.length / 2) diff += items.length;
+                baseAngle -= diff * stepAngle;
+                index = i;
+                update();
+                render();
+                return;
+            }
 
+            // Logik khas Animasi Mobile
             index = i;
             update();
             render();
@@ -457,7 +475,7 @@ function update(){
     itemEls[index].classList.add("active");
 
     const item = items[index];
-    activeSection = item.title; 
+    activeSection = item.title; // Nilai aktif kini sentiasa terjamin dikemaskini
 
     title.innerText = item.title;
     cardTitle.innerText = item.title;
@@ -469,10 +487,6 @@ function update(){
         card.classList.remove("show");
         void card.offsetWidth;
         card.classList.add("show");
-    }
-
-    if(isMobile){
-        card.classList.remove("show-mobile");
     }
 }
 
@@ -518,10 +532,11 @@ window.addEventListener("touchend", e => {
     if(diff > 0) next(); else prev();
 }, { passive:true });
 
-/* ── DISMISS ON CLICK OUTSIDE ── */
+/* ── DISMISS ON CLICK OUTSIDE (DIPERBAIKI) ── */
 document.addEventListener("click", e => {
     if(!isMobile) return;
-    if(!card.contains(e.target) && !e.target.closest(".item")){
+    // Pastikan klik pada butang openBtn tidak menutup kad secara tidak sengaja
+    if(!card.contains(e.target) && !e.target.closest(".item") && e.target.id !== "openBtn"){
         card.classList.remove("show-mobile");
         document.body.classList.remove("hide-wheel");
         dismissFloating();
