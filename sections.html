@@ -264,32 +264,6 @@ z-index:2;
         visibility:visible;
         transform:translateY(0);
     }
-
-body.hide-wheel .wheel{
-    opacity:0;
-    transform:translateY(-50%) scale(0.6);
-    pointer-events:none;
-    transition:0.4s ease;
-}
-
-body.hide-wheel .item:not(.active){
-    opacity:0;
-    pointer-events:none;
-    transition:0.3s ease;
-}
-
-/* only active item show */
-body.hide-wheel .item.active{
-    opacity:1 !important;
-    left:50%;
-    top:28%;
-    transform:translateX(-50%) scale(1.5) !important;
-    z-index:9999;
-    transition: all 0.4s ease;
-}
-body.hide-wheel .item.active .section-helm{
-    transform:scale(1.2);
-}
 }
 </style>
 
@@ -359,9 +333,6 @@ const radius = isMobile ? 180 : 240;
 let index = 0;
 let angle = 0;
 let lock = false;
-let items = [];
-let itemEls = [];
-let stepAngle = 0;
 
     async function loadSections(){
 
@@ -439,18 +410,15 @@ function createWheel(){
 
             if(isMobile){
 
-    index = i;
-    angle = -(stepAngle * i);
+                index = i;
 
-    update();
-    render();
+                angle = -(stepAngle * i);
 
-    // HIDE WHEEL + OTHER ITEMS
-    document.body.classList.add("hide-wheel");
+                update();
+                render();
 
-    // show card
-    card.classList.add("show-mobile");
-}
+                card.classList.add("show-mobile");
+            }
 
         });
 
@@ -461,6 +429,20 @@ function createWheel(){
     render();
 }
 
+let itemEls = [];
+
+    itemEls.forEach((el,i)=>{
+
+    el.addEventListener("click",()=>{
+
+        if(!isMobile) return;
+
+        if(i !== index) return;
+
+        card.classList.add("show-mobile");
+    });
+
+});
 
 /* POSITION ITEMS */
 function positionItems(){
@@ -513,7 +495,6 @@ document.getElementById("openBtn").onclick = () => {
 
         card.classList.add("show");
     }
-
 }
 
     function goContract(sectionName){
@@ -606,9 +587,8 @@ window.addEventListener("touchend",(e)=>{
         !e.target.closest(".item")
     ){
         card.classList.remove("show-mobile");
-        document.body.classList.add("hide-wheel");
-
     }
+
 });
 
     if(isMobile){
