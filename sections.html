@@ -371,22 +371,55 @@ function createWheel(){
 
       if(!isMobile) return;
 
-      index = i;
-      angle = -(stepAngle * i);
-      update();
-      render();
+index = i;
+angle = -(stepAngle * i);
+update();
+render();
 
-      // buang floating lama
-      dismissFloating();
+dismissFloating();
 
-      const helmImg = el.querySelector(".section-helm");
+const helmImg = el.querySelector(".section-helm");
 
-      // sembunyikan wheel dulu
-      document.body.classList.add("hide-wheel");
+if(!helmImg) return;
 
-      if(helmImg){
-        // ambil saiz & posisi EXACT PNG aktif sekarang
-        const r = helmImg.getBoundingClientRect();
+// 🔥 1. AMBIL POSITION DULU (IMPORTANT FIX)
+const r = helmImg.getBoundingClientRect();
+
+// 🔥 2. BARU HIDE WHEEL
+document.body.classList.add("hide-wheel");
+
+// clone floating
+const fl = document.createElement("img");
+fl.src = helmImg.src;
+fl.className = "floating-helm";
+
+// lock position awal
+fl.style.transition = "none";
+fl.style.top    = r.top + "px";
+fl.style.left   = r.left + "px";
+fl.style.width  = r.width + "px";
+fl.style.height = r.height + "px";
+
+document.body.appendChild(fl);
+currentFloating = fl;
+
+// animate
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+
+    fl.style.transition = "";
+
+    const cardEstH = card.offsetHeight || 220;
+    const cardTop = window.innerHeight - 20 - cardEstH;
+
+    fl.style.left = (window.innerWidth/2 - r.width/2) + "px";
+    fl.style.top  = (cardTop - r.height - 12) + "px";
+  });
+});
+
+setTimeout(() => {
+  card.classList.add("show-mobile");
+}, 120);
 
         // clone
         const fl = document.createElement("img");
