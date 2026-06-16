@@ -276,17 +276,13 @@ body::before{
 </div>
 
 <script>
-
 window.addEventListener("DOMContentLoaded", async () => {
-  if(typeof checkSession === "function") await checkSession();
+  if (typeof checkSession === "function") await checkSession();
   loadSections();
 });
 
-const role    = localStorage.getItem("role");
-const isAdmin = role === "admin";
-
 const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
+const SB_KEY = "YOUR_KEY";
 
 const headers = {
   apikey: SB_KEY,
@@ -302,19 +298,18 @@ const cardDesc  = document.getElementById("cardDesc");
 const isMobile = window.innerWidth <= 768;
 const radius   = isMobile ? 180 : 240;
 
-let index     = 0;
-let angle     = 0;
+let index = 0;
 let baseAngle = 0;
-let lock      = false;
 let stepAngle = 0;
-let items     = [];
-let itemEls   = [];
+let lock = false;
 
-let cardOpen = false;
+let items = [];
+let itemEls = [];
+let currentFloating = null;
 
-/* ── HELM SRC ── */
-function getHelmSrc(sectionName){
-  const n = sectionName.toUpperCase();
+/* ================= HELM ================= */
+function getHelmSrc(name){
+  const n = name.toUpperCase();
   if(n.includes("SELENGGARA")) return "MaintHelm.png";
   if(n.includes("PEMATUHAN"))  return "CompHelm.png";
   if(n.includes("ASET"))       return "AssetFinHelm.png";
@@ -322,46 +317,41 @@ function getHelmSrc(sectionName){
   return null;
 }
 
-/* ── LOAD ── */
+/* ================= LOAD ================= */
 async function loadSections(){
-  try{
-    const [secRes, unitRes] = await Promise.all([
-      fetch(`${SB_URL}/rest/v1/me_sections?select=*`, { headers }),
-      fetch(`${SB_URL}/rest/v1/units?select=*`,       { headers })
-    ]);
-    const sections = await secRes.json();
-    const units    = await unitRes.json();
+  const [secRes, unitRes] = await Promise.all([
+    fetch(`${SB_URL}/rest/v1/me_sections?select=*`, { headers }),
+    fetch(`${SB_URL}/rest/v1/units?select=*`, { headers })
+  ]);
 
-    items = sections.map(sec => {
-      const sectionUnits = units.filter(u => u.section_id === sec.id);
-      return {
-        id:    sec.id,
-        title: sec.section_name,
-        units: sectionUnits
-      };
-    });
+  const sections = await secRes.json();
+  const units = await unitRes.json();
 
-    stepAngle = 360 / items.length;
-    createWheel();
-  }catch(err){
-    console.error(err);
-  }
+  items = sections.map(sec => ({
+    id: sec.id,
+    title: sec.section_name,
+    units: units.filter(u => u.section_id === sec.id)
+  }));
+
+  stepAngle = 360 / items.length;
+  createWheel();
 }
 
-/* ── CREATE WHEEL ── */
+/* ================= WHEEL ================= */
 function createWheel(){
   wheel.innerHTML = "";
 
   items.forEach(item => {
-    const el  = document.createElement("div");
+    const el = document.createElement("div");
     el.className = "item";
 
     const src = getHelmSrc(item.title);
     if(src){
       el.innerHTML = `<img src="${src}" class="section-helm">`;
-    } else {
+    }else{
       el.innerText = item.title;
     }
+
     wheel.appendChild(el);
   });
 
@@ -372,56 +362,49 @@ function createWheel(){
 
       if(!isMobile) return;
 
-index = i;
-update();
-render();
+      index = i;
 
-dismissFloating();
+      update();
+      render();
 
-const helmImg = el.querySelector(".section-helm");
+      dismissFloating();
 
-if(!helmImg) return;
+      const img = el.querySelector(".section-helm");
+      if(!img) return;
 
-// 🔥 1. AMBIL POSITION DULU (IMPORTANT FIX)
-const r = helmImg.getBoundingClientRect();
+      const r = img.getBoundingClientRect();
 
-// 🔥 2. BARU HIDE WHEEL
-document.body.classList.add("hide-wheel");
+      document.body.classList.add("hide-wheel");
 
-// clone floating
-const fl = document.createElement("img");
-fl.src = helmImg.src;
-fl.className = "floating-helm";
+      const fl = document.createElement("img");
+      fl.src = img.src;
+      fl.className = "floating-helm";
 
-// lock position awal
-fl.style.transition = "none";
-fl.style.top    = r.top + "px";
-fl.style.left   = r.left + "px";
-fl.style.width  = r.width + "px";
-fl.style.height = r.height + "px";
+      fl.style.transition = "none";
+      fl.style.top = r.top + "px";
+      fl.style.left = r.left + "px";
+      fl.style.width = r.width + "px";
+      fl.style.height = r.height + "px";
 
-document.body.appendChild(fl);
-currentFloating = fl;
+      document.body.appendChild(fl);
+      currentFloating = fl;
 
-// animate
-requestAnimationFrame(() => {
-  requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
 
-    fl.style.transition = "";
+          fl.style.transition = "";
 
-    const cardEstH = card.offsetHeight || 220;
-    const cardTop = window.innerHeight - 20 - cardEstH;
+          const cardH = card.offsetHeight || 220;
+          const cardTop = window.innerHeight - cardH - 20;
 
-    fl.style.left = (window.innerWidth/2 - r.width/2) + "px";
-    fl.style.top  = (cardTop - r.height - 12) + "px";
-  });
-});
+          fl.style.left = (window.innerWidth/2 - r.width/2) + "px";
+          fl.style.top = (cardTop - r.height - 12) + "px";
+        });
+      });
 
-setTimeout(() => {
-  card.classList.add("show-mobile");
-  cardOpen = true;
-}, 120);
-
+      setTimeout(() => {
+        card.classList.add("show-mobile");
+      }, 120);
     });
   });
 
@@ -430,7 +413,11 @@ setTimeout(() => {
   render();
 }
 
-/* ── DISMISS FLOATING ── */
+/* ================= HELPERS ================= */
+function isCardOpen(){
+  return card.classList.contains("show-mobile");
+}
+
 function dismissFloating(){
   if(currentFloating){
     currentFloating.remove();
@@ -438,111 +425,114 @@ function dismissFloating(){
   }
 }
 
-/* ── POSITION ITEMS ── */
+/* ================= POSITION ================= */
 function positionItems(){
   itemEls.forEach((el, i) => {
     const theta = (i / items.length) * Math.PI * 2;
     const x = Math.cos(theta) * radius;
     const y = Math.sin(theta) * radius;
+
     el.style.left = `calc(50% + ${x}px - 60px)`;
     el.style.top  = `calc(50% + ${y}px - 60px)`;
   });
 }
 
-/* ── UPDATE ── */
+/* ================= UPDATE ================= */
 function update(){
-  itemEls.forEach(el => el.classList.remove("active"));
+  itemEls.forEach(e => e.classList.remove("active"));
   itemEls[index].classList.add("active");
 
-  title.innerText     = items[index].title;
-  cardTitle.innerText = items[index].title;
+  const item = items[index];
 
-  cardDesc.innerHTML = `
-    <div style="margin-bottom:12px;">${items[index].units.length} Unit</div>
-    ${items[index].units.map(u => `<div class="unit-card">${u.unit_name}</div>`).join("")}
-  `;
+  title.innerText = item.title;
+  cardTitle.innerText = item.title;
 
-  document.getElementById("openBtn").onclick = () => goContract(items[index].title);
+  cardDesc.innerHTML =
+    `<div style="margin-bottom:10px">${item.units.length} Unit</div>` +
+    item.units.map(u => `<div class="unit-card">${u.unit_name}</div>`).join("");
 
-  if(isMobile){
-    card.classList.remove("show-mobile");
-  } else {
-    card.classList.remove("show");
-    void card.offsetWidth;
+  document.getElementById("openBtn").onclick =
+    () => goContract(item.title);
+
+  if(!isMobile){
     card.classList.add("show");
   }
 }
 
-function goContract(sectionName){
-  window.location.href = `dashboard-contract.html?section=${encodeURIComponent(sectionName)}`;
-}
-
-/* ── RENDER ── */
+/* ================= RENDER ================= */
 function render(){
-  wheel.style.transform = `translateY(-50%) rotate(${baseAngle + angle}deg)`;
+  wheel.style.transform = `translateY(-50%) rotate(${baseAngle}deg)`;
 
   itemEls.forEach(el => {
-    el.style.transform = `rotate(${-(baseAngle + angle)}deg) scale(0.9)`;
+    el.style.transform = `rotate(${-baseAngle}deg) scale(0.9)`;
   });
 
   itemEls[index].style.transform =
-    `rotate(${-(baseAngle + angle)}deg) scale(1.25)`;
+    `rotate(${-baseAngle}deg) scale(1.25)`;
 }
 
-/* ── NEXT / PREV ── */
+/* ================= NAV ================= */
 function next(){
   index = (index + 1) % items.length;
   baseAngle -= stepAngle;
   update(); render();
 }
+
 function prev(){
   index = (index - 1 + items.length) % items.length;
   baseAngle += stepAngle;
   update(); render();
 }
 
-/* ── SCROLL ── */
-let scrollBuffer = 0;
-window.addEventListener("wheel", (e) => {
+/* ================= WHEEL SCROLL ================= */
+let buffer = 0;
+
+window.addEventListener("wheel", e => {
   if(lock) return;
   lock = true;
-  scrollBuffer += e.deltaY;
-  if(scrollBuffer >  80){ next(); scrollBuffer = 0; }
-  if(scrollBuffer < -80){ prev(); scrollBuffer = 0; }
+
+  buffer += e.deltaY;
+
+  if(buffer > 80){ next(); buffer = 0; }
+  if(buffer < -80){ prev(); buffer = 0; }
+
   setTimeout(() => lock = false, 120);
-}, { passive: true });
+}, { passive:true });
 
-/* ── SWIPE ── */
+/* ================= SWIPE (FIXED) ================= */
 let startX = 0;
-window.addEventListener("touchstart", (e) => { startX = e.touches[0].clientX; });
-window.addEventListener("touchend", (e) => {
 
-  if(cardOpen) return; // 🔥 STOP SWIPE bila card open
+window.addEventListener("touchstart", e => {
+  if(isCardOpen()) return;
+  startX = e.touches[0].clientX;
+}, { passive:true });
+
+window.addEventListener("touchend", e => {
+  if(isCardOpen()) return;
 
   const diff = startX - e.changedTouches[0].clientX;
   if(Math.abs(diff) < 40) return;
 
   if(diff > 0) next();
   else prev();
-});
+}, { passive:true });
 
-/* ── DISMISS ON TAP LUAR ── */
-document.addEventListener("click", (e) => {
+/* ================= OUTSIDE CLICK ================= */
+document.addEventListener("click", e => {
   if(!isMobile) return;
+
   if(!card.contains(e.target) && !e.target.closest(".item")){
     card.classList.remove("show-mobile");
-document.body.classList.remove("hide-wheel");
-dismissFloating();
-
-cardOpen = false;
+    document.body.classList.remove("hide-wheel");
+    dismissFloating();
   }
 });
 
-if(isMobile){
-  card.classList.remove("show");
-  card.classList.remove("show-mobile");
+/* ================= CONTRACT ================= */
+function goContract(name){
+  window.location.href =
+    `dashboard-contract.html?section=${encodeURIComponent(name)}`;
 }
-
 </script>
 </body>
 </html>
