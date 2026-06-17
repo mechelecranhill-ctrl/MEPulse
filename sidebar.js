@@ -85,8 +85,6 @@ this.logoutModal = this.querySelector("#logoutModal");
 this.cancelLogout = this.querySelector("#cancelLogout");
 this.confirmLogout = this.querySelector("#confirmLogout");
 
-        this.dashboardBtn = this.querySelector("#dashboardBtn");
-        this.dashboardMenu = this.querySelector("#dashboardMenu");
     }
 
     bindEvents() {
@@ -111,12 +109,6 @@ this.logoutModal.addEventListener("click", (e) => {
         this.logoutModal.classList.remove("active");
     }
 });
-        
-        this.dashboardBtn.addEventListener("click", (e) => {
-            e.preventDefault();
-            this.dashboardMenu.classList.toggle("active");
-});
-
         document.addEventListener("keydown", (e) => {
             if (e.key === "Escape") this.close();
         });
