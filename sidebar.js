@@ -53,7 +53,22 @@ class AppSidebar extends HTMLElement {
              
              </svg>
              </button>
-             `;
+             <div class="logout-modal" id="logoutModal">
+    <div class="logout-box">
+        <h3>Logout</h3>
+        <p>Are you sure you want to logout?</p>
+
+        <div class="logout-actions">
+            <button class="cancel-btn" id="cancelLogout">
+                Cancel
+            </button>
+
+            <button class="confirm-btn" id="confirmLogout">
+                Logout
+            </button>
+        </div>
+    </div>
+</div>`;
 
         this.cacheDOM();
         this.bindEvents();
@@ -65,6 +80,11 @@ class AppSidebar extends HTMLElement {
         this.btn = this.querySelector("#hamburger");
         this.checkbox = this.querySelector("#menuToggle");
         this.logoutBtn = this.querySelector("#logoutBtn");
+
+this.logoutModal = this.querySelector("#logoutModal");
+this.cancelLogout = this.querySelector("#cancelLogout");
+this.confirmLogout = this.querySelector("#confirmLogout");
+
         this.dashboardBtn = this.querySelector("#dashboardBtn");
         this.dashboardMenu = this.querySelector("#dashboardMenu");
     }
@@ -74,9 +94,23 @@ class AppSidebar extends HTMLElement {
         this.overlay.addEventListener("click", () => this.close());
 
         this.logoutBtn.addEventListener("click", (e) => {
-            e.preventDefault();
-            this.logout();
-        });
+    e.preventDefault();
+    this.logoutModal.classList.add("active");
+});
+
+this.cancelLogout.addEventListener("click", () => {
+    this.logoutModal.classList.remove("active");
+});
+
+this.confirmLogout.addEventListener("click", () => {
+    this.logout();
+});
+
+this.logoutModal.addEventListener("click", (e) => {
+    if (e.target === this.logoutModal) {
+        this.logoutModal.classList.remove("active");
+    }
+});
         
         this.dashboardBtn.addEventListener("click", (e) => {
             e.preventDefault();
