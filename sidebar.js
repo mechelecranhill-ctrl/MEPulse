@@ -1,3 +1,7 @@
+// 🌟 Masukkan kredensial Supabase anda di sini supaya fungsi upload berfungsi
+const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
+
 class AppSidebar extends HTMLElement {
     connectedCallback() {
         // 1. Ambil data nama, posisi, dan URL avatar staf daripada localStorage
@@ -5,10 +9,17 @@ class AppSidebar extends HTMLElement {
         const staffRole = localStorage.getItem("role") || "STAFF";
         const staffAvatar = localStorage.getItem("staff_avatar") || ""; 
 
-        // 2. Semak sama ada staf ada gambar profil tersendiri dari Supabase Storage
-        const avatarHtml = staffAvatar 
-            ? `<img src="${staffAvatar}" alt="Profile">` 
-            : `<i class="fa-solid fa-user-circle"></i>`;
+        // 2. Sistem sandaran pintar: Jika tiada gambar, paparkan huruf pertama nama staf
+        let avatarHtml = '';
+        if (staffAvatar && staffAvatar.trim() !== "") {
+            avatarHtml = `<img src="${staffAvatar}" alt="Profile" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">`;
+        }
+        
+        const placeholderHtml = `
+            <div class="avatar-placeholder" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.2); color:white; font-size:28px; font-weight:bold; border-radius:50%;">
+                ${staffName.charAt(0).toUpperCase()}
+            </div>
+        `;
 
         this.innerHTML = `
             <div class="overlay" id="overlay"></div>
@@ -16,11 +27,14 @@ class AppSidebar extends HTMLElement {
             <div class="sidebar" id="sidebar">
                 
                 <div class="sidebar-profile">
-                    <div class="profile-img-wrapper">
+                    <div class="profile-img-wrapper" id="avatarClickable" style="position:relative; width:80px; height:80px; border-radius:50%; margin-bottom:10px; overflow:hidden; cursor:pointer;" title="Klik untuk tukar gambar profil">
                         ${avatarHtml}
+                        ${staffAvatar ? placeholderHtml.replace("display:flex", "display:none") : placeholderHtml}
+                        
+                        <input type="file" id="avatarInput" accept="image/*" style="display:none;">
                     </div>
-                    <div class="profile-name" id="profName">${staffName.toUpperCase()}</div>
-                    <div class="profile-role" id="profRole">${staffRole.toUpperCase()}</div>
+                    <div class="profile-name" id="profName" style="color:white; font-weight:700;">${staffName.toUpperCase()}</div>
+                    <div class="profile-role" id="profRole" style="color:rgba(255,255,255,0.6); font-size:11px;">${staffRole.toUpperCase()}</div>
                 </div>
                 
                 <a href="sections.html">Home</a>
@@ -29,7 +43,7 @@ class AppSidebar extends HTMLElement {
                         Dashboard ▼
                     </a>
                     
-                    <div class="submenu" id="dashboardMenu">
+                    <div class="submenu" id="dashboardMenu" style="display:none;">
                         <a href="dashboard-contract.html?section=Seksyen%20Selenggara">
                             Seksyen Selenggara
                         </a>
@@ -88,11 +102,37 @@ class AppSidebar extends HTMLElement {
         this.logoutModal = this.querySelector("#logoutModal");
         this.cancelLogout = this.querySelector("#cancelLogout");
         this.confirmLogout = this.querySelector("#confirmLogout");
+        
+        this.dashboardBtn = this.querySelector("#dashboardBtn");
+        this.dashboardMenu = this.querySelector("#dashboardMenu");
+
+        // Cache untuk elemen avatar upload baru
+        this.avatarWrapper = this.querySelector("#avatarClickable");
+        this.avatarInput = this.querySelector("#avatarInput");
     }
 
     bindEvents() {
         this.btn.addEventListener("click", () => this.toggle());
         this.overlay.addEventListener("click", () => this.close());
+
+        // Logik Klik pada bulatan avatar untuk buka fail picker
+        if (this.avatarWrapper && this.avatarInput) {
+            this.avatarWrapper.addEventListener("click", () => {
+                this.avatarInput.click();
+            });
+
+            // Jalankan fungsi hantar imej apabila fail dipilih
+            this.avatarInput.addEventListener("change", (e) => this.handleAvatarUpload(e));
+        }
+
+        if(this.dashboardBtn && this.dashboardMenu) {
+            this.dashboardBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                const isOpen = this.dashboardMenu.style.display === "block";
+                this.dashboardMenu.style.display = isOpen ? "none" : "block";
+                this.dashboardBtn.innerHTML = isOpen ? "Dashboard ▼" : "Dashboard ▲";
+            });
+        }
 
         this.logoutBtn.addEventListener("click", (e) => {
             e.preventDefault();
@@ -112,10 +152,68 @@ class AppSidebar extends HTMLElement {
                 this.logoutModal.classList.remove("active");
             }
         });
-        
+
         document.addEventListener("keydown", (e) => {
             if (e.key === "Escape") this.close();
         });
+    }
+
+    // Fungsi automatik menguruskan muat naik ke Supabase Storage & Database
+    async handleAvatarUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const employeeId = localStorage.getItem("userId");
+        if (!employeeId || employeeId === "@dm1n") {
+            alert("Ralat: Akaun pentadbir sistem am tidak boleh menukar gambar profil melalui kaedah ini.");
+            return;
+        }
+
+        // Generate nama fail unik berasaskan ID Pekerja untuk mengelakkan pertindihan cache
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${employeeId}-${Date.now()}.${fileExt}`;
+        
+        try {
+            // 1. Kirim imej ke Supabase Storage Bucket bernama 'avatars'
+            let formData = new FormData();
+            formData.append('', file);
+
+            const uploadRes = await fetch(`${SB_URL}/storage/v1/object/avatars/${fileName}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${SB_KEY}`,
+                    'apikey': SB_KEY
+                },
+                body: formData
+            });
+
+            if (!uploadRes.ok) throw new Error("Gagal menyimpan gambar ke pelayan storage.");
+
+            // 2. Bina pautan URL awam (Public URL)
+            const publicUrl = `${SB_URL}/storage/v1/object/public/avatars/${fileName}`;
+
+            // 3. Kemas kini data lajur 'avatar_url' dalam jadual 'staff'
+            const updateRes = await fetch(`${SB_URL}/rest/v1/staff?employee_id=eq.${encodeURIComponent(employeeId)}`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${SB_KEY}`,
+                    'apikey': SB_KEY,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ avatar_url: publicUrl })
+            });
+
+            if (!updateRes.ok) throw new Error("Gagal mengemaskini maklumat profil di pangkalan data.");
+
+            // 4. Set nilai baharu di localStorage dan segarkan halaman secara automatik
+            localStorage.setItem("staff_avatar", publicUrl);
+            alert("✅ Gambar profil berjaya dikemas kini!");
+            window.location.reload();
+
+        } catch (err) {
+            console.error(err);
+            alert("Ralat: " + err.message);
+        }
     }
 
     toggle() {
