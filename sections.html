@@ -10,7 +10,7 @@
 <link rel="preload" href="AssetFinHelm.png" as="image">
 <link rel="preload" href="ProjectsHelm.png" as="image">
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
 <style>
 *{
@@ -67,14 +67,11 @@ body {
     justify-content: center;
     align-items: flex-start;
     position: relative;
-    
     background:
         radial-gradient(circle at top, rgba(255,255,255,.15), transparent 35%),
         linear-gradient(60deg, var(--gradient-1, #0b3d91) 0%, var(--gradient-2, #0077b6) 40%, var(--gradient-3, #00b4d8) 100%);
     background-attachment: fixed;
-    /* Tambah transition supaya penukaran warna nampak lembut */
     transition: --gradient-1 0.8s ease-in-out, --gradient-2 0.8s ease-in-out, --gradient-3 0.8s ease-in-out;
-}
 }
 
 body::before {
@@ -116,40 +113,34 @@ to{ transform:translateX(30px) translateY(-20px); }
     pointer-events: auto;
 }
 
-.wheel::before{
-content:"";
-position:absolute;
-inset:60px;
-border-radius:50%;
-border:1px solid rgba(56,189,248,0.15);
-box-shadow:0 0 60px rgba(56,189,248,0.08);
-}
+/* KOTAK ATAU BULATAN RUJUKAN DI BELAKANG WHEEL TELAH DIBUANG SINI (.wheel::before) */
 
 .item{
 position:absolute;
 width:120px;
 height:120px;
 border-radius:18px;
-background:rgba(255,255,255,0.06);
-border:1px solid rgba(255,255,255,0.08);
+/* Latar belakang kotak diubah menjadi lutsinar sepenuhnya */
+background:transparent;
+border:none;
 display:flex;
 justify-content:center;
 align-items:center;
 text-align:center;
 color:white;
 font-weight:600;
-backdrop-filter:blur(14px);
+backdrop-filter:none;
 transition:0.3s;
-opacity:0.5;
+opacity:0.4;
 transform:scale(0.9);
 pointer-events: none; 
 cursor: default;
 }
 
 .item.active{
-background:rgba(56,189,248,0.25);
-border-color:rgba(56,189,248,0.6);
-box-shadow:0 0 25px rgba(56,189,248,0.25);
+background:transparent;
+border:none;
+box-shadow:none;
 opacity:1;
 transform:scale(1.25);
 pointer-events: auto;
@@ -167,7 +158,7 @@ color:white;
 
 .info-card {
     position: absolute;
-    z-index: 10; /* Dinaikkan ke 10 supaya sentiasa berada di lapisan paling atas */
+    z-index: 10;
     right: 80px;
     top: 50%;
     transform: translateY(-50%);
@@ -180,7 +171,7 @@ color:white;
     color: white;
     opacity: 0;
     animation: none;
-    pointer-events: auto; /* Memastikan butang di dalam kad boleh diklik secara penuh */
+    pointer-events: auto;
 }
 
 @keyframes fadeInRight{
@@ -208,13 +199,14 @@ width:160px;
 height:160px;
 object-fit:contain;
 pointer-events:none;
+transition: transform 0.3s, filter 0.3s;
 }
 
 .item.active .section-helm{
 transform:scale(1.15);
 filter:
-drop-shadow(0 0 10px rgba(56,189,248,.8))
-drop-shadow(0 0 20px rgba(56,189,248,.5));
+drop-shadow(0 0 10px rgba(255,255,255,.6))
+drop-shadow(0 0 20px rgba(56,189,248,.4));
 }
 
 /* ── OPEN BUTTON ── */
@@ -258,7 +250,6 @@ drop-shadow(0 0 20px rgba(56,189,248,.5));
 
 /* ── MOBILE ── */
 @media (max-width:768px){
-
 .panel{ display:none; }
 
 .info-card{
@@ -271,10 +262,7 @@ width:auto;
 opacity:0;
 visibility:hidden;
 transform:translateY(40px);
-transition:
-opacity .35s ease,
-transform .35s ease,
-visibility .35s;
+transition:opacity .35s ease, transform .35s ease, visibility .35s;
 }
 
 .info-card.show-mobile{
@@ -327,7 +315,6 @@ opacity:0 !important;
 </div>
 
 <script>
-
 window.addEventListener("DOMContentLoaded", async () => {
     if(typeof checkSession === "function") await checkSession();
     loadSections();
@@ -358,8 +345,6 @@ let lock = false;
 let items = [];
 let itemEls = [];
 let currentFloating = null;
-
-// Track section aktif untuk button
 let activeSection = "";
 
 /* ── HELM SRC ── */
@@ -376,60 +361,28 @@ function getHelmSrc(name){
 function getSectionColor(name) {
     const n = name.toUpperCase();
     if (n.includes("SELENGGARA")) {
-        // Tema Biru Gelap / Teal (Asal)
-        return {
-            base: "#0b3d91",
-            color1: "#0b3d91",
-            color2: "#0077b6",
-            color3: "#00b4d8"
-        };
+        return { base: "#0b3d91", color1: "#0b3d91", color2: "#1e40af", color3: "#0369a1" };
     }
     if (n.includes("PEMATUHAN")) {
-        // Tema Ungu / Indigo
-        return {
-            base: "#311042",
-            color1: "#311042",
-            color2: "#4a154b",
-            color3: "#6b114d"
-        };
+        return { base: "#1e1b4b", color1: "#1e1b4b", color2: "#311042", color3: "#4338ca" };
     }
     if (n.includes("ASET")) {
-        // Tema Hijau Emerald / Kekuningan (Kewangan/Aset)
-        return {
-            base: "#064e3b",
-            color1: "#064e3b",
-            color2: "#047857",
-            color3: "#059669"
-        };
+        return { base: "#064e3b", color1: "#064e3b", color2: "#0f5132", color3: "#115e59" };
     }
     if (n.includes("PROJEK")) {
-        // Tema Jingga / Merah Bata (Projek/Pembinaan)
-        return {
-            base: "#7c2d12",
-            color1: "#7c2d12",
-            color2: "#9a3412",
-            color3: "#ea580c"
-        };
+        return { base: "#7c2d12", color1: "#6c2a0d", color2: "#9a3412", color3: "#b45309" };
     }
-    // Warna default jika tiada padanan
-    return {
-        base: "#0b3d91",
-        color1: "#0b3d91",
-        color2: "#0077b6",
-        color3: "#00b4d8"
-    };
+    return { base: "#0b3d91", color1: "#0b3d91", color2: "#0077b6", color3: "#00b4d8" };
 }
 
-
-/* ── BUTTON REDIRECT (DIPERBAIKI) ── */
+/* ── BUTTON REDIRECT ── */
 openBtn.addEventListener("click", (e) => {
-    e.stopPropagation(); // Elak trigger dismiss card pada mobile
+    e.stopPropagation();
     if(!activeSection) {
         alert("Sila pilih seksyen terlebih dahulu.");
         return;
     }
     const targetUrl = `dashboard-contract.html?section=${encodeURIComponent(activeSection)}`;
-    console.log("Redirecting to:", targetUrl); // Semakan log pembangunan
     window.location.href = targetUrl;
 });
 
@@ -476,9 +429,7 @@ function createWheel(){
 
     itemEls.forEach((el, i) => {
         el.addEventListener("click", (e) => {
-            // PEMBETULAN DESKTOP: Klik roda terus menukar pilihan tanpa sekatan mobile sahaja
             if(!isMobile) {
-                // Kira putaran animasi roda ke item terklik pada desktop
                 let diff = i - index;
                 if (diff > items.length / 2) diff -= items.length;
                 if (diff < -items.length / 2) diff += items.length;
@@ -489,11 +440,9 @@ function createWheel(){
                 return;
             }
 
-            // Logik khas Animasi Mobile
             index = i;
             update();
             render();
-
             dismissFloating();
 
             const img = el.querySelector(".section-helm");
@@ -501,11 +450,9 @@ function createWheel(){
 
             if(img){
                 const r = img.getBoundingClientRect();
-
                 const fl = document.createElement("img");
                 fl.src = img.src;
                 fl.className = "floating-helm";
-
                 fl.style.transition = "none";
                 fl.style.top = r.top + "px";
                 fl.style.left = r.left + "px";
@@ -520,13 +467,11 @@ function createWheel(){
                         fl.style.transition = "";
                         const cardH = card.offsetHeight || 220;
                         const cardTop = window.innerHeight - cardH - 20;
-
                         fl.style.left = (window.innerWidth / 2 - r.width / 2) + "px";
                         fl.style.top = (cardTop - r.height - 12) + "px";
                     });
                 });
             }
-
             setTimeout(() => card.classList.add("show-mobile"), 120);
         });
     });
@@ -536,12 +481,10 @@ function createWheel(){
     render();
 }
 
-/* ── DISMISS FLOATING ── */
 function dismissFloating(){
     if(currentFloating){ currentFloating.remove(); currentFloating = null; }
 }
 
-/* ── POSITION ITEMS ── */
 function positionItems(){
     itemEls.forEach((el, i) => {
         const theta = (i / items.length) * Math.PI * 2;
@@ -560,9 +503,8 @@ function update(){
     itemEls[index].classList.add("active");
 
     const item = items[index];
-    activeSection = item.title; // Nilai aktif kini sentiasa terjamin dikemaskini
+    activeSection = item.title;
 
-    // ── KEMASKINI WARNA BACKGROUND SECARA DINAMIK ──
     const colors = getSectionColor(item.title);
     document.body.style.setProperty('--bg-color', colors.base);
     document.body.style.setProperty('--gradient-1', colors.color1);
@@ -582,7 +524,6 @@ function update(){
     }
 }
 
-
 /* ── RENDER WHEEL ROTATION ── */
 function render(){
     if(itemEls.length === 0) return;
@@ -594,7 +535,6 @@ function render(){
     itemEls[index].style.transform = `rotate(${-baseAngle}deg) scale(1.25)`;
 }
 
-/* ── NEXT / PREV ── */
 function next(){ index=(index+1)%items.length; baseAngle-=stepAngle; update(); render(); }
 function prev(){ index=(index-1+items.length)%items.length; baseAngle+=stepAngle; update(); render(); }
 
@@ -625,18 +565,15 @@ window.addEventListener("touchend", e => {
     if(diff > 0) next(); else prev();
 }, { passive:true });
 
-/* ── DISMISS ON CLICK OUTSIDE (DIPERBAIKI) ── */
+/* ── DISMISS ON CLICK OUTSIDE ── */
 document.addEventListener("click", e => {
     if(!isMobile) return;
-    // Pastikan klik pada butang openBtn tidak menutup kad secara tidak sengaja
     if(!card.contains(e.target) && !e.target.closest(".item") && e.target.id !== "openBtn"){
         card.classList.remove("show-mobile");
         document.body.classList.remove("hide-wheel");
         dismissFloating();
     }
 });
-
-
 </script>
 </body>
 </html>
