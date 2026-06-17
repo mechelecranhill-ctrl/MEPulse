@@ -1,74 +1,78 @@
 class AppSidebar extends HTMLElement {
     connectedCallback() {
+        // 1. Ambil data nama, posisi, dan URL avatar staf daripada localStorage
+        const staffName = localStorage.getItem("staff_name") || "USER";
+        const staffRole = localStorage.getItem("role") || "STAFF";
+        const staffAvatar = localStorage.getItem("staff_avatar") || ""; 
+
+        // 2. Semak sama ada staf ada gambar profil tersendiri dari Supabase Storage
+        const avatarHtml = staffAvatar 
+            ? `<img src="${staffAvatar}" alt="Profile">` 
+            : `<i class="fa-solid fa-user-circle"></i>`;
+
         this.innerHTML = `
             <div class="overlay" id="overlay"></div>
 
             <div class="sidebar" id="sidebar">
-                <h3>M&E Menu</h3>
+                
+                <div class="sidebar-profile">
+                    <div class="profile-img-wrapper">
+                        ${avatarHtml}
+                    </div>
+                    <div class="profile-name" id="profName">${staffName.toUpperCase()}</div>
+                    <div class="profile-role" id="profRole">${staffRole.toUpperCase()}</div>
+                </div>
                 
                 <a href="sections.html">Home</a>
                 <div class="menu-group">
-                <a href="#" class="menu-parent" id="dashboardBtn">
-                Dashboard ▼
-                </a>
-                
-                <div class="submenu" id="dashboardMenu">
-                <a href="dashboard-contract.html?section=Seksyen%20Selenggara">
-                Seksyen Selenggara
-                </a>
-                
-                <a href="dashboard-contract.html?section=Seksyen%20Pematuhan%20Peraturan">
-                Seksyen Pematuhan Peraturan
-                </a>
-                
-                <a href="dashboard-contract.html?section=Seksyen%20Pengurusan%20Aset%20%26%20Kewangan">
-                Seksyen Pengurusan Aset & Kewangan 
-                </a>
-                
-                <a href="dashboard-contract.html?section=Seksyen%20Projek%20%26%20Perkhidmatan%20Teknikal">
-                Seksyen Projek & Perkhidmatan Teknikal
-                </a>
-                </div>
-                
+                    <a href="#" class="menu-parent" id="dashboardBtn">
+                        Dashboard ▼
+                    </a>
+                    
+                    <div class="submenu" id="dashboardMenu">
+                        <a href="dashboard-contract.html?section=Seksyen%20Selenggara">
+                            Seksyen Selenggara
+                        </a>
+                        <a href="dashboard-contract.html?section=Seksyen%20Pematuhan%20Peraturan">
+                            Seksyen Pematuhan Peraturan
+                        </a>
+                        <a href="dashboard-contract.html?section=Seksyen%20Pengurusan%20Aset%20%26%20Kewangan">
+                            Seksyen Pengurusan Aset & Kewangan 
+                        </a>
+                        <a href="dashboard-contract.html?section=Seksyen%20Projek%20%26%20Perkhidmatan%20Teknikal">
+                            Seksyen Projek & Perkhidmatan Teknikal
+                        </a>
+                    </div>
                 </div>
                 
                 <a href="#" id="logoutBtn">Logout</a>
-            
             </div>
 
             <button class="hamburger" id="hamburger" aria-label="Menu">
-            <input type="checkbox" id="menuToggle">
-            <svg viewBox="0 0 32 32">
-            <path class="line line-top-bottom"
-            d="M27 10 13 10C10.8 10 9 8.2 9 6
-             9 3.5 10.8 2 13 2
-             15.2 2 17 3.8 17 6
-             L17 26C17 28.2 18.8 30 21 30
-             23.2 30 25 28.2 25 26
-             25 23.8 23.2 22 21 22
-             L7 22" />
-             
-             <path class="line"
-             d="M7 16 27 16" />
-             
-             </svg>
-             </button>
-             <div class="logout-modal" id="logoutModal">
-    <div class="logout-box">
-        <h3>Logout</h3>
-        <p>Are you sure you want to logout?</p>
-
-        <div class="logout-actions">
-            <button class="cancel-btn" id="cancelLogout">
-                Cancel
+                <input type="checkbox" id="menuToggle">
+                <svg viewBox="0 0 32 32">
+                    <path class="line line-top-bottom"
+                        d="M27 10 13 10C10.8 10 9 8.2 9 6
+                        9 3.5 10.8 2 13 2
+                        15.2 2 17 3.8 17 6
+                        L17 26C17 28.2 18.8 30 21 30
+                        23.2 30 25 28.2 25 26
+                        25 23.8 23.2 22 21 22
+                        L7 22" />
+                    <path class="line" d="M7 16 27 16" />
+                </svg>
             </button>
 
-            <button class="confirm-btn" id="confirmLogout">
-                Logout
-            </button>
-        </div>
-    </div>
-</div>`;
+            <div class="logout-modal" id="logoutModal">
+                <div class="logout-box">
+                    <h3>Logout</h3>
+                    <p>Are you sure you want to logout?</p>
+                    <div class="logout-actions">
+                        <button class="cancel-btn" id="cancelLogout">Cancel</button>
+                        <button class="confirm-btn" id="confirmLogout">Logout</button>
+                    </div>
+                </div>
+            </div>`;
 
         this.cacheDOM();
         this.bindEvents();
@@ -81,10 +85,9 @@ class AppSidebar extends HTMLElement {
         this.checkbox = this.querySelector("#menuToggle");
         this.logoutBtn = this.querySelector("#logoutBtn");
 
-this.logoutModal = this.querySelector("#logoutModal");
-this.cancelLogout = this.querySelector("#cancelLogout");
-this.confirmLogout = this.querySelector("#confirmLogout");
-
+        this.logoutModal = this.querySelector("#logoutModal");
+        this.cancelLogout = this.querySelector("#cancelLogout");
+        this.confirmLogout = this.querySelector("#confirmLogout");
     }
 
     bindEvents() {
@@ -92,56 +95,50 @@ this.confirmLogout = this.querySelector("#confirmLogout");
         this.overlay.addEventListener("click", () => this.close());
 
         this.logoutBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    this.logoutModal.classList.add("active");
-});
+            e.preventDefault();
+            this.logoutModal.classList.add("active");
+        });
 
-this.cancelLogout.addEventListener("click", () => {
-    this.logoutModal.classList.remove("active");
-});
+        this.cancelLogout.addEventListener("click", () => {
+            this.logoutModal.classList.remove("active");
+        });
 
-this.confirmLogout.addEventListener("click", () => {
-    this.logout();
-});
+        this.confirmLogout.addEventListener("click", () => {
+            this.logout();
+        });
 
-this.logoutModal.addEventListener("click", (e) => {
-    if (e.target === this.logoutModal) {
-        this.logoutModal.classList.remove("active");
-    }
-});
+        this.logoutModal.addEventListener("click", (e) => {
+            if (e.target === this.logoutModal) {
+                this.logoutModal.classList.remove("active");
+            }
+        });
+        
         document.addEventListener("keydown", (e) => {
             if (e.key === "Escape") this.close();
         });
     }
 
     toggle() {
-    const isOpen = this.sidebar.classList.toggle("active");
-    this.overlay.classList.toggle("active");
+        const isOpen = this.sidebar.classList.toggle("active");
+        this.overlay.classList.toggle("active");
+        this.checkbox.checked = isOpen;
+    }
 
-    this.checkbox.checked = isOpen;
-}
+    close() {
+        this.sidebar.classList.remove("active");
+        this.overlay.classList.remove("active");
+        this.checkbox.checked = false;
+    }
 
-close() {
-    this.sidebar.classList.remove("active");
-    this.overlay.classList.remove("active");
-
-    this.checkbox.checked = false;
-}
-
-logout() {
-
-    localStorage.clear();
-    sessionStorage.clear();
-
-    window.location.replace("login.html");
-}
+    logout() {
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.replace("login.html");
+    }
 
     goDashboard() {
-        const section =
-            localStorage.getItem("current_section") || "GENERAL";
-
-        window.location.href =
-            `dashboard-contract.html?section=${encodeURIComponent(section)}`;
+        const section = localStorage.getItem("current_section") || "GENERAL";
+        window.location.href = `dashboard-contract.html?section=${encodeURIComponent(section)}`;
     }
 }
 
