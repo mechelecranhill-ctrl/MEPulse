@@ -106,7 +106,7 @@
     const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
 
-    async function fetchAllStatus() {
+        async function fetchAllStatus() {
         const list = document.getElementById('mainList');
         list.innerHTML = "<div style='text-align:center; padding:20px;'>CHECKING DATABASE</div>";
 
@@ -117,11 +117,35 @@
         };
 
         try {
-            const resS = await fetch(SB_URL + '/rest/v1/staff?select=*', {
-                headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-            });
-            let allStaff = await resS.json();
+            let allStaff = [];
+            
+            // --- PROSES CACHING UNTUK DATA STAFF ---
+            const CACHE_KEY = 'staff_data_cache';
+            const CACHE_TIME_KEY = 'staff_data_time';
+            const ONE_DAY = 24 * 60 * 60 * 1000; // 24 Jam
 
+            const cachedData = localStorage.getItem(CACHE_KEY);
+            const cachedTime = localStorage.getItem(CACHE_TIME_KEY);
+            const now = new Date().getTime();
+
+            if (cachedData && cachedTime && (now - cachedTime < ONE_DAY)) {
+                console.log("Menggunakan data staf dari cache browser...");
+                allStaff = JSON.parse(cachedData);
+            } else {
+                console.log("Tarik data staf baru dari Supabase...");
+                const resS = await fetch(SB_URL + '/rest/v1/staff?select=*', {
+                    headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
+                });
+                allStaff = await resS.json();
+                
+                // Simpan ke cache
+                localStorage.setItem(CACHE_KEY, JSON.stringify(allStaff));
+                localStorage.setItem(CACHE_TIME_KEY, now.toString());
+            }
+            // ----------------------------------------
+
+            // DATA ATTENDANCE TETAP TARIK FRESH TIAP KALI OPEN/REFRESH
+            console.log("Tarik status kehadiran terkini dari Supabase...");
             const resA = await fetch(SB_URL + '/rest/v1/attendance?select=*', {
                 headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
             });
