@@ -2406,80 +2406,52 @@ calculateContractSum();
 
 }
 
-async function updateWorkOrderSequenceNumbers(
-    contractId,
-    districtText,
-    areaText
-){
+async function updateWorkOrderSequenceNumbers(contractId, districtText, areaText) {
+    const districts = districtText.split(',').map(x => x.trim().toUpperCase());
+    const areas = areaText.split(',').map(x => x.trim().toUpperCase());
 
-    const districts = districtText
-        .split(',')
-        .map(x => x.trim().toUpperCase());
-
-    const areas = areaText
-        .split(',')
-        .map(x => x.trim().toUpperCase());
-
-    const res = await fetch(
-        `${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&select=*`,
-        { headers }
-    );
-
+    // 1. Tarik semua data work order untuk kontrak ini (Hanya 1 GET request)
+    const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&select=id,sequence_no,district`, { headers });
     const works = await res.json();
 
-    for(const district of districts){
+    let bulkUpdatePayload = [];
+
+    // 2. Proses susunan dalam JavaScript (Sangat laju, tak beban database)
+    districts.forEach((district, index) => {
+        const areaCode = areas[index] || 'WO';
 
         const districtWorks = works
-            .filter(w =>
-                (w.district || '').trim().toUpperCase()
-                === district
-            )
-            .sort((a,b)=>{
-
-                const aNum =
-                    parseInt(
-                        (a.sequence_no || '')
-                        .replace(/\D/g,'')
-                    ) || 0;
-
-                const bNum =
-                    parseInt(
-                        (b.sequence_no || '')
-                        .replace(/\D/g,'')
-                    ) || 0;
-
+            .filter(w => (w.district || '').trim().toUpperCase() === district)
+            .sort((a, b) => {
+                const aNum = parseInt((a.sequence_no || '').replace(/\D/g, '')) || 0;
+                const bNum = parseInt((b.sequence_no || '').replace(/\D/g, '')) || 0;
                 return aNum - bNum;
             });
 
-        const index = districts.indexOf(district);
+        districtWorks.forEach((work, i) => {
+            const newSeq = areaCode + String(i + 1).padStart(3, '0');
+            
+            // Masukkan ID dan data baru ke dalam senarai pukal
+            bulkUpdatePayload.push({
+                id: work.id,
+                sequence_no: newSeq
+            });
+        });
+    });
 
-        const areaCode =
-            areas[index] || 'WO';
-
-        await Promise.all(
-    districtWorks.map((work, i) => {
-
-        const newSeq =
-            areaCode +
-            String(i + 1).padStart(3,'0');
-
-        return fetch(
-            `${SB_URL}/rest/v1/work_orders?id=eq.${work.id}`,
-            {
-                method:'PATCH',
-                headers,
-                body: JSON.stringify({
-                    sequence_no:newSeq
-                })
-            }
-        );
-
-    })
-);
-
+    // 3. Hantar SEMUA data kemaskini dalam SATU call sahaja (Bulk Upsert)
+    if (bulkUpdatePayload.length > 0) {
+        await fetch(`${SB_URL}/rest/v1/work_orders`, {
+            method: 'POST', // Supabase guna POST + Prefer: resolution=merge untuk Bulk Update
+            headers: {
+                ...headers,
+                'Prefer': 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify(bulkUpdatePayload)
+        });
     }
-
 }
+
     function centerActiveForm(btn) {
         /* Mobile: snap scroll. Desktop: tiada kesan (wrapper tak overflow) */
         if(window.innerWidth <= 768) {
