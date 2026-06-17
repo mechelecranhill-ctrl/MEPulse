@@ -108,7 +108,6 @@
     const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
 
-    // DIUBAH: Tambah parameter forceRefresh dengan default value false
     async function fetchAllStatus(forceRefresh = false) {
         const list = document.getElementById('mainList');
         const icon = document.getElementById('refIcon');
@@ -116,7 +115,6 @@
 
         list.innerHTML = "<div style='text-align:center; padding:20px;'>CHECKING DATABASE</div>";
 
-        // Tambah kesan animasi pusing pada butang jika ditekan manual
         if(forceRefresh && icon && btn) {
             btn.disabled = true;
             icon.classList.add('fa-spin');
@@ -132,9 +130,8 @@
             let allStaff = [];
             const CACHE_KEY = 'staff_data_cache';
             const CACHE_TIME_KEY = 'staff_data_time';
-            const ONE_DAY = 24 * 60 * 60 * 1000; // 24 Jam
+            const ONE_DAY = 24 * 60 * 60 * 1000;
 
-            // DIUBAH: Jika forceRefresh dikesan, padam terus cache dalam browser
             if (forceRefresh) {
                 console.log("Memadam cache staf lama secara paksa...");
                 localStorage.removeItem(CACHE_KEY);
@@ -165,8 +162,9 @@
             });
             const allAtt = await resA.json();
 
+            // FIX 1: Dapatkan tarikh hari ini yang bersih tanpa gangguan waktu jam/minit
             const sekarang = new Date();
-            const hariIni = new Date(sekarang.getFullYear(), sekarang.getMonth(), grandmaM = sekarang.getMonth(), sekarang.getDate());
+            const hariIni = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate()).getTime();
 
             allStaff.sort((a, b) => {
                 const jA = (a.position || "").toUpperCase().trim();
@@ -182,11 +180,17 @@
 
                 const record = allAtt.find(a => {
                     const namaAtt = (a.name || "").toUpperCase().trim();
+                    if (namaAtt !== sNama) return false;
+
+                    // FIX 2: Parse tarikh format YYYY-MM-DD dengan jaminan zon masa neutral
                     const tMulaParts = a.start_date.split('-');
                     const tAkhirParts = a.end_date.split('-');
-                    const tMula = new Date(tMulaParts[0], tMulaParts[1] - 1, tMulaParts[2]);
-                    const tAkhir = new Date(tAkhirParts[0], tAkhirParts[1] - 1, tAkhirParts[2]);
-                    return namaAtt.trim() === sNama.trim() && hariIni >= tMula && hariIni <= tAkhir;
+                    
+                    const tMula = new Date(tMulaParts[0], tMulaParts[1] - 1, tMulaParts[2]).getTime();
+                    const tAkhir = new Date(tAkhirParts[0], tAkhirParts[1] - 1, tAkhirParts[2]).getTime();
+                    
+                    // Semak jika tarikh hari ini berada dalam julat cuti/onsite staf
+                    return hariIni >= tMula && hariIni <= tAkhir;
                 });
 
                 let sText = "HADIR";
@@ -200,10 +204,9 @@
                     sSub = sSub + " • SEHINGGA: " + record.end_date;
 
                     deleteButtonHtml = `
-<button class="delete-btn"
-        onclick="padamRekod('${sNama}','${record.start_date}')">
-    <i class="fa-solid fa-xmark"></i> HADIR
-</button>`;
+                        <button class="delete-btn" onclick="padamRekod('${sNama}','${record.start_date}')">
+                            <i class="fa-solid fa-xmark"></i> HADIR
+                        </button>`;
                 }
 
                 list.innerHTML += `
@@ -219,7 +222,6 @@
                     </div>`;
             });
 
-            // Hentikan animasi spin selepas data selesai di-render
             if (forceRefresh && icon && btn) {
                 alert("✅ Senarai staf & rekod kehadiran telah dikemas kini!");
             }
@@ -245,7 +247,7 @@
 
             if (res.ok) {
                 alert("REKOD DIPADAM. STATUS KEMBALI KEPADA HADIR.");
-                fetchAllStatus(false); // Selepas delete, tak perlu force refresh staff data
+                fetchAllStatus(false);
             } else {
                 throw new Error("Gagal padam rekod");
             }
@@ -257,7 +259,6 @@
     const opsi = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
     document.getElementById('todayDate').innerText = new Date().toLocaleDateString('ms-MY', opsi).toUpperCase();
 
-    // Panggilan asal waktu aplikasi mula dibuka (Guna cache jika ada)
     window.onload = () => fetchAllStatus(false);
 </script>
 
