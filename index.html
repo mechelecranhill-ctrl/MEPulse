@@ -307,11 +307,16 @@ body::before{
         </div>
     </div>
 
+    
     <div id="attendancePage" class="page">
         <div class="glass-card">
-            <div class="header">
+            <div class="header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                 <div class="back-btn" onclick="showPage('homePage')"><i class="fa-solid fa-chevron-left"></i> RETURN</div>
+                <div id="refreshBtn" onclick="forceRefreshStaff()" style="color: var(--ios-blue); font-size: 18px; cursor: pointer; padding: 5px 0 5px 15px;" title="Refresh Staff List">
+                    <i class="fa-solid fa-rotate"></i>
+                </div>
             </div>
+
             <form id="attendanceForm">
                 <label for="jawatan">Position</label>
                 <select id="jawatan" required onchange="filterNames()"><option value="">Retrieving</option></select>
@@ -354,23 +359,79 @@ function showPage(pageId) {
 
 async function loadStaff() {
     try {
+        const CACHE_KEY = 'staff_data_cache';
+        const CACHE_TIME_KEY = 'staff_data_time';
+        const ONE_DAY = 24 * 60 * 60 * 1000; // 1 jam dalam milisaat
+
+        const cachedData = localStorage.getItem(CACHE_KEY);
+        const cachedTime = localStorage.getItem(CACHE_TIME_KEY);
+        const now = new Date().getTime();
+
+        if (cachedData && cachedTime && (now - cachedTime < ONE_DAY)) {
+            console.log("Menggunakan data staf dari cache browser...");
+            staffData = JSON.parse(cachedData);
+            populateJawatanSelect(); // Panggil fungsi untuk masukkan data ke <select>
+            return;
+        }
+
+        // 2. Jika tiada cache atau dah luput, baru tarik dari Supabase
+        console.log("Tarik data baru dari Supabase...");
         const res = await fetch(SB_URL + '/rest/v1/staff?select=*', {
             headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
         });
         staffData = await res.json();
-        const jSel = document.getElementById('jawatan');
-        jSel.innerHTML = '<option value="">Choose Position</option>';
-        const uniqueJawatan = [...new Set(
-    staffData.map(s => s.position.toUpperCase().trim())
-)];
-        uniqueJawatan.sort((a, b) => (hierarki[a] || 99) - (hierarki[b] || 99));
-        uniqueJawatan.forEach(j => {
-            const opt = document.createElement('option');
-            opt.value = j; opt.innerText = j;
-            jSel.appendChild(opt);
-        });
+
+        // 3. Simpan data baru ke dalam cache
+        localStorage.setItem(CACHE_KEY, JSON.stringify(staffData));
+        localStorage.setItem(CACHE_TIME_KEY, now.toString());
+
+        populateJawatanSelect();
+
     } catch (err) { console.error(err); }
 }
+
+// Asingkan fungsi susun select supaya kod lebih bersih
+function populateJawatanSelect() {
+    const jSel = document.getElementById('jawatan');
+    jSel.innerHTML = '<option value="">Choose Position</option>';
+    
+    const uniqueJawatan = [...new Set(
+        staffData.map(s => s.position.toUpperCase().trim())
+    )];
+    
+    uniqueJawatan.sort((a, b) => (hierarki[a] || 99) - (hierarki[b] || 99));
+    uniqueJawatan.forEach(j => {
+        const opt = document.createElement('option');
+        opt.value = j; opt.innerText = j;
+        jSel.appendChild(opt);
+    });
+}
+
+function forceRefreshStaff() {
+    const refBtn = document.getElementById('refreshBtn');
+    
+    // 1. Buat animasi pusing pada ikon (Optional tapi kemas)
+    refBtn.style.pointerEvents = 'none';
+    refBtn.innerHTML = '<i class="fa-solid fa-rotate fa-spin"></i>';
+
+    // 2. Padam cache lama dari localStorage
+    localStorage.removeItem('staff_data_cache');
+    localStorage.removeItem('staff_data_time');
+    
+    // 3. Tarik data baru dari Supabase
+    loadStaff().then(() => {
+        // Pulihkan rupa butang asal selepas selesai muat turun
+        refBtn.innerHTML = '<i class="fa-solid fa-rotate"></i>';
+        refBtn.style.pointerEvents = 'auto';
+        alert("✅ Senarai staf telah dikemas kini!");
+    }).catch((err) => {
+        refBtn.innerHTML = '<i class="fa-solid fa-rotate"></i>';
+        refBtn.style.pointerEvents = 'auto';
+        alert("❌ Gagal mengemas kini data.");
+    });
+}
+
+
 
 function filterNames() {
     const selJ = document.getElementById('jawatan').value;
