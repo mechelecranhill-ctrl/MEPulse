@@ -65,6 +65,8 @@
             font-weight: bold; font-size: 12px;
         }
 
+        .refresh-btn:disabled, .tv-btn:disabled, .res-btn:disabled { opacity: 0.6; pointer-events: none; }
+
         .res-btn {
             background: #34C759; color: white; border: none;
             padding: 8px 12px; border-radius: 10px; cursor: pointer;
@@ -90,8 +92,8 @@
                 <button class="res-btn" onclick="window.location.href='dashboard-response.html'">
                     <i class="fa-solid fa-clipboard-list"></i> RESPONSE
                 </button>
-                <button class="refresh-btn" onclick="fetchAllStatus()">
-                    <i class="fa-solid fa-rotate"></i> REFRESH
+                <button id="refBtnText" class="refresh-btn" onclick="fetchAllStatus(true)">
+                    <i id="refIcon" class="fa-solid fa-rotate"></i> REFRESH
                 </button>
             </div>
         </div>
@@ -106,9 +108,19 @@
     const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
 
-        async function fetchAllStatus() {
+    // DIUBAH: Tambah parameter forceRefresh dengan default value false
+    async function fetchAllStatus(forceRefresh = false) {
         const list = document.getElementById('mainList');
+        const icon = document.getElementById('refIcon');
+        const btn = document.getElementById('refBtnText');
+
         list.innerHTML = "<div style='text-align:center; padding:20px;'>CHECKING DATABASE</div>";
+
+        // Tambah kesan animasi pusing pada butang jika ditekan manual
+        if(forceRefresh && icon && btn) {
+            btn.disabled = true;
+            icon.classList.add('fa-spin');
+        }
 
         const hierarki = {
             'KETUA JABATAN': 1, 'KETUA SEKSYEN': 2, 'EKSEKUTIF KANAN': 3,
@@ -118,11 +130,16 @@
 
         try {
             let allStaff = [];
-            
-            // --- PROSES CACHING UNTUK DATA STAFF ---
             const CACHE_KEY = 'staff_data_cache';
             const CACHE_TIME_KEY = 'staff_data_time';
             const ONE_DAY = 24 * 60 * 60 * 1000; // 24 Jam
+
+            // DIUBAH: Jika forceRefresh dikesan, padam terus cache dalam browser
+            if (forceRefresh) {
+                console.log("Memadam cache staf lama secara paksa...");
+                localStorage.removeItem(CACHE_KEY);
+                localStorage.removeItem(CACHE_TIME_KEY);
+            }
 
             const cachedData = localStorage.getItem(CACHE_KEY);
             const cachedTime = localStorage.getItem(CACHE_TIME_KEY);
@@ -132,27 +149,24 @@
                 console.log("Menggunakan data staf dari cache browser...");
                 allStaff = JSON.parse(cachedData);
             } else {
-                console.log("Tarik data staf baru dari Supabase...");
+                console.log("Tarik data staf terkini dari Supabase...");
                 const resS = await fetch(SB_URL + '/rest/v1/staff?select=*', {
                     headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
                 });
                 allStaff = await resS.json();
                 
-                // Simpan ke cache
                 localStorage.setItem(CACHE_KEY, JSON.stringify(allStaff));
                 localStorage.setItem(CACHE_TIME_KEY, now.toString());
             }
-            // ----------------------------------------
 
-            // DATA ATTENDANCE TETAP TARIK FRESH TIAP KALI OPEN/REFRESH
-            console.log("Tarik status kehadiran terkini dari Supabase...");
+            console.log("Tarik status ketiadaan live terkini dari Supabase...");
             const resA = await fetch(SB_URL + '/rest/v1/attendance?select=*', {
                 headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
             });
             const allAtt = await resA.json();
 
             const sekarang = new Date();
-            const hariIni = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate());
+            const hariIni = new Date(sekarang.getFullYear(), sekarang.getMonth(), grandmaM = sekarang.getMonth(), sekarang.getDate());
 
             allStaff.sort((a, b) => {
                 const jA = (a.position || "").toUpperCase().trim();
@@ -205,8 +219,18 @@
                     </div>`;
             });
 
+            // Hentikan animasi spin selepas data selesai di-render
+            if (forceRefresh && icon && btn) {
+                alert("✅ Senarai staf & rekod kehadiran telah dikemas kini!");
+            }
+
         } catch (err) {
             list.innerHTML = "<div style='color:red; text-align:center;'>RALAT: " + err.message.toUpperCase() + "</div>";
+        } finally {
+            if (icon && btn) {
+                btn.disabled = false;
+                icon.classList.remove('fa-spin');
+            }
         }
     }
 
@@ -221,7 +245,7 @@
 
             if (res.ok) {
                 alert("REKOD DIPADAM. STATUS KEMBALI KEPADA HADIR.");
-                fetchAllStatus();
+                fetchAllStatus(false); // Selepas delete, tak perlu force refresh staff data
             } else {
                 throw new Error("Gagal padam rekod");
             }
@@ -233,7 +257,8 @@
     const opsi = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
     document.getElementById('todayDate').innerText = new Date().toLocaleDateString('ms-MY', opsi).toUpperCase();
 
-    window.onload = fetchAllStatus;
+    // Panggilan asal waktu aplikasi mula dibuka (Guna cache jika ada)
+    window.onload = () => fetchAllStatus(false);
 </script>
 
 </body>
