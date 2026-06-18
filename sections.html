@@ -556,17 +556,23 @@ async function loadSections(){
             fetch(`${SB_URL}/rest/v1/me_sections?select=*`, { headers }), 
             fetch(`${SB_URL}/rest/v1/units?select=*`, { headers })
         ]);
+
         const sections = await secRes.json();
         const units = await unitRes.json();
+
+        // OPTIONAL: safety filter (buang orphan unit)
+        const validSectionIds = new Set(sections.map(s => s.id));
+        const cleanUnits = units.filter(u => validSectionIds.has(u.section_id));
 
         items = sections.map(sec => ({
             id: sec.id,
             title: sec.section_name,
-            units: units.filter(u => u.section_id === sec.id)
-        }));
+            units: cleanUnits.filter(u => u.section_id === sec.id)
+        })).filter(sec => sec.units.length > 0); // 🔥 penting: buang empty section
 
         stepAngle = 360 / items.length;
         createWheel();
+
     }catch(err){
         console.error(err);
     }
