@@ -30,16 +30,16 @@ class AppSidebar extends HTMLElement {
                     </a>
                     
                     <div class="submenu" id="dashboardMenu">
-                        <a href="#" data-section="Seksyen Selenggara">
+                        <a href="dashboard-contract.html?section=Seksyen%20Selenggara">
                             Seksyen Selenggara
                         </a>
-                        <a href="#" data-section="Seksyen Pematuhan Peraturan">
+                        <a href="dashboard-contract.html?section=Seksyen%20Pematuhan%20Peraturan">
                             Seksyen Pematuhan Peraturan
                         </a>
-                        <a href="#" data-section="Seksyen Pengurusan Aset & Kewangan">
+                        <a href="dashboard-contract.html?section=Seksyen%20Pengurusan%20Aset%20%26%20Kewangan">
                             Seksyen Pengurusan Aset & Kewangan 
                         </a>
-                        <a href="#" data-section="Seksyen Projek & Perkhidmatan Teknikal">
+                        <a href="dashboard-contract.html?section=Seksyen%20Projek%20%26%20Perkhidmatan%20Teknikal">
                             Seksyen Projek & Perkhidmatan Teknikal
                         </a>
                     </div>
@@ -80,7 +80,6 @@ class AppSidebar extends HTMLElement {
 
         this.cacheDOM();
         this.bindEvents();
-        this.loadDashboardLinks();
     }
 
     cacheDOM() {
@@ -121,29 +120,6 @@ class AppSidebar extends HTMLElement {
         document.addEventListener("keydown", (e) => {
             if (e.key === "Escape") this.close();
         });
-    }
-
-    async loadDashboardLinks() {
-        const links = this.querySelectorAll("#dashboardMenu a[data-section]");
-        if (!links.length) return;
-
-        const sbUrl = "https://ywmsvowroxzhrjwrhsru.supabase.co";
-        const sbKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
-
-        try {
-            const res = await fetch(`${sbUrl}/rest/v1/me_sections?select=id,section_name`, {
-                headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
-            });
-            const sections = await res.json();
-
-            links.forEach(a => {
-                const name = a.dataset.section;
-                const sec = sections.find(s => s.section_name === name);
-                if (sec) a.href = `dashboard-contract.html?section=${sec.id}`;
-            });
-        } catch (e) {
-            console.error("Error loading dashboard links:", e);
-        }
     }
 
     toggle() {
