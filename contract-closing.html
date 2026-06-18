@@ -3,84 +3,94 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Contract Closing</title>
+<title>Contract Closing System</title>
 
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
 <style>
 body{
-    margin:0;
-    font-family:-apple-system,system-ui,sans-serif;
-    background:linear-gradient(60deg,#0b3d91,#0077b6,#00b4d8);
-    min-height:100vh;
-    padding:20px;
+margin:0;
+font-family:-apple-system,system-ui,sans-serif;
+background:linear-gradient(60deg,#0b3d91,#0077b6,#00b4d8);
+padding:20px;
+min-height:100vh;
 }
 
 .glass{
-    background:rgba(255,255,255,0.18);
-    backdrop-filter:blur(14px);
-    border-radius:18px;
-    padding:18px;
-    max-width:900px;
-    margin:auto;
-    border:1px solid rgba(255,255,255,0.25);
+background:rgba(255,255,255,0.18);
+backdrop-filter:blur(15px);
+border-radius:18px;
+padding:20px;
+max-width:1000px;
+margin:auto;
+}
+
+h2{color:white}
+
+select,input,textarea{
+width:100%;
+padding:10px;
+border-radius:10px;
+border:none;
+margin-top:5px;
 }
 
 label{
-    font-size:11px;
-    font-weight:700;
-    color:#444;
-    margin-top:10px;
-    display:block;
+font-size:11px;
+font-weight:700;
+color:#fff;
+margin-top:10px;
+display:block;
 }
 
-input,select,textarea{
-    width:100%;
-    padding:12px;
-    border-radius:12px;
-    border:1px solid rgba(255,255,255,0.4);
-    background:rgba(255,255,255,0.35);
-    outline:none;
-    margin-top:5px;
+.tabs{
+display:flex;
+gap:10px;
+margin:15px 0;
 }
 
-.grid{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:10px;
+.tab{
+flex:1;
+padding:12px;
+border:none;
+border-radius:10px;
+font-weight:700;
+cursor:pointer;
+background:rgba(255,255,255,0.2);
+color:white;
 }
+
+.tab.active{background:#007AFF}
 
 .card{
-    background:rgba(255,255,255,0.25);
-    padding:12px;
-    border-radius:14px;
+background:rgba(255,255,255,0.25);
+padding:12px;
+border-radius:12px;
+margin-top:10px;
 }
 
 .btn{
-    width:100%;
-    padding:14px;
-    border:none;
-    border-radius:14px;
-    font-weight:700;
-    cursor:pointer;
-    margin-top:10px;
+width:100%;
+padding:12px;
+border:none;
+border-radius:12px;
+font-weight:700;
+cursor:pointer;
+margin-top:10px;
 }
 
-.primary{background:#007AFF;color:white;}
-.green{background:#34C759;color:white;}
+.primary{background:#007AFF;color:white}
+.green{background:#34C759;color:white}
+.red{background:#FF3B30;color:white}
 
-.timeline div{
-    padding:6px 0;
-    font-size:12px;
+.checklist label{
+display:flex;
+gap:10px;
+align-items:center;
+font-size:12px;
+color:white;
+margin:6px 0;
 }
-
-.badge{
-    padding:6px 10px;
-    border-radius:999px;
-    font-size:11px;
-    font-weight:700;
-}
-
 </style>
 </head>
 
@@ -88,245 +98,227 @@ input,select,textarea{
 
 <div class="glass">
 
-<h2><i class="fa fa-circle-check"></i> Contract Closing</h2>
+<h2><i class="fa fa-file-contract"></i> Closing Contract</h2>
 
-<!-- CONTRACT SELECT -->
+<!-- UNIT -->
 <label>Unit</label>
 <select id="unit" onchange="loadContracts()"></select>
 
+<!-- CONTRACT -->
 <label>Contract</label>
-<select id="contract" onchange="loadClosing()"></select>
+<select id="contract" onchange="loadData()"></select>
 
-<!-- SUMMARY -->
-<div class="grid" style="margin-top:15px;">
+<!-- TABS -->
+<div class="tabs">
+<button class="tab active" onclick="showTab('cpc')">CPC</button>
+<button class="tab" onclick="showTab('cmgd')">CMGD</button>
+<button class="tab" onclick="showTab('sfa')">SFA</button>
+</div>
+
+<!-- ================= CPC ================= -->
+<div id="cpcTab">
 
 <div class="card">
-<div>Contract Value</div>
-<strong id="cv">RM 0.00</strong>
+<b style="color:white">Contract End (CPC)</b>
+<div id="contractEnd" style="color:#fff;font-size:14px"></div>
 </div>
+
+<div class="card checklist">
+<b style="color:white">CPC Checklist</b>
+
+<label><input type="checkbox" id="c1"> Site inspection completed</label>
+<label><input type="checkbox" id="c2"> Work certified completed</label>
+<label><input type="checkbox" id="c3"> As-built drawing</label>
+<label><input type="checkbox" id="c4"> Testing & commissioning</label>
+<label><input type="checkbox" id="c5"> Safety clearance</label>
+<label><input type="checkbox" id="c6"> Consultant approval</label>
+</div>
+
+<button class="btn primary" onclick="saveCPC()">Submit CPC</button>
+</div>
+
+<!-- ================= CMGD ================= -->
+<div id="cmgdTab" style="display:none">
 
 <div class="card">
-<div>Total VO</div>
-<strong id="vo">RM 0.00</strong>
+<b style="color:white">CMGD Eligibility</b>
+<div id="cmgdStatus"></div>
 </div>
 
-<div class="card">
-<div>Total Interim</div>
-<strong id="ti">RM 0.00</strong>
-</div>
-
-<div class="card">
-<div>Balance</div>
-<strong id="bal">RM 0.00</strong>
-</div>
-
-</div>
-
-<!-- CPC / CMGD -->
-<div class="grid" style="margin-top:15px;">
-
-<div>
-<label>CPC Date</label>
-<input type="date" id="cpc" onchange="calcDLP()">
-</div>
-
-<div>
 <label>CMGD Date</label>
-<input type="date" id="cmgd" onchange="calcDLP()">
+<input type="date" id="cmgd">
+
+<label>Defect Status</label>
+<select id="defect">
+<option>Completed</option>
+<option>Pending</option>
+</select>
+
+<label>Remarks</label>
+<textarea id="cmgdRemark"></textarea>
+
+<button class="btn primary" onclick="saveCMGD()">Submit CMGD</button>
 </div>
 
+<!-- ================= SFA ================= -->
+<div id="sfaTab" style="display:none">
+
+<div class="card">
+<b style="color:white">SFA Eligibility</b>
+<div id="sfaStatus"></div>
 </div>
 
-<div class="card" style="margin-top:10px;">
-<b>DLP Days:</b> <span id="dlp">0</span>
-</div>
+<label>SFA Date</label>
+<input type="date" id="sfa">
 
-<!-- FINAL -->
 <label>Final Account</label>
 <input type="number" id="final">
 
-<label>Retention Released</label>
+<label>Retention Release</label>
 <input type="number" id="retention">
 
-<label>PG Released</label>
+<label>PG Release</label>
 <input type="number" id="pg">
 
 <label>Remarks</label>
-<textarea id="remarks"></textarea>
+<textarea id="sfaRemark"></textarea>
 
-<!-- TIMELINE -->
-<div class="card timeline" style="margin-top:15px;">
-<div>✔ Contract Registered</div>
-<div>✔ Work Orders</div>
-<div>✔ Interim</div>
-<div>✔ VO</div>
-<div id="t_cpc">○ CPC</div>
-<div id="t_cmgd">○ CMGD</div>
-<div id="t_close">○ CLOSED</div>
+<button class="btn green" onclick="saveSFA()">CLOSE CONTRACT</button>
 </div>
-
-<!-- ACTION -->
-<button class="btn green" onclick="saveClosing()">Save Closing</button>
 
 </div>
 
 <script>
-const SB = "https://ywmsvowroxzhrjwrhsru.supabase.co";
-const KEY = "YOUR_ANON_KEY";
+const SB="https://ywmsvowroxzhrjwrhsru.supabase.co";
+const KEY="YOUR_ANON_KEY";
 
-const headers = {
-"apikey": KEY,
-"Authorization": "Bearer "+KEY,
+const headers={
+apikey:KEY,
+Authorization:"Bearer "+KEY,
 "Content-Type":"application/json"
 };
 
-let currentId = null;
-let contractData = null;
+let contract=null;
+let closing=null;
 
-async function loadUnits(){
-const res = await fetch(SB+"/rest/v1/units?select=*",{headers});
-const data = await res.json();
+function showTab(t){
+document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
+event.target.classList.add("active");
 
-document.getElementById('unit').innerHTML =
-'<option value="">Choose</option>';
-
-data.forEach(u=>{
-document.getElementById('unit').innerHTML +=
-`<option value="${u.id}">${u.unit_name}</option>`;
-});
+document.getElementById("cpcTab").style.display=t=="cpc"?"block":"none";
+document.getElementById("cmgdTab").style.display=t=="cmgd"?"block":"none";
+document.getElementById("sfaTab").style.display=t=="sfa"?"block":"none";
 }
 
 async function loadContracts(){
-const unit = document.getElementById('unit').value;
+const unit=document.getElementById("unit").value;
+const res=await fetch(`${SB}/rest/v1/contract?unit_id=eq.${unit}`,{headers});
+const data=await res.json();
 
-const res = await fetch(
-SB+"/rest/v1/contract?unit_id=eq."+unit+"&select=*",
-{headers}
-);
-
-const data = await res.json();
-
-const sel = document.getElementById('contract');
-sel.innerHTML = '<option value="">Choose</option>';
+let sel=document.getElementById("contract");
+sel.innerHTML="<option value=''>Select</option>";
 
 data.forEach(c=>{
-const opt = document.createElement('option');
-opt.value = c.id;
-opt.text = c.contract_code;
-opt.dataset.data = JSON.stringify(c);
+let opt=document.createElement("option");
+opt.value=c.id;
+opt.text=c.contract_code;
 sel.appendChild(opt);
 });
 }
 
-async function loadClosing(){
+async function loadData(){
+const id=document.getElementById("contract").value;
+if(!id)return;
 
-const id = document.getElementById('contract').value;
+// contract
+const c=await fetch(`${SB}/rest/v1/contract?id=eq.${id}`,{headers});
+contract=(await c.json())[0];
 
-if(!id) return;
+document.getElementById("contractEnd").innerText=contract.contract_end;
 
-const cRes = await fetch(
-SB+"/rest/v1/contract?id=eq."+id,
-{headers}
-);
+// closing
+const r=await fetch(`${SB}/rest/v1/contract_closing?contract_id=eq.${id}`,{headers});
+const d=await r.json();
 
-const cData = await cRes.json();
-contractData = cData[0];
+closing=d[0]||null;
 
-// CONTRACT VALUE
-document.getElementById('cv').innerText =
-"RM "+(contractData.contract_sum||0).toLocaleString();
+// CMGD status
+let cmgdDate=new Date(contract.contract_end);
+cmgdDate.setMonth(cmgdDate.getMonth()+6);
 
-// VO
-document.getElementById('vo').innerText =
-"RM "+(contractData.total_vo_amount||0).toLocaleString();
+document.getElementById("cmgdStatus").innerText=
+"Available after: "+cmgdDate.toDateString();
 
-// INTERIM SUM (simple fallback)
-document.getElementById('ti').innerText =
-"RM 0.00";
+// SFA status
+let sfaDate=new Date(contract.contract_end);
+sfaDate.setMonth(sfaDate.getMonth()+12);
 
-document.getElementById('bal').innerText =
-"RM "+(
-(contractData.contract_sum||0)
-+(contractData.total_vo_amount||0)
-).toLocaleString();
-
-// CHECK EXISTING CLOSING
-const res = await fetch(
-SB+"/rest/v1/contract_closing?contract_id=eq."+id,
-{headers}
-);
-
-const data = await res.json();
-
-if(data.length>0){
-const d = data[0];
-currentId = d.id;
-
-document.getElementById('cpc').value = d.cpc_date||"";
-document.getElementById('cmgd').value = d.cmgd_date||"";
-document.getElementById('final').value = d.final_account||0;
-document.getElementById('retention').value = d.retention_released||0;
-document.getElementById('pg').value = d.pg_released||0;
-document.getElementById('remarks').value = d.remarks||"";
-
-calcDLP();
-}
+document.getElementById("sfaStatus").innerText=
+"Available after: "+sfaDate.toDateString();
 }
 
-function calcDLP(){
-const cpc = new Date(document.getElementById('cpc').value);
-const cmgd = new Date(document.getElementById('cmgd').value);
+async function saveCPC(){
 
-if(!cpc || !cmgd || isNaN(cpc) || isNaN(cmgd)) return;
-
-const diff = Math.ceil((cmgd-cpc)/(1000*60*60*24));
-
-document.getElementById('dlp').innerText = diff;
-
-// timeline
-document.getElementById('t_cpc').innerText = "✔ CPC";
-document.getElementById('t_cmgd').innerText = "✔ CMGD";
-document.getElementById('t_close').innerText = "○ CLOSED";
-}
-
-async function saveClosing(){
-
-const payload = {
-contract_id: document.getElementById('contract').value,
-cpc_date: document.getElementById('cpc').value,
-cmgd_date: document.getElementById('cmgd').value,
-dlp_days: parseInt(document.getElementById('dlp').innerText||0),
-contract_value: contractData?.contract_sum||0,
-total_vo: contractData?.total_vo_amount||0,
-revised_contract_value:
-(contractData?.contract_sum||0)+(contractData?.total_vo_amount||0),
-final_account: parseFloat(document.getElementById('final').value||0),
-retention_released: parseFloat(document.getElementById('retention').value||0),
-pg_released: parseFloat(document.getElementById('pg').value||0),
-remarks: document.getElementById('remarks').value,
-status: "CPC"
-};
-
-let url = SB+"/rest/v1/contract_closing";
-let method = "POST";
-
-if(currentId){
-url += "?id=eq."+currentId;
-method = "PATCH";
-}
-
-const res = await fetch(url,{
-method,
-headers,
-body: JSON.stringify(payload)
+let checklist=[];
+document.querySelectorAll(".checklist input").forEach((c,i)=>{
+checklist.push(c.checked);
 });
 
-if(res.ok){
-alert("Closing saved!");
-location.reload();
-}else{
-alert("Error saving closing");
+await fetch(`${SB}/rest/v1/contract_closing`,{
+method:"POST",
+headers,
+body:JSON.stringify({
+contract_id:contract.id,
+cpc_date:contract.contract_end,
+cpc_checklist:checklist,
+cpc_status:"COMPLETED"
+})
+});
+
+alert("CPC saved");
 }
+
+async function saveCMGD(){
+
+await fetch(`${SB}/rest/v1/contract_closing`,{
+method:"PATCH",
+headers,
+body:JSON.stringify({
+cmgd_date:document.getElementById("cmgd").value,
+defect_status:document.getElementById("defect").value,
+cmgd_remarks:document.getElementById("cmgdRemark").value
+})
+});
+
+alert("CMGD saved");
+}
+
+async function saveSFA(){
+
+await fetch(`${SB}/rest/v1/contract_closing`,{
+method:"PATCH",
+headers,
+body:JSON.stringify({
+sfa_date:document.getElementById("sfa").value,
+final_account:document.getElementById("final").value,
+retention_release:document.getElementById("retention").value,
+pg_release:document.getElementById("pg").value,
+sfa_remarks:document.getElementById("sfaRemark").value,
+status:"CLOSED"
+})
+});
+
+alert("Contract Closed");
+}
+
+async function loadUnits(){
+const r=await fetch(`${SB}/rest/v1/units`,{headers});
+const d=await r.json();
+
+let u=document.getElementById("unit");
+d.forEach(x=>{
+u.innerHTML+=`<option value="${x.id}">${x.unit_name}</option>`;
+});
 }
 
 loadUnits();
