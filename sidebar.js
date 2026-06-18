@@ -44,6 +44,10 @@ class AppSidebar extends HTMLElement {
                         </a>
                     </div>
                 </div>
+
+<a href="contract-closing.html" class="menu-link">
+    Contract Closing
+</a>
                 
                 <a href="#" id="logoutBtn">Logout</a>
             </div>
