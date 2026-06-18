@@ -396,17 +396,56 @@
     }
 
     async function fetchUnits() {
-        try {
-            const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
-            const units = await res.json();
-            const nav = document.getElementById('unitNav');
-            nav.innerHTML = units.map(u => `<button class="unit-pill" id="unit-${u.id}" onclick="fetchContracts(${u.id}, this)">${u.unit_name}</button>`).join('');
+    try {
+        const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
+        const units = await res.json();
 
-            const instUnit = units.find(u => u.unit_name.toUpperCase() === 'INSTRUMENTASI');
-            if(instUnit) { document.getElementById(`unit-${instUnit.id}`).click(); } 
-            else if(units.length > 0) { document.querySelector('.unit-pill').click(); }
-        } catch (e) { console.error("Error units:", e); }
+        const userRole = (localStorage.getItem("role") || "").toLowerCase();
+
+        // 🔥 FILTER LOGIC
+        const filteredUnits = units.filter(u => {
+            const name = (u.unit_name || "").toLowerCase();
+
+            // admin nampak semua
+            if (isAdmin) return true;
+
+            // mapping unit ikut role
+            if (userRole.includes("selenggara")) {
+                return name.includes("selenggara");
+            }
+
+            if (userRole.includes("pematuhan")) {
+                return name.includes("pematuhan");
+            }
+
+            if (userRole.includes("aset")) {
+                return name.includes("aset") || name.includes("kewangan");
+            }
+
+            if (userRole.includes("projek")) {
+                return name.includes("projek") || name.includes("teknikal");
+            }
+            return false;
+        });
+
+        const nav = document.getElementById('unitNav');
+
+        nav.innerHTML = filteredUnits.map(u => `
+            <button class="unit-pill" id="unit-${u.id}"
+                onclick="fetchContracts(${u.id}, this)">
+                ${u.unit_name}
+            </button>
+        `).join('');
+
+        // auto select first available unit
+        if (filteredUnits.length > 0) {
+            document.getElementById(`unit-${filteredUnits[0].id}`).click();
+        }
+
+    } catch (e) {
+        console.error("Error units:", e);
     }
+}
 
     async function fetchContracts(unitId, btn) {
         document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
