@@ -397,37 +397,48 @@
 
     async function fetchUnits() {
     try {
+        const userRole = (localStorage.getItem("role") || "").toLowerCase();
+
+        // 1. ambil semua sections
+        const secRes = await fetch(`${SB_URL}/rest/v1/me_sections?select=*`, { headers });
+        const sections = await secRes.json();
+
+        // 2. map role → section_id
+        let allowedSectionIds = [];
+
+        if (isAdmin) {
+            allowedSectionIds = sections.map(s => s.id);
+        } else {
+            sections.forEach(s => {
+                const name = (s.section_name || "").toLowerCase();
+
+                if (userRole.includes("selenggara") && name.includes("selenggara")) {
+                    allowedSectionIds.push(s.id);
+                }
+
+                if (userRole.includes("pematuhan") && name.includes("pematuhan")) {
+                    allowedSectionIds.push(s.id);
+                }
+
+                if (userRole.includes("aset") && name.includes("aset")) {
+                    allowedSectionIds.push(s.id);
+                }
+
+                if (userRole.includes("projek") && name.includes("projek")) {
+                    allowedSectionIds.push(s.id);
+                }
+            });
+        }
+
+        // 3. ambil units yang match section_id
         const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
         const units = await res.json();
 
-        const userRole = (localStorage.getItem("role") || "").toLowerCase();
+        const filteredUnits = units.filter(u =>
+            allowedSectionIds.includes(u.section_id)
+        );
 
-        // 🔥 FILTER LOGIC
-        const filteredUnits = units.filter(u => {
-            const name = (u.unit_name || "").toLowerCase();
-
-            // admin nampak semua
-            if (isAdmin) return true;
-
-            // mapping unit ikut role
-            if (userRole.includes("selenggara")) {
-                return name.includes("selenggara");
-            }
-
-            if (userRole.includes("pematuhan")) {
-                return name.includes("pematuhan");
-            }
-
-            if (userRole.includes("aset")) {
-                return name.includes("aset") || name.includes("kewangan");
-            }
-
-            if (userRole.includes("projek")) {
-                return name.includes("projek") || name.includes("teknikal");
-            }
-            return false;
-        });
-
+        // 4. render UI
         const nav = document.getElementById('unitNav');
 
         nav.innerHTML = filteredUnits.map(u => `
@@ -437,7 +448,6 @@
             </button>
         `).join('');
 
-        // auto select first available unit
         if (filteredUnits.length > 0) {
             document.getElementById(`unit-${filteredUnits[0].id}`).click();
         }
