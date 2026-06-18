@@ -397,45 +397,19 @@
 
     async function fetchUnits() {
     try {
-        const userRole = (localStorage.getItem("role") || "").toLowerCase();
-
-        // 1. ambil semua sections
+        // 1. ambil sections
         const secRes = await fetch(`${SB_URL}/rest/v1/me_sections?select=*`, { headers });
         const sections = await secRes.json();
 
-        // 2. map role → section_id
-        let allowedSectionIds = [];
-
-        if (isAdmin) {
-            allowedSectionIds = sections.map(s => s.id);
-        } else {
-            sections.forEach(s => {
-                const name = (s.section_name || "").toLowerCase();
-
-                if (userRole.includes("selenggara") && name.includes("selenggara")) {
-                    allowedSectionIds.push(s.id);
-                }
-
-                if (userRole.includes("pematuhan") && name.includes("pematuhan")) {
-                    allowedSectionIds.push(s.id);
-                }
-
-                if (userRole.includes("aset") && name.includes("aset")) {
-                    allowedSectionIds.push(s.id);
-                }
-
-                if (userRole.includes("projek") && name.includes("projek")) {
-                    allowedSectionIds.push(s.id);
-                }
-            });
-        }
-
-        // 3. ambil units yang match section_id
+        // 2. ambil units
         const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
         const units = await res.json();
 
+        // 3. filter units ikut valid section_id sahaja
+        const validSectionIds = new Set(sections.map(s => s.id));
+
         const filteredUnits = units.filter(u =>
-            allowedSectionIds.includes(u.section_id)
+            validSectionIds.has(u.section_id)
         );
 
         // 4. render UI
@@ -448,6 +422,7 @@
             </button>
         `).join('');
 
+        // 5. auto select first unit
         if (filteredUnits.length > 0) {
             document.getElementById(`unit-${filteredUnits[0].id}`).click();
         }
