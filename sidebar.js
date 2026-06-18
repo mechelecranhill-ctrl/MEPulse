@@ -1,6 +1,3 @@
-const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
-
 class AppSidebar extends HTMLElement {
     connectedCallback() {
         // 1. Ambil data nama, posisi, dan URL avatar staf daripada localStorage
@@ -130,9 +127,12 @@ class AppSidebar extends HTMLElement {
         const links = this.querySelectorAll("#dashboardMenu a[data-section]");
         if (!links.length) return;
 
+        const sbUrl = "https://ywmsvowroxzhrjwrhsru.supabase.co";
+        const sbKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
+
         try {
-            const res = await fetch(`${SB_URL}/rest/v1/me_sections?select=id,section_name`, {
-                headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
+            const res = await fetch(`${sbUrl}/rest/v1/me_sections?select=id,section_name`, {
+                headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
             });
             const sections = await res.json();
 
