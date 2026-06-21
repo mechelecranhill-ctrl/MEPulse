@@ -1,6 +1,6 @@
 const SESSION_TIMEOUT = 15 * 60 * 1000;
 const WARNING_TIME = 10 * 1000;
-const CHECK_INTERVAL = 5000;
+const CHECK_INTERVAL = 3000;
 
 const channel = new BroadcastChannel("auth_channel");
 
@@ -9,24 +9,58 @@ let expired = false;
 let countdown = 10;
 let countdownInterval;
 
+let lastScrollTime = Date.now();
+let lastMouseTime = Date.now();
+
 /* =========================
-   ACTIVITY
+   ACTIVITY TRACKING
 ========================= */
 function updateActivity() {
     localStorage.setItem("lastActivity", Date.now());
+
+    warningShown = false;
 }
 
-["mousemove","mousedown","keydown","scroll","touchstart"]
-.forEach(e => document.addEventListener(e, updateActivity, true));
-
-updateActivity();
+/* mouse/keyboard activity */
+["mousemove","mousedown","keydown","touchstart"]
+.forEach(e => {
+    document.addEventListener(e, () => {
+        lastMouseTime = Date.now();
+        updateActivity();
+    }, true);
+});
 
 /* =========================
-   FORCE LOGOUT
+   SCROLL TRACKING (READING MODE)
+========================= */
+let scrollTimer = null;
+
+window.addEventListener("scroll", () => {
+
+    lastScrollTime = Date.now();
+    updateActivity();
+
+    // detect reading mode (scrolling continuously)
+    clearTimeout(scrollTimer);
+
+    scrollTimer = setTimeout(() => {
+        // user stopped scrolling → still reading, NOT idle
+        lastScrollTime = Date.now();
+    }, 1500);
+
+}, { passive: true });
+
+/* =========================
+   FORCE LOGOUT (SYNC ALL TABS)
 ========================= */
 function forceLogout(broadcast = true) {
+
     localStorage.clear();
-    if (broadcast) channel.postMessage({ type: "LOGOUT" });
+
+    if (broadcast) {
+        channel.postMessage({ type: "LOGOUT" });
+    }
+
     window.location.replace("login.html");
 }
 
@@ -37,7 +71,7 @@ channel.onmessage = (e) => {
 };
 
 /* =========================
-   REFRESH TOKEN
+   SUPABASE REFRESH
 ========================= */
 async function refreshSupabaseSession() {
     try {
@@ -70,35 +104,54 @@ async function refreshSupabaseSession() {
 }
 
 /* =========================
-   MODAL
+   SMART IDLE DETECTION
 ========================= */
-function showModal() {
+function getUserState() {
 
-    if (expired) return;
-    expired = true;
+    const now = Date.now();
+
+    const lastActivity = Number(localStorage.getItem("lastActivity")) || 0;
+
+    const idleTime = now - lastActivity;
+
+    const recentScroll = now - lastScrollTime;
+    const recentMouse = now - lastMouseTime;
+
+    const isReading =
+        recentScroll < 5000; // user still reading/scrolling
+
+    const isActive =
+        recentMouse < 5000 || recentScroll < 5000;
+
+    return {
+        idleTime,
+        isReading,
+        isActive
+    };
+}
+
+/* =========================
+   WARNING MODAL
+========================= */
+function showWarning() {
+
+    if (warningShown) return;
+    warningShown = true;
 
     const modal = document.createElement("div");
 
     modal.innerHTML = `
     <div style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;justify-content:center;align-items:center;z-index:999999;">
-        <div style="width:320px;background:white;border-radius:18px;text-align:center;font-family:system-ui;overflow:hidden;">
-            
-            <div style="padding:20px">
-                <h3>Session Expiring</h3>
-                <p>You will be logged out soon</p>
-                <p style="font-weight:700;color:#007AFF">
-                    Auto logout in <span id="cd">${countdown}</span>s
-                </p>
-            </div>
+        <div style="width:320px;background:white;border-radius:18px;text-align:center;font-family:system-ui;padding:20px;">
+            <h3>Session Expiring</h3>
+            <p>You are inactive</p>
+            <p style="font-weight:700;color:#007AFF">
+                Auto logout in <span id="cd">${countdown}</span>s
+            </p>
 
-            <button id="extendBtn" style="width:100%;padding:14px;border:none;background:#34C759;color:white;font-weight:700;">
+            <button id="extendBtn" style="width:100%;margin-top:10px;padding:12px;background:#34C759;color:white;border:none;font-weight:700;">
                 Extend Session
             </button>
-
-            <button id="logoutBtn" style="width:100%;padding:14px;border:none;background:#007AFF;color:white;font-weight:700;">
-                Logout Now
-            </button>
-
         </div>
     </div>`;
 
@@ -124,8 +177,8 @@ function showModal() {
 
         if (ok) {
             updateActivity();
-            expired = false;
             warningShown = false;
+            expired = false;
             countdown = 10;
             modal.remove();
             clearInterval(countdownInterval);
@@ -133,29 +186,28 @@ function showModal() {
             forceLogout(true);
         }
     };
-
-    document.getElementById("logoutBtn").onclick = () => forceLogout(true);
 }
 
 /* =========================
-   LOOP
+   MAIN LOOP (SMART ENGINE)
 ========================= */
 setInterval(async () => {
 
-    const last = Number(localStorage.getItem("lastActivity")) || 0;
-    const idle = Date.now() - last;
+    const state = getUserState();
 
-    // WARNING
-    if (idle > SESSION_TIMEOUT - WARNING_TIME && !warningShown) {
-        warningShown = true;
-        showModal();
+    const idle = state.idleTime;
+
+    // ❌ DO NOT TRIGGER WARNING if reading
+    if (!state.isReading && idle > SESSION_TIMEOUT - WARNING_TIME && !warningShown) {
+        showWarning();
     }
 
-    // EXPIRE
-    if (idle > SESSION_TIMEOUT) {
-        const ok = await refreshSupabaseSession();
+    // ❌ EXPIRE ONLY IF TRUE IDLE
+    if (!state.isReading && idle > SESSION_TIMEOUT) {
 
-        if (ok) {
+        const refreshed = await refreshSupabaseSession();
+
+        if (refreshed) {
             updateActivity();
             warningShown = false;
             return;
