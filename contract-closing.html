@@ -270,6 +270,22 @@ document.getElementById("cmgdTab").style.display=t=="cmgd"?"block":"none";
 document.getElementById("sfaTab").style.display=t=="sfa"?"block":"none";
 }
 
+function isCPCEligible(endDate){
+    return new Date(endDate) <= new Date();
+}
+
+function isCMGDEligible(endDate){
+    let d = new Date(endDate);
+    d.setMonth(d.getMonth() + 6);
+    return d <= new Date();
+}
+
+function isSFAEligible(endDate){
+    let d = new Date(endDate);
+    d.setMonth(d.getMonth() + 12);
+    return d <= new Date();
+}
+
 async function loadContracts(){
 const unit=document.getElementById("unit").value;
 const res=await fetch(`${SB_URL}/rest/v1/contract?unit_id=eq.${unit}`,{headers});
@@ -286,32 +302,27 @@ sel.appendChild(opt);
 });
 }
 
-async function loadData(){
-const id=document.getElementById("contract").value;
-if(!id)return;
+const today = new Date();
 
-const c=await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`,{headers});
-contract=(await c.json())[0];
+const contractEnd = new Date(contract.contract_end);
 
-document.getElementById("contractEnd").innerText=contract.contract_end;
-
-const r=await fetch(`${SB_URL}/rest/v1/contract_closing?contract_id=eq.${id}`,{headers});
-const d=await r.json();
-
-closing=d[0]||null;
-
-let cmgdDate=new Date(contract.contract_end);
+let cmgdDate = new Date(contract.contract_end);
 cmgdDate.setMonth(cmgdDate.getMonth()+6);
 
-document.getElementById("cmgdStatus").innerText=
-"Available after: "+cmgdDate.toDateString();
-
-let sfaDate=new Date(contract.contract_end);
+let sfaDate = new Date(contract.contract_end);
 sfaDate.setMonth(sfaDate.getMonth()+12);
 
-document.getElementById("sfaStatus").innerText=
-"Available after: "+sfaDate.toDateString();
-}
+// CPC
+document.querySelector("#cpcTab .btn").disabled =
+    contractEnd > today;
+
+// CMGD
+document.querySelector("#cmgdTab .btn").disabled =
+    cmgdDate > today;
+
+// SFA
+document.querySelector("#sfaTab .btn").disabled =
+    sfaDate > today;
 
 async function saveCPC(){
 
