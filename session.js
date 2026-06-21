@@ -2,6 +2,7 @@ const SESSION_TIMEOUT = 15 * 60 * 1000;
 const WARNING_TIME = 10 * 1000;
 const CHECK_INTERVAL = 3000;
 
+
 const channel = new BroadcastChannel("auth_channel");
 
 let warningShown = false;
