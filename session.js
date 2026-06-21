@@ -1,16 +1,16 @@
-const SESSION_TIMEOUT = 20 * 1000; // 15 min idle
-const WARNING_TIME = 10 * 1000; // 10s warning
+const SESSION_TIMEOUT = 15 * 60 * 1000;
+const WARNING_TIME = 10 * 1000;
 const CHECK_INTERVAL = 5000;
 
 const channel = new BroadcastChannel("auth_channel");
 
 let warningShown = false;
-let expiredShown = false;
-let countdownInterval = null;
-let countdownValue = 10;
+let expired = false;
+let countdown = 10;
+let countdownInterval;
 
 /* =========================
-   TRACK ACTIVITY
+   ACTIVITY
 ========================= */
 function updateActivity() {
     localStorage.setItem("lastActivity", Date.now());
@@ -22,7 +22,22 @@ function updateActivity() {
 updateActivity();
 
 /* =========================
-   SUPABASE REFRESH SESSION
+   FORCE LOGOUT
+========================= */
+function forceLogout(broadcast = true) {
+    localStorage.clear();
+    if (broadcast) channel.postMessage({ type: "LOGOUT" });
+    window.location.replace("login.html");
+}
+
+channel.onmessage = (e) => {
+    if (e.data.type === "LOGOUT") {
+        forceLogout(false);
+    }
+};
+
+/* =========================
+   REFRESH TOKEN
 ========================= */
 async function refreshSupabaseSession() {
     try {
@@ -49,122 +64,43 @@ async function refreshSupabaseSession() {
 
         return false;
 
-    } catch (err) {
-        console.error("Refresh failed:", err);
+    } catch (e) {
         return false;
     }
 }
 
 /* =========================
-   BACKEND EXTEND (OPTIONAL)
+   MODAL
 ========================= */
-async function extendSessionBackend() {
-    try {
-        const token = JSON.parse(localStorage.getItem("sb-session"))?.access_token;
-        if (!token) return;
+function showModal() {
 
-        await fetch(`${SB_URL}/rest/v1/rpc/extend_session`, {
-            method: "POST",
-            headers: {
-                apikey: SB_KEY,
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({})
-        });
-
-    } catch (e) {
-        console.log("extendSessionBackend failed (ignored)");
-    }
-}
-
-/* =========================
-   MULTI-TAB LOGOUT SYNC
-========================= */
-function broadcastLogout() {
-    channel.postMessage({ type: "LOGOUT" });
-}
-
-channel.onmessage = (event) => {
-    if (event.data.type === "LOGOUT") {
-        forceLogout(false);
-    }
-};
-
-/* =========================
-   FORCE LOGOUT
-========================= */
-function forceLogout(broadcast = true) {
-    localStorage.clear();
-
-    if (broadcast) broadcastLogout();
-
-    window.location.replace("login.html");
-}
-
-/* =========================
-   SESSION EXPIRED MODAL
-========================= */
-function showSessionModal() {
-
-    if (expiredShown) return;
-    expiredShown = true;
+    if (expired) return;
+    expired = true;
 
     const modal = document.createElement("div");
 
     modal.innerHTML = `
-        <div style="
-            position:fixed;
-            inset:0;
-            background:rgba(0,0,0,.55);
-            display:flex;
-            justify-content:center;
-            align-items:center;
-            z-index:999999;
-        ">
-            <div style="
-                width:320px;
-                background:white;
-                border-radius:18px;
-                text-align:center;
-                font-family:system-ui;
-                overflow:hidden;
-            ">
-                <div style="padding:20px">
-                    <h3>Session Expiring</h3>
-                    <p style="color:#666">
-                        You will be logged out soon
-                    </p>
-
-                    <p style="font-weight:700;color:#007AFF">
-                        Auto logout in <span id="cd">${countdownValue}</span>s
-                    </p>
-                </div>
-
-                <button id="extendBtn" style="
-                    width:100%;
-                    border:none;
-                    background:#34C759;
-                    color:white;
-                    padding:14px;
-                    font-weight:700;
-                ">
-                    Extend Session
-                </button>
-
-                <button id="logoutBtn" style="
-                    width:100%;
-                    border:none;
-                    background:#007AFF;
-                    color:white;
-                    padding:14px;
-                    font-weight:700;
-                ">
-                    Logout Now
-                </button>
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;justify-content:center;align-items:center;z-index:999999;">
+        <div style="width:320px;background:white;border-radius:18px;text-align:center;font-family:system-ui;overflow:hidden;">
+            
+            <div style="padding:20px">
+                <h3>Session Expiring</h3>
+                <p>You will be logged out soon</p>
+                <p style="font-weight:700;color:#007AFF">
+                    Auto logout in <span id="cd">${countdown}</span>s
+                </p>
             </div>
+
+            <button id="extendBtn" style="width:100%;padding:14px;border:none;background:#34C759;color:white;font-weight:700;">
+                Extend Session
+            </button>
+
+            <button id="logoutBtn" style="width:100%;padding:14px;border:none;background:#007AFF;color:white;font-weight:700;">
+                Logout Now
+            </button>
+
         </div>
-    `;
+    </div>`;
 
     document.body.appendChild(modal);
 
@@ -172,61 +108,54 @@ function showSessionModal() {
 
     countdownInterval = setInterval(() => {
 
-        countdownValue--;
+        countdown--;
 
-        if (cd) cd.textContent = countdownValue;
+        if (cd) cd.textContent = countdown;
 
-        if (countdownValue <= 0) {
-            clearInterval(countdownInterval);
+        if (countdown <= 0) {
             forceLogout(true);
         }
 
     }, 1000);
 
-    /* EXTEND SESSION */
     document.getElementById("extendBtn").onclick = async () => {
-
-        clearInterval(countdownInterval);
 
         const ok = await refreshSupabaseSession();
 
         if (ok) {
             updateActivity();
-            expiredShown = false;
+            expired = false;
             warningShown = false;
-            countdownValue = 10;
+            countdown = 10;
             modal.remove();
+            clearInterval(countdownInterval);
         } else {
             forceLogout(true);
         }
     };
 
-    /* LOGOUT NOW */
-    document.getElementById("logoutBtn").onclick = () => {
-        forceLogout(true);
-    };
+    document.getElementById("logoutBtn").onclick = () => forceLogout(true);
 }
 
 /* =========================
-   MAIN SESSION LOOP
+   LOOP
 ========================= */
 setInterval(async () => {
 
     const last = Number(localStorage.getItem("lastActivity")) || 0;
     const idle = Date.now() - last;
 
-    // SHOW WARNING
+    // WARNING
     if (idle > SESSION_TIMEOUT - WARNING_TIME && !warningShown) {
         warningShown = true;
-        showSessionModal();
+        showModal();
     }
 
-    // HARD EXPIRE
+    // EXPIRE
     if (idle > SESSION_TIMEOUT) {
+        const ok = await refreshSupabaseSession();
 
-        const refreshed = await refreshSupabaseSession();
-
-        if (refreshed) {
+        if (ok) {
             updateActivity();
             warningShown = false;
             return;
