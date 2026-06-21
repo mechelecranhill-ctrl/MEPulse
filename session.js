@@ -1,4 +1,4 @@
-const SESSION_TIMEOUT = 15 * 60 * 1000; // 15 min idle
+const SESSION_TIMEOUT = 20 * 1000; // 15 min idle
 const COUNTDOWN_TIME = 10; // 10 saat sebelum logout
 
 let expiredShown = false;
