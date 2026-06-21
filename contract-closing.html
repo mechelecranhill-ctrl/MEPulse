@@ -177,12 +177,21 @@ margin:6px 0;
 <div class="card checklist">
 <b style="color:white">CPC Checklist</b>
 
-<label><input type="checkbox" id="c1"> Site inspection completed</label>
-<label><input type="checkbox" id="c2"> Work certified completed</label>
-<label><input type="checkbox" id="c3"> As-built drawing</label>
-<label><input type="checkbox" id="c4"> Testing & commissioning</label>
-<label><input type="checkbox" id="c5"> Safety clearance</label>
-<label><input type="checkbox" id="c6"> Consultant approval</label>
+<label>
+    <input type="checkbox" id="c1">
+    Tracking Form
+</label>
+
+<label>
+    <input type="checkbox" id="c2">
+    Certificate of Practical Completion (CPC) Form
+</label>
+
+<label>
+    <input type="checkbox" id="c3">
+    Laporan Prestasi Kontraktor (LPK)
+</label>
+
 </div>
 
 <button class="btn primary" onclick="saveCPC()">Submit CPC</button>
@@ -306,20 +315,29 @@ document.getElementById("sfaStatus").innerText=
 
 async function saveCPC(){
 
+const required = ["c1","c2","c3"];
+
+for(const id of required){
+    if(!document.getElementById(id).checked){
+        alert("Sila lengkapkan semua dokumen CPC terlebih dahulu.");
+        return;
+    }
+}
+
 let checklist=[];
-document.querySelectorAll(".checklist input").forEach((c,i)=>{
-checklist.push(c.checked);
+document.querySelectorAll(".checklist input").forEach(c=>{
+    checklist.push(c.checked);
 });
 
 await fetch(`${SB_URL}/rest/v1/contract_closing`,{
-method:"POST",
-headers,
-body:JSON.stringify({
-contract_id:contract.id,
-cpc_date:contract.contract_end,
-cpc_checklist:checklist,
-cpc_status:"COMPLETED"
-})
+    method:"POST",
+    headers,
+    body:JSON.stringify({
+        contract_id:contract.id,
+        cpc_date:contract.contract_end,
+        cpc_checklist:checklist,
+        cpc_status:"COMPLETED"
+    })
 });
 
 alert("CPC saved");
