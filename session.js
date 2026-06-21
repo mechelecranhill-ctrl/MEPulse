@@ -1,4 +1,4 @@
-const SESSION_TIMEOUT = 20 * 1000; // 15 min idle
+const SESSION_TIMEOUT = 15 * 60 * 1000; // 15 min idle
 const COUNTDOWN_TIME = 10; // 10 saat sebelum logout
 
 let expiredShown = false;
@@ -55,11 +55,11 @@ function sessionExpired() {
                 <div style="padding:20px">
                     <h3>Session Expired</h3>
                     <p style="color:#666">
-                        Anda tidak aktif terlalu lama.
+                        You Were Inactive For Too Long
                     </p>
 
                     <p style="font-weight:700;color:#007AFF">
-                        Auto logout dalam <span id="countdown">${countdownValue}</span>s
+                        Auto logout in <span id="countdown">${countdownValue}</span>s
                     </p>
                 </div>
 
