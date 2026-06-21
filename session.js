@@ -1,4 +1,4 @@
-const SESSION_TIMEOUT = 15 * 60 * 1000;
+const SESSION_TIMEOUT = 20 * 1000;
 
 function sessionExpired(){
 
