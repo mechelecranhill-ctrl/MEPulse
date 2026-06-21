@@ -1,14 +1,16 @@
 const SESSION_TIMEOUT = 20 * 1000; // 15 min idle
+const WARNING_TIME = 10 * 1000; // 10s warning
 const CHECK_INTERVAL = 5000;
-const WARNING_TIME = 10 * 1000; // warning before logout
 
 const channel = new BroadcastChannel("auth_channel");
 
 let warningShown = false;
-let logoutTriggered = false;
+let expiredShown = false;
+let countdownInterval = null;
+let countdownValue = 10;
 
 /* =========================
-   ACTIVITY TRACKER
+   TRACK ACTIVITY
 ========================= */
 function updateActivity() {
     localStorage.setItem("lastActivity", Date.now());
@@ -20,7 +22,7 @@ function updateActivity() {
 updateActivity();
 
 /* =========================
-   SUPABASE REFRESH TOKEN
+   SUPABASE REFRESH SESSION
 ========================= */
 async function refreshSupabaseSession() {
     try {
@@ -48,19 +50,17 @@ async function refreshSupabaseSession() {
         return false;
 
     } catch (err) {
-        console.error("Refresh error:", err);
+        console.error("Refresh failed:", err);
         return false;
     }
 }
 
 /* =========================
-   BACKEND EXTEND SESSION
-   (optional API call)
+   BACKEND EXTEND (OPTIONAL)
 ========================= */
 async function extendSessionBackend() {
     try {
         const token = JSON.parse(localStorage.getItem("sb-session"))?.access_token;
-
         if (!token) return;
 
         await fetch(`${SB_URL}/rest/v1/rpc/extend_session`, {
@@ -73,13 +73,13 @@ async function extendSessionBackend() {
             body: JSON.stringify({})
         });
 
-    } catch (err) {
-        console.log("Backend extend failed (ignore)");
+    } catch (e) {
+        console.log("extendSessionBackend failed (ignored)");
     }
 }
 
 /* =========================
-   BROADCAST LOGOUT
+   MULTI-TAB LOGOUT SYNC
 ========================= */
 function broadcastLogout() {
     channel.postMessage({ type: "LOGOUT" });
@@ -87,34 +87,28 @@ function broadcastLogout() {
 
 channel.onmessage = (event) => {
     if (event.data.type === "LOGOUT") {
-        doLogout(false);
+        forceLogout(false);
     }
 };
 
 /* =========================
-   LOGOUT FUNCTION
+   FORCE LOGOUT
 ========================= */
-function doLogout(broadcast = true) {
-
-    if (logoutTriggered) return;
-    logoutTriggered = true;
-
+function forceLogout(broadcast = true) {
     localStorage.clear();
 
-    if (broadcast) {
-        broadcastLogout();
-    }
+    if (broadcast) broadcastLogout();
 
     window.location.replace("login.html");
 }
 
 /* =========================
-   WARNING POPUP (10s)
+   SESSION EXPIRED MODAL
 ========================= */
-function showWarning() {
+function showSessionModal() {
 
-    if (warningShown) return;
-    warningShown = true;
+    if (expiredShown) return;
+    expiredShown = true;
 
     const modal = document.createElement("div");
 
@@ -134,24 +128,39 @@ function showWarning() {
                 border-radius:18px;
                 text-align:center;
                 font-family:system-ui;
-                padding:20px;
+                overflow:hidden;
             ">
-                <h3>Session Expiring</h3>
-                <p style="color:#666">
-                    Anda akan logout dalam 10 saat
-                </p>
+                <div style="padding:20px">
+                    <h3>Session Expiring</h3>
+                    <p style="color:#666">
+                        You will be logged out soon
+                    </p>
+
+                    <p style="font-weight:700;color:#007AFF">
+                        Auto logout in <span id="cd">${countdownValue}</span>s
+                    </p>
+                </div>
 
                 <button id="extendBtn" style="
                     width:100%;
-                    margin-top:10px;
-                    padding:12px;
                     border:none;
-                    border-radius:12px;
                     background:#34C759;
                     color:white;
+                    padding:14px;
                     font-weight:700;
                 ">
                     Extend Session
+                </button>
+
+                <button id="logoutBtn" style="
+                    width:100%;
+                    border:none;
+                    background:#007AFF;
+                    color:white;
+                    padding:14px;
+                    font-weight:700;
+                ">
+                    Logout Now
                 </button>
             </div>
         </div>
@@ -159,44 +168,62 @@ function showWarning() {
 
     document.body.appendChild(modal);
 
+    const cd = document.getElementById("cd");
+
+    countdownInterval = setInterval(() => {
+
+        countdownValue--;
+
+        if (cd) cd.textContent = countdownValue;
+
+        if (countdownValue <= 0) {
+            clearInterval(countdownInterval);
+            forceLogout(true);
+        }
+
+    }, 1000);
+
+    /* EXTEND SESSION */
     document.getElementById("extendBtn").onclick = async () => {
 
-        // refresh session
+        clearInterval(countdownInterval);
+
         const ok = await refreshSupabaseSession();
 
         if (ok) {
             updateActivity();
+            expiredShown = false;
             warningShown = false;
+            countdownValue = 10;
             modal.remove();
         } else {
-            doLogout(true);
+            forceLogout(true);
         }
     };
 
-    // auto logout after 10s
-    setTimeout(() => {
-        doLogout(true);
-    }, WARNING_TIME);
+    /* LOGOUT NOW */
+    document.getElementById("logoutBtn").onclick = () => {
+        forceLogout(true);
+    };
 }
 
 /* =========================
-   SESSION MONITOR LOOP
+   MAIN SESSION LOOP
 ========================= */
 setInterval(async () => {
 
     const last = Number(localStorage.getItem("lastActivity")) || 0;
+    const idle = Date.now() - last;
 
-    const idleTime = Date.now() - last;
-
-    // WARNING STATE
-    if (idleTime > SESSION_TIMEOUT - WARNING_TIME && !warningShown) {
-        showWarning();
+    // SHOW WARNING
+    if (idle > SESSION_TIMEOUT - WARNING_TIME && !warningShown) {
+        warningShown = true;
+        showSessionModal();
     }
 
-    // EXPIRED STATE
-    if (idleTime > SESSION_TIMEOUT) {
+    // HARD EXPIRE
+    if (idle > SESSION_TIMEOUT) {
 
-        // try refresh first
         const refreshed = await refreshSupabaseSession();
 
         if (refreshed) {
@@ -205,8 +232,7 @@ setInterval(async () => {
             return;
         }
 
-        // fallback logout all tabs
-        doLogout(true);
+        forceLogout(true);
     }
 
 }, CHECK_INTERVAL);
