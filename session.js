@@ -17,7 +17,9 @@ function updateActivity(){
     document.addEventListener(event, updateActivity, true);
 });
 
-updateActivity();
+if(!localStorage.getItem("lastActivity")){
+    updateActivity();
+}
 
 setInterval(() => {
 
