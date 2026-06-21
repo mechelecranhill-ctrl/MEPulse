@@ -1,77 +1,15 @@
-const SESSION_TIMEOUT = 20 * 1000;
+const SESSION_TIMEOUT = 15 * 60 * 1000; // 15 min idle
+const COUNTDOWN_TIME = 10; // 10 saat sebelum logout
 
-function sessionExpired(){
+let expiredShown = false;
+let countdownInterval = null;
+let countdownValue = COUNTDOWN_TIME;
 
-    localStorage.clear();
-
-    const modal = document.createElement("div");
-
-    modal.innerHTML = `
-        <div style="
-            position:fixed;
-            inset:0;
-            background:rgba(0,0,0,.45);
-            display:flex;
-            justify-content:center;
-            align-items:center;
-            z-index:99999;
-        ">
-            <div style="
-                width:300px;
-                background:white;
-                border-radius:18px;
-                overflow:hidden;
-                text-align:center;
-                font-family:system-ui;
-            ">
-                <div style="padding:20px">
-                    <h3>Sesi Tamat</h3>
-                    <p style="color:#666">
-                        Anda tidak aktif selama 15 minit.
-                        Sila log masuk semula.
-                    </p>
-                </div>
-
-                <button id="expiredBtn" style="
-                    width:100%;
-                    border:none;
-                    background:#007AFF;
-                    color:white;
-                    padding:14px;
-                    font-weight:600;
-                ">
-                    OK
-                </button>
-            </div>
-        </div>
-    `;
-
-    document.body.appendChild(modal);
-
-    document.getElementById("expiredBtn")
-    .onclick = () => {
-        window.location.replace("login.html");
-    };
+function updateActivity() {
+    localStorage.setItem("lastActivity", Date.now());
 }
 
-const last =
-    Number(localStorage.getItem("lastActivity")) || 0;
-
-if(
-    last &&
-    Date.now() - last > SESSION_TIMEOUT
-){
-    localStorage.clear();
-    window.location.replace("login.html");
-}
-
-function updateActivity(){
-    localStorage.setItem(
-        "lastActivity",
-        Date.now()
-    );
-}
-
+// track activity
 [
     "mousemove",
     "mousedown",
@@ -79,29 +17,131 @@ function updateActivity(){
     "scroll",
     "touchstart"
 ].forEach(event => {
-    document.addEventListener(
-        event,
-        updateActivity,
-        true
-    );
+    document.addEventListener(event, updateActivity, true);
 });
 
-if(!last){
-    updateActivity();
-}
+updateActivity();
 
-setInterval(() => {
+/* =========================
+   POPUP SESSION EXPIRED
+========================= */
+function sessionExpired() {
+    if (expiredShown) return;
+    expiredShown = true;
 
-    const last =
-        Number(localStorage.getItem("lastActivity")) || 0;
+    localStorage.clear();
 
-    if(Date.now() - last > SESSION_TIMEOUT){
+    const modal = document.createElement("div");
 
-        localStorage.clear();
+    modal.innerHTML = `
+        <div id="sessionModal" style="
+            position:fixed;
+            inset:0;
+            background:rgba(0,0,0,.55);
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            z-index:999999;
+        ">
+            <div style="
+                width:320px;
+                background:white;
+                border-radius:18px;
+                overflow:hidden;
+                text-align:center;
+                font-family:system-ui;
+                box-shadow:0 10px 30px rgba(0,0,0,.2);
+            ">
+                <div style="padding:20px">
+                    <h3>Session Expired</h3>
+                    <p style="color:#666">
+                        Anda tidak aktif terlalu lama.
+                    </p>
 
-        window.location.replace(
-            "login.html"
-        );
+                    <p style="font-weight:700;color:#007AFF">
+                        Auto logout dalam <span id="countdown">${countdownValue}</span>s
+                    </p>
+                </div>
+
+                <button id="extendBtn" style="
+                    width:100%;
+                    border:none;
+                    background:#34C759;
+                    color:white;
+                    padding:14px;
+                    font-weight:700;
+                    cursor:pointer;
+                ">
+                    Extend Session
+                </button>
+
+                <button id="logoutBtn" style="
+                    width:100%;
+                    border:none;
+                    background:#007AFF;
+                    color:white;
+                    padding:14px;
+                    font-weight:700;
+                    cursor:pointer;
+                ">
+                    Logout Now
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const countdownEl = document.getElementById("countdown");
+
+    function startCountdown() {
+        countdownInterval = setInterval(() => {
+            countdownValue--;
+
+            if (countdownEl) {
+                countdownEl.textContent = countdownValue;
+            }
+
+            if (countdownValue <= 0) {
+                clearInterval(countdownInterval);
+                doLogout();
+            }
+        }, 1000);
     }
 
+    function doLogout() {
+        localStorage.clear();
+        window.location.replace("login.html");
+    }
+
+    // Extend session
+    document.getElementById("extendBtn").onclick = () => {
+        clearInterval(countdownInterval);
+
+        // reset session
+        localStorage.setItem("lastActivity", Date.now());
+
+        // remove modal
+        modal.remove();
+
+        // reset state
+        expiredShown = false;
+        countdownValue = COUNTDOWN_TIME;
+    };
+
+    // logout now
+    document.getElementById("logoutBtn").onclick = doLogout;
+
+    startCountdown();
+}
+
+/* =========================
+   AUTO CHECK SESSION
+========================= */
+setInterval(() => {
+    const last = Number(localStorage.getItem("lastActivity")) || 0;
+
+    if (Date.now() - last > SESSION_TIMEOUT) {
+        sessionExpired();
+    }
 }, 5000);
