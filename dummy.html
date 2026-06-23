@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Usage Trend Dashboard (Dummy)</title>
+<title>Usage Trend Dashboard (Improved Dummy)</title>
 
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -152,10 +152,10 @@ th{
 
 <div class="header">
     <div class="title">CONTRACT HEALTH DASHBOARD</div>
-    <div class="subtitle">DUMMY DATA - Usage Trend & Lifecycle Tracker</div>
+    <div class="subtitle">Improved Dummy - Realistic Interim Claim Pattern</div>
 </div>
 
-<!-- LIFECYCLE TRACKER -->
+<!-- LIFECYCLE -->
 <div class="lifecycle">
     <div class="step done"><div class="dot"><i class="fa fa-check"></i></div><span>AWARD</span></div>
     <div class="line"></div>
@@ -179,22 +179,22 @@ th{
 <div class="summary">
     <div class="card">
         <div class="label">CONTRACT VALUE</div>
-        <div class="value" id="contractValue">RM 500,000</div>
+        <div class="value">RM 500,000</div>
     </div>
 
     <div class="card">
         <div class="label">USED</div>
-        <div class="value" id="usedValue">RM 210,000</div>
+        <div class="value" id="usedValue">RM 275,000</div>
     </div>
 
     <div class="card">
         <div class="label">BALANCE</div>
-        <div class="value" id="balanceValue">RM 290,000</div>
+        <div class="value">RM 225,000</div>
     </div>
 
     <div class="card">
         <div class="label">PROGRESS</div>
-        <div class="value">42%</div>
+        <div class="value">55%</div>
     </div>
 </div>
 
@@ -205,22 +205,41 @@ th{
 
 <!-- TABLE -->
 <table>
-    <thead>
-        <tr>
-            <th>Month</th>
-            <th>Planned</th>
-            <th>Actual</th>
-            <th>Variance</th>
-        </tr>
-    </thead>
-    <tbody id="tableBody"></tbody>
+<thead>
+<tr>
+    <th>Month</th>
+    <th>Planned</th>
+    <th>Actual</th>
+    <th>Variance</th>
+</tr>
+</thead>
+<tbody id="tableBody"></tbody>
 </table>
 
 <script>
 
+/* =========================
+   REALISTIC M&E PATTERN
+========================= */
+
 const months = ["Jan","Feb","Mar","Apr","May","Jun"];
+
+/* Planned smooth */
 const planned = [80000,80000,80000,80000,80000,80000];
-const actual  = [60000,75000,90000,85000,100000,90000];
+
+/* Interim claim (selang-seli realistic) */
+const actual = [
+    0,        // Jan - no claim
+    55000,    // Feb - first interim
+    0,        // Mar - idle
+    120000,   // Apr - big claim (progress catch up)
+    40000,    // May - small claim
+    60000     // Jun - steady claim
+];
+
+/* =========================
+   CHART
+========================= */
 
 const ctx = document.getElementById('chart');
 
@@ -233,16 +252,19 @@ new Chart(ctx,{
                 label:'Planned',
                 data:planned,
                 borderColor:'#8e8e93',
-                borderDash:[5,5],
-                fill:false
+                borderDash:[6,4],
+                fill:false,
+                tension:0.3
             },
             {
-                label:'Actual Usage',
+                label:'Actual Interim Claims',
                 data:actual,
                 borderColor:'#007AFF',
-                backgroundColor:'rgba(0,122,255,0.1)',
+                backgroundColor:'rgba(0,122,255,0.15)',
                 fill:true,
-                tension:0.3
+                tension:0.35,
+                pointRadius:5,
+                pointBackgroundColor:'#007AFF'
             }
         ]
     },
@@ -250,22 +272,32 @@ new Chart(ctx,{
         responsive:true,
         plugins:{
             legend:{position:'top'}
+        },
+        scales:{
+            y:{
+                beginAtZero:true
+            }
         }
     }
 });
 
-// TABLE BUILD
+/* =========================
+   TABLE BUILD
+========================= */
+
 const tableBody = document.getElementById('tableBody');
 
 months.forEach((m,i)=>{
+
     const variance = actual[i] - planned[i];
+    const color = variance > 0 ? '#FF3B30' : '#34C759';
 
     tableBody.innerHTML += `
         <tr>
             <td>${m}</td>
             <td>RM ${planned[i].toLocaleString()}</td>
             <td>RM ${actual[i].toLocaleString()}</td>
-            <td style="color:${variance>0?'#FF3B30':'#34C759'}">
+            <td style="color:${color}; font-weight:700;">
                 RM ${variance.toLocaleString()}
             </td>
         </tr>
