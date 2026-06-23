@@ -216,92 +216,346 @@ th{
 <tbody id="tableBody"></tbody>
 </table>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <script>
-const months = ["Jan","Feb","Mar","Apr","May","Jun"];
 
-const planned = [80000,80000,80000,80000,80000,80000];
+const SB_URL="https://ywmsvowroxzhrjwrhsru.supabase.co";
+const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
 
-const actual = [0,55000,0,120000,40000,60000];
+const supabase = window.supabase.createClient(
+    SB_URL,
+    SB_KEY
+);
 
-/* =========================
-   CALCULATIONS
-========================= */
-const totalPlanned = planned.reduce((a,b)=>a+b,0);
-const totalActual = actual.reduce((a,b)=>a+b,0);
-const balance = 500000 - totalActual;
-const progress = ((totalActual / 500000) * 100).toFixed(1);
+let chartInstance = null;
 
-/* inject summary */
-document.getElementById("usedValue").innerText =
-    "RM " + totalActual.toLocaleString();
-
-document.getElementById("balanceValue").innerText =
-    "RM " + balance.toLocaleString();
-
-document.getElementById("progressValue").innerText =
-    progress + "%";
-
-/* =========================
-   CHART
-========================= */
-const ctx = document.getElementById('chart');
-
-new Chart(ctx,{
-    type:'line',
-    data:{
-        labels:months,
-        datasets:[
-            {
-                label:'Planned',
-                data:planned,
-                borderColor:'#8e8e93',
-                borderDash:[6,4],
-                fill:false,
-                tension:0.3
-            },
-            {
-                label:'Actual Interim Claims',
-                data:actual,
-                borderColor:'#007AFF',
-                backgroundColor:'rgba(0,122,255,0.15)',
-                fill:true,
-                tension:0.35,
-                pointRadius:5,
-                pointBackgroundColor:'#007AFF'
-            }
-        ]
-    },
-    options:{
-        responsive:true,
-        plugins:{
-            legend:{position:'top'}
-        },
-        scales:{
-            y:{beginAtZero:true}
+function formatRM(value){
+    return "RM " + Number(value || 0).toLocaleString(
+        "en-MY",
+        {
+            minimumFractionDigits:2,
+            maximumFractionDigits:2
         }
+    );
+}
+
+async function loadDashboard(){
+
+    try{
+
+        const params = new URLSearchParams(
+            location.search
+        );
+
+        const contractId =
+            params.get("id");
+
+        if(!contractId){
+            alert("Contract ID not found");
+            return;
+        }
+
+        /* ==========================
+           CONTRACT
+        ========================== */
+
+        const {
+            data:contract,
+            error:contractError
+        } = await supabase
+        .from("contract")
+        .select("*")
+        .eq("id",contractId)
+        .single();
+
+        if(contractError) throw contractError;
+
+        document.querySelector(".subtitle").innerHTML =
+            contract.contract_code +
+            " • " +
+            contract.contract_name;
+
+        /* ==========================
+           INTERIMS
+        ========================== */
+
+        const {
+            data:interims,
+            error:interimError
+        } = await supabase
+        .from("interims")
+        .select("*")
+        .eq("contract_id",contractId)
+        .order("claim_date");
+
+        if(interimError) throw interimError;
+
+        const contractValue =
+            Number(contract.contract_sum || 0);
+
+        const totalUsed =
+            interims.reduce(
+                (sum,row)=>
+                sum + Number(
+                    row.net_amount ||
+                    row.claim_amount ||
+                    0
+                ),
+                0
+            );
+
+        const balance =
+            contractValue - totalUsed;
+
+        const progress =
+            contractValue
+            ? ((totalUsed / contractValue)*100)
+                .toFixed(1)
+            : 0;
+
+        /* ==========================
+           KPI
+        ========================== */
+
+        document.querySelectorAll(".value")[0]
+            .innerText =
+            formatRM(contractValue);
+
+        document.getElementById("usedValue")
+            .innerText =
+            formatRM(totalUsed);
+
+        document.getElementById("balanceValue")
+            .innerText =
+            formatRM(balance);
+
+        document.getElementById("progressValue")
+            .innerText =
+            progress + "%";
+
+        /* ==========================
+           MONTHLY DATA
+        ========================== */
+
+        const monthlyMap = {};
+
+        interims.forEach(item=>{
+
+            if(!item.claim_date) return;
+
+            const date =
+                new Date(item.claim_date);
+
+            const month =
+                date.toLocaleString(
+                    "en",
+                    {
+                        month:"short"
+                    }
+                );
+
+            monthlyMap[month] =
+                (monthlyMap[month] || 0)
+                +
+                Number(
+                    item.net_amount ||
+                    item.claim_amount ||
+                    0
+                );
+        });
+
+        const months =
+            Object.keys(monthlyMap);
+
+        const actual =
+            Object.values(monthlyMap);
+
+        const planned =
+            months.map(()=>
+                contractValue / 12
+            );
+
+        buildChart(
+            months,
+            planned,
+            actual
+        );
+
+        buildTable(
+            months,
+            planned,
+            actual
+        );
+
+        updateLifecycle(
+            contract,
+            interims
+        );
+
+    }catch(err){
+
+        console.error(err);
+
+        alert(
+            err.message ||
+            "Failed loading dashboard"
+        );
     }
-});
+}
 
-/* =========================
-   TABLE
-========================= */
-const tableBody = document.getElementById('tableBody');
+function buildChart(
+    months,
+    planned,
+    actual
+){
 
-months.forEach((m,i)=>{
-    const variance = actual[i] - planned[i];
-    const color = variance > 0 ? '#FF3B30' : '#34C759';
+    const ctx =
+        document
+        .getElementById("chart");
 
-    tableBody.innerHTML += `
+    if(chartInstance){
+        chartInstance.destroy();
+    }
+
+    chartInstance =
+    new Chart(ctx,{
+        type:"line",
+        data:{
+            labels:months,
+            datasets:[
+                {
+                    label:"Planned",
+                    data:planned,
+                    borderColor:"#8e8e93",
+                    borderDash:[6,4],
+                    fill:false,
+                    tension:0.3
+                },
+                {
+                    label:"Actual Interim Claims",
+                    data:actual,
+                    borderColor:"#007AFF",
+                    backgroundColor:
+                        "rgba(0,122,255,0.15)",
+                    fill:true,
+                    tension:0.35,
+                    pointRadius:5
+                }
+            ]
+        },
+        options:{
+            responsive:true,
+            plugins:{
+                legend:{
+                    position:"top"
+                }
+            },
+            scales:{
+                y:{
+                    beginAtZero:true
+                }
+            }
+        }
+    });
+}
+
+function buildTable(
+    months,
+    planned,
+    actual
+){
+
+    const body =
+        document.getElementById(
+            "tableBody"
+        );
+
+    body.innerHTML = "";
+
+    months.forEach((m,i)=>{
+
+        const variance =
+            actual[i] - planned[i];
+
+        const color =
+            variance > 0
+            ? "#FF3B30"
+            : "#34C759";
+
+        body.innerHTML += `
         <tr>
             <td>${m}</td>
-            <td>RM ${planned[i].toLocaleString()}</td>
-            <td>RM ${actual[i].toLocaleString()}</td>
-            <td style="color:${color}; font-weight:700;">
-                RM ${variance.toLocaleString()}
+            <td>${formatRM(planned[i])}</td>
+            <td>${formatRM(actual[i])}</td>
+            <td style="
+                color:${color};
+                font-weight:700;
+            ">
+                ${formatRM(variance)}
             </td>
         </tr>
-    `;
-});
+        `;
+    });
+}
+
+function updateLifecycle(
+    contract,
+    interims
+){
+
+    const steps =
+        document.querySelectorAll(
+            ".step"
+        );
+
+    steps.forEach(
+        s=>s.classList.remove(
+            "done",
+            "current",
+            "overdue"
+        )
+    );
+
+    if(interims.length > 0){
+
+        steps[0].classList.add("done");
+        steps[1].classList.add("done");
+        steps[2].classList.add("current");
+
+    }else{
+
+        steps[0].classList.add("done");
+        steps[1].classList.add("current");
+    }
+
+    const today =
+        new Date();
+
+    const endDate =
+        new Date(
+            contract.contract_end
+        );
+
+    if(today > endDate){
+
+        steps[2].classList.remove(
+            "current"
+        );
+
+        steps[2].classList.add(
+            "done"
+        );
+
+        steps[3].classList.add(
+            "current"
+        );
+    }
+}
+
+loadDashboard();
+
 </script>
 
 </body>
