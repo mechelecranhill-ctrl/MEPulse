@@ -2,13 +2,15 @@ const SESSION_TIMEOUT = 15 * 60 * 1000;
 const WARNING_TIME = 10 * 1000;
 const CHECK_INTERVAL = 3000;
 
+if (!localStorage.getItem("lastActivity")) {
+    localStorage.setItem("lastActivity", Date.now());
+}
 
 const channel = new BroadcastChannel("auth_channel");
 
 let warningShown = false;
-let expired = false;
 let countdown = 10;
-let countdownInterval;
+let countdownInterval = null;
 
 let lastScrollTime = Date.now();
 let lastMouseTime = Date.now();
@@ -18,13 +20,11 @@ let lastMouseTime = Date.now();
 ========================= */
 function updateActivity() {
     localStorage.setItem("lastActivity", Date.now());
-
     warningShown = false;
 }
 
-/* mouse/keyboard activity */
-["mousemove","mousedown","keydown","touchstart"]
-.forEach(e => {
+/* input activity */
+["mousemove","mousedown","keydown","touchstart"].forEach(e => {
     document.addEventListener(e, () => {
         lastMouseTime = Date.now();
         updateActivity();
@@ -32,31 +32,38 @@ function updateActivity() {
 });
 
 /* =========================
-   SCROLL TRACKING (READING MODE)
+   PWA RESUME FIX
+========================= */
+document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) updateActivity();
+});
+
+window.addEventListener("focus", updateActivity);
+window.addEventListener("pageshow", updateActivity);
+window.addEventListener("online", updateActivity);
+
+/* =========================
+   SCROLL TRACKING
 ========================= */
 let scrollTimer = null;
 
 window.addEventListener("scroll", () => {
-
     lastScrollTime = Date.now();
     updateActivity();
 
-    // detect reading mode (scrolling continuously)
     clearTimeout(scrollTimer);
-
     scrollTimer = setTimeout(() => {
-        // user stopped scrolling → still reading, NOT idle
         lastScrollTime = Date.now();
     }, 1500);
-
 }, { passive: true });
 
 /* =========================
-   FORCE LOGOUT (SYNC ALL TABS)
+   FORCE LOGOUT
 ========================= */
 function forceLogout(broadcast = true) {
 
-    localStorage.clear();
+    localStorage.removeItem("sb-session");
+    localStorage.removeItem("lastActivity");
 
     if (broadcast) {
         channel.postMessage({ type: "LOGOUT" });
@@ -99,35 +106,30 @@ async function refreshSupabaseSession() {
 
         return false;
 
-    } catch (e) {
+    } catch (err) {
         return false;
     }
 }
 
 /* =========================
-   SMART IDLE DETECTION
+   STATE ENGINE
 ========================= */
 function getUserState() {
 
     const now = Date.now();
 
-    const lastActivity = Number(localStorage.getItem("lastActivity")) || 0;
+    const last = Number(localStorage.getItem("lastActivity")) || Date.now();
 
-    const idleTime = now - lastActivity;
-
-    const recentScroll = now - lastScrollTime;
-    const recentMouse = now - lastMouseTime;
+    const idleTime = now - last;
 
     const isReading =
-        recentScroll < 5000; // user still reading/scrolling
-
-    const isActive =
-        recentMouse < 5000 || recentScroll < 5000;
+        (now - lastScrollTime < 5000);
 
     return {
         idleTime,
         isReading,
-        isActive
+        shouldWarn: idleTime >= (SESSION_TIMEOUT - WARNING_TIME),
+        isExpired: idleTime >= SESSION_TIMEOUT
     };
 }
 
@@ -139,21 +141,24 @@ function showWarning() {
     if (warningShown) return;
     warningShown = true;
 
+    countdown = 10;
+
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+    }
+
     const modal = document.createElement("div");
 
     modal.innerHTML = `
-    <div style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;justify-content:center;align-items:center;z-index:999999;">
-        <div style="width:320px;background:white;border-radius:18px;text-align:center;font-family:system-ui;padding:20px;">
-            <h3>Session Expiring</h3>
-            <p>You are inactive</p>
-            <p style="font-weight:700;color:#007AFF">
-                Auto logout in <span id="cd">${countdown}</span>s
-            </p>
-
-            <button id="extendBtn" style="width:100%;margin-top:10px;padding:12px;background:#34C759;color:white;border:none;font-weight:700;">
-                Extend Session
-            </button>
-        </div>
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.6);
+    display:flex;align-items:center;justify-content:center;z-index:999999;">
+    
+    <div style="background:#fff;padding:20px;border-radius:16px;width:320px;text-align:center;">
+        <h3>Session Expiring</h3>
+        <p>Auto logout in <b id="cd">${countdown}</b>s</p>
+        <button id="extendBtn">Extend Session</button>
+    </div>
     </div>`;
 
     document.body.appendChild(modal);
@@ -161,15 +166,12 @@ function showWarning() {
     const cd = document.getElementById("cd");
 
     countdownInterval = setInterval(() => {
-
         countdown--;
-
         if (cd) cd.textContent = countdown;
 
         if (countdown <= 0) {
             forceLogout(true);
         }
-
     }, 1000);
 
     document.getElementById("extendBtn").onclick = async () => {
@@ -179,8 +181,6 @@ function showWarning() {
         if (ok) {
             updateActivity();
             warningShown = false;
-            expired = false;
-            countdown = 10;
             modal.remove();
             clearInterval(countdownInterval);
         } else {
@@ -190,21 +190,17 @@ function showWarning() {
 }
 
 /* =========================
-   MAIN LOOP (SMART ENGINE)
+   MAIN LOOP
 ========================= */
 setInterval(async () => {
 
     const state = getUserState();
 
-    const idle = state.idleTime;
-
-    // ❌ DO NOT TRIGGER WARNING if reading
-    if (!state.isReading && idle > SESSION_TIMEOUT - WARNING_TIME && !warningShown) {
+    if (state.shouldWarn && !warningShown) {
         showWarning();
     }
 
-    // ❌ EXPIRE ONLY IF TRUE IDLE
-    if (!state.isReading && idle > SESSION_TIMEOUT) {
+    if (state.isExpired) {
 
         const refreshed = await refreshSupabaseSession();
 
