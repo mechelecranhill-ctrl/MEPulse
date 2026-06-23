@@ -166,13 +166,13 @@ th{
     <div class="step current"><div class="dot"><i class="fa fa-clock"></i></div><span>INTERIM</span></div>
     <div class="line"></div>
 
-    <div class="step"><div class="dot">4</div><span>CPC</span></div>
+    <div class="step"><div class="dot">CPC</div></div>
     <div class="line"></div>
 
-    <div class="step"><div class="dot">6</div><span>CMGD</span></div>
+    <div class="step"><div class="dot">CMGD</div></div>
     <div class="line"></div>
 
-    <div class="step"><div class="dot">12</div><span>SFA</span></div>
+    <div class="step"><div class="dot">SFA</div></div>
 </div>
 
 <!-- SUMMARY -->
@@ -184,17 +184,17 @@ th{
 
     <div class="card">
         <div class="label">USED</div>
-        <div class="value" id="usedValue">RM 275,000</div>
+        <div class="value" id="usedValue"></div>
     </div>
 
     <div class="card">
         <div class="label">BALANCE</div>
-        <div class="value">RM 225,000</div>
+        <div class="value" id="balanceValue"></div>
     </div>
 
     <div class="card">
         <div class="label">PROGRESS</div>
-        <div class="value">55%</div>
+        <div class="value" id="progressValue"></div>
     </div>
 </div>
 
@@ -217,30 +217,33 @@ th{
 </table>
 
 <script>
-
-/* =========================
-   REALISTIC M&E PATTERN
-========================= */
-
 const months = ["Jan","Feb","Mar","Apr","May","Jun"];
 
-/* Planned smooth */
 const planned = [80000,80000,80000,80000,80000,80000];
 
-/* Interim claim (selang-seli realistic) */
-const actual = [
-    0,        // Jan - no claim
-    55000,    // Feb - first interim
-    0,        // Mar - idle
-    120000,   // Apr - big claim (progress catch up)
-    40000,    // May - small claim
-    60000     // Jun - steady claim
-];
+const actual = [0,55000,0,120000,40000,60000];
+
+/* =========================
+   CALCULATIONS
+========================= */
+const totalPlanned = planned.reduce((a,b)=>a+b,0);
+const totalActual = actual.reduce((a,b)=>a+b,0);
+const balance = 500000 - totalActual;
+const progress = ((totalActual / 500000) * 100).toFixed(1);
+
+/* inject summary */
+document.getElementById("usedValue").innerText =
+    "RM " + totalActual.toLocaleString();
+
+document.getElementById("balanceValue").innerText =
+    "RM " + balance.toLocaleString();
+
+document.getElementById("progressValue").innerText =
+    progress + "%";
 
 /* =========================
    CHART
 ========================= */
-
 const ctx = document.getElementById('chart');
 
 new Chart(ctx,{
@@ -274,21 +277,17 @@ new Chart(ctx,{
             legend:{position:'top'}
         },
         scales:{
-            y:{
-                beginAtZero:true
-            }
+            y:{beginAtZero:true}
         }
     }
 });
 
 /* =========================
-   TABLE BUILD
+   TABLE
 ========================= */
-
 const tableBody = document.getElementById('tableBody');
 
 months.forEach((m,i)=>{
-
     const variance = actual[i] - planned[i];
     const color = variance > 0 ? '#FF3B30' : '#34C759';
 
@@ -303,7 +302,6 @@ months.forEach((m,i)=>{
         </tr>
     `;
 });
-
 </script>
 
 </body>
