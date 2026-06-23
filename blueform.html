@@ -401,6 +401,7 @@
             let sectionUsed = {};
             let totalSalvage = 0;
             let totalPG = 0;
+let totalTax = 0;
             let timeline = [];
 
             allWO.sort((a, b) => {
@@ -422,6 +423,7 @@
                 const pg = Number(int.performance_guarantee_sum || 0);
                 totalSalvage += salvage;
                 totalPG += pg;
+totalTax += Number(int.tax || 0);
                 const cat = int.claim_breakdown || {};
                 let amt = 0;
                 Object.values(cat).forEach(s => { amt += Number(s?.amt || s?.amount || s?.value || 0); });
@@ -499,18 +501,20 @@
                     bakiKontrak -= t.amount;
                     bakiKontrak += (t.salvage || 0);
                     bakiKontrak += (t.pg || 0);
+bakiKontrak -= (t.tax || 0);
                 } else if (t.type === 'WORKORDER') {
                     bakiKontrak -= t.amount;
                 }
             });
 
-            const tpl = JSON.parse(localStorage.getItem(`bf_sections_${c.id}`) || '{}');
+            const tpl = Array.isArray(c.selected_sections) ? c.selected_sections : [];
+
             let dynamicHtml = '';
             let currentRow = 6;
 
             Object.keys(b).sort().forEach((key, idx) => {
-                const label = b[key]?.desc || tpl[key]?.label || key;
-                const active = tpl[key]?.active ?? true;
+                const label = b[key]?.desc || key;
+const active = tpl.length > 0 ? tpl.includes(key) : true;
                 if (!active) return;
                 const sumValue = b[key]?.amt || 0;
                 let workValue = Number(s[key]?.amt || 0);
@@ -579,6 +583,11 @@
                             <div class="bf-value">RM ${totalPG.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
                         </div>
                     </div>
+<div class="bf-row" style="font-size:9px;">
+    <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">TAX</span></div>
+    <div class="bf-colon">:</div>
+    <div class="bf-value">RM ${totalTax.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+</div>
                 </div>
                 <div class="bf-row" style="margin-top:8px;"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Baki Harga Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value" style="font-weight:bold;">RM ${bakiKontrak.toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
                 <hr style="border:0.5px solid #000;margin:8px 0;">
