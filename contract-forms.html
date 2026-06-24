@@ -588,20 +588,22 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
 
     <div>
         <label>Salvage Value (RM)</label>
-        <input type="number"
-               id="i_salvage"
-               value="0"
-               step="0.01"
-               oninput="calcInterimManualTotal()">
+        <input type="text"
+       id="i_salvage"
+       data-raw-value="0"
+       value="0.00"
+       placeholder="0.00"
+       oninput="formatCurrencyInput(this); calcInterimManualTotal()">
     </div>
 
     <div>
         <label>Performance Guarantee (RM)</label>
-        <input type="number"
-               id="i_pg_sum"
-               value="0"
-               step="0.01"
-               oninput="calcInterimManualTotal()">
+        <input type="text"
+       id="i_pg_sum"
+       data-raw-value="0"
+       value="0.00"
+       placeholder="0.00"
+       oninput="formatCurrencyInput(this); calcInterimManualTotal()">
     </div>
 
 </div>
@@ -610,12 +612,12 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
 
     <div>
     <label>Tax Amount (RM)</label>
-    <input type="number"
-           id="i_tax_amount"
-           value="0"
-           step="0.01"
-           placeholder="0.00"
-           oninput="calcInterimManualTotal()">
+    <input type="text"
+       id="i_tax_amount"
+       data-raw-value="0"
+       value="0.00"
+       placeholder="0.00"
+       oninput="formatCurrencyInput(this); calcInterimManualTotal()">
 </div>
 
 </div>
@@ -775,10 +777,13 @@ oninput="autoDetectContract()">
 
     <div>
         <label>Performance Guarantee Total (RM)</label>
-        <input type="number"
-               id="c_pg_total"
-               step="0.01"
-               placeholder="0.00">
+        <input type="text"
+       id="c_pg_total"
+       data-raw-value="0"
+       value="0.00"
+       placeholder="0.00"
+       oninput="formatCurrencyInput(this)">
+
     </div>
 
 </div>
@@ -1027,7 +1032,9 @@ function formatCurrencyInput(input) {
                 contractor: document.getElementById('c_contractor').value,
 insurance_no: document.getElementById('c_insurance_no').value,
     performance_guarantee_total:
-        parseFloat(document.getElementById('c_pg_total').value) || 0,
+    parseFloat(
+        document.getElementById('c_pg_total').dataset.rawValue || 0
+    ),
                 district: document.getElementById('c_dist').value,
                 area_code: document.getElementById('c_area').value,
                 contract_sections_breakdown: sections,
@@ -1598,9 +1605,11 @@ document.getElementById('i_no').value = '';
 }
 
 document.getElementById('i_date_received').value = '';
-document.getElementById('i_salvage').value = 0;
-document.getElementById('i_pg_sum').value = 0;
-document.getElementById('i_tax_amount').value = 0;
+['i_salvage','i_pg_sum','i_tax_amount'].forEach(id=>{
+    const el = document.getElementById(id);
+    el.value = '0.00';
+    el.dataset.rawValue = '0';
+});
 
 
 attachedWorkOrders = [];
@@ -1661,9 +1670,17 @@ function addWorkOrdersToList() {
     total += parseFloat(input.dataset.rawValue || 0);
 });
 
-    const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
-    const pg = parseFloat(document.getElementById('i_pg_sum').value) || 0;
-    const taxAmount = parseFloat(document.getElementById('i_tax_amount').value) || 0;
+    const salvage = parseFloat(
+    document.getElementById('i_salvage').dataset.rawValue || 0
+);
+
+const pg = parseFloat(
+    document.getElementById('i_pg_sum').dataset.rawValue || 0
+);
+
+const taxAmount = parseFloat(
+    document.getElementById('i_tax_amount').dataset.rawValue || 0
+);
 
 const net = total - salvage - pg + taxAmount;
        document.getElementById('i_total_display').innerHTML = `
@@ -1720,9 +1737,17 @@ document.querySelectorAll('.i_sec_claim_val').forEach(i=>{
     }
 });
 
-const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
-const pg = parseFloat(document.getElementById('i_pg_sum').value) || 0;
-const taxAmount = parseFloat(document.getElementById('i_tax_amount').value) || 0;
+const salvage = parseFloat(
+    document.getElementById('i_salvage').dataset.rawValue || 0
+);
+
+const pg = parseFloat(
+    document.getElementById('i_pg_sum').dataset.rawValue || 0
+);
+
+const taxAmount = parseFloat(
+    document.getElementById('i_tax_amount').dataset.rawValue || 0
+);
 
 const net = total - salvage - pg + taxAmount;
 
@@ -2155,14 +2180,23 @@ document.getElementById('interim_submit_btn').style.background =
 document.getElementById('i_date_received').value =
 (i.date_received || '').split('T')[0];
 
-document.getElementById('i_salvage').value =
-i.salvage_value || 0;
+[
+    ['i_salvage', i.salvage_value],
+    ['i_pg_sum', i.performance_guarantee_sum],
+    ['i_tax_amount', i.tax]
+].forEach(([id,val])=>{
 
-document.getElementById('i_pg_sum').value =
-i.performance_guarantee_sum || 0;
+    const num = Number(val || 0);
+    const el = document.getElementById(id);
 
-    document.getElementById('i_tax_amount').value =
-i.tax || 0;
+    el.dataset.rawValue = num;
+
+    el.value = num.toLocaleString('en-MY',{
+        minimumFractionDigits:2,
+        maximumFractionDigits:2
+    });
+
+});
 
 onInterimContractSelect(true);
 
@@ -2301,8 +2335,17 @@ c.contractor || '';
 document.getElementById('c_insurance_no').value =
 c.insurance_no || '';
 
-document.getElementById('c_pg_total').value =
+const pgInput = document.getElementById('c_pg_total');
+
+pgInput.dataset.rawValue =
 c.performance_guarantee_total || 0;
+
+pgInput.value =
+Number(c.performance_guarantee_total || 0)
+.toLocaleString('en-MY',{
+    minimumFractionDigits:2,
+    maximumFractionDigits:2
+});
 
 document.getElementById('c_dist').value =
 c.district || '';
