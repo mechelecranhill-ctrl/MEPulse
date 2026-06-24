@@ -439,50 +439,61 @@ if (selectedSectionName) {
 }
 
     async function fetchContracts(unitId, btn) {
-        document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
-        btn.classList.add('active');
-        centerActiveUnit(btn);
-        document.getElementById('contractSearch').value = '';
-        document.body.classList.remove('analysis-active');
-        document.getElementById('analysis-panel').style.display = 'none';
-        currentContract = null;
-        currentWO = [];
-        document.getElementById('panel-title').innerText = 'Analisis';
-        document.getElementById('panel-vendor').innerText = '';
-        
-        try {
-            const res = await fetch(
-  `${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}`,
-  { headers }
-);
+    document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    centerActiveUnit(btn);
 
-let data = await res.json();
+    document.getElementById('contractSearch').value = '';
+    document.body.classList.remove('analysis-active');
+    document.getElementById('analysis-panel').style.display = 'none';
 
-data.sort((a, b) => {
-  const dateDiff = new Date(a.contract_start) - new Date(b.contract_start);
-  if (dateDiff !== 0) return dateDiff;
+    currentContract = null;
+    currentWO = [];
 
-  // tie-breaker
-  return a.contract_code.localeCompare(b.contract_code, undefined, {
-    numeric: true,
-    sensitivity: "base"
-  });
-});
-            const data = await res.json();
-            const list = document.getElementById('contractList');
-            list.innerHTML = data.map(c => `
-                <div class="c-card" id="card-${c.id}" onclick='selectCard(${c.id}); openAnalysis(${JSON.stringify(c)})'>
-                    <h4>${c.contract_code}</h4>
-                    <div class="sub-text">${c.contract_name}</div>
-                </div>
-            `).join('');
+    document.getElementById('panel-title').innerText = 'Analisis';
+    document.getElementById('panel-vendor').innerText = '';
 
-            if(data.length > 0 && window.innerWidth > 768) {
-                selectCard(data[0].id);
-                openAnalysis(data[0]);
-            }
-        } catch (e) { console.error("Error contracts:", e); }
+    try {
+        const res = await fetch(
+            `${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}`,
+            { headers }
+        );
+
+        let data = await res.json();
+
+        // ✅ SORT BETUL (start sama → code jadi tie-breaker)
+        data.sort((a, b) => {
+            const dateDiff =
+                new Date(a.contract_start) - new Date(b.contract_start);
+
+            if (dateDiff !== 0) return dateDiff;
+
+            return a.contract_code.localeCompare(
+                b.contract_code,
+                undefined,
+                { numeric: true, sensitivity: "base" }
+            );
+        });
+
+        const list = document.getElementById('contractList');
+
+        list.innerHTML = data.map(c => `
+            <div class="c-card" id="card-${c.id}"
+                onclick='selectCard(${c.id}); openAnalysis(${JSON.stringify(c)})'>
+                <h4>${c.contract_code}</h4>
+                <div class="sub-text">${c.contract_name}</div>
+            </div>
+        `).join('');
+
+        if (data.length > 0 && window.innerWidth > 768) {
+            selectCard(data[0].id);
+            openAnalysis(data[0]);
+        }
+
+    } catch (e) {
+        console.error("Error contracts:", e);
     }
+}
 
     function selectCard(id) {
         document.querySelectorAll('.c-card').forEach(c => c.classList.remove('active'));
