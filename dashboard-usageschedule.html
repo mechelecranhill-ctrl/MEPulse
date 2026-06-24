@@ -1211,7 +1211,7 @@ async function saveTemplate() {
         const interims = await intRes.json();
 
         renderTable(allWorks, true);
-        buildInterimMatrix(c, interims, allWorks);
+        buildInterimMatrix(c, interims, allWorks, c.vo_breakdown || {});
 
         generateDistrictTabs(allWorks);
         filterDistrict('ALL', document.querySelector('.district-tab'));
@@ -1532,7 +1532,6 @@ return `${hari} ${bulanText} ${tahun}`;
 
     let allInterims, allWO, localAreaPriority;
 
-    // FIX: kalau ada sharedData (dari bulk), guna terus, jangan fetch lagi
     if (sharedData) {
         allInterims = sharedData.allInterims;
         allWO = [...sharedData.allWO]; // copy sebab kita sort di bawah
@@ -1684,14 +1683,24 @@ return `${hari} ${bulanText} ${tahun}`;
         }
     });
 
-    return { data, c, b, s, totalWorkValue, provisionalExtra, sectionUsed, totalSalvage, totalPG, totalTax, bakiKontrak };
+const voBreakdown = c.vo_breakdown || {};
+let totalVO = 0;
+Object.values(voBreakdown).forEach(vo => {
+    totalVO += Number(vo.amt || 0);
+});
+bakiKontrak += totalVO;
+    return { data, c, b, s, totalWorkValue, provisionalExtra, 
+         sectionUsed, totalSalvage, totalPG, totalTax, 
+         bakiKontrak, voBreakdown };
 }
 
     // ============================
     // BLUEFORM: BUILD HTML STRING (boleh dipakai single & bulk)
     // ============================
     function buildBlueformHTML(payload) {
-        const { data, c, b, s, totalWorkValue, provisionalExtra, sectionUsed, totalSalvage, totalPG, totalTax, bakiKontrak } = payload;
+        const { data, c, b, s, totalWorkValue, provisionalExtra, 
+        sectionUsed, totalSalvage, totalPG, totalTax, 
+        bakiKontrak, voBreakdown } = payload;
 
         const seq = data.sequence_no || '';
         const refPrefix = c.reference || 'RSAJ/M&E/IP/11-';
@@ -1721,7 +1730,38 @@ const tpl = Array.isArray(c.selected_sections) ? c.selected_sections : [];
         <span>Anggaran Kerja (${getInitials(label)})</span></div><div class="bf-colon">:</div><div class="bf-value">RM ${workValue.toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
         </div>
     `;
-        });
+
+let voTotal = 0;
+    let voLines = '';
+    Object.entries(voBreakdown).forEach(([voName, vo]) => {
+        const voAmt = Number(vo.breakdown?.[key]?.amt || 0);
+        if(voAmt > 0){
+            voTotal += voAmt;
+            voLines += `
+            <div class="bf-row" style="font-size:9px;color:#c0392b;">
+                <div class="bf-label">
+                    <span class="bf-no"></span>
+                    <span>↳ ${voName}</span>
+                </div>
+                <div class="bf-colon">:</div>
+                <div class="bf-value">RM ${voAmt.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+            </div>`;
+        }
+    });
+
+    if(voTotal > 0){
+        dynamicHtml += `
+        <div class="bf-row" style="font-size:9.5px;font-weight:700;color:#c0392b;">
+            <div class="bf-label">
+                <span class="bf-no">${currentRow++}</span>
+                <span>Variation Order (${getInitials(label)})</span>
+            </div>
+            <div class="bf-colon">:</div>
+            <div class="bf-value">RM ${voTotal.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+        </div>
+        ${voLines}`;
+    }
+});
 
         function formatLocation(loc){
             if(!loc) return '';
@@ -1774,6 +1814,7 @@ RM ${baki.toLocaleString(undefined,{minimumFractionDigits:2})}
         RM ${provisionalExtra.toLocaleString(undefined,{minimumFractionDigits:2})}
     </div>
 </div>
+
                 <hr style="border: 0.5px solid #000; margin: 8px 0;">
                 <div class="bf-row"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Jumlah Harga Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value">RM ${Number(c.contract_sum || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
                 
@@ -1910,7 +1951,7 @@ minimumFractionDigits:2,
 maximumFractionDigits:2
 });
 }
-    function buildInterimMatrix(contract, interims, workorders){
+    function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}){
 
 const sections = contract.contract_sections_breakdown || {};
 const interimCount = interims.length;
@@ -1957,6 +1998,12 @@ let body='';
 sectionNames.forEach((sec,index)=>{
 
 const letter=String.fromCharCode(65+index);
+
+let voForSection = 0;
+        Object.values(voBreakdown).forEach(vo => {
+            voForSection += Number(vo.breakdown?.[sec]?.amt || 0);
+        });
+
 const contractAmt=Number(sections[sec]?.amt||0);
 
 let row=`
@@ -2101,10 +2148,6 @@ taxRow += `
 `;
 
 body += taxRow;
-
-
-/* TOTAL ONGOING CONTRACT BALANCE */
-/* FIX: pakai balik ongoingBySection yang dah dikira, buang loop workorders berulang */
 
 let totalOngoingBalance = 0;
 
