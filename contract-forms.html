@@ -798,7 +798,7 @@ oninput="autoDetectContract()">
 class="b_v"
 placeholder="0.00"
 required
-oninput="formatCurrencyInput(this); calculateContractSum()">
+oninput="formatCurrencyInput(this)">
                         </div>
                     </div>
                     <button type="button" onclick="addB()" style="background:none; color:var(--ios-blue); border:1px dashed var(--ios-blue); font-size:12px; padding:10px; width:100%; border-radius:10px; cursor:pointer;">+ ADD SECTION</button>
@@ -857,8 +857,33 @@ function triggerAllCalcs() {
     calcInterimManualTotal();
     calcVOTotal();
 }
-    function formatCurrencyInput(el) {
-    Currency.format(el, triggerAllCalcs);
+function formatCurrencyInput(el) {
+    Currency.format(el, () => smartCalc(el));
+}
+
+function smartCalc(el) {
+    const id = el.id || '';
+    const cls = el.classList;
+
+    if (cls.contains('w_sec_amt') || cls.contains('w_sec_extra')) {
+        calcTotalWork();
+        return;
+    }
+    if (cls.contains('i_sec_claim_val') || 
+        id === 'i_salvage' || 
+        id === 'i_pg_sum' || 
+        id === 'i_tax_amount') {
+        calcInterimManualTotal();
+        return;
+    }
+    if (cls.contains('vo_sec_amt')) {
+        calcVOTotal();
+        return;
+    }
+    if (cls.contains('b_v') || id === 'c_pg_total') {
+        calculateContractSum();
+        return;
+    }
 }
 const REGION_MAP = {
     UTARA: [
@@ -902,8 +927,7 @@ showPage(
 );
 
 setupFormListeners();
-renderDistrictChecklist();
-     Currency.bind('.currency', triggerAllCalcs);   
+renderDistrictChecklist(); 
 
 }
 
@@ -1400,13 +1424,13 @@ container.innerHTML += `
         class="w_sec_amt currency"
         data-sec="${sec}"
         placeholder="0.00"
-        oninput="formatCurrencyInput(this); calcTotalWork()">
+        oninput="formatCurrencyInput(this)">
     ${isProvisional ? `
     <input type="text"
         class="w_sec_extra currency"
         data-sec="${sec}"
         placeholder="Provisional Sum"
-        oninput="formatCurrencyInput(this); calcTotalWork()">
+        oninput="formatCurrencyInput(this)">
     ` : ``}
 </div>
 `;
@@ -1486,10 +1510,7 @@ container.innerHTML += `
                class="b_v"
                data-raw-value="0"
                value="0.00"
-               oninput="
-                    formatCurrencyInput(this);
-                    calculateContractSum();
-               ">
+               oninput="formatCurrencyInput(this)">
     `;
 
     container.appendChild(d);
@@ -1572,7 +1593,7 @@ ${sections[sec].desc || ''}
 class="i_sec_claim_val"
 data-sec="${sec}"
 placeholder="0.00"
-oninput="formatCurrencyInput(this); calcInterimManualTotal()">
+oninput="formatCurrencyInput(this)">
 
 </div>
 `;
@@ -1861,7 +1882,7 @@ ${sections[sec].desc || ''}
     class="vo_sec_amt currency"
     data-sec="${sec}"
     placeholder="0.00"
-    oninput="formatCurrencyInput(this); calcVOTotal()">
+    oninput="formatCurrencyInput(this)">
 
 </div>
 `;
@@ -2399,8 +2420,7 @@ value="${Number(item.amt || 0).toLocaleString('en-MY',{
 })}"
 required
 oninput="
-formatCurrencyInput(this);
-calculateContractSum();
+formatCurrencyInput(this)
 ">
 
 </div>
