@@ -117,7 +117,11 @@ async function startAutoDownload() {
                 sectionNames.forEach((sec, idx) => {
                     const currentRowIdx = ws_data.length;
                     const letter = String.fromCharCode(65 + idx);
-                    const contractAmt = Number(sections[sec]?.amt || 0);
+                    let voForSection = 0;
+Object.values(c.vo_breakdown || {}).forEach(vo => {
+    voForSection += Number(vo.breakdown?.[sec]?.amt || 0);
+});
+const contractAmt = Number(sections[sec]?.amt || 0) + voForSection;
                     let row = [letter, sections[sec]?.desc || sec, "", contractAmt];
 
                     for (let i = startInt; i <= endInt; i++) {
@@ -146,8 +150,14 @@ async function startAutoDownload() {
                     let row = ["", label, "", 0];
                     if(isNet) {
                         let sumContract = 0;
-                        sectionNames.forEach(s => sumContract += Number(sections[s]?.amt || 0));
-                        row[3] = sumContract;
+sectionNames.forEach(s => {
+    let voExtra = 0;
+    Object.values(c.vo_breakdown || {}).forEach(vo => {
+        voExtra += Number(vo.breakdown?.[s]?.amt || 0);
+    });
+    sumContract += Number(sections[s]?.amt || 0) + voExtra;
+});
+row[3] = sumContract;
                     }
                     for (let i = startInt; i <= endInt; i++) {
                         const val = isNet ? Number(interims[i - 1]?.net_amount || 0) : Number(interims[i - 1]?.[interimKey] || 0);
@@ -256,9 +266,11 @@ addSpecialRow("TOTAL BRING TO INTERIM PAYMENT", "", true);
             let sumLab = 0, sumSpa = 0, sumPrv = 0;
             let balLab = 0, balSpa = 0, balPrv = 0;
 
-            sectionNames.forEach(sec => {
-                const desc = (sections[sec]?.desc || sec).toUpperCase();
-                const contractAmt = Number(sections[sec]?.amt || 0);
+            let voExtra = 0;
+Object.values(c.vo_breakdown || {}).forEach(vo => {
+    voExtra += Number(vo.breakdown?.[sec]?.amt || 0);
+});
+const contractAmt = Number(sections[sec]?.amt || 0) + voExtra;
                 let totalClaimed = 0;
                 interims.forEach(int => totalClaimed += Number(int.claim_breakdown?.[sec]?.amt || 0));
                 
