@@ -451,7 +451,23 @@ if (selectedSectionName) {
         document.getElementById('panel-vendor').innerText = '';
         
         try {
-            const res = await fetch(`${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}&order=contract_start.asc`, { headers });
+            const res = await fetch(
+  `${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}`,
+  { headers }
+);
+
+let data = await res.json();
+
+data.sort((a, b) => {
+  const dateDiff = new Date(a.contract_start) - new Date(b.contract_start);
+  if (dateDiff !== 0) return dateDiff;
+
+  // tie-breaker
+  return a.contract_code.localeCompare(b.contract_code, undefined, {
+    numeric: true,
+    sensitivity: "base"
+  });
+});
             const data = await res.json();
             const list = document.getElementById('contractList');
             list.innerHTML = data.map(c => `
