@@ -588,21 +588,13 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
 
     <div>
         <label>Salvage Value (RM)</label>
-        <input type="text"
-       id="i_salvage"
-       value="0.00"
-       oninput="formatCurrencyInput(this); calcInterimManualTotal()">
+        <input type="text" id="i_salvage" class="currency">
 
-<div>
+</div>
 
     <div>
         <label>Performance Guarantee (RM)</label>
-        <input type="text"
-       id="i_pg_sum"
-       value="0.00"
-       oninput="formatCurrencyInput(this); calcInterimManualTotal()">
-
-<div>
+        <input type="text" id="i_pg_sum" class="currency">
 
 </div>
 
@@ -610,10 +602,7 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
 
     <div>
     <label>Tax Amount (RM)</label>
-    <input type="number"
-           id="i_tax_amount"
-           value="0.00"
-       oninput="formatCurrencyInput(this); calcInterimManualTotal()">
+    <input type="text" id="i_tax_amount" class="currency">
 </div>
 
 </div>
@@ -686,6 +675,7 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
 
     </div>
 </div>
+    
         <div id="voPage" class="page">
             <div class="glass-card">
                 <h3 style="margin-top:0;"><i class="fa-solid fa-triangle-exclamation"></i> Variation Order (VO)</h3>
@@ -773,10 +763,7 @@ oninput="autoDetectContract()">
 
     <div>
         <label>Performance Guarantee Total (RM)</label>
-        <input type="text"
-       id="c_pg_total"
-       placeholder="0.00"
-       oninput="formatCurrencyInput(this)">
+       <input type="text" id="c_pg_total" class="currency">
 
 </div>
     </div>
@@ -837,7 +824,42 @@ oninput="formatCurrencyInput(this); calculateContractSum()">
     let originalContractArea = '';
     let lastWorkIdNum = '';
 
+    const Currency = {
+    format(el, triggerCalc = null) {
+        let digits = (el.value || '').replace(/\D/g, '');
+        if (!digits) digits = '0';
 
+        let val = parseInt(digits) / 100;
+
+        el.value = val.toLocaleString('en-MY', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+
+        el.dataset.rawValue = val.toFixed(2);
+
+        if (typeof triggerCalc === 'function') {
+            triggerCalc();
+        }
+    },
+
+    bind(selector, calcFn = null) {
+        document.querySelectorAll(selector).forEach(el => {
+            el.addEventListener('input', () => {
+                Currency.format(el, calcFn);
+            });
+        });
+    }
+};
+function triggerAllCalcs() {
+    calculateContractSum();
+    calcTotalWork();
+    calcInterimManualTotal();
+    calcVOTotal();
+}
+    function formatCurrencyInput(el) {
+    Currency.format(el, triggerAllCalcs);
+}
 const REGION_MAP = {
     UTARA: [
         "SEGAMAT",
@@ -881,6 +903,7 @@ showPage(
 
 setupFormListeners();
 renderDistrictChecklist();
+     Currency.bind('.currency', triggerAllCalcs);   
 
 }
 
@@ -985,25 +1008,7 @@ function syncDistrictInput() {
 
     document.getElementById('c_area').value = codes.join(',');
 }
-
-function formatCurrencyInput(input) {
-    // Ambil digit sahaja
-    let digits = input.value.replace(/\D/g, '');
-    if (!digits) digits = '0';
-
-    // Tukar kepada nilai sebenar (bahagi 100)
-    let val = parseInt(digits) / 100;
-
-    // Paparan formatted
-    input.value = val.toLocaleString('en-MY', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-    });
-
-    // Simpan nilai sebenar dalam dataset untuk hantar ke DB
-    input.dataset.rawValue = val.toFixed(2);
-}
-
+    
     function setupFormListeners() {
  
         // Contract Form
@@ -1389,24 +1394,20 @@ const isProvisional = desc.includes('PROVISIONAL');
 
 container.innerHTML += `
 <div class="funding-item">
-
-<label>${sec}</label>
-<span class="sec-desc">${b[sec].desc}</span>
-
-<input type="text"
-class="w_sec_amt"
-data-sec="${sec}"
-placeholder="0.00"
-oninput="formatCurrencyInput(this); calcTotalWork()">
-
-${isProvisional ? `
-<input type="text"
-class="w_sec_extra"
-data-sec="${sec}"
-placeholder="0.00"
-oninput="formatCurrencyInput(this); calcTotalWork()">
-` : ``}
-
+    <label>${sec}</label>
+    <span class="sec-desc">${b[sec].desc}</span>
+    <input type="text"
+        class="w_sec_amt currency"
+        data-sec="${sec}"
+        placeholder="0.00"
+        oninput="formatCurrencyInput(this); calcTotalWork()">
+    ${isProvisional ? `
+    <input type="text"
+        class="w_sec_extra currency"
+        data-sec="${sec}"
+        placeholder="Provisional Sum"
+        oninput="formatCurrencyInput(this); calcTotalWork()">
+    ` : ``}
 </div>
 `;
 
@@ -1720,9 +1721,9 @@ document.querySelectorAll('.i_sec_claim_val').forEach(i=>{
     }
 });
 
-const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
-const pg = parseFloat(document.getElementById('i_pg_sum').value) || 0;
-const taxAmount = parseFloat(document.getElementById('i_tax_amount').value) || 0;
+const salvage = parseFloat(document.getElementById('i_salvage').dataset.rawValue || 0);
+const pg = parseFloat(document.getElementById('i_pg_sum').dataset.rawValue || 0);
+const taxAmount = parseFloat(document.getElementById('i_tax_amount').dataset.rawValue || 0);
 
 const net = total - salvage - pg + taxAmount;
 
@@ -1856,14 +1857,11 @@ ${sections[sec].desc || ''}
 </span>
 
 <input
-type="text"
-class="vo_sec_amt"
-data-sec="${sec}"
-placeholder="0.00"
-oninput="
-formatCurrencyInput(this);
-calcVOTotal();
-">
+    type="text"
+    class="vo_sec_amt currency"
+    data-sec="${sec}"
+    placeholder="0.00"
+    oninput="formatCurrencyInput(this); calcVOTotal()">
 
 </div>
 `;
