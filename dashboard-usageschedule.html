@@ -2084,15 +2084,9 @@ sectionNames.forEach((sec, index) => {
     let totalClaim = 0;
 
     interims.forEach(int => {
-    Object.entries(int.claim_breakdown || {}).forEach(([key, val]) => {
-        if (!isValidSection(key)) return;
-        // Section utama
-        totalClaim += Number(val?.amt || 0);
-        // VO nested
-        Object.values(val?.vo || {}).forEach(voVal => {
-            totalClaim += Number(voVal?.amt || 0);
-        });
-    });
+    const secData = int.claim_breakdown?.[sec];
+    totalClaim += Number(secData?.amt || 0);
+    // VO TIDAK dikira dalam row section
 });
 
 
@@ -2112,12 +2106,7 @@ sectionNames.forEach((sec, index) => {
 `;
 
     interims.forEach(int => {
-    const secData = int.claim_breakdown?.[sec];
-    let val = Number(secData?.amt || 0);
-    // Tambah VO nested
-    Object.values(secData?.vo || {}).forEach(voVal => {
-        val += Number(voVal?.amt || 0);
-    });
+    const val = Number(int.claim_breakdown?.[sec]?.amt || 0);
     row += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
 });
 
@@ -2139,30 +2128,35 @@ ${formatRM(finalBalance)}
     ========================= */
     Object.entries(voBreakdown).forEach(([voName, vo]) => {
 
-        const voAmt = vo?.breakdown?.[sec]?.amt;
-        if (!voAmt || voAmt <= 0) return;
+    const voAmt = vo?.breakdown?.[sec]?.amt;
+    if (!voAmt || voAmt <= 0) return;
 
-        let voRow = `
+    let voTotalClaim = 0;
+
+    let voRow = `
 <tr style="background:#fff8e1;">
 <td></td>
 <td style="padding-left:20px;">↳ ${voName}</td>
 <td style="text-align:right;">${formatRM(voAmt)}</td>
 `;
 
-        for (let i = 0; i < interimCount; i++) {
-            voRow += `<td>-</td>`;
-        }
-
-        voRow += `
-<td style="text-align:right;">${formatRM(voAmt)}</td>
-<td></td>
-<td></td>
-<td></td>
-</tr>
-`;
-
-        body += voRow;
+    interims.forEach(int => {
+        const claimed = Number(int.claim_breakdown?.[sec]?.vo?.[voName]?.amt || 0);
+        voTotalClaim += claimed;
+        voRow += `<td style="text-align:right;">${claimed ? formatRM(claimed) : '-'}</td>`;
     });
+
+    const voBal = voAmt - voTotalClaim;
+
+    voRow += `
+<td style="text-align:right;">${formatRM(voTotalClaim)}</td>
+<td style="text-align:right;">${formatRM(voBal)}</td>
+<td>-</td>
+<td>-</td>
+</tr>`;
+
+    body += voRow;
+});
 
 });
 
