@@ -1803,7 +1803,24 @@ document.querySelectorAll('.i_sec_claim_val').forEach(i=>{
     const val = parseFloat(i.dataset.rawValue || 0);
 
     if(val > 0){
-        breakdown[i.dataset.sec] = { amt: val };
+        const secKey = i.dataset.sec; // "SECTION G" atau "SECTION G|VO:PPJHK NO. 1"
+        const parts = secKey.split('|VO:');
+
+        if(parts.length === 2){
+            // Ini adalah VO claim
+            const sectionName = parts[0];           // "SECTION G"
+            const voName = parts[1];                // "PPJHK NO. 1"
+
+            if(!breakdown[sectionName]) breakdown[sectionName] = { amt: 0 };
+            if(!breakdown[sectionName].vo) breakdown[sectionName].vo = {};
+            breakdown[sectionName].vo[voName] = { amt: val };
+
+        } else {
+            // Section biasa
+            if(!breakdown[secKey]) breakdown[secKey] = { amt: 0 };
+            breakdown[secKey].amt = val;
+        }
+
         total += val;
     }
 });
