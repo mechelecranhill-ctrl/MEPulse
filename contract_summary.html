@@ -117,7 +117,14 @@ async function startAutoDownload() {
                 sectionNames.forEach((sec, idx) => {
                     const currentRowIdx = ws_data.length;
                     const letter = String.fromCharCode(65 + idx);
-                    const contractAmt = Number(sections[sec]?.amt || 0);
+                    let contractAmt =
+    Number(sections[sec]?.amt || 0);
+
+Object.values(c.vo_breakdown || {}).forEach(vo => {
+    contractAmt += Number(
+        vo?.breakdown?.[sec]?.amt || 0
+    );
+});
                     let row = [letter, sections[sec]?.desc || sec, "", contractAmt];
 
                     for (let i = startInt; i <= endInt; i++) {
@@ -167,13 +174,13 @@ Object.entries(voBreakdown)
         }
 
         if (isLastSet) {
-            voRow.push(
-                sectionVOAmt,
-                0,
-                0,
-                0
-            );
-        }
+    voRow.push(
+        0,
+        sectionVOAmt,
+        0,
+        sectionVOAmt
+    );
+}
 
         ws_data.push(voRow);
 
@@ -182,47 +189,28 @@ Object.entries(voBreakdown)
             e: { r: voRowIdx, c: 2 }
         });
     });
-
-    const voRowIdx = ws_data.length;
-
-    let voRow = [
-        "",
-        `↳ ${voName}`,   // PAPAR NAMA VO
-        "",
-        Number(voData?.amt || 0)
-    ];
-
-    // Interim columns
-    for (let i = startInt; i <= endInt; i++) {
-        voRow.push(0);
-    }
-
-    if (isLastSet) {
-        voRow.push(
-            Number(voData?.amt || 0),
-            0,
-            0,
-            0
-        );
-    }
-
-    ws_data.push(voRow);
-
-    merges.push({
-        s: { r: voRowIdx, c: 1 },
-        e: { r: voRowIdx, c: 2 }
-    });
-});
                 });
 
                 const addSpecialRow = (label, interimKey, isNet = false) => {
                     const rIdx = ws_data.length;
                     let row = ["", label, "", 0];
-                    if(isNet) {
-                        let sumContract = 0;
-                        sectionNames.forEach(s => sumContract += Number(sections[s]?.amt || 0));
-                        row[3] = sumContract;
-                    }
+                    if (isNet) {
+    let sumContract = 0;
+
+    sectionNames.forEach(s => {
+        sumContract += Number(
+            sections[s]?.amt || 0
+        );
+
+        Object.values(c.vo_breakdown || {}).forEach(vo => {
+            sumContract += Number(
+                vo?.breakdown?.[s]?.amt || 0
+            );
+        });
+    });
+
+    row[3] = sumContract;
+}
                     for (let i = startInt; i <= endInt; i++) {
                         const val = isNet ? Number(interims[i - 1]?.net_amount || 0) : Number(interims[i - 1]?.[interimKey] || 0);
                         row.push(val || 0);
@@ -231,8 +219,21 @@ Object.entries(voBreakdown)
                         let totalClaimSum = 0;
                         interims.forEach(int => totalClaimSum += Number(isNet ? int.net_amount : (int[interimKey] || 0)));
                         if (isNet) {
-                            let totalContractAmt = 0;
-                            sectionNames.forEach(s => totalContractAmt += Number(sections[s]?.amt || 0));
+    let totalContractAmt = 0;
+
+    sectionNames.forEach(s => {
+
+        totalContractAmt += Number(
+            sections[s]?.amt || 0
+        );
+
+        Object.values(c.vo_breakdown || {}).forEach(vo => {
+            totalContractAmt += Number(
+                vo?.breakdown?.[s]?.amt || 0
+            );
+        });
+
+    });
                             let totalOngoingSum = 0;
                             workorders.filter(w => w.status !== 'Claimed').forEach(w => {
                                 if(w.section_category) {
@@ -331,8 +332,17 @@ addSpecialRow("TOTAL BRING TO INTERIM PAYMENT", "", true);
             let balLab = 0, balSpa = 0, balPrv = 0;
 
             sectionNames.forEach(sec => {
-                const desc = (sections[sec]?.desc || sec).toUpperCase();
-                const contractAmt = Number(sections[sec]?.amt || 0);
+
+    const desc = (sections[sec]?.desc || sec).toUpperCase();
+
+    let contractAmt = Number(sections[sec]?.amt || 0);
+
+    Object.values(c.vo_breakdown || {}).forEach(vo => {
+        contractAmt += Number(
+            vo?.breakdown?.[sec]?.amt || 0
+        );
+    });
+
                 let totalClaimed = 0;
                 interims.forEach(int => totalClaimed += Number(int.claim_breakdown?.[sec]?.amt || 0));
                 
