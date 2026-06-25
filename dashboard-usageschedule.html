@@ -1951,7 +1951,7 @@ const sectionNames = Object.keys(sections);
 const interimCount = interims.length;
 
 /* =========================
-   1. ONGOING (WO + VO)
+   1. ON-GOING (WORKORDER ONLY)
 ========================= */
 const pendingWO = workorders.filter(w => w.status !== 'Claimed');
 
@@ -1961,19 +1961,16 @@ sectionNames.forEach(sec => {
 
     let ongoing = 0;
 
-    // WO ongoing
     pendingWO.forEach(w => {
         const cat = w.section_category || {};
-        ongoing += Number(cat[sec]?.amt || 0);
+        let amt = Number(cat[sec]?.amt || 0);
 
+        // PROVISIONAL SUM special handling (same Excel behaviour)
         if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) {
-            ongoing += Number(w.additional || 0);
+            amt += Number(w.additional || 0);
         }
-    });
 
-    // VO ongoing (same logic as Excel)
-    Object.values(voBreakdown).forEach(vo => {
-        ongoing += Number(vo?.breakdown?.[sec]?.amt || 0);
+        ongoing += amt;
     });
 
     ongoingBySection[sec] = ongoing;
@@ -1995,8 +1992,8 @@ for (let i = 1; i <= interimCount; i++) {
 head += `
 <th>TOTAL CLAIM</th>
 <th>CONTRACT BALANCE</th>
-<th>ON GOING WORKS</th>
-<th>ON GOING CONTRACT BALANCE</th>
+<th>ON GOING CLAIM</th>
+<th>ON GOING BALANCE</th>
 </tr>`;
 
 document.getElementById("interimHead").innerHTML = head;
@@ -2011,14 +2008,14 @@ sectionNames.forEach((sec, index) => {
 
     const letter = String.fromCharCode(65 + index);
 
-    /* base + VO contract */
+    /* CONTRACT = base + VO ONLY */
     let contractAmt = Number(sections[sec]?.amt || 0);
 
     Object.values(voBreakdown).forEach(vo => {
         contractAmt += Number(vo?.breakdown?.[sec]?.amt || 0);
     });
 
-    /* TOTAL CLAIM */
+    /* TOTAL CLAIM (ALL INTERIMS) */
     let totalClaim = 0;
 
     interims.forEach(int => {
@@ -2028,6 +2025,7 @@ sectionNames.forEach((sec, index) => {
     const contractBalance = contractAmt - totalClaim;
     const ongoing = ongoingBySection[sec];
     const finalBalance = contractBalance - ongoing;
+
 
     let row = `
 <tr>
@@ -2055,7 +2053,7 @@ ${formatRM(finalBalance)}
 
 
     /* =========================
-       VO ROW (display only)
+       VO DISPLAY ROW (NO FINANCIAL IMPACT ROW)
     ========================= */
     Object.entries(voBreakdown).forEach(([voName, vo]) => {
 
@@ -2151,7 +2149,7 @@ body += taxRow;
 
 
 /* =========================
-   TOTAL (SYNC LOGIC EXCEL STYLE)
+   TOTAL (EXCEL LOGIC MATCH)
 ========================= */
 
 let totalContract = 0;
@@ -2178,7 +2176,7 @@ sectionNames.forEach(sec => {
 let totalBalance = totalContract - totalClaim;
 let finalOngoingBalance = totalBalance - totalOngoing;
 
-/* salvage + pg + tax (EXCEL SAME RULE) */
+/* ONLY FINAL ROW ADJUSTMENT (same Excel rule) */
 finalOngoingBalance += salvageTotal;
 finalOngoingBalance += pgTotal;
 finalOngoingBalance -= taxTotal;
