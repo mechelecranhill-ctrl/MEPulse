@@ -1944,55 +1944,6 @@ minimumFractionDigits:2,
 maximumFractionDigits:2
 });
 }
-
-    function cleanInterims(interims, sectionNames) {
-
-return interims.map(int => {
-
-    const cleanClaim = {};
-
-    Object.entries(int.claim_breakdown || {}).forEach(([k, v]) => {
-
-        if (sectionNames.includes(k)) {
-            cleanClaim[k] = v;
-        }
-    });
-
-    return {
-        ...int,
-        claim_breakdown: cleanClaim
-    };
-});
-
-}
-    function cleanVO(voBreakdown, sectionNames) {
-
-const clean = {};
-
-Object.entries(voBreakdown).forEach(([voName, vo]) => {
-
-    const filtered = {};
-
-    Object.entries(vo?.breakdown || {}).forEach(([sec, val]) => {
-
-        if (sectionNames.includes(sec)) {
-            filtered[sec] = val;
-        }
-    });
-
-    clean[voName] = {
-        ...vo,
-        breakdown: filtered
-    };
-
-});
-
-return clean;
-}
-    const cleanInterimData = cleanInterims(interims, sectionNames);
-const cleanVOData = cleanVO(voBreakdown, sectionNames);
-
-buildInterimMatrix(contract, cleanInterimData, workorders, cleanVOData);
     
     function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
 
@@ -2018,17 +1969,25 @@ sectionNames.forEach(sec => {
     let ongoing = 0;
 
     pendingWO.forEach(w => {
-        const cat = w.section_category || {};
 
-        let amt = Number(cat[sec]?.amt || 0);
+    const cat = w.section_category || {};
 
-        /* PROVISIONAL SUM special rule */
-        if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) {
-            amt += Number(w.additional || 0);
-        }
+    let amt = Number(cat[sec]?.amt || 0);
 
-        ongoing += amt;
+    if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) {
+        amt += Number(w.additional || 0);
+    }
+
+    Object.values(w.vo || {}).forEach(vo => {
+
+        const voAmt =
+            Number(vo?.breakdown?.[sec]?.amt || 0);
+
+        amt += voAmt;
     });
+
+    ongoing += amt;
+});
 
     ongoingBySection[sec] = ongoing;
 });
@@ -2084,9 +2043,15 @@ sectionNames.forEach((sec, index) => {
     let totalClaim = 0;
 
     interims.forEach(int => {
-    const secData = int.claim_breakdown?.[sec];
-    totalClaim += Number(secData?.amt || 0);
-    // VO TIDAK dikira dalam row section
+
+    const secData = int.claim_breakdown?.[sec] || {};
+
+    totalClaim += Number(secData.amt || 0);
+
+    Object.values(secData.vo || {}).forEach(vo => {
+        totalClaim += Number(vo?.amt || 0);
+    });
+
 });
 
 
@@ -2106,8 +2071,19 @@ sectionNames.forEach((sec, index) => {
 `;
 
     interims.forEach(int => {
-    const val = Number(int.claim_breakdown?.[sec]?.amt || 0);
-    row += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
+
+    const secData = int.claim_breakdown?.[sec] || {};
+
+    let val = Number(secData.amt || 0);
+
+    Object.values(secData.vo || {}).forEach(vo => {
+        val += Number(vo?.amt || 0);
+    });
+
+    row += `
+    <td style="text-align:right;">
+        ${val ? formatRM(val) : '-'}
+    </td>`;
 });
 
     row += `
@@ -2248,6 +2224,10 @@ sectionNames.forEach(sec => {
         Object.entries(int.claim_breakdown || {}).forEach(([key, val]) => {
             if (!isValidSection(key)) return;
             totalClaim += Number(val?.amt || 0);
+
+Object.values(val?.vo || {}).forEach(voVal => {
+    totalClaim += Number(voVal?.amt || 0);
+});
         });
 
     });
