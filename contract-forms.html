@@ -96,6 +96,40 @@
         .excel-table td { padding: 8px; border-bottom: 1px solid #eee; }
         .funding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(255,255,255,0.2); padding: 10px; border-radius: 12px; }
         .sec-desc { font-size: 9px; color: #555; display: block; margin-bottom: 4px; line-height: 1.2; font-weight: 500; text-transform: none; }
+
+        .interim-section-block {
+            background: rgba(255,255,255,0.22);
+            border: 1px solid rgba(255,255,255,0.35);
+            border-radius: 14px;
+            padding: 12px;
+            margin-bottom: 10px;
+            grid-column: 1 / -1;
+        }
+        .interim-section-block .sec-main-label {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: .5px;
+            color: #2b2b2b;
+            display: block;
+            margin-bottom: 2px;
+        }
+        .interim-vo-sub {
+            margin-top: 10px;
+            margin-left: 14px;
+            padding: 10px 10px 10px 12px;
+            border-left: 3px solid var(--ios-orange);
+            background: rgba(255,255,255,0.28);
+            border-radius: 0 10px 10px 0;
+        }
+        .interim-vo-sub .vo-sub-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: #b35900;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 2px;
+        }
                     
         .glass-header { 
             width: 100%; height: 60px; 
@@ -618,7 +652,7 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
         <div id="i_section_inputs_container"
              style="margin-top:15px;
              display:grid;
-             grid-template-columns:1fr 1fr;
+             grid-template-columns:1fr;
              gap:10px;">
         </div>
 
@@ -1535,6 +1569,21 @@ return `${prefix} ${match[2]}${suffix}`;
 
 }
 
+/* ============================================================
+   INTERIM — Section -> VO (nested) claim input rendering
+   ============================================================
+   data-sec key format:
+     - Section biasa:           "SECTION B"
+     - VO bawah section:        "SECTION B|VO:PPJHK NO. 1"
+   Pipe '|' digunakan sebagai separator sebab nama Section/VO
+   boleh mengandungi dash, koma, titik, dll — pipe paling jarang
+   bertembung dengan nama sebenar.
+   ============================================================ */
+
+function escapeAttr(str){
+    return String(str).replace(/"/g, '&quot;');
+}
+
 function onInterimContractSelect(skipReset = false) {
 
 const opt = document.getElementById('i_contract_id').selectedOptions[0];
@@ -1547,55 +1596,67 @@ if(!skipReset){
     resetInterimForm(false);
 }
 
-if(opt && opt.dataset.b){
+if(!opt || !opt.dataset.b){
+    return;
+}
 
 const sections = JSON.parse(opt.dataset.b);
-    const contractVO = opt.dataset.vo 
+const contractVO = opt.dataset.vo
     ? JSON.parse(opt.dataset.vo)
     : {};
 
-const mergedSections = {
-    ...sections,
-    ...Object.fromEntries(
-        Object.entries(contractVO).map(([k, v]) => [
-            `VO: ${k}`,
-            {
-                desc: v.desc || 'Variation Order',
-                amt: v.amt
-            }
-        ])
-    )
-};
+// Bina map: SECTION_NAME -> [ {voName, voData}, ... ]
+// berdasarkan breakdown setiap VO (vo.breakdown = { "SECTION B": {amt}, ... })
+const voBySection = {};
+Object.keys(contractVO).sort().forEach(voName => {
+    const vo = contractVO[voName] || {};
+    const voSectionBreakdown = vo.breakdown || {};
 
-Object.keys(mergedSections).sort().forEach(sec => {
-
-container.innerHTML += `
-<div style="
-background:rgba(255,255,255,0.2);
-padding:10px;
-border-radius:12px;
-">
-
-<label style="font-size:10px;">
-${sec}
-</label>
-
-<span class="sec-desc">
-${mergedSections[sec].desc || ''}
-</span>
-
-<input type="text"
-class="i_sec_claim_val"
-data-sec="${sec}"
-placeholder="0.00"
-oninput="formatCurrencyInput(this); calcInterimManualTotal()">
-
-</div>
-`;
-
+    Object.keys(voSectionBreakdown).forEach(secName => {
+        if(!voBySection[secName]) voBySection[secName] = [];
+        voBySection[secName].push({
+            voName: voName,
+            amt: voSectionBreakdown[secName].amt || 0,
+            desc: vo.desc || ''
+        });
+    });
 });
 
-}
+// Render ikut urutan Section asal kontrak (A, B, C, ...)
+Object.keys(sections).sort().forEach(sec => {
+
+    const secData = sections[sec];
+    const secKey = sec; // data-sec untuk claim section utama
+    const relatedVOs = voBySection[sec] || [];
+
+    let voHtml = '';
+    relatedVOs.forEach(vo => {
+        const voKey = `${sec}|VO:${vo.voName}`;
+        voHtml += `
+<div class="interim-vo-sub">
+    <span class="vo-sub-label"><i class="fa-solid fa-turn-down" style="font-size:9px;"></i> ${vo.voName}</span>
+    <span class="sec-desc">${vo.desc || 'Variation Order'}</span>
+    <input type="text"
+        class="i_sec_claim_val"
+        data-sec="${escapeAttr(voKey)}"
+        placeholder="0.00"
+        oninput="formatCurrencyInput(this); calcInterimManualTotal()">
+</div>`;
+    });
+
+    container.innerHTML += `
+<div class="interim-section-block">
+    <span class="sec-main-label">${sec}</span>
+    <span class="sec-desc">${secData.desc || ''}</span>
+    <input type="text"
+        class="i_sec_claim_val"
+        data-sec="${escapeAttr(secKey)}"
+        placeholder="0.00"
+        oninput="formatCurrencyInput(this); calcInterimManualTotal()">
+    ${voHtml}
+</div>`;
+
+});
 
 }
     function resetInterimForm(clearNo=true){
@@ -2217,7 +2278,7 @@ if(i.claim_breakdown){
 Object.keys(i.claim_breakdown).forEach(sec=>{
 
 const input = document.querySelector(
-`.i_sec_claim_val[data-sec="${sec}"]`
+`.i_sec_claim_val[data-sec="${CSS.escape(sec)}"]`
 );
 
 if(input){
