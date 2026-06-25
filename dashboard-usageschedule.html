@@ -1738,10 +1738,10 @@ let voTotal = 0;
         if(voAmt > 0){
             voTotal += voAmt;
             voLines += `
-            <div class="bf-row" style="font-size:9px;color:#c0392b;">
+            <div class="bf-row" style="font-size:9.5px;font-weight:700;color:#c0392b;">
                 <div class="bf-label">
-                    <span class="bf-no"></span>
-                    <span>↳ ${voName}</span>
+                    <span class="bf-no">${currentRow++}</span>
+                    <span>${voName} (${getInitials(label)})</span>
                 </div>
                 <div class="bf-colon">:</div>
                 <div class="bf-value">RM ${voAmt.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
@@ -1750,16 +1750,7 @@ let voTotal = 0;
     });
 
     if(voTotal > 0){
-        dynamicHtml += `
-        <div class="bf-row" style="font-size:9.5px;font-weight:700;color:#c0392b;">
-            <div class="bf-label">
-                <span class="bf-no">${currentRow++}</span>
-                <span>Variation Order (${getInitials(label)})</span>
-            </div>
-            <div class="bf-colon">:</div>
-            <div class="bf-value">RM ${voTotal.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
-        </div>
-        ${voLines}`;
+        dynamicHtml += voLines;
     }
 });
 
@@ -1999,11 +1990,6 @@ sectionNames.forEach((sec,index)=>{
 
 const letter=String.fromCharCode(65+index);
 
-let voForSection = 0;
-        Object.values(voBreakdown).forEach(vo => {
-            voForSection += Number(vo.breakdown?.[sec]?.amt || 0);
-        });
-
 const contractAmt=Number(sections[sec]?.amt||0);
 
 let row=`
@@ -2053,19 +2039,23 @@ row+=`</tr>`;
 
 body+=row;
     // =====================
-// VARIATION ORDER ROW
+// VARIATION ORDER ROW(S) — satu baris bagi setiap PPJHK/VO yang ada untuk section ini
 // =====================
 
-if (voForSection > 0) {
+Object.entries(voBreakdown).forEach(([voName, vo]) => {
+
+    const voAmtForSection = Number(vo.breakdown?.[sec]?.amt || 0);
+
+    if (voAmtForSection <= 0) return;
 
     let voRow = `
     <tr style="background:#fff8e1;">
         <td></td>
         <td style="padding-left:25px;">
-            ↳ VARIATION ORDER (${letter})
+            ↳ ${voName} (${letter})
         </td>
         <td style="text-align:right;">
-            ${formatRM(voForSection)}
+            ${formatRM(voAmtForSection)}
         </td>
     `;
 
@@ -2076,7 +2066,7 @@ if (voForSection > 0) {
 
     voRow += `
         <td style="text-align:right;">
-            ${formatRM(voForSection)}
+            ${formatRM(voAmtForSection)}
         </td>
         <td></td>
         <td></td>
@@ -2085,7 +2075,7 @@ if (voForSection > 0) {
     `;
 
     body += voRow;
-}
+});
 
 });
 
