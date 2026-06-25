@@ -139,6 +139,80 @@ async function startAutoDownload() {
                     }
                     ws_data.push(row);
                     merges.push({ s: { r: currentRowIdx, c: 1 }, e: { r: currentRowIdx, c: 2 } });
+                    // ================================
+// VARIATION ORDER (VO)
+// ================================
+const voBreakdown = c.vo_breakdown || {};
+
+Object.entries(voBreakdown)
+    .filter(([voName, voData]) => {
+        return voData?.breakdown?.[sec];
+    })
+    .forEach(([voName, voData]) => {
+
+        const sectionVOAmt =
+            Number(voData?.breakdown?.[sec]?.amt || 0);
+
+        const voRowIdx = ws_data.length;
+
+        let voRow = [
+            "",
+            `↳ ${voName}`,
+            "",
+            sectionVOAmt
+        ];
+
+        for (let i = startInt; i <= endInt; i++) {
+            voRow.push(0);
+        }
+
+        if (isLastSet) {
+            voRow.push(
+                sectionVOAmt,
+                0,
+                0,
+                0
+            );
+        }
+
+        ws_data.push(voRow);
+
+        merges.push({
+            s: { r: voRowIdx, c: 1 },
+            e: { r: voRowIdx, c: 2 }
+        });
+    });
+
+    const voRowIdx = ws_data.length;
+
+    let voRow = [
+        "",
+        `↳ ${voName}`,   // PAPAR NAMA VO
+        "",
+        Number(voData?.amt || 0)
+    ];
+
+    // Interim columns
+    for (let i = startInt; i <= endInt; i++) {
+        voRow.push(0);
+    }
+
+    if (isLastSet) {
+        voRow.push(
+            Number(voData?.amt || 0),
+            0,
+            0,
+            0
+        );
+    }
+
+    ws_data.push(voRow);
+
+    merges.push({
+        s: { r: voRowIdx, c: 1 },
+        e: { r: voRowIdx, c: 2 }
+    });
+});
                 });
 
                 const addSpecialRow = (label, interimKey, isNet = false) => {
