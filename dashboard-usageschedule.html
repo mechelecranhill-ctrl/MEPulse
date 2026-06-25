@@ -2013,21 +2013,27 @@ maximumFractionDigits:2
         const letter = String.fromCharCode(65 + index);
         const secDesc = sections[sec]?.desc || sec;
 
-        // Ambil nilai kontrak asal & VO contract
+        // Ambil nilai kontrak asal & VO contract, serta simpan deskripsi VO jika ada
         const originalContractAmt = Number(sections[sec]?.amt || 0);
         let voContractAmt = 0;
+        let voTitle = `↳ VARIATION ORDER`; // Default fallback
+
         Object.values(voBreakdown).forEach(vo => {
             if (vo.breakdown && vo.breakdown[sec]) {
                 voContractAmt += Number(vo.breakdown[sec].amt || 0);
+                // Mengambil nama VO daripada data vo_breakdown (cth: vo.title atau vo.desc)
+                if (vo.title || vo.desc) {
+                    voTitle = `↳ ${vo.title || vo.desc}`;
+                }
             }
         });
 
         // =========================================================
-        // BARIS A: KONTRAK ASAL / S.O.R
+        // BARIS UTAMA: KONTRAK ASAL (Item kekal A, B, C...)
         // =========================================================
         let rowBase = `<tr>
-        <td>${letter}.1</td>
-        <td>${secDesc} (ORIGINAL)</td>
+        <td>${letter}</td>
+        <td>${secDesc}</td>
         <td style="text-align:right;">${formatRM(originalContractAmt)}</td>`;
 
         let totalClaimBase = 0;
@@ -2055,7 +2061,7 @@ maximumFractionDigits:2
         body += rowBase;
 
         // =========================================================
-        // 2️⃣ KIRA CLAIM VO DAHULU UNTUK SEMAKAN LOGIK PAPARAN
+        // KIRA CLAIM VO DAHULU UNTUK SEMAKAN LOGIK PAPARAN
         // =========================================================
         let totalClaimVO = 0;
         let interimValsVO = [];
@@ -2075,13 +2081,12 @@ maximumFractionDigits:2
         const ongoingV = ongoingVO[sec];
 
         // =========================================================
-        // BARIS B: VARIATION ORDER (VO) - HANYA KELUAR JIKA ADA VALUE
+        // BARIS KEDUA: VARIATION ORDER (VO) - ITEM KOSONG & NAMA DARI VO_BREAKDOWN
         // =========================================================
-        // Dipaparkan jika ada nilai Kontrak VO, ada Claim VO, atau ada Ongoing VO
         if (voContractAmt > 0 || totalClaimVO > 0 || ongoingV > 0) {
             let rowVO = `<tr style="color: #c0392b; background: #fffcfc;">
-            <td>${letter}.2</td>
-            <td>↳ VARIATION ORDER (${sec})</td>
+            <td></td>
+            <td>${voTitle}</td>
             <td style="text-align:right;">${formatRM(voContractAmt)}</td>`;
 
             interimValsVO.forEach(val => {
@@ -2176,6 +2181,7 @@ maximumFractionDigits:2
     body += totalRow;
     document.getElementById("interimBody").innerHTML = body;
 }
+
 
 function printBlueform() {
 
