@@ -1944,6 +1944,56 @@ minimumFractionDigits:2,
 maximumFractionDigits:2
 });
 }
+
+    function cleanInterims(interims, sectionNames) {
+
+return interims.map(int => {
+
+    const cleanClaim = {};
+
+    Object.entries(int.claim_breakdown || {}).forEach(([k, v]) => {
+
+        if (sectionNames.includes(k)) {
+            cleanClaim[k] = v;
+        }
+    });
+
+    return {
+        ...int,
+        claim_breakdown: cleanClaim
+    };
+});
+
+}
+    function cleanVO(voBreakdown, sectionNames) {
+
+const clean = {};
+
+Object.entries(voBreakdown).forEach(([voName, vo]) => {
+
+    const filtered = {};
+
+    Object.entries(vo?.breakdown || {}).forEach(([sec, val]) => {
+
+        if (sectionNames.includes(sec)) {
+            filtered[sec] = val;
+        }
+    });
+
+    clean[voName] = {
+        ...vo,
+        breakdown: filtered
+    };
+
+});
+
+return clean;
+}
+    const cleanInterimData = cleanInterims(interims, sectionNames);
+const cleanVOData = cleanVO(voBreakdown, sectionNames);
+
+buildInterimMatrix(contract, cleanInterimData, workorders, cleanVOData);
+    
     function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
 
 const sections = contract.contract_sections_breakdown || {};
