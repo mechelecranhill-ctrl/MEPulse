@@ -1967,14 +1967,12 @@ maximumFractionDigits:2
 
         pendingWO.forEach(w => {
             const cat = w.section_category || {};
-            // Jika work order biasa
             if (w.status !== 'Variation Order' && w.status !== 'VO') {
                 ongoingBase[sec] += Number(cat[sec]?.amt || 0);
                 if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) {
                     ongoingBase[sec] += Number(w.additional || 0);
                 }
             } else {
-                // Jika work order tersebut didaftarkan sebagai VO
                 ongoingVO[sec] += Number(cat[sec]?.amt || 0);
             }
         });
@@ -2013,23 +2011,11 @@ maximumFractionDigits:2
         const letter = String.fromCharCode(65 + index);
         const secDesc = sections[sec]?.desc || sec;
 
-        // Ambil nilai kontrak asal & VO contract, serta simpan deskripsi VO jika ada
+        // Ambil nilai kontrak asal
         const originalContractAmt = Number(sections[sec]?.amt || 0);
-        let voContractAmt = 0;
-        let voTitle = `↳ VARIATION ORDER`; // Default fallback
-
-        Object.values(voBreakdown).forEach(vo => {
-            if (vo.breakdown && vo.breakdown[sec]) {
-                voContractAmt += Number(vo.breakdown[sec].amt || 0);
-                // Mengambil nama VO daripada data vo_breakdown (cth: vo.title atau vo.desc)
-                if (vo.title || vo.desc) {
-                    voTitle = `↳ ${vo.title || vo.desc}`;
-                }
-            }
-        });
 
         // =========================================================
-        // BARIS UTAMA: KONTRAK ASAL (Item kekal A, B, C...)
+        // BARIS UTAMA: KONTRAK ASAL (Item: A, B, C...)
         // =========================================================
         let rowBase = `<tr>
         <td>${letter}</td>
@@ -2060,65 +2046,82 @@ maximumFractionDigits:2
 
         body += rowBase;
 
-        // =========================================================
-        // KIRA CLAIM VO DAHULU UNTUK SEMAKAN LOGIK PAPARAN
-        // =========================================================
-        let totalClaimVO = 0;
-        let interimValsVO = [];
-
-        interims.forEach(int => {
-            const cat = int.claim_breakdown || {};
-            let val = 0;
-            if (cat[sec] && cat[sec].vo) {
-                Object.values(cat[sec].vo).forEach(voItem => {
-                    val += Number(voItem.amt || 0);
-                });
-            }
-            totalClaimVO += val;
-            interimValsVO.push(val);
-        });
-
-        const ongoingV = ongoingVO[sec];
-
-        // =========================================================
-        // BARIS KEDUA: VARIATION ORDER (VO) - ITEM KOSONG & NAMA DARI VO_BREAKDOWN
-        // =========================================================
-        if (voContractAmt > 0 || totalClaimVO > 0 || ongoingV > 0) {
-            let rowVO = `<tr style="color: #c0392b; background: #fffcfc;">
-            <td></td>
-            <td>${voTitle}</td>
-            <td style="text-align:right;">${formatRM(voContractAmt)}</td>`;
-
-            interimValsVO.forEach(val => {
-                rowVO += `<td style="text-align:right; color: #c0392b;">${val ? formatRM(val) : '-'}</td>`;
-            });
-
-            const balanceVO = voContractAmt - totalClaimVO;
-            const afterWOVO = balanceVO - ongoingV;
-
-            rowVO += `
-            <td style="text-align:right; font-weight:600;">${formatRM(totalClaimVO)}</td>
-            <td style="text-align:right;">${formatRM(balanceVO)}</td>
-            <td style="text-align:right;">${formatRM(ongoingV)}</td>
-            <td style="text-align:right; font-weight:bold; color:${afterWOVO < 0 ? 'red' : '#c0392b'};">${formatRM(afterWOVO)}</td>
-            </tr>`;
-
-            body += rowVO;
-
-            // Akumulasi data ke grand total (Hanya jika baris VO ini wujud)
-            grandTotalContract += voContractAmt;
-            grandTotalContractBalance += balanceVO;
-            grandTotalOngoing += ongoingV;
-            grandTotalOngoingBalance += afterWOVO;
-            interimValsBase.forEach((v, i) => { grandTotalInterims[i] += interimValsVO[i]; });
-        }
-
         // Akumulasi data Base ke grand total (Sentiasa berjalan)
         grandTotalContract += originalContractAmt;
         grandTotalContractBalance += balanceBase;
         grandTotalOngoing += ongoingB;
         grandTotalOngoingBalance += afterWOBase;
         interimValsBase.forEach((v, i) => { grandTotalInterims[i] += v; });
+
+        // =========================================================
+        // PROSES & PAPAR SETIAP VO DI BAWAH SEKSYEN INI
+        // =========================================================
+        // Loop setiap VO yang ada dalam voBreakdown (Contoh: "PPJHK NO. 1", "PPJHK NO. 2")
+        Object.entries(voBreakdown).forEach(([voName, voData]) => {
+            
+            // Check jika VO ini mempunyai pecahan (breakdown) untuk seksyen semasa (sec)
+            if (voData && voData.breakdown && voData.breakdown[sec]) {
+                
+                const voContractAmt = Number(voData.breakdown[sec].amt || 0);
+
+                // Kira tuntutan interim khusus untuk VO ini dalam seksyen ini
+                let totalClaimVO = 0;
+                let interimValsVO = [];
+
+                interims.forEach(int => {
+                    const cat = int.claim_breakdown || {};
+                    let val = 0;
+                    
+                    // Memandangkan struktur data interim biasanya menyimpan rekod mengikut nama VO
+                    if (cat[sec] && cat[sec].vo && cat[sec].vo[voName]) {
+                        val = Number(cat[sec].vo[voName].amt || 0);
+                    } else if (cat[sec] && cat[sec].vo) { 
+                        // Fallback jika structure vo dalam interim disimpan sebagai array/object lain
+                        Object.entries(cat[sec].vo).forEach(([key, item]) => {
+                            if (key === voName) val += Number(item.amt || 0);
+                        });
+                    }
+                    
+                    totalClaimVO += val;
+                    interimValsVO.push(val);
+                });
+
+                // Buat baris jika ada nilai kontrak VO atau ada tuntutan dibuat
+                if (voContractAmt > 0 || totalClaimVO > 0) {
+                    let rowVO = `<tr style="color: #c0392b; background: #fffcfc;">
+                    <td></td>
+                    <td>↳ ${voName}</td>
+                    <td style="text-align:right;">${formatRM(voContractAmt)}</td>`;
+
+                    interimValsVO.forEach(val => {
+                        rowVO += `<td style="text-align:right; color: #c0392b;">${val ? formatRM(val) : '-'}</td>`;
+                    });
+
+                    const balanceVO = voContractAmt - totalClaimVO;
+                    
+                    // Untuk ongoing VO, jika anda ingin asingkan mengikut nama VO boleh tapis di sini, 
+                    // buat masa ini ia diletakkan pada ongoing seksyen berkaitan.
+                    const ongoingV = 0; 
+                    const afterWOVO = balanceVO - ongoingV;
+
+                    rowVO += `
+                    <td style="text-align:right; font-weight:600;">${formatRM(totalClaimVO)}</td>
+                    <td style="text-align:right;">${formatRM(balanceVO)}</td>
+                    <td style="text-align:right;">${formatRM(ongoingV)}</td>
+                    <td style="text-align:right; font-weight:bold; color:${afterWOVO < 0 ? 'red' : '#c0392b'};">${formatRM(afterWOVO)}</td>
+                    </tr>`;
+
+                    body += rowVO;
+
+                    // Akumulasi data VO ini ke grand total keseluruhan
+                    grandTotalContract += voContractAmt;
+                    grandTotalContractBalance += balanceVO;
+                    grandTotalOngoing += ongoingV;
+                    grandTotalOngoingBalance += afterWOVO;
+                    interimValsBase.forEach((v, i) => { grandTotalInterims[i] += interimValsVO[i]; });
+                }
+            }
+        });
     });
 
     /* ==============================
