@@ -2084,15 +2084,16 @@ sectionNames.forEach((sec, index) => {
     let totalClaim = 0;
 
     interims.forEach(int => {
-
-        Object.entries(int.claim_breakdown || {}).forEach(([key, val]) => {
-
-            if (!isValidSection(key)) return;   // HARD FILTER
-
-            totalClaim += Number(val?.amt || 0);
+    Object.entries(int.claim_breakdown || {}).forEach(([key, val]) => {
+        if (!isValidSection(key)) return;
+        // Section utama
+        totalClaim += Number(val?.amt || 0);
+        // VO nested
+        Object.values(val?.vo || {}).forEach(voVal => {
+            totalClaim += Number(voVal?.amt || 0);
         });
-
     });
+});
 
 
     const contractBalance = contractAmt - totalClaim;
@@ -2111,9 +2112,14 @@ sectionNames.forEach((sec, index) => {
 `;
 
     interims.forEach(int => {
-        const val = int.claim_breakdown?.[sec]?.amt;
-        row += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
+    const secData = int.claim_breakdown?.[sec];
+    let val = Number(secData?.amt || 0);
+    // Tambah VO nested
+    Object.values(secData?.vo || {}).forEach(voVal => {
+        val += Number(voVal?.amt || 0);
     });
+    row += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
+});
 
     row += `
 <td style="text-align:right;">${formatRM(totalClaim)}</td>
@@ -2275,7 +2281,19 @@ let totalRow = `
 `;
 
 interims.forEach(int => {
-    totalRow += `<td style="text-align:right;">${formatRM(Number(int.net_amount || 0))}</td>`;
+    let intTotal = 0;
+    Object.entries(int.claim_breakdown || {}).forEach(([key, val]) => {
+        if (!isValidSection(key)) return;
+        intTotal += Number(val?.amt || 0);
+        Object.values(val?.vo || {}).forEach(voVal => {
+            intTotal += Number(voVal?.amt || 0);
+        });
+    });
+    const salvage = Number(int.salvage_value || 0);
+    const pg = Number(int.performance_guarantee_sum || 0);
+    const tax = Number(int.tax || 0);
+    const net = intTotal - salvage - pg + tax;
+    totalRow += `<td style="text-align:right;">${formatRM(net)}</td>`;
 });
 
 totalRow += `
