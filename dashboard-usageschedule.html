@@ -1951,35 +1951,42 @@ minimumFractionDigits:2,
 maximumFractionDigits:2
 });
 }
-    function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}){
-
+    function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
     const sections = contract.contract_sections_breakdown || {};
     const interimCount = interims.length;
     const sectionNames = Object.keys(sections);
 
-    /* ongoing-per-section */
+    // 1️⃣ ONGOING WORKS (Pecahkan siap-siap kepada Base dan VO)
     const pendingWO = workorders.filter(w => w.status !== 'Claimed');
-    const ongoingBySection = {};
+    const ongoingBase = {};
+    const ongoingVO = {};
 
     sectionNames.forEach(sec => {
-        let ongoing = 0;
+        ongoingBase[sec] = 0;
+        ongoingVO[sec] = 0;
+
         pendingWO.forEach(w => {
             const cat = w.section_category || {};
-            ongoing += Number(cat[sec]?.amt || 0);
-            if(sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]){
-                ongoing += Number(w.additional || 0);
+            // Jika work order biasa
+            if (w.status !== 'Variation Order' && w.status !== 'VO') {
+                ongoingBase[sec] += Number(cat[sec]?.amt || 0);
+                if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) {
+                    ongoingBase[sec] += Number(w.additional || 0);
+                }
+            } else {
+                // Jika work order tersebut didaftarkan sebagai VO
+                ongoingVO[sec] += Number(cat[sec]?.amt || 0);
             }
         });
-        ongoingBySection[sec] = ongoing;
     });
 
     /* HEADER */
     let head = `<tr>
     <th>ITEM</th>
     <th>DESCRIPTION</th>
-    <th>AS PER CONTRACT (INC. VO)</th>`;
+    <th>AS PER CONTRACT</th>`;
 
-    for(let i=1; i<=interimCount; i++){
+    for (let i = 1; i <= interimCount; i++) {
         head += `<th>INTERIM ${i}</th>`;
     }
 
@@ -1993,169 +2000,168 @@ maximumFractionDigits:2
     document.getElementById("interimHead").innerHTML = head;
 
     let body = '';
+    
+    // Pembolehubah untuk pengiraan baris TOTAL akhir
+    let grandTotalContract = 0;
+    let grandTotalInterims = new Array(interimCount).fill(0);
+    let grandTotalClaim = 0;
+    let grandTotalContractBalance = 0;
+    let grandTotalOngoing = 0;
+    let grandTotalOngoingBalance = 0;
 
     sectionNames.forEach((sec, index) => {
         const letter = String.fromCharCode(65 + index);
+        const secDesc = sections[sec]?.desc || sec;
 
-        // 1️⃣ KIRA JUMLAH VO UNTUK SECTION INI (Daripada data contract)
-        let voForSection = 0;
+        // Ambil nilai kontrak asal & VO contract
+        const originalContractAmt = Number(sections[sec]?.amt || 0);
+        let voContractAmt = 0;
         Object.values(voBreakdown).forEach(vo => {
             if (vo.breakdown && vo.breakdown[sec]) {
-                voForSection += Number(vo.breakdown[sec].amt || 0);
+                voContractAmt += Number(vo.breakdown[sec].amt || 0);
             }
         });
 
-        // AS PER CONTRACT = Asal + VO
-        const originalContractAmt = Number(sections[sec]?.amt || 0);
-        const totalContractAmtWithVO = originalContractAmt + voForSection;
+        // =========================================================
+        // BARIS A: KONTRAK ASAL / S.O.R
+        // =========================================================
+        let rowBase = `<tr>
+        <td>${letter}.1</td>
+        <td>${secDesc} (ORIGINAL)</td>
+        <td style="text-align:right;">${formatRM(originalContractAmt)}</td>`;
 
-        let row = `
-        <tr>
-        <td>${letter}</td>
-        <td>${sections[sec]?.desc || sec}</td>
-        <td style="text-align:right; font-weight:600;">${formatRM(totalContractAmtWithVO)}</td>
-        `;
+        let totalClaimBase = 0;
+        let interimValsBase = [];
 
-        let totalClaim = 0;
+        interims.forEach(int => {
+            const cat = int.claim_breakdown || {};
+            let val = cat[sec] ? Number(cat[sec].amt || 0) : 0;
+            totalClaimBase += val;
+            interimValsBase.push(val);
+            rowBase += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
+        });
 
-        /* interim columns */
+        const balanceBase = originalContractAmt - totalClaimBase;
+        const ongoingB = ongoingBase[sec];
+        const afterWOBase = balanceBase - ongoingB;
+
+        rowBase += `
+        <td style="text-align:right;">${formatRM(totalClaimBase)}</td>
+        <td style="text-align:right;">${formatRM(balanceBase)}</td>
+        <td style="text-align:right;">${formatRM(ongoingB)}</td>
+        <td style="text-align:right; font-weight:bold; color:${afterWOBase < 0 ? 'red' : 'black'};">${formatRM(afterWOBase)}</td>
+        </tr>`;
+
+        body += rowBase;
+
+        // =========================================================
+        // BARIS B: VARIATION ORDER (VO)
+        // =========================================================
+        let rowVO = `<tr style="color: #c0392b; background: #fffcfc;">
+        <td>${letter}.2</td>
+        <td>↳ VARIATION ORDER (${sec})</td>
+        <td style="text-align:right;">${formatRM(voContractAmt)}</td>`;
+
+        let totalClaimVO = 0;
+        let interimValsVO = [];
+
         interims.forEach(int => {
             const cat = int.claim_breakdown || {};
             let val = 0;
-
-            if (cat[sec]) {
-                // 2️⃣ KIRA TUNTUTAN INTERIM (Sama ada 'amt' biasa atau di dalam objek 'vo')
-                val += Number(cat[sec].amt || 0);
-                
-                if (cat[sec].vo) {
-                    Object.values(cat[sec].vo).forEach(voItem => {
-                        val += Number(voItem.amt || 0);
-                    });
-                }
+            if (cat[sec] && cat[sec].vo) {
+                Object.values(cat[sec].vo).forEach(voItem => {
+                    val += Number(voItem.amt || 0);
+                });
             }
-
-            totalClaim += val;
-            row += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
+            totalClaimVO += val;
+            interimValsVO.push(val);
+            rowVO += `<td style="text-align:right; color: #c0392b;">${val ? formatRM(val) : '-'}</td>`;
         });
 
-        /* contract balance */
-        const contractBalance = totalContractAmtWithVO - totalClaim;
-        const ongoing = ongoingBySection[sec];
-        const afterWO = contractBalance - ongoing;
+        const balanceVO = voContractAmt - totalClaimVO;
+        const ongoingV = ongoingVO[sec];
+        const afterWOVO = balanceVO - ongoingV;
 
-        row += `
-        <td style="text-align:right;">${formatRM(totalClaim)}</td>
-        <td style="text-align:right;">${formatRM(contractBalance)}</td>
-        <td style="text-align:right;">${formatRM(ongoing)}</td>
-        <td style="text-align:right;font-weight:bold;color:${afterWO < 0 ? 'red' : 'black'};">
-        ${formatRM(afterWO)}
-        </td>
-        `;
+        rowVO += `
+        <td style="text-align:right; font-weight:600;">${formatRM(totalClaimVO)}</td>
+        <td style="text-align:right;">${formatRM(balanceVO)}</td>
+        <td style="text-align:right;">${formatRM(ongoingV)}</td>
+        <td style="text-align:right; font-weight:bold; color:${afterWOVO < 0 ? 'red' : '#c0392b'};">${formatRM(afterWOVO)}</td>
+        </tr>`;
 
-        row += `</tr>`;
-        body += row;
+        body += rowVO;
+
+        // Akumulasi data untuk baris TOTAL utama di bawah
+        grandTotalContract += (originalContractAmt + voContractAmt);
+        interimValsBase.forEach((v, i) => { grandTotalInterims[i] += (v + interimValsVO[i]); });
+        grandTotalClaim += (totalClaimBase + totalClaimVO);
+        grandTotalContractBalance += (balanceBase + balanceVO);
+        grandTotalOngoing += (ongoingB + ongoingV);
+        grandTotalOngoingBalance += (afterWOBase + afterWOVO);
     });
 
     /* ==============================
-       SALVAGE VALUE ROW 
+       SALVAGE VALUE, PG, TAX ROWS
     ============================== */
-    let salvageRow = `<tr><td></td><td>SALVAGE VALUE</td><td style="text-align:right;">-</td>`;
     let salvageTotal = 0;
-    interims.forEach(int => {
+    let salvageRow = `<tr><td></td><td>SALVAGE VALUE</td><td style="text-align:right;">-</td>`;
+    interims.forEach((int, i) => {
         const val = Number(int.salvage_value || 0);
         salvageTotal += val;
+        grandTotalInterims[i] += val; // Kesan kepada net interim total
         salvageRow += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
     });
     salvageRow += `<td style="text-align:right;">${formatRM(salvageTotal)}</td><td colspan="3"></td></tr>`;
     body += salvageRow;
 
-    /* ==============================
-       PERFORMANCE GUARANTEE ROW
-    ============================== */
-    let pgRow = `<tr><td></td><td>PERFORMANCE GUARANTEE SUM</td><td style="text-align:right;">-</td>`;
     let pgTotal = 0;
-    interims.forEach(int => {
+    let pgRow = `<tr><td></td><td>PERFORMANCE GUARANTEE SUM</td><td style="text-align:right;">-</td>`;
+    interims.forEach((int, i) => {
         const val = Number(int.performance_guarantee_sum || 0);
         pgTotal += val;
+        grandTotalInterims[i] += val; // Kesan kepada net interim total
         pgRow += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
     });
     pgRow += `<td style="text-align:right;">${formatRM(pgTotal)}</td><td colspan="3"></td></tr>`;
     body += pgRow;
 
-    /* ==============================
-       TAX ROW
-    ============================== */
-    let taxRow = `<tr><td></td><td>TAX</td><td style="text-align:right;">-</td>`;
     let taxTotal = 0;
-    interims.forEach(int => {
+    let taxRow = `<tr><td></td><td>TAX</td><td style="text-align:right;">-</td>`;
+    interims.forEach((int, i) => {
         const val = Number(int.tax || 0);
         taxTotal += val;
+        grandTotalInterims[i] -= val; // Mengurangkan net interim total
         taxRow += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
     });
     taxRow += `<td style="text-align:right;">${formatRM(taxTotal)}</td><td colspan="3"></td></tr>`;
     body += taxRow;
 
+    // Laraskan baki ongoing bersih keseluruhan dengan mengambil kira Salvage, PG dan Tax
+    grandTotalOngoingBalance += salvageTotal + pgTotal - taxTotal;
+    grandTotalClaim = interims.reduce((acc, int) => acc + Number(int.net_amount || 0), 0);
+
     /* ==============================
-       KIRA UNTUK TOTAL ROW
+       TOTAL ROW
     ============================== */
-    let totalContractWithVOAll = 0;
-    sectionNames.forEach(sec => {
-        let voForSection = 0;
-        Object.values(voBreakdown).forEach(vo => {
-            if (vo.breakdown && vo.breakdown[sec]) voForSection += Number(vo.breakdown[sec].amt || 0);
-        });
-        totalContractWithVOAll += (Number(sections[sec]?.amt || 0) + voForSection);
-    });
+    let totalRow = `<tr style="font-weight:bold; background:#eef4fc; border-top:2px solid #b0c4de;">
+    <td colspan="2">TOTAL</td>
+    <td style="text-align:right;">${formatRM(grandTotalContract)}</td>`;
 
-    let totalClaimAll = 0;
-    interims.forEach(int => {
-        totalClaimAll += Number(int.net_amount || 0);
-    });
-
-    let totalOngoingBalance = 0;
-    sectionNames.forEach(sec => {
-        let voForSection = 0;
-        Object.values(voBreakdown).forEach(vo => {
-            if (vo.breakdown && vo.breakdown[sec]) voForSection += Number(vo.breakdown[sec].amt || 0);
-        });
-        const contractAmt = Number(sections[sec]?.amt || 0) + voForSection;
-
-        let claimed = 0;
-        interims.forEach(int => {
-            const cat = int.claim_breakdown || {};
-            if (cat[sec]) {
-                claimed += Number(cat[sec].amt || 0);
-                if (cat[sec].vo) {
-                    Object.values(cat[sec].vo).forEach(voItem => { claimed += Number(voItem.amt || 0); });
-                }
-            }
-        });
-
-        const ongoing = ongoingBySection[sec];
-        totalOngoingBalance += (contractAmt - claimed - ongoing);
-    });
-
-    totalOngoingBalance += salvageTotal + pgTotal - taxTotal;
-
-    /* TOTAL ROW GENERATION */
-    let totalRow = `<tr style="font-weight:bold;background:#f5f5f5;"><td colspan="2">TOTAL</td>`;
-    totalRow += `<td style="text-align:right;">${formatRM(totalContractWithVOAll)}</td>`;
-
-    interims.forEach(int => {
-        const v = Number(int.net_amount || 0);
-        totalRow += `<td style="text-align:right;">${formatRM(v)}</td>`;
+    interims.forEach((int, i) => {
+        totalRow += `<td style="text-align:right;">${formatRM(Number(int.net_amount || 0))}</td>`;
     });
 
     totalRow += `
-    <td style="text-align:right;">${formatRM(totalClaimAll)}</td>
-    <td></td>
-    <td></td>
-    <td style="text-align:right;font-weight:bold;">${formatRM(totalOngoingBalance)}</td>
+    <td style="text-align:right;">${formatRM(grandTotalClaim)}</td>
+    <td style="text-align:right;">${formatRM(grandTotalContractBalance + salvageTotal + pgTotal - taxTotal)}</td>
+    <td style="text-align:right;">${formatRM(grandTotalOngoing)}</td>
+    <td style="text-align:right; font-weight:bold;">${formatRM(grandTotalOngoingBalance)}</td>
     </tr>`;
 
     body += totalRow;
     document.getElementById("interimBody").innerHTML = body;
 }
+
 
 
 function printBlueform() {
