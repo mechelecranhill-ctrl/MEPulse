@@ -122,13 +122,23 @@ async function startAutoDownload() {
                     let row = [letter, sections[sec]?.desc || sec, "", contractAmt];
 
                     for (let i = startInt; i <= endInt; i++) {
-                        const val = Number(interims[i - 1]?.claim_breakdown?.[sec]?.amt || 0);
-                        row.push(val || 0);
-                    }
+    const secData = interims[i - 1]?.claim_breakdown?.[sec];
+    let val = Number(secData?.amt || 0);
+    Object.values(secData?.vo || {}).forEach(voVal => {
+        val += Number(voVal?.amt || 0);
+    });
+    row.push(val || 0);
+}
 
                     if (isLastSet) {
                         let totalClaimAll = 0;
-                        interims.forEach(int => totalClaimAll += Number(int.claim_breakdown?.[sec]?.amt || 0));
+interims.forEach(int => {
+    const secData = int.claim_breakdown?.[sec];
+    totalClaimAll += Number(secData?.amt || 0);
+    Object.values(secData?.vo || {}).forEach(voVal => {
+        totalClaimAll += Number(voVal?.amt || 0);
+    });
+});
                         let ongoing = 0;
                         workorders.filter(w => w.status !== 'Claimed').forEach(w => {
                             const cat = w.section_category || {};
@@ -333,7 +343,13 @@ addSpecialRow("TOTAL BRING TO INTERIM PAYMENT", "", true);
     Number(sections[sec]?.amt || 0);
 
                 let totalClaimed = 0;
-                interims.forEach(int => totalClaimed += Number(int.claim_breakdown?.[sec]?.amt || 0));
+interims.forEach(int => {
+    const secData = int.claim_breakdown?.[sec];
+    totalClaimed += Number(secData?.amt || 0);
+    Object.values(secData?.vo || {}).forEach(voVal => {
+        totalClaimed += Number(voVal?.amt || 0);
+    });
+});
                 
                 let ongoing = 0;
                 workorders.filter(w => w.status !== 'Claimed').forEach(w => {
