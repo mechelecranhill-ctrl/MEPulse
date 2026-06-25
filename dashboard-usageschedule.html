@@ -1953,14 +1953,24 @@ const pendingWO = workorders.filter(w => w.status !== 'Claimed');
 const ongoingBySection = {};
 
 sectionNames.forEach(sec => {
+
     let ongoing = 0;
+
+    // WO ongoing
     pendingWO.forEach(w => {
         const cat = w.section_category || {};
         ongoing += Number(cat[sec]?.amt || 0);
-        if(sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]){
+
+        if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) {
             ongoing += Number(w.additional || 0);
         }
     });
+
+    // VO (ONCE ONLY)
+    Object.values(voBreakdown).forEach(vo => {
+        ongoing += Number(vo.breakdown?.[sec]?.amt || 0);
+    });
+
     ongoingBySection[sec] = ongoing;
 });
 
@@ -1990,7 +2000,12 @@ sectionNames.forEach((sec,index)=>{
 
 const letter=String.fromCharCode(65+index);
 
-const contractAmt=Number(sections[sec]?.amt||0);
+let contractAmt = Number(sections[sec]?.amt || 0);
+
+// ADD VO into contract amount
+Object.values(voBreakdown).forEach(vo => {
+    contractAmt += Number(vo.breakdown?.[sec]?.amt || 0);
+});
 
 let row=`
 <tr>
@@ -2220,7 +2235,7 @@ let interimTotals=new Array(interimCount).fill(0);
 
 interims.forEach((int,i)=>{
 
-interimTotals[i] = Number(int.net_amount || 0);
+interimTotals.push(Number(int.net_amount || 0));
 
 });
 
