@@ -224,8 +224,21 @@ addSpecialRow("TOTAL BRING TO INTERIM PAYMENT", "", true);
                     
                     const rowDesc = ws[XLSX.utils.encode_cell({ r: r, c: 1 })]?.v?.toString().toUpperCase() || "";
 
+                    if (rowDesc.includes("VARIATION ORDER")) {
+
+    ws[cellRef].s.fill = {
+        fgColor: { rgb: "D9EAD3" }
+    };
+
+    ws[cellRef].s.font = {
+        italic: true,
+        bold: true,
+        color: { rgb: "006100" }
+    };
+}
+
                     if (rowDesc) {
-                        // 1. Logik Warna Latar Belakang
+
                         if (rowDesc.includes("LABOUR") || rowDesc.includes("WORKMANSHIP")) {
                             ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } };
                         } 
@@ -235,7 +248,7 @@ addSpecialRow("TOTAL BRING TO INTERIM PAYMENT", "", true);
                         else if (rowDesc.includes("REFURBISHMENT")) {
                             ws[cellRef].s.fill = { fgColor: { rgb: "A9A9A9" } };
                         }
-                        // 2. Logik BOLD & FONT HITAM (Untuk semua baris total di bahagian bawah)
+
                         if (rowDesc.includes("TOTAL BRING TO INTERIM")) {
                             ws[cellRef].s.font = { bold: true, color: { rgb: "000000" } };
                         } else {
@@ -249,10 +262,7 @@ addSpecialRow("TOTAL BRING TO INTERIM PAYMENT", "", true);
             ws["!cols"] = [{ wch: 8 }, { wch: 40 }, { wch: 3 }, { wch: 25 }];
             for (let i = 0; i < 35; i++) ws["!cols"].push({ wch: 14 });
             XLSX.utils.book_append_sheet(wb, ws, "Summary");
-
-            // ==========================================
-            // SHEET 2
-            // ==========================================
+            
             let sumLab = 0, sumSpa = 0, sumPrv = 0;
             let balLab = 0, balSpa = 0, balPrv = 0;
 
@@ -328,10 +338,6 @@ addSpecialRow("TOTAL BRING TO INTERIM PAYMENT", "", true);
             }
             ws2["!cols"] = [{ wch: 35 }, { wch: 5 }, { wch: 15 }, { wch: 10 }, { wch: 5 }, { wch: 5 }, { wch: 40 }, { wch: 10 }];
             XLSX.utils.book_append_sheet(wb, ws2, "Budget Usage");
-            
-            // ==========================================
-            // SHEET 3: LIST WORK ORDER (IKUT PECAHAN DAERAH)
-            // ==========================================
 
             const districtString = c.district || "SEGAMAT,MUAR,BATU PAHAT,KLUANG,MERSING";
             const daerahList = districtString.split(',').map(d => d.trim());
@@ -356,14 +362,12 @@ addSpecialRow("TOTAL BRING TO INTERIM PAYMENT", "", true);
                 const startRow = ws3_data.length;
                 const sectionCount = dynamicSectionKeys.length;
                 const lastColIdx = 3 + (sectionCount * 2) + 2;
-   
-                // Tajuk Daerah & Header
+
                 ws3_data.push([daerah.toUpperCase()]); 
                 ws3_data.push([]);
                 ws3_data.push(["SENARAI PERMOHONAN KERJA-KERJA KONTRAK PENYELENGGARAAN"]);
                 ws3_data.push([]);
-    
-                // BARIS 5: Tajuk Utama (Merge Quotation & Payment mengikut bilangan seksyen)
+
     let h1 = ["NO.", "DESCRIPTION", "LOCATION", "WORK ORDER", "QUOTATION"];
     for(let i=0; i < sectionCount - 1; i++) h1.push(""); // Padding untuk merge Quotation
     h1.push("PAYMENT");
@@ -371,7 +375,6 @@ addSpecialRow("TOTAL BRING TO INTERIM PAYMENT", "", true);
     h1.push("QUOTATION APPROVAL DATE", "STATUS / PAID AS PER INTERIM NO");
     ws3_data.push(h1);
 
-    // BARIS 6: Tajuk Seksyen Dinamik (E.g. SECTION C, SECTION D...)
     let h2 = ["", "", "", ""];
     dynamicSectionKeys.forEach(key => {
     h2.push(sections[key]?.desc || key);
@@ -383,26 +386,21 @@ dynamicSectionKeys.forEach(key => {
     h2.push("", "");
     ws3_data.push(h2);
 
-    // BARIS 7: Unit (RM)
     let h3 = ["", "", "", ""];
     for(let i=0; i < (sectionCount * 2); i++) h3.push("(RM)");
     h3.push("", "");
     ws3_data.push(h3);
 
-    // LOGIK MERGE DINAMIK
                 currentMerges.push({ s: { r: startRow, c: 0 }, e: { r: startRow, c: lastColIdx } }); 
                 currentMerges.push({ s: { r: startRow + 2, c: 0 }, e: { r: startRow + 2, c: lastColIdx } }); 
     
-    // Merge NO, DESC, LOC, WO (Vertical)
     [0, 1, 2, 3].forEach(cIdx => {
         currentMerges.push({ s: { r: startRow + 4, c: cIdx }, e: { r: startRow + 6, c: cIdx } });
     });
     
-    // Merge QUOTATION & PAYMENT (Horizontal)
     currentMerges.push({ s: { r: startRow + 4, c: 4 }, e: { r: startRow + 4, c: 4 + sectionCount - 1 } });
     currentMerges.push({ s: { r: startRow + 4, c: 4 + sectionCount }, e: { r: startRow + 4, c: 4 + (sectionCount * 2) - 1 } });
 
-    // Merge DATE & STATUS (Vertical)
     currentMerges.push({ s: { r: startRow + 4, c: 4 + (sectionCount * 2) }, e: { r: startRow + 6, c: 4 + (sectionCount * 2) } });
     currentMerges.push({ s: { r: startRow + 4, c: 4 + (sectionCount * 2) + 1 }, e: { r: startRow + 6, c: 4 + (sectionCount * 2) + 1 } });
 
@@ -423,7 +421,6 @@ dynamicSectionKeys.forEach(key => {
             const cat = wo.section_category || {};
             let rowData = [index + 1, wo.description || "-", wo.location || "-", wo.work_id || "-"];
             
-            // Masukkan data Quotation
             dynamicSectionKeys.forEach((key, kIdx) => {
                 const amt = Number(cat[key]?.amt || 0);
                 const quotationVal = (wo.status === 'Claimed') ? 0 : amt;
@@ -431,7 +428,6 @@ dynamicSectionKeys.forEach(key => {
                 dTotals[kIdx] += quotationVal;
             });
 
-            // Masukkan data Payment (Jika Claimed)
             dynamicSectionKeys.forEach((key, kIdx) => {
                 const amt = Number(cat[key]?.amt || 0);
                 const paymentVal = (wo.status === 'Claimed') ? amt : 0;
@@ -446,41 +442,36 @@ dynamicSectionKeys.forEach(key => {
             ws3_data.push(rowData);
         });
     }
-                // 2. MASUKKAN GRAND TOTAL
+
 const totalRowIdx = ws3_data.length;
 
 let grandTotalRow = Array(totalCols).fill("");
 
 grandTotalRow[0] = "GRAND TOTAL";
 
-// QUOTATION TOTAL PER SECTION
 for (let i = 0; i < sectionCount; i++) {
     grandTotalRow[4 + i] = dTotals[i] || 0;
 }
 
-// PAYMENT TOTAL PER SECTION
 for (let i = 0; i < sectionCount; i++) {
     grandTotalRow[4 + sectionCount + i] = dTotals[sectionCount + i] || 0;
 }
-                // TOTAL SEMUA SECTION (quotation + payment)
+
 let overallGrandTotal = 0;
 
 for (let i = 0; i < sectionCount; i++) {
-    overallGrandTotal += Number(dTotals[i] || 0); // quotation
-    overallGrandTotal += Number(dTotals[sectionCount + i] || 0); // payment
+    overallGrandTotal += Number(dTotals[i] || 0);
+    overallGrandTotal += Number(dTotals[sectionCount + i] || 0);
 }
-
-// letak dekat kolum paling hujung
 grandTotalRow[totalCols - 1] = overallGrandTotal;
 
 ws3_data.push(grandTotalRow);
 
-// merge kiri
 currentMerges.push({
     s: { r: totalRowIdx, c: 0 },
     e: { r: totalRowIdx, c: 3 }
 });
-                // jarak antara daerah
+
 ws3_data.push([]);
 ws3_data.push([]);
 ws3_data.push([]);
@@ -489,8 +480,6 @@ ws3_data.push([]);
 
             const ws3 = XLSX.utils.aoa_to_sheet(ws3_data);
             ws3["!merges"] = currentMerges;
-
-            // 4. Styling Dinamik untuk Sheet 3
 
 for (let r = 0; r < ws3_data.length; r++) {
 
@@ -509,9 +498,6 @@ for (let r = 0; r < ws3_data.length; r++) {
 
         const val = ws3[ref].v ? ws3[ref].v.toString() : "";
 
-        // =========================
-        // DEFAULT ALIGNMENT
-        // =========================
         ws3[ref].s.alignment = {
             horizontal: "center",
             vertical: "center",
@@ -522,9 +508,6 @@ for (let r = 0; r < ws3_data.length; r++) {
             ws3[ref].s.alignment.horizontal = "left";
         }
 
-        // =========================
-// HEADER STYLE
-// =========================
 if (
     daerahList.includes(val) ||
     val.includes("SENARAI PERMOHONAN") ||
@@ -560,9 +543,6 @@ if (
     };
 }
 
-        // =========================
-        // BORDER
-        // =========================
         if (
             r > 0 &&
             ws3_data[r] &&
@@ -578,9 +558,6 @@ if (
             };
         }
 
-        // =========================
-        // GRAND TOTAL STYLE
-        // =========================
         if (isGrandTotalRow) {
 
             ws3[ref].s.font = {
@@ -606,19 +583,14 @@ if (
             }
         }
 
-        // =========================
-        // NUMBER FORMAT + WARNA
-        // =========================
         if (r > 6 && typeof ws3[ref].v === 'number') {
 
             let currentSecIdx;
 
-            // QUOTATION SECTION
             if (c >= 4 && c < 4 + sectionCount) {
                 currentSecIdx = c - 4;
             }
 
-            // PAYMENT SECTION
             else if (
                 c >= 4 + sectionCount &&
                 c < 4 + (sectionCount * 2)
@@ -631,11 +603,6 @@ if (
                 const secKey = dynamicSectionKeys[currentSecIdx];
                 const secDesc = (sections[secKey]?.desc || secKey).toUpperCase();
 
-                // CHECK ADA PAYMENT / INTERIM
-// =========================
-// HIGHLIGHT ROW CLAIMED
-// =========================
-
 const isPaymentColumn = (
     c >= 4 + sectionCount &&
     c < 4 + (sectionCount * 2)
@@ -643,8 +610,6 @@ const isPaymentColumn = (
 
 const hasInterim = Number(ws3[ref].v || 0) > 0;
 
-// highlight row claimed sahaja
-// EXCLUDE grand total
 if (
     isPaymentColumn &&
     hasInterim &&
@@ -748,23 +713,20 @@ if (
 
             ws3["!rows"] = ws3_data.map(() => ({ hpt: 15.75 }));
             let ws3Cols = [
-    { wch: 5 },   // NO
-    { wch: 40 },  // DESCRIPTION
-    { wch: 20 },  // LOCATION
-    { wch: 15 }   // WORK ORDER
+    { wch: 5 },  
+    { wch: 40 },  
+    { wch: 20 }, 
+    { wch: 15 }  
 ];
 
-// quotation columns
 for(let i=0; i<sectionCount; i++) {
     ws3Cols.push({ wch: 12 });
 }
 
-// payment columns
 for(let i=0; i<sectionCount; i++) {
     ws3Cols.push({ wch: 12 });
 }
 
-// final columns
 ws3Cols.push({ wch: 15 });
 ws3Cols.push({ wch: 20 });
 
@@ -772,7 +734,6 @@ ws3["!cols"] = ws3Cols;
 
             XLSX.utils.book_append_sheet(wb, ws3, "List Work Order");
 
-// ===== PWA SAFE DOWNLOAD LOGIC =====
             const wbout = XLSX.write(wb, {
                 bookType: 'xlsx',
                 type: 'array'
@@ -802,7 +763,6 @@ ws3["!cols"] = ws3Cols;
                 }, 1000);
             };
 
-            // Paparkan butang untuk PWA
             statusText.innerText = "Fail Sedia!";
             subText.innerText = "Sila klik butang di bawah jika muat turun tidak bermula.";
             btn.style.display = "inline-block";
@@ -811,814 +771,6 @@ ws3["!cols"] = ws3Cols;
                 triggerDownload();
             };
 
-            // Cuba trigger automatik
-            try {
-                triggerDownload();
-            } catch (e) {
-                console.log("Auto-download disekat, menunggu klik pengguna.");
-            }
-
-        } else {   
-            alert("Tiada data kontrak dijumpai.");
-        }
-    } catch(err) { 
-        console.error("Ralat Utama:", err);
-        alert("Ralat memproses data: " + err.message);
-    }
-}
-    startAutoDownload();
-</script>
-</body>
-</html>function formatShortDate(dateStr) {
-    if (!dateStr) return "-";
-    const date = new Date(dateStr);
-    if (isNaN(date)) return "-";
-    return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
-}
-
-async function startAutoDownload() {
-    if(!contractId) return;
-    
-    try {
-        const [conRes, intRes, woRes] = await Promise.all([
-            fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}`, { headers }),
-            fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=created_at.asc`, { headers }),
-            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}`, { headers })
-        ]);
-
-        const contracts = await conRes.json();
-        const interims = await intRes.json();
-        const workorders = await woRes.json();
-    
-        if (contracts && contracts.length > 0) {
-            const c = contracts[0];
-            let unitName = "UNIT";
-            try {
-                const unitRes = await fetch(`${SB_URL}/rest/v1/units?id=eq.${c.unit_id}`, { headers });
-                const units = await unitRes.json();
-                if (units && units.length > 0) unitName = units[0].unit_name;
-            } catch (e) {}
-
-            const startYear = c.contract_start ? new Date(c.contract_start).getFullYear() : "????";
-            const endYear = c.contract_end ? new Date(c.contract_end).getFullYear() : "????";
-            const safeCode = (c.contract_code || "-")
-                .replace(/[\/\\?%*:|"<>]/g, "-");
-            const fileName = `${unitName} ${startYear}-${endYear} ${safeCode} SUMMARY.xlsx`;
-
-            const period = `${formatDateMY(c.contract_start)} ~ ${formatDateMY(c.contract_end)}`;
-            const pgSumFormatted = Number(c.performance_guarantee_total || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            
-            const sections = c.contract_sections_breakdown || {};
-            const sectionNames = Object.keys(sections);
-            const wb = XLSX.utils.book_new();
-            
-            let merges = [{ s: { r: 1, c: 1 }, e: { r: 2, c: 13 } }]; 
-            const fmtCurrency = '#,##0.00;\\(#,##0.00\\);"-"'; 
-            const fmtRM = '"RM"#,##0.00'; 
-            const pgInfo = `RM ${pgSumFormatted} (${c.insurance_no || '-'})`;
-
-            let ws_data = [
-                [], 
-                ["", c.contract_name || "SUMMARY OF CONTRACT"], 
-                [], [], 
-                ["", "CONTRACT NO.", ":", c.contract_code || "-"], 
-                ["", "CONTRACTOR", ":", c.contractor || "-"],
-                ["", "CONTRACT PERIOD", ":", period],
-                ["", "CONTRACT SUM", ":", Number(c.contract_sum || 0)],
-                ["", "PERFORMANCE GUARANTEE SUM", ":", pgInfo],
-                [] 
-            ];
-
-            function buildTableSet(startInt, endInt, isLastSet) {
-                const startRow = ws_data.length;
-                let h1 = ["ITEM", "DESCRIPTION", "", "AS PER CONTRACT"];
-                for (let i = startInt; i <= endInt; i++) h1.push(`INTERIM NO.${i}`);
-                if (isLastSet) h1.push("TOTAL CLAIM", "CONTRACT BALANCE", "ON GOING WORKS", "ON GOING CONTRACT BALANCE");
-                
-                let h2 = ["", "", "", ""];
-                for (let i = startInt; i <= endInt; i++) {
-                    const dRec = interims[i - 1]?.date_received;
-                    h2.push(dRec ? formatShortDate(dRec) : "-");
-                }
-                if (isLastSet) h2.push("", "", "", "");
-
-                let h3 = h1.map((h, i) => (i < 4 ? "" : "RM"));
-                ws_data.push(h1, h2, h3);
-
-                merges.push({ s: { r: startRow, c: 0 }, e: { r: startRow + 2, c: 0 } });
-                merges.push({ s: { r: startRow, c: 1 }, e: { r: startRow + 2, c: 2 } });
-                merges.push({ s: { r: startRow, c: 3 }, e: { r: startRow + 2, c: 3 } });
-
-                sectionNames.forEach((sec, idx) => {
-                    const currentRowIdx = ws_data.length;
-                    const letter = String.fromCharCode(65 + idx);
-                    let voForSection = 0;
-Object.values(c.vo_breakdown || {}).forEach(vo => {
-    voForSection += Number(vo.breakdown?.[sec]?.amt || 0);
-});
-const contractAmt = Number(sections[sec]?.amt || 0) + voForSection;
-                    let row = [letter, sections[sec]?.desc || sec, "", contractAmt];
-
-                    for (let i = startInt; i <= endInt; i++) {
-                        const val = Number(interims[i - 1]?.claim_breakdown?.[sec]?.amt || 0);
-                        row.push(val || 0);
-                    }
-
-                    if (isLastSet) {
-                        let totalClaimAll = 0;
-                        interims.forEach(int => totalClaimAll += Number(int.claim_breakdown?.[sec]?.amt || 0));
-                        let ongoing = 0;
-                        workorders.filter(w => w.status !== 'Claimed').forEach(w => {
-                            const cat = w.section_category || {};
-                            ongoing += Number(cat[sec]?.amt || 0);
-                            if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) ongoing += Number(w.additional || 0);
-                        });
-                        const balance = contractAmt - totalClaimAll;
-                        row.push(totalClaimAll, balance, ongoing, (balance - ongoing));
-                    }
-                    ws_data.push(row);
-                    merges.push({ s: { r: currentRowIdx, c: 1 }, e: { r: currentRowIdx, c: 2 } });
-                });
-
-                const addSpecialRow = (label, interimKey, isNet = false) => {
-                    const rIdx = ws_data.length;
-                    let row = ["", label, "", 0];
-                    if(isNet) {
-                        let sumContract = 0;
-sectionNames.forEach(s => {
-    let voExtra = 0;
-    Object.values(c.vo_breakdown || {}).forEach(vo => {
-        voExtra += Number(vo.breakdown?.[s]?.amt || 0);
-    });
-    sumContract += Number(sections[s]?.amt || 0) + voExtra;
-});
-row[3] = sumContract;
-                    }
-                    for (let i = startInt; i <= endInt; i++) {
-                        const val = isNet ? Number(interims[i - 1]?.net_amount || 0) : Number(interims[i - 1]?.[interimKey] || 0);
-                        row.push(val || 0);
-                    }
-                    if (isLastSet) {
-                        let totalClaimSum = 0;
-                        interims.forEach(int => totalClaimSum += Number(isNet ? int.net_amount : (int[interimKey] || 0)));
-                        if (isNet) {
-                            let totalContractAmt = 0;
-                            sectionNames.forEach(s => totalContractAmt += Number(sections[s]?.amt || 0));
-                            let totalOngoingSum = 0;
-                            workorders.filter(w => w.status !== 'Claimed').forEach(w => {
-                                if(w.section_category) {
-                                    sectionNames.forEach(s => totalOngoingSum += Number(w.section_category[s]?.amt || 0));
-                                } else { totalOngoingSum += Number(w.total_amount || 0); }
-                            });
-                            const totalBalance = totalContractAmt - totalClaimSum;
-                            row.push(totalClaimSum, totalBalance, totalOngoingSum, (totalBalance - totalOngoingSum));
-                        } else { row.push(totalClaimSum, 0, 0, 0); }
-                    }
-                    ws_data.push(row);
-                    merges.push({ s: { r: rIdx, c: 1 }, e: { r: rIdx, c: 2 } });
-                };
-
-                addSpecialRow("PERFORMANCE GUARANTEE SUM", "performance_guarantee_sum");
-addSpecialRow("SALVAGE VALUE", "salvage_value");
-addSpecialRow("TAX", "tax");
-addSpecialRow("TOTAL BRING TO INTERIM PAYMENT", "", true);
-                ws_data.push([]); 
-            }
-
-            buildTableSet(1, 10, false);
-            buildTableSet(11, 20, false);
-            buildTableSet(21, 26, true);
-
-            const ws = XLSX.utils.aoa_to_sheet(ws_data);
-            ws["!merges"] = merges;
-            const lastRowIdx = ws_data.length - 1;
-
-            // STYLING SHEET 1
-            for (let r = 0; r <= lastRowIdx; r++) {
-                for (let cidx = 0; cidx <= 40; cidx++) {
-                    const cellRef = XLSX.utils.encode_cell({ r: r, c: cidx });
-                    if (!ws[cellRef]) continue;
-                    if (!ws[cellRef].s) ws[cellRef].s = {};
-                    if (r === 1 && cidx === 1) {
-                        ws[cellRef].s = { font: { bold: true, sz: 12 }, alignment: { horizontal: "center", vertical: "center", wrapText: true } };
-                        continue;
-                    }
-                    if (r < 10) {
-                        if (r === 7 && cidx === 3) { ws[cellRef].t = 'n'; ws[cellRef].z = fmtRM; }
-                        ws[cellRef].s.font = { bold: (cidx !== 1) };
-                        ws[cellRef].s.alignment = { horizontal: (cidx === 1 || cidx === 3 ? "left" : "center") };
-                        continue; 
-                    }
-
-                    const rowAboveValue = ws[XLSX.utils.encode_cell({ r: r-1, c: cidx })]?.v;
-                    if (rowAboveValue && rowAboveValue.toString().includes("INTERIM NO")) {
-                        ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } };
-                    }
-                    ws[cellRef].s.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
-                    ws[cellRef].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
-                    if (cidx === 1) ws[cellRef].s.alignment.horizontal = "left";
-                    if (typeof ws[cellRef].v === 'number' && cidx >= 3) { ws[cellRef].t = 'n'; ws[cellRef].z = fmtCurrency; }
-                    if (cidx >= 14) ws[cellRef].s.font = { bold: true };
-                    
-                    const valStr = ws[cellRef].v ? ws[cellRef].v.toString() : "";
-                    const isHeaderRow = valStr.includes("INTERIM NO") || valStr === "ITEM" || valStr === "DESCRIPTION" || valStr === "AS PER CONTRACT" || valStr.includes("CLAIM") || valStr.includes("BALANCE") || valStr.includes("WORKS");
-                    if (isHeaderRow || valStr === "RM") { 
-                        ws[cellRef].s.fill = { fgColor: { rgb: "EAEAEA" } }; 
-                        ws[cellRef].s.font = { bold: true }; 
-                    }
-                    
-                    const rowDesc = ws[XLSX.utils.encode_cell({ r: r, c: 1 })]?.v?.toString().toUpperCase() || "";
-
-                    if (rowDesc) {
-                        // 1. Logik Warna Latar Belakang
-                        if (rowDesc.includes("LABOUR") || rowDesc.includes("WORKMANSHIP")) {
-                            ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } };
-                        } 
-                        else if (rowDesc.includes("SPARE") || rowDesc.includes("PROVISIONAL")) {
-                            ws[cellRef].s.fill = { fgColor: { rgb: "FFFF00" } };
-                        } 
-                        else if (rowDesc.includes("REFURBISHMENT")) {
-                            ws[cellRef].s.fill = { fgColor: { rgb: "A9A9A9" } };
-                        }
-                        // 2. Logik BOLD & FONT HITAM (Untuk semua baris total di bahagian bawah)
-                        if (rowDesc.includes("TOTAL BRING TO INTERIM")) {
-                            ws[cellRef].s.font = { bold: true, color: { rgb: "000000" } };
-                        } else {
-                            // Pastikan font selain header/total tetap hitam tapi tak bold 
-                            if (!ws[cellRef].s.font) ws[cellRef].s.font = {};
-                            ws[cellRef].s.font.color = { rgb: "000000" };
-                        }
-                    }
-                }
-            }
-            ws["!cols"] = [{ wch: 8 }, { wch: 40 }, { wch: 3 }, { wch: 25 }];
-            for (let i = 0; i < 35; i++) ws["!cols"].push({ wch: 14 });
-            XLSX.utils.book_append_sheet(wb, ws, "Summary");
-
-            // ==========================================
-            // SHEET 2
-            // ==========================================
-            let sumLab = 0, sumSpa = 0, sumPrv = 0;
-            let balLab = 0, balSpa = 0, balPrv = 0;
-
-            let voExtra = 0;
-Object.values(c.vo_breakdown || {}).forEach(vo => {
-    voExtra += Number(vo.breakdown?.[sec]?.amt || 0);
-});
-const contractAmt = Number(sections[sec]?.amt || 0) + voExtra;
-                let totalClaimed = 0;
-                interims.forEach(int => totalClaimed += Number(int.claim_breakdown?.[sec]?.amt || 0));
-                
-                let ongoing = 0;
-                workorders.filter(w => w.status !== 'Claimed').forEach(w => {
-                    const cat = w.section_category || {};
-                    ongoing += Number(cat[sec]?.amt || 0);
-                    if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) ongoing += Number(w.additional || 0);
-                });
-
-                const currentBal = (contractAmt - totalClaimed) - ongoing;
-
-                if (desc.includes("LABOUR") || desc.includes("WORKMANSHIP")) { sumLab += contractAmt; balLab += currentBal; }
-                else if (desc.includes("SPARE")) { sumSpa += contractAmt; balSpa += currentBal; }
-                else if (desc.includes("PROVISIONAL")) { sumPrv += contractAmt; balPrv += currentBal; }
-            });
-
-            const getP = (b, t) => t > 0 ? Math.round((b/t)*100) + "%" : "0%";
-            
-            let ws2_data = [
-                [], [], 
-                ["TOTAL LABOUR CHARGES", "RM", sumLab, "", "", "", "ON GOING LABOUR CHARGES BALANCE", getP(balLab, sumLab)],
-                [],
-                ["TOTAL SUPPLY OF SPARE PART", "RM", sumSpa, "", "", "", "ON GOING SUPPLY OF SPARE PART BALANCE", getP(balSpa, sumSpa)],
-                [],
-                ["TOTAL PROVISIONAL SUM", "RM", sumPrv, "", "", "", "ON GOING PROV SUM BALANCE", getP(balPrv, sumPrv)],
-                [],
-                ["TOTAL APPROVED CM WORKS", "RM", 0, "", "", "", "TOTAL G&P CLAIMED", "0%"],
-                ["TOTAL CM WORKS CLAIMED", "RM", 0, "0%", "", "", "BAL. G&P NOT CLAIM", "100%"],
-                ["BAL. CM WORKS NOT CLAIM", "RM", 0, "0%", "", "", "", ""],
-                [],
-                ["", "", "", "", "", "", "TOTAL PM WORKS CLAIMED", "0%"],
-                ["TOTAL PENDING CLAIM", "RM", 0, "0%", "", "", "BAL. PM WORKS NOT CLAIM", "100%"],
-                [],
-                ["", "", "", "", "", "", "TOTAL CALIBRATION WORKS CLAIMED", "0%"],
-                ["", "", "", "", "", "", "BAL. CALIBRATION WORKS NOT CLAIM", "100%"],
-                [], [], [], [],
-                ["CM BUDGET USAGE BY DISTRICT"],
-                [],
-                ["SEGAMAT", "RM", 0, "0%"],
-                ["MUAR", "RM", 0, "0%"],
-                ["BATU PAHAT", "RM", 0, "0%"],
-                ["KLUANG", "RM", 0, "0%"],
-                ["MERSING", "RM", 0, "0%"],
-                ["TOTAL USAGE OF CM BUDGET", "RM", 0]
-            ];
-            
-            const ws2 = XLSX.utils.aoa_to_sheet(ws2_data);
-            for(let r=0; r<ws2_data.length; r++) {
-                for(let c=0; c<8; c++) {
-                    const ref = XLSX.utils.encode_cell({r:r, c:c});
-                    if(!ws2[ref]) continue;
-                    if(!ws2[ref].s) ws2[ref].s = {};
-                    if(ws2[ref].v !== "" && r > 1) ws2[ref].s.border = { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} };
-                    if(typeof ws2[ref].v === 'number' && c === 2) { ws2[ref].t = 'n'; ws2[ref].z = fmtCurrency; }
-                    if(r===2 && c<3) ws2[ref].s.fill = { fgColor: { rgb: "FFCC99" } }; 
-                    if(r===4 && c<3) ws2[ref].s.fill = { fgColor: { rgb: "FFFF00" } }; 
-                    if(r===6 && c<3) ws2[ref].s.fill = { fgColor: { rgb: "FFFF00" } }; 
-                    if(r===8 && c<3) ws2[ref].s.fill = { fgColor: { rgb: "FFCC99" } }; 
-                    if(r===13 && c<4) { ws2[ref].s.fill = { fgColor: { rgb: "FF0000" } }; ws2[ref].s.font = { color: { rgb: "FFFFFF" }, bold: true }; }
-                    if(c >= 6) {
-                        if(r===2 || r===6) ws2[ref].s.fill = { fgColor: { rgb: "FFFF00" } };
-                        if(r===4) ws2[ref].s.fill = { fgColor: { rgb: "FFCC99" } };
-                    }
-                    if(r === 21) ws2[ref].s.font = { bold: true };
-                }
-            }
-            ws2["!cols"] = [{ wch: 35 }, { wch: 5 }, { wch: 15 }, { wch: 10 }, { wch: 5 }, { wch: 5 }, { wch: 40 }, { wch: 10 }];
-            XLSX.utils.book_append_sheet(wb, ws2, "Budget Usage");
-            
-            // ==========================================
-            // SHEET 3: LIST WORK ORDER (IKUT PECAHAN DAERAH)
-            // ==========================================
-
-            const districtString = c.district || "SEGAMAT,MUAR,BATU PAHAT,KLUANG,MERSING";
-            const daerahList = districtString.split(',').map(d => d.trim());
-            
-            const allSectionKeys = Object.keys(sections || {});
-            const dynamicSectionKeys = allSectionKeys.filter(key => {
-                const desc = (sections[key]?.desc || key).toUpperCase();
-                return desc.includes("LABOUR") || 
-                    desc.includes("WORKMANSHIP") || 
-                    desc.includes("SPARE") || 
-                    desc.includes("REFURBISHMENT") || 
-                    desc.includes("PROVISIONAL");
-            }).sort(); 
-            
-            const sectionCount = dynamicSectionKeys.length;
-            
-            let ws3_data = [];
-            let currentMerges = [];
-
-            daerahList.forEach((daerah) => {
-                // 1. Kenalpasti baris permulaan untuk daerah ini 
-                const startRow = ws3_data.length;
-                const sectionCount = dynamicSectionKeys.length;
-                const lastColIdx = 3 + (sectionCount * 2) + 2;
-   
-                // Tajuk Daerah & Header
-                ws3_data.push([daerah.toUpperCase()]); 
-                ws3_data.push([]);
-                ws3_data.push(["SENARAI PERMOHONAN KERJA-KERJA KONTRAK PENYELENGGARAAN"]);
-                ws3_data.push([]);
-    
-                // BARIS 5: Tajuk Utama (Merge Quotation & Payment mengikut bilangan seksyen)
-    let h1 = ["NO.", "DESCRIPTION", "LOCATION", "WORK ORDER", "QUOTATION"];
-    for(let i=0; i < sectionCount - 1; i++) h1.push(""); // Padding untuk merge Quotation
-    h1.push("PAYMENT");
-    for(let i=0; i < sectionCount - 1; i++) h1.push(""); // Padding untuk merge Payment
-    h1.push("QUOTATION APPROVAL DATE", "STATUS / PAID AS PER INTERIM NO");
-    ws3_data.push(h1);
-
-    // BARIS 6: Tajuk Seksyen Dinamik (E.g. SECTION C, SECTION D...)
-    let h2 = ["", "", "", ""];
-    dynamicSectionKeys.forEach(key => {
-    h2.push(sections[key]?.desc || key);
-});
-
-dynamicSectionKeys.forEach(key => {
-    h2.push(sections[key]?.desc || key);
-});
-    h2.push("", "");
-    ws3_data.push(h2);
-
-    // BARIS 7: Unit (RM)
-    let h3 = ["", "", "", ""];
-    for(let i=0; i < (sectionCount * 2); i++) h3.push("(RM)");
-    h3.push("", "");
-    ws3_data.push(h3);
-
-    // LOGIK MERGE DINAMIK
-                currentMerges.push({ s: { r: startRow, c: 0 }, e: { r: startRow, c: lastColIdx } }); 
-                currentMerges.push({ s: { r: startRow + 2, c: 0 }, e: { r: startRow + 2, c: lastColIdx } }); 
-    
-    // Merge NO, DESC, LOC, WO (Vertical)
-    [0, 1, 2, 3].forEach(cIdx => {
-        currentMerges.push({ s: { r: startRow + 4, c: cIdx }, e: { r: startRow + 6, c: cIdx } });
-    });
-    
-    // Merge QUOTATION & PAYMENT (Horizontal)
-    currentMerges.push({ s: { r: startRow + 4, c: 4 }, e: { r: startRow + 4, c: 4 + sectionCount - 1 } });
-    currentMerges.push({ s: { r: startRow + 4, c: 4 + sectionCount }, e: { r: startRow + 4, c: 4 + (sectionCount * 2) - 1 } });
-
-    // Merge DATE & STATUS (Vertical)
-    currentMerges.push({ s: { r: startRow + 4, c: 4 + (sectionCount * 2) }, e: { r: startRow + 6, c: 4 + (sectionCount * 2) } });
-    currentMerges.push({ s: { r: startRow + 4, c: 4 + (sectionCount * 2) + 1 }, e: { r: startRow + 6, c: 4 + (sectionCount * 2) + 1 } });
-
-    const filteredWO = workorders
-    .filter(wo => (wo.district || "").toUpperCase() === daerah.toUpperCase())
-    .sort((a, b) => {
-        return (a.sequence_no || "").localeCompare(
-            (b.sequence_no || ""),
-            undefined,
-            { numeric: true, sensitivity: 'base' }
-        );
-    });
-                let totalCols = 4 + (sectionCount * 2) + 2;
-                let dTotals = new Array(totalCols).fill(0);
-    
-    if (filteredWO.length > 0) {
-        filteredWO.forEach((wo, index) => {
-            const cat = wo.section_category || {};
-            let rowData = [index + 1, wo.description || "-", wo.location || "-", wo.work_id || "-"];
-            
-            // Masukkan data Quotation
-            dynamicSectionKeys.forEach((key, kIdx) => {
-                const amt = Number(cat[key]?.amt || 0);
-                const quotationVal = (wo.status === 'Claimed') ? 0 : amt;
-                rowData.push(quotationVal);
-                dTotals[kIdx] += quotationVal;
-            });
-
-            // Masukkan data Payment (Jika Claimed)
-            dynamicSectionKeys.forEach((key, kIdx) => {
-                const amt = Number(cat[key]?.amt || 0);
-                const paymentVal = (wo.status === 'Claimed') ? amt : 0;
-                rowData.push(paymentVal);
-                dTotals[sectionCount + kIdx] += paymentVal;
-
-            });
-
-            rowData.push(formatShortDate(wo.qpb_date));
-            rowData.push(wo.status === 'Claimed' ? `INT ${wo.interim_no}` : (wo.status || "PENDING"));
-            
-            ws3_data.push(rowData);
-        });
-    }
-                // 2. MASUKKAN GRAND TOTAL
-const totalRowIdx = ws3_data.length;
-
-let grandTotalRow = Array(totalCols).fill("");
-
-grandTotalRow[0] = "GRAND TOTAL";
-
-// QUOTATION TOTAL PER SECTION
-for (let i = 0; i < sectionCount; i++) {
-    grandTotalRow[4 + i] = dTotals[i] || 0;
-}
-
-// PAYMENT TOTAL PER SECTION
-for (let i = 0; i < sectionCount; i++) {
-    grandTotalRow[4 + sectionCount + i] = dTotals[sectionCount + i] || 0;
-}
-                // TOTAL SEMUA SECTION (quotation + payment)
-let overallGrandTotal = 0;
-
-for (let i = 0; i < sectionCount; i++) {
-    overallGrandTotal += Number(dTotals[i] || 0); // quotation
-    overallGrandTotal += Number(dTotals[sectionCount + i] || 0); // payment
-}
-
-// letak dekat kolum paling hujung
-grandTotalRow[totalCols - 1] = overallGrandTotal;
-
-ws3_data.push(grandTotalRow);
-
-// merge kiri
-currentMerges.push({
-    s: { r: totalRowIdx, c: 0 },
-    e: { r: totalRowIdx, c: 3 }
-});
-                // jarak antara daerah
-ws3_data.push([]);
-ws3_data.push([]);
-ws3_data.push([]);
-                
-            });
-
-            const ws3 = XLSX.utils.aoa_to_sheet(ws3_data);
-            ws3["!merges"] = currentMerges;
-
-            // 4. Styling Dinamik untuk Sheet 3
-
-for (let r = 0; r < ws3_data.length; r++) {
-
-    const isGrandTotalRow = ws3_data[r] && ws3_data[r][0] === "GRAND TOTAL";
-    const currentLastCol = 3 + (sectionCount * 2) + 2;
-
-    for (let c = 0; c <= currentLastCol; c++) {
-
-        const ref = XLSX.utils.encode_cell({ r: r, c: c });
-
-        if (!ws3[ref]) {
-            ws3[ref] = { v: "", t: "s", s: {} };
-        }
-
-        if (!ws3[ref].s) ws3[ref].s = {};
-
-        const val = ws3[ref].v ? ws3[ref].v.toString() : "";
-
-        // =========================
-        // DEFAULT ALIGNMENT
-        // =========================
-        ws3[ref].s.alignment = {
-            horizontal: "center",
-            vertical: "center",
-            wrapText: true
-        };
-
-        if (c === 1) {
-            ws3[ref].s.alignment.horizontal = "left";
-        }
-
-        // =========================
-// HEADER STYLE
-// =========================
-if (
-    daerahList.includes(val) ||
-    val.includes("SENARAI PERMOHONAN") ||
-    val === "NO." ||
-    val === "DESCRIPTION" ||
-    val === "LOCATION" ||
-    val === "WORK ORDER" ||
-    val === "QUOTATION" ||
-    val === "PAYMENT" ||
-    val === "(RM)" || 
-    val === "QUOTATION APPROVAL DATE" ||
-    val === "STATUS / PAID AS PER INTERIM NO" ||
-
-    // tambah section description sekali
-    dynamicSectionKeys.some(key => 
-        val === (sections[key]?.desc || key)
-    )
-) {
-
-    ws3[ref].s.fill = {
-        fgColor: { rgb: "EAEAEA" } // kelabu
-    };
-
-    ws3[ref].s.font = {
-        bold: true,
-        color: { rgb: "000000" }
-    };
-
-    ws3[ref].s.alignment = {
-        horizontal: "center",
-        vertical: "center",
-        wrapText: true
-    };
-}
-
-        // =========================
-        // BORDER
-        // =========================
-        if (
-            r > 0 &&
-            ws3_data[r] &&
-            ws3_data[r].length > 0 &&
-            !daerahList.includes(ws3_data[r][0])
-        ) {
-
-            ws3[ref].s.border = {
-                top: { style: "thin" },
-                bottom: { style: "thin" },
-                left: { style: "thin" },
-                right: { style: "thin" }
-            };
-        }
-
-        // =========================
-        // GRAND TOTAL STYLE
-        // =========================
-        if (isGrandTotalRow) {
-
-            ws3[ref].s.font = {
-                bold: true
-            };
-
-            ws3[ref].s.fill = {
-                fgColor: { rgb: "EAEAEA" }
-            };
-
-            ws3[ref].s.border = {
-                top: { style: "double" },
-                bottom: { style: "double" },
-                left: { style: "double" },
-                right: { style: "double" }
-            };
-
-            if (c === 0) {
-                ws3[ref].s.alignment = {
-                    horizontal: "center",
-                    vertical: "center"
-                };
-            }
-        }
-
-        // =========================
-        // NUMBER FORMAT + WARNA
-        // =========================
-        if (r > 6 && typeof ws3[ref].v === 'number') {
-
-            let currentSecIdx;
-
-            // QUOTATION SECTION
-            if (c >= 4 && c < 4 + sectionCount) {
-                currentSecIdx = c - 4;
-            }
-
-            // PAYMENT SECTION
-            else if (
-                c >= 4 + sectionCount &&
-                c < 4 + (sectionCount * 2)
-            ) {
-                currentSecIdx = c - (4 + sectionCount);
-            }
-
-            if (currentSecIdx !== undefined) {
-
-                const secKey = dynamicSectionKeys[currentSecIdx];
-                const secDesc = (sections[secKey]?.desc || secKey).toUpperCase();
-
-                // CHECK ADA PAYMENT / INTERIM
-// =========================
-// HIGHLIGHT ROW CLAIMED
-// =========================
-
-const isPaymentColumn = (
-    c >= 4 + sectionCount &&
-    c < 4 + (sectionCount * 2)
-);
-
-const hasInterim = Number(ws3[ref].v || 0) > 0;
-
-// highlight row claimed sahaja
-// EXCLUDE grand total
-if (
-    isPaymentColumn &&
-    hasInterim &&
-    !isGrandTotalRow
-) {
-
-    for (let cc = 0; cc <= currentLastCol; cc++) {
-
-        const rowRef = XLSX.utils.encode_cell({
-            r: r,
-            c: cc
-        });
-
-        if (!ws3[rowRef]) continue;
-
-        if (!ws3[rowRef].s) ws3[rowRef].s = {};
-
-        // jangan overwrite header
-        const rowVal = ws3[rowRef].v
-            ? ws3[rowRef].v.toString()
-            : "";
-
-        const isHeaderCell =
-            rowVal === "NO." ||
-            rowVal === "DESCRIPTION" ||
-            rowVal === "LOCATION" ||
-            rowVal === "WORK ORDER" ||
-            rowVal === "QUOTATION" ||
-            rowVal === "PAYMENT" ||
-            rowVal === "(RM)" ||
-            rowVal === "QUOTATION APPROVAL DATE" ||
-            rowVal === "STATUS / PAID AS PER INTERIM NO";
-
-        if (!isHeaderCell) {
-
-            ws3[rowRef].s.fill = {
-                fgColor: { rgb: "C6EFCE" }
-            };
-
-            ws3[rowRef].s.font = {
-                ...(ws3[rowRef].s.font || {}),
-                color: { rgb: "006100" }
-            };
-        }
-    }
-}
-                // LABOUR
-                if (
-                    !isPaymentColumn &&
-                    (
-                        secDesc.includes("LABOUR") ||
-                        secDesc.includes("WORKMANSHIP")
-                    )
-                ) 
-                {
-
-                    ws3[ref].s.fill = {
-                        fgColor: { rgb: "FFCC99" }
-                    };
-                }
-
-                // SPARE / PROVISIONAL
-                else if (
-    !isPaymentColumn &&
-    (
-        secDesc.includes("SPARE") ||
-        secDesc.includes("PROVISIONAL")
-    )
-) {
-
-                    ws3[ref].s.fill = {
-                        fgColor: { rgb: "FFFF00" }
-                    };
-                }
-
-                // REFURBISHMENT
-                else if (
-    !isPaymentColumn &&
-    secDesc.includes("REFURBISHMENT")
-) {
-
-                    ws3[ref].s.fill = {
-                        fgColor: { rgb: "A9A9A9" }
-                    };
-                }
-                if (isGrandTotalRow) {
-
-    ws3[ref].s.font = {
-        ...(ws3[ref].s.font || {}),
-        bold: true,
-        color: { rgb: "000000" }
-    };
-}
-            }
-
-            ws3[ref].t = 'n';
-            ws3[ref].z = fmtCurrency;
-        }
-    }
-}  
-
-            ws3["!rows"] = ws3_data.map(() => ({ hpt: 15.75 }));
-            let ws3Cols = [
-    { wch: 5 },   // NO
-    { wch: 40 },  // DESCRIPTION
-    { wch: 20 },  // LOCATION
-    { wch: 15 }   // WORK ORDER
-];
-
-// quotation columns
-for(let i=0; i<sectionCount; i++) {
-    ws3Cols.push({ wch: 12 });
-}
-
-// payment columns
-for(let i=0; i<sectionCount; i++) {
-    ws3Cols.push({ wch: 12 });
-}
-
-// final columns
-ws3Cols.push({ wch: 15 });
-ws3Cols.push({ wch: 20 });
-
-ws3["!cols"] = ws3Cols;
-
-            XLSX.utils.book_append_sheet(wb, ws3, "List Work Order");
-
-// ===== PWA SAFE DOWNLOAD LOGIC =====
-            const wbout = XLSX.write(wb, {
-                bookType: 'xlsx',
-                type: 'array'
-            });
-
-            const blob = new Blob([wbout], {
-                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            });
-
-            const url = URL.createObjectURL(blob);
-            const btn = document.getElementById('download-btn');
-            const statusText = document.getElementById('status-text');
-            const subText = document.getElementById('sub-text');
-
-            // Fungsi untuk proses muat turun
-            const triggerDownload = () => {
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = fileName;
-                document.body.appendChild(a);
-                a.click();
-                
-                setTimeout(() => {
-                    document.body.removeChild(a);
-                    statusText.innerText = "Selesai!";
-                    subText.innerText = "Fail telah dihantar ke sistem muat turun anda.";
-                }, 1000);
-            };
-
-            // Paparkan butang untuk PWA
-            statusText.innerText = "Fail Sedia!";
-            subText.innerText = "Sila klik butang di bawah jika muat turun tidak bermula.";
-            btn.style.display = "inline-block";
-
-            btn.onclick = () => {
-                triggerDownload();
-            };
-
-            // Cuba trigger automatik
             try {
                 triggerDownload();
             } catch (e) {
