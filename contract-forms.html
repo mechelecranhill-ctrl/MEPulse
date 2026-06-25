@@ -2292,26 +2292,45 @@ setTimeout(async ()=>{
 
 if(i.claim_breakdown){
 
-Object.keys(i.claim_breakdown).forEach(sec=>{
+    Object.keys(i.claim_breakdown).forEach(sec=>{
 
-const input = document.querySelector(
-`.i_sec_claim_val[data-sec="${CSS.escape(sec)}"]`
-);
+        // Load nilai section utama
+        const secInput = document.querySelector(
+            `.i_sec_claim_val[data-sec="${CSS.escape(sec)}"]`
+        );
 
-if(input){
+        if(secInput){
+            const val = Number(i.claim_breakdown[sec].amt || 0);
+            secInput.dataset.rawValue = val;
+            secInput.value = val.toLocaleString('en-MY',{
+                minimumFractionDigits:2,
+                maximumFractionDigits:2
+            });
+        }
 
-    const val = Number(i.claim_breakdown[sec].amt || 0);
+        // Load nilai VO bawah section ini (kalau ada)
+        const voData = i.claim_breakdown[sec].vo || {};
 
-    input.dataset.rawValue = val;
+        Object.keys(voData).forEach(voName=>{
 
-    input.value = val.toLocaleString('en-MY',{
-        minimumFractionDigits:2,
-        maximumFractionDigits:2
+            const voKey = `${sec}|VO:${voName}`;
+
+            const voInput = document.querySelector(
+                `.i_sec_claim_val[data-sec="${CSS.escape(voKey)}"]`
+            );
+
+            if(voInput){
+                const val = Number(voData[voName].amt || 0);
+                voInput.dataset.rawValue = val;
+                voInput.value = val.toLocaleString('en-MY',{
+                    minimumFractionDigits:2,
+                    maximumFractionDigits:2
+                });
+            }
+
+        });
+
     });
-
-}
-
-});
 
 }
 
