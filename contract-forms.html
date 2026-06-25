@@ -728,15 +728,17 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
 
                 <label>Contracts</label>
                 <select id="vo_contract_id" onchange="onVOContractSelect()" required><option value="">Choose Contract</option></select>
+                
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-    <div>
-        <label>VO Name</label>
-        <input type="text"
-               id="vo_name"
-               placeholder="Example: PPJHK NO. 1"
-               required>
-    </div>
-</div>
+                    <div>
+                        <label>VO Name</label>
+                        <input type="text" id="vo_name" placeholder="Example: PPJHK NO. 1" required>
+                    </div>
+                    <div>
+                        <label>VO Date</label>
+                        <input type="date" id="vo_date" required>
+                    </div>
+                </div>
 
 <label>Cost Breakdown</label>
 
@@ -1569,13 +1571,6 @@ return `${prefix} ${match[2]}${suffix}`;
 
 /* ============================================================
    INTERIM — Section -> VO (nested) claim input rendering
-   ============================================================
-   data-sec key format:
-     - Section biasa:           "SECTION B"
-     - VO bawah section:        "SECTION B|VO:PPJHK NO. 1"
-   Pipe '|' digunakan sebagai separator sebab nama Section/VO
-   boleh mengandungi dash, koma, titik, dll — pipe paling jarang
-   bertembung dengan nama sebenar.
    ============================================================ */
 
 function escapeAttr(str){
@@ -1604,7 +1599,6 @@ const contractVO = opt.dataset.vo
     : {};
 
 // Bina map: SECTION_NAME -> [ {voName, voData}, ... ]
-// berdasarkan breakdown setiap VO (vo.breakdown = { "SECTION B": {amt}, ... })
 const voBySection = {};
 Object.keys(contractVO).sort().forEach(voName => {
     const vo = contractVO[voName] || {};
@@ -1615,7 +1609,7 @@ Object.keys(contractVO).sort().forEach(voName => {
         voBySection[secName].push({
             voName: voName,
             amt: voSectionBreakdown[secName].amt || 0,
-            desc: vo.desc || ''
+            desc: `VO Date: ${vo.date || '-'} | Variation Order`
         });
     });
 });
@@ -1624,7 +1618,7 @@ Object.keys(contractVO).sort().forEach(voName => {
 Object.keys(sections).sort().forEach(sec => {
 
     const secData = sections[sec];
-    const secKey = sec; // data-sec untuk claim section utama
+    const secKey = sec; 
     const relatedVOs = voBySection[sec] || [];
 
     let voHtml = '';
@@ -1633,7 +1627,7 @@ Object.keys(sections).sort().forEach(sec => {
         voHtml += `
 <div class="interim-vo-sub">
     <span class="vo-sub-label"><i class="fa-solid fa-turn-down" style="font-size:9px;"></i> ${vo.voName}</span>
-    <span class="sec-desc">${vo.desc || 'Variation Order'}</span>
+    <span class="sec-desc">${vo.desc}</span>
     <input type="text"
         class="i_sec_claim_val"
         data-sec="${escapeAttr(voKey)}"
@@ -1801,20 +1795,18 @@ document.querySelectorAll('.i_sec_claim_val').forEach(i=>{
     const val = parseFloat(i.dataset.rawValue || 0);
 
     if(val > 0){
-        const secKey = i.dataset.sec; // "SECTION G" atau "SECTION G|VO:PPJHK NO. 1"
+        const secKey = i.dataset.sec; 
         const parts = secKey.split('|VO:');
 
         if(parts.length === 2){
-            // Ini adalah VO claim
-            const sectionName = parts[0];           // "SECTION G"
-            const voName = parts[1];                // "PPJHK NO. 1"
+            const sectionName = parts[0];           
+            const voName = parts[1];                
 
             if(!breakdown[sectionName]) breakdown[sectionName] = { amt: 0 };
             if(!breakdown[sectionName].vo) breakdown[sectionName].vo = {};
             breakdown[sectionName].vo[voName] = { amt: val };
 
         } else {
-            // Section biasa
             if(!breakdown[secKey]) breakdown[secKey] = { amt: 0 };
             breakdown[secKey].amt = val;
         }
@@ -2019,6 +2011,7 @@ return total;
         try {
             const cId = document.getElementById('vo_contract_id').value;
             const voName = document.getElementById('vo_name').value.trim().toUpperCase();
+            const voDate = document.getElementById('vo_date').value;
             let amt = 0;
 
 const breakdown = {};
@@ -2044,8 +2037,8 @@ amt += value;
 
 });
             if(!cId) return alert("Sila pilih kontrak!");
-            if(!voName || isNaN(amt)){
-    return alert("Sila isi Nama VO dan Amaun!");
+            if(!voName || !voDate || isNaN(amt)){
+    return alert("Sila isi Nama VO, Tarikh VO dan Amaun!");
 }
 
             // 1. Ambil data kontrak terkini
@@ -2057,9 +2050,10 @@ amt += value;
             const contract = data[0];
             let vBreak = contract.vo_breakdown || {};
             
-            // 2. Tambah rekod VO baru ke dalam breakdown (Kunci desc dibuang sepenuhnya)
+            // 2. Tambah rekod VO baru termasuk maklumat tarikh
             vBreak[voName] = {
                 amt: amt,
+                date: voDate,
                 breakdown: breakdown
             };
             
@@ -2091,7 +2085,6 @@ amt += value;
 function autoDetectWork(){
     const num = document.getElementById('w_id_num').value.trim();
     
-    // Jika nombor ditaip sama macam sebelum ini, jangan hantar API request!
     if(num === lastWorkIdNum) return; 
     lastWorkIdNum = num;
 
@@ -2286,7 +2279,6 @@ if(i.claim_breakdown){
 
     Object.keys(i.claim_breakdown).forEach(sec=>{
 
-        // Load nilai section utama
         const secInput = document.querySelector(
             `.i_sec_claim_val[data-sec="${CSS.escape(sec)}"]`
         );
@@ -2300,7 +2292,6 @@ if(i.claim_breakdown){
             });
         }
 
-        // Load nilai VO bawah section ini (kalau ada)
         const voData = i.claim_breakdown[sec].vo || {};
 
         Object.keys(voData).forEach(voName=>{
@@ -2560,13 +2551,11 @@ async function updateWorkOrderSequenceNumbers(contractId, districtText, areaText
     const districts = districtText.split(',').map(x => x.trim().toUpperCase());
     const areas = areaText.split(',').map(x => x.trim().toUpperCase());
 
-    // 1. Tarik semua data work order untuk kontrak ini (Hanya 1 GET request)
     const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&select=id,sequence_no,district`, { headers });
     const works = await res.json();
 
     let bulkUpdatePayload = [];
 
-    // 2. Proses susunan dalam JavaScript (Sangat laju, tak beban database)
     districts.forEach((district, index) => {
         const areaCode = areas[index] || 'WO';
 
@@ -2580,8 +2569,6 @@ async function updateWorkOrderSequenceNumbers(contractId, districtText, areaText
 
         districtWorks.forEach((work, i) => {
             const newSeq = areaCode + String(i + 1).padStart(3, '0');
-            
-            // Masukkan ID dan data baru ke dalam senarai pukal
             bulkUpdatePayload.push({
                 id: work.id,
                 sequence_no: newSeq
@@ -2589,10 +2576,9 @@ async function updateWorkOrderSequenceNumbers(contractId, districtText, areaText
         });
     });
 
-    // 3. Hantar SEMUA data kemaskini dalam SATU call sahaja (Bulk Upsert)
     if (bulkUpdatePayload.length > 0) {
         await fetch(`${SB_URL}/rest/v1/work_orders`, {
-            method: 'POST', // Supabase guna POST + Prefer: resolution=merge untuk Bulk Update
+            method: 'POST', 
             headers: {
                 ...headers,
                 'Prefer': 'resolution=merge-duplicates'
@@ -2603,7 +2589,6 @@ async function updateWorkOrderSequenceNumbers(contractId, districtText, areaText
 }
 
     function centerActiveForm(btn) {
-        /* Mobile: snap scroll. Desktop: tiada kesan (wrapper tak overflow) */
         if(window.innerWidth <= 768) {
             btn.scrollIntoView({ 
                 behavior: "smooth", 
@@ -2651,12 +2636,10 @@ function handleFormSwipe(dx) {
 
     if(activeIndex === -1) return;
 
-    // Swipe kiri → page seterusnya
     if(dx < 0 && activeIndex < tabs.length - 1){
         tabs[activeIndex + 1].click();
     }
 
-    // Swipe kanan → page sebelumnya
     if(dx > 0 && activeIndex > 0){
         tabs[activeIndex - 1].click();
     }
