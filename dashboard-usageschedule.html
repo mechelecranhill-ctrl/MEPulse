@@ -1951,9 +1951,10 @@ const sectionNames = Object.keys(sections);
 const interimCount = interims.length;
 
 /* =========================
-   1. ONGOING (CALCULATE ONCE)
+   1. ONGOING (WO + VO)
 ========================= */
 const pendingWO = workorders.filter(w => w.status !== 'Claimed');
+
 const ongoingBySection = {};
 
 sectionNames.forEach(sec => {
@@ -1970,17 +1971,17 @@ sectionNames.forEach(sec => {
         }
     });
 
-    // VO (ONLY IF CLAIMED / ACTIVE RULE SAFE)
+    // VO ongoing (same logic as Excel)
     Object.values(voBreakdown).forEach(vo => {
-        if (!vo?.breakdown) return;
-        ongoing += Number(vo.breakdown?.[sec]?.amt || 0);
+        ongoing += Number(vo?.breakdown?.[sec]?.amt || 0);
     });
 
     ongoingBySection[sec] = ongoing;
 });
 
+
 /* =========================
-   2. HEADER
+   HEADER
 ========================= */
 let head = `<tr>
 <th>ITEM</th>
@@ -2000,208 +2001,165 @@ head += `
 
 document.getElementById("interimHead").innerHTML = head;
 
+
 /* =========================
-   3. BODY
+   BODY
 ========================= */
 let body = '';
 
 sectionNames.forEach((sec, index) => {
 
-const letter = String.fromCharCode(65 + index);
+    const letter = String.fromCharCode(65 + index);
 
-/* base contract */
-let contractAmt = Number(sections[sec]?.amt || 0);
+    /* base + VO contract */
+    let contractAmt = Number(sections[sec]?.amt || 0);
 
-/* VO included into contract value */
-Object.values(voBreakdown).forEach(vo => {
-    contractAmt += Number(vo?.breakdown?.[sec]?.amt || 0);
-});
+    Object.values(voBreakdown).forEach(vo => {
+        contractAmt += Number(vo?.breakdown?.[sec]?.amt || 0);
+    });
 
-let row = `
+    /* TOTAL CLAIM */
+    let totalClaim = 0;
+
+    interims.forEach(int => {
+        totalClaim += Number(int.claim_breakdown?.[sec]?.amt || 0);
+    });
+
+    const contractBalance = contractAmt - totalClaim;
+    const ongoing = ongoingBySection[sec];
+    const finalBalance = contractBalance - ongoing;
+
+    let row = `
 <tr>
 <td>${letter}</td>
 <td>${sections[sec]?.desc || sec}</td>
 <td style="text-align:right;">${formatRM(contractAmt)}</td>
 `;
 
-let totalClaim = 0;
+    interims.forEach(int => {
+        const val = Number(int.claim_breakdown?.[sec]?.amt || 0);
+        row += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
+    });
 
-/* INTERIM COLUMNS */
-interims.forEach(int => {
-    const cat = int.claim_breakdown || {};
-    const val = Number(cat[sec]?.amt || 0);
-    totalClaim += val;
-
-    row += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
-});
-
-/* BALANCE */
-const contractBalance = contractAmt - totalClaim;
-const ongoing = ongoingBySection[sec];
-
-/* FINAL BALANCE */
-const afterWO = contractBalance - ongoing;
-
-row += `
+    row += `
 <td style="text-align:right;">${formatRM(totalClaim)}</td>
 <td style="text-align:right;">${formatRM(contractBalance)}</td>
 <td style="text-align:right;">${formatRM(ongoing)}</td>
-<td style="text-align:right;font-weight:bold;color:${afterWO < 0 ? 'red' : 'black'};">
-${formatRM(afterWO)}
+<td style="text-align:right;font-weight:bold;color:${finalBalance < 0 ? 'red' : 'black'};">
+${formatRM(finalBalance)}
 </td>
 </tr>
 `;
 
-body += row;
+    body += row;
 
-/* =========================
-   VO SUB ROWS (SAFE VERSION)
-   - only show VO breakdown
-   - no double counting in totals
-========================= */
-Object.entries(voBreakdown).forEach(([voName, vo]) => {
 
-    const voAmt = Number(vo?.breakdown?.[sec]?.amt || 0);
-    if (voAmt <= 0) return;
+    /* =========================
+       VO ROW (display only)
+    ========================= */
+    Object.entries(voBreakdown).forEach(([voName, vo]) => {
 
-    let voRow = `
-    <tr style="background:#fff8e1;">
-        <td></td>
-        <td style="padding-left:25px;">
-            ↳ ${voName} (${letter})
-        </td>
-        <td style="text-align:right;">
-            ${formatRM(voAmt)}
-        </td>
-    `;
+        const voAmt = Number(vo?.breakdown?.[sec]?.amt || 0);
+        if (voAmt <= 0) return;
 
-    for (let i = 0; i < interimCount; i++) {
-        voRow += `<td>-</td>`;
-    }
-
-    voRow += `
-        <td style="text-align:right;">${formatRM(voAmt)}</td>
-        <td></td>
-        <td></td>
-        <td></td>
-    </tr>
-    `;
-
-    body += voRow;
-});
-
-});
-
-/* =========================
-   4. SALVAGE
-========================= */
-let salvageRow = `
-<tr>
+        let voRow = `
+<tr style="background:#fff8e1;">
 <td></td>
-<td>SALVAGE VALUE</td>
-<td style="text-align:right;">-</td>
+<td style="padding-left:20px;">↳ ${voName}</td>
+<td style="text-align:right;">${formatRM(voAmt)}</td>
 `;
 
+        for (let i = 0; i < interimCount; i++) {
+            voRow += `<td>-</td>`;
+        }
+
+        voRow += `
+<td style="text-align:right;">${formatRM(voAmt)}</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+`;
+
+        body += voRow;
+    });
+
+});
+
+
+/* =========================
+   SALVAGE
+========================= */
 let salvageTotal = 0;
+
+let salvageRow = `<tr><td></td><td>SALVAGE VALUE</td><td>-</td>`;
 
 interims.forEach(int => {
     const val = Number(int.salvage_value || 0);
     salvageTotal += val;
-    salvageRow += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
+    salvageRow += `<td>${val ? formatRM(val) : '-'}</td>`;
 });
 
 salvageRow += `
-<td style="text-align:right;">${formatRM(salvageTotal)}</td>
+<td>${formatRM(salvageTotal)}</td>
 <td colspan="3"></td>
-</tr>
-`;
+</tr>`;
 
 body += salvageRow;
 
-/* =========================
-   5. PG
-========================= */
-let pgRow = `
-<tr>
-<td></td>
-<td>PERFORMANCE GUARANTEE SUM</td>
-<td style="text-align:right;">-</td>
-`;
 
+/* =========================
+   PG
+========================= */
 let pgTotal = 0;
+
+let pgRow = `<tr><td></td><td>PERFORMANCE GUARANTEE SUM</td><td>-</td>`;
 
 interims.forEach(int => {
     const val = Number(int.performance_guarantee_sum || 0);
     pgTotal += val;
-    pgRow += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
+    pgRow += `<td>${val ? formatRM(val) : '-'}</td>`;
 });
 
 pgRow += `
-<td style="text-align:right;">${formatRM(pgTotal)}</td>
+<td>${formatRM(pgTotal)}</td>
 <td colspan="3"></td>
-</tr>
-`;
+</tr>`;
 
 body += pgRow;
 
-/* =========================
-   6. TAX
-========================= */
-let taxRow = `
-<tr>
-<td></td>
-<td>TAX</td>
-<td style="text-align:right;">-</td>
-`;
 
+/* =========================
+   TAX
+========================= */
 let taxTotal = 0;
+
+let taxRow = `<tr><td></td><td>TAX</td><td>-</td>`;
 
 interims.forEach(int => {
     const val = Number(int.tax || 0);
     taxTotal += val;
-
-    taxRow += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
+    taxRow += `<td>${val ? formatRM(val) : '-'}</td>`;
 });
 
 taxRow += `
-<td style="text-align:right;">${formatRM(taxTotal)}</td>
+<td>${formatRM(taxTotal)}</td>
 <td colspan="3"></td>
-</tr>
-`;
+</tr>`;
 
 body += taxRow;
 
-/* =========================
-   7. TOTAL BALANCE
-========================= */
-let totalOngoingBalance = 0;
-
-sectionNames.forEach(sec => {
-
-    const contractAmt = Number(sections[sec]?.amt || 0);
-
-    let claimed = 0;
-
-    interims.forEach(int => {
-        claimed += Number(int.claim_breakdown?.[sec]?.amt || 0);
-    });
-
-    totalOngoingBalance += contractAmt - claimed - ongoingBySection[sec];
-});
-
-totalOngoingBalance += salvageTotal;
-totalOngoingBalance += pgTotal;
-totalOngoingBalance -= taxTotal;
 
 /* =========================
-   8. TOTAL ROW
+   TOTAL (SYNC LOGIC EXCEL STYLE)
 ========================= */
-let totalRow = `<tr style="font-weight:bold;background:#f5f5f5;">
-<td colspan="2">TOTAL</td>`;
 
 let totalContract = 0;
+let totalClaim = 0;
+let totalOngoing = 0;
 
 sectionNames.forEach(sec => {
+
     let amt = Number(sections[sec]?.amt || 0);
 
     Object.values(voBreakdown).forEach(vo => {
@@ -2209,17 +2167,32 @@ sectionNames.forEach(sec => {
     });
 
     totalContract += amt;
+
+    interims.forEach(int => {
+        totalClaim += Number(int.claim_breakdown?.[sec]?.amt || 0);
+    });
+
+    totalOngoing += ongoingBySection[sec];
 });
 
-let totalClaim = 0;
+let totalBalance = totalContract - totalClaim;
+let finalOngoingBalance = totalBalance - totalOngoing;
 
-interims.forEach(int => {
-    totalClaim += Number(int.net_amount || 0);
-});
+/* salvage + pg + tax (EXCEL SAME RULE) */
+finalOngoingBalance += salvageTotal;
+finalOngoingBalance += pgTotal;
+finalOngoingBalance -= taxTotal;
 
-totalRow += `<td style="text-align:right;">${formatRM(totalContract)}</td>`;
 
-/* interim totals */
+/* =========================
+   TOTAL ROW
+========================= */
+let totalRow = `
+<tr style="font-weight:bold;background:#f5f5f5;">
+<td colspan="2">TOTAL</td>
+<td style="text-align:right;">${formatRM(totalContract)}</td>
+`;
+
 interims.forEach(int => {
     totalRow += `<td style="text-align:right;">${formatRM(Number(int.net_amount || 0))}</td>`;
 });
@@ -2228,11 +2201,12 @@ totalRow += `
 <td style="text-align:right;">${formatRM(totalClaim)}</td>
 <td></td>
 <td></td>
-<td style="text-align:right;font-weight:bold;">${formatRM(totalOngoingBalance)}</td>
+<td style="text-align:right;">${formatRM(finalOngoingBalance)}</td>
 </tr>
 `;
 
 body += totalRow;
+
 
 /* =========================
    OUTPUT
