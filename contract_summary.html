@@ -122,22 +122,14 @@ async function startAutoDownload() {
                     let row = [letter, sections[sec]?.desc || sec, "", contractAmt];
 
                     for (let i = startInt; i <= endInt; i++) {
-    const secData = interims[i - 1]?.claim_breakdown?.[sec];
-    let val = Number(secData?.amt || 0);
-    Object.values(secData?.vo || {}).forEach(voVal => {
-        val += Number(voVal?.amt || 0);
-    });
+    const val = Number(interims[i - 1]?.claim_breakdown?.[sec]?.amt || 0);
     row.push(val || 0);
 }
 
                     if (isLastSet) {
                         let totalClaimAll = 0;
 interims.forEach(int => {
-    const secData = int.claim_breakdown?.[sec];
-    totalClaimAll += Number(secData?.amt || 0);
-    Object.values(secData?.vo || {}).forEach(voVal => {
-        totalClaimAll += Number(voVal?.amt || 0);
-    });
+    totalClaimAll += Number(int.claim_breakdown?.[sec]?.amt || 0);
 });
                         let ongoing = 0;
                         workorders.filter(w => w.status !== 'Claimed').forEach(w => {
@@ -173,17 +165,19 @@ Object.entries(voBreakdown)
             sectionVOAmt
         ];
 
-        for (let i = startInt; i <= endInt; i++) {
-            voRow.push(0);
-        }
+        let voTotalClaim = 0;
 
-        if (isLastSet) {
-    voRow.push(
-        0,
-        sectionVOAmt,
-        0,
-        sectionVOAmt
+for (let i = startInt; i <= endInt; i++) {
+    const claimed = Number(
+        interims[i - 1]?.claim_breakdown?.[sec]?.vo?.[voName]?.amt || 0
     );
+    voTotalClaim += claimed;
+    voRow.push(claimed || 0);
+}
+
+if (isLastSet) {
+    const voBal = sectionVOAmt - voTotalClaim;
+    voRow.push(voTotalClaim, voBal, 0, voBal);
 }
 
         ws_data.push(voRow);
@@ -344,9 +338,10 @@ addSpecialRow("TOTAL BRING TO INTERIM PAYMENT", "", true);
 
                 let totalClaimed = 0;
 interims.forEach(int => {
-    const secData = int.claim_breakdown?.[sec];
-    totalClaimed += Number(secData?.amt || 0);
-    Object.values(secData?.vo || {}).forEach(voVal => {
+    totalClaimed += Number(int.claim_breakdown?.[sec]?.amt || 0);
+
+    // Tambah VO claim bawah section ini
+    Object.entries(int.claim_breakdown?.[sec]?.vo || {}).forEach(([voName, voVal]) => {
         totalClaimed += Number(voVal?.amt || 0);
     });
 });
