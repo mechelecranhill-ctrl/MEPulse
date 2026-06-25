@@ -2055,13 +2055,8 @@ maximumFractionDigits:2
         body += rowBase;
 
         // =========================================================
-        // BARIS B: VARIATION ORDER (VO)
+        // 2️⃣ KIRA CLAIM VO DAHULU UNTUK SEMAKAN LOGIK PAPARAN
         // =========================================================
-        let rowVO = `<tr style="color: #c0392b; background: #fffcfc;">
-        <td>${letter}.2</td>
-        <td>↳ VARIATION ORDER (${sec})</td>
-        <td style="text-align:right;">${formatRM(voContractAmt)}</td>`;
-
         let totalClaimVO = 0;
         let interimValsVO = [];
 
@@ -2075,29 +2070,50 @@ maximumFractionDigits:2
             }
             totalClaimVO += val;
             interimValsVO.push(val);
-            rowVO += `<td style="text-align:right; color: #c0392b;">${val ? formatRM(val) : '-'}</td>`;
         });
 
-        const balanceVO = voContractAmt - totalClaimVO;
         const ongoingV = ongoingVO[sec];
-        const afterWOVO = balanceVO - ongoingV;
 
-        rowVO += `
-        <td style="text-align:right; font-weight:600;">${formatRM(totalClaimVO)}</td>
-        <td style="text-align:right;">${formatRM(balanceVO)}</td>
-        <td style="text-align:right;">${formatRM(ongoingV)}</td>
-        <td style="text-align:right; font-weight:bold; color:${afterWOVO < 0 ? 'red' : '#c0392b'};">${formatRM(afterWOVO)}</td>
-        </tr>`;
+        // =========================================================
+        // BARIS B: VARIATION ORDER (VO) - HANYA KELUAR JIKA ADA VALUE
+        // =========================================================
+        // Dipaparkan jika ada nilai Kontrak VO, ada Claim VO, atau ada Ongoing VO
+        if (voContractAmt > 0 || totalClaimVO > 0 || ongoingV > 0) {
+            let rowVO = `<tr style="color: #c0392b; background: #fffcfc;">
+            <td>${letter}.2</td>
+            <td>↳ VARIATION ORDER (${sec})</td>
+            <td style="text-align:right;">${formatRM(voContractAmt)}</td>`;
 
-        body += rowVO;
+            interimValsVO.forEach(val => {
+                rowVO += `<td style="text-align:right; color: #c0392b;">${val ? formatRM(val) : '-'}</td>`;
+            });
 
-        // Akumulasi data untuk baris TOTAL utama di bawah
-        grandTotalContract += (originalContractAmt + voContractAmt);
-        interimValsBase.forEach((v, i) => { grandTotalInterims[i] += (v + interimValsVO[i]); });
-        grandTotalClaim += (totalClaimBase + totalClaimVO);
-        grandTotalContractBalance += (balanceBase + balanceVO);
-        grandTotalOngoing += (ongoingB + ongoingV);
-        grandTotalOngoingBalance += (afterWOBase + afterWOVO);
+            const balanceVO = voContractAmt - totalClaimVO;
+            const afterWOVO = balanceVO - ongoingV;
+
+            rowVO += `
+            <td style="text-align:right; font-weight:600;">${formatRM(totalClaimVO)}</td>
+            <td style="text-align:right;">${formatRM(balanceVO)}</td>
+            <td style="text-align:right;">${formatRM(ongoingV)}</td>
+            <td style="text-align:right; font-weight:bold; color:${afterWOVO < 0 ? 'red' : '#c0392b'};">${formatRM(afterWOVO)}</td>
+            </tr>`;
+
+            body += rowVO;
+
+            // Akumulasi data ke grand total (Hanya jika baris VO ini wujud)
+            grandTotalContract += voContractAmt;
+            grandTotalContractBalance += balanceVO;
+            grandTotalOngoing += ongoingV;
+            grandTotalOngoingBalance += afterWOVO;
+            interimValsBase.forEach((v, i) => { grandTotalInterims[i] += interimValsVO[i]; });
+        }
+
+        // Akumulasi data Base ke grand total (Sentiasa berjalan)
+        grandTotalContract += originalContractAmt;
+        grandTotalContractBalance += balanceBase;
+        grandTotalOngoing += ongoingB;
+        grandTotalOngoingBalance += afterWOBase;
+        interimValsBase.forEach((v, i) => { grandTotalInterims[i] += v; });
     });
 
     /* ==============================
@@ -2108,7 +2124,7 @@ maximumFractionDigits:2
     interims.forEach((int, i) => {
         const val = Number(int.salvage_value || 0);
         salvageTotal += val;
-        grandTotalInterims[i] += val; // Kesan kepada net interim total
+        grandTotalInterims[i] += val;
         salvageRow += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
     });
     salvageRow += `<td style="text-align:right;">${formatRM(salvageTotal)}</td><td colspan="3"></td></tr>`;
@@ -2119,7 +2135,7 @@ maximumFractionDigits:2
     interims.forEach((int, i) => {
         const val = Number(int.performance_guarantee_sum || 0);
         pgTotal += val;
-        grandTotalInterims[i] += val; // Kesan kepada net interim total
+        grandTotalInterims[i] += val;
         pgRow += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
     });
     pgRow += `<td style="text-align:right;">${formatRM(pgTotal)}</td><td colspan="3"></td></tr>`;
@@ -2130,13 +2146,12 @@ maximumFractionDigits:2
     interims.forEach((int, i) => {
         const val = Number(int.tax || 0);
         taxTotal += val;
-        grandTotalInterims[i] -= val; // Mengurangkan net interim total
+        grandTotalInterims[i] -= val;
         taxRow += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
     });
     taxRow += `<td style="text-align:right;">${formatRM(taxTotal)}</td><td colspan="3"></td></tr>`;
     body += taxRow;
 
-    // Laraskan baki ongoing bersih keseluruhan dengan mengambil kira Salvage, PG dan Tax
     grandTotalOngoingBalance += salvageTotal + pgTotal - taxTotal;
     grandTotalClaim = interims.reduce((acc, int) => acc + Number(int.net_amount || 0), 0);
 
@@ -2161,8 +2176,6 @@ maximumFractionDigits:2
     body += totalRow;
     document.getElementById("interimBody").innerHTML = body;
 }
-
-
 
 function printBlueform() {
 
