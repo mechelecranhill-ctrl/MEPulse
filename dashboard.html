@@ -207,7 +207,7 @@
                     sSub = sSub + " • SEHINGGA: " + record.end_date;
 
                     deleteButtonHtml = `
-                        <button class="delete-btn" onclick="padamRekod('${sNama}','${record.start_date}')">
+                        <button class="delete-btn" onclick="padamRekod('${record.id}')">
                             <i class="fa-solid fa-xmark"></i> HADIR
                         </button>`;
                 }
@@ -239,25 +239,36 @@
         }
     }
 
-    async function padamRekod(nama, tarikh) {
-        if (!confirm(`ADAKAH ANDA PASTI ${nama} TELAH HADIR? REKOD KETIADAAN HARI INI AKAN DIPADAM.`)) return;
+    async function padamRekod(id) {
 
-        try {
-            const res = await fetch(`${SB_URL}/rest/v1/attendance?name=eq.${nama}&start_date=eq.${tarikh}`, {
+    if (!confirm("ADAKAH ANDA PASTI PEKERJA INI TELAH HADIR?")) return;
+
+    try {
+
+        const res = await fetch(
+            `${SB_URL}/rest/v1/attendance?id=eq.${id}`,
+            {
                 method: 'DELETE',
-                headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-            });
-
-            if (res.ok) {
-                alert("REKOD DIPADAM. STATUS KEMBALI KEPADA HADIR.");
-                fetchAllStatus(false);
-            } else {
-                throw new Error("Gagal padam rekod");
+                headers: {
+                    apikey: SB_KEY,
+                    Authorization: 'Bearer ' + SB_KEY
+                }
             }
-        } catch (err) {
-            alert("RALAT: " + err.message);
+        );
+
+        if (!res.ok) {
+            const err = await res.text();
+            throw new Error(err);
         }
+
+        alert("REKOD DIPADAM. STATUS KEMBALI KEPADA HADIR.");
+        fetchAllStatus(false);
+
+    } catch (err) {
+        console.error(err);
+        alert("RALAT: " + err.message);
     }
+}
 
     const opsi = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
     document.getElementById('todayDate').innerText = new Date().toLocaleDateString('ms-MY', opsi).toUpperCase();
