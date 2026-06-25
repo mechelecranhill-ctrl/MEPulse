@@ -117,20 +117,17 @@ async function startAutoDownload() {
                 sectionNames.forEach((sec, idx) => {
                     const currentRowIdx = ws_data.length;
                     const letter = String.fromCharCode(65 + idx);
-                    let contractAmt =
-    Number(sections[sec]?.amt || 0);
+                    const contractAmt = Number(sections[sec]?.amt || 0);
                     let row = [letter, sections[sec]?.desc || sec, "", contractAmt];
 
                     for (let i = startInt; i <= endInt; i++) {
-    const val = Number(interims[i - 1]?.claim_breakdown?.[sec]?.amt || 0);
-    row.push(val || 0);
-}
+                        const val = Number(interims[i - 1]?.claim_breakdown?.[sec]?.amt || 0);
+                        row.push(val || 0);
+                    }
 
                     if (isLastSet) {
                         let totalClaimAll = 0;
-interims.forEach(int => {
-    totalClaimAll += Number(int.claim_breakdown?.[sec]?.amt || 0);
-});
+                        interims.forEach(int => totalClaimAll += Number(int.claim_breakdown?.[sec]?.amt || 0));
                         let ongoing = 0;
                         workorders.filter(w => w.status !== 'Claimed').forEach(w => {
                             const cat = w.section_category || {};
@@ -142,73 +139,16 @@ interims.forEach(int => {
                     }
                     ws_data.push(row);
                     merges.push({ s: { r: currentRowIdx, c: 1 }, e: { r: currentRowIdx, c: 2 } });
-                    // ================================
-// VARIATION ORDER (VO)
-// ================================
-const voBreakdown = c.vo_breakdown || {};
-
-Object.entries(voBreakdown)
-    .filter(([voName, voData]) => {
-        return voData?.breakdown?.[sec];
-    })
-    .forEach(([voName, voData]) => {
-
-        const sectionVOAmt =
-            Number(voData?.breakdown?.[sec]?.amt || 0);
-
-        const voRowIdx = ws_data.length;
-
-        let voRow = [
-            "",
-            `↳ ${voName}`,
-            "",
-            sectionVOAmt
-        ];
-
-        let voTotalClaim = 0;
-
-for (let i = startInt; i <= endInt; i++) {
-    const claimed = Number(
-        interims[i - 1]?.claim_breakdown?.[sec]?.vo?.[voName]?.amt || 0
-    );
-    voTotalClaim += claimed;
-    voRow.push(claimed || 0);
-}
-
-if (isLastSet) {
-    const voBal = sectionVOAmt - voTotalClaim;
-    voRow.push(voTotalClaim, voBal, 0, voBal);
-}
-
-        ws_data.push(voRow);
-
-        merges.push({
-            s: { r: voRowIdx, c: 1 },
-            e: { r: voRowIdx, c: 2 }
-        });
-    });
                 });
 
                 const addSpecialRow = (label, interimKey, isNet = false) => {
                     const rIdx = ws_data.length;
                     let row = ["", label, "", 0];
-                    if (isNet) {
-    let sumContract = 0;
-
-    sectionNames.forEach(s => {
-        sumContract += Number(
-            sections[s]?.amt || 0
-        );
-
-        Object.values(c.vo_breakdown || {}).forEach(vo => {
-            sumContract += Number(
-                vo?.breakdown?.[s]?.amt || 0
-            );
-        });
-    });
-
-    row[3] = sumContract;
-}
+                    if(isNet) {
+                        let sumContract = 0;
+                        sectionNames.forEach(s => sumContract += Number(sections[s]?.amt || 0));
+                        row[3] = sumContract;
+                    }
                     for (let i = startInt; i <= endInt; i++) {
                         const val = isNet ? Number(interims[i - 1]?.net_amount || 0) : Number(interims[i - 1]?.[interimKey] || 0);
                         row.push(val || 0);
@@ -217,21 +157,8 @@ if (isLastSet) {
                         let totalClaimSum = 0;
                         interims.forEach(int => totalClaimSum += Number(isNet ? int.net_amount : (int[interimKey] || 0)));
                         if (isNet) {
-    let totalContractAmt = 0;
-
-    sectionNames.forEach(s => {
-
-        totalContractAmt += Number(
-            sections[s]?.amt || 0
-        );
-
-        Object.values(c.vo_breakdown || {}).forEach(vo => {
-            totalContractAmt += Number(
-                vo?.breakdown?.[s]?.amt || 0
-            );
-        });
-
-    });
+                            let totalContractAmt = 0;
+                            sectionNames.forEach(s => totalContractAmt += Number(sections[s]?.amt || 0));
                             let totalOngoingSum = 0;
                             workorders.filter(w => w.status !== 'Claimed').forEach(w => {
                                 if(w.section_category) {
@@ -330,21 +257,10 @@ addSpecialRow("TOTAL BRING TO INTERIM PAYMENT", "", true);
             let balLab = 0, balSpa = 0, balPrv = 0;
 
             sectionNames.forEach(sec => {
-
-    const desc = (sections[sec]?.desc || sec).toUpperCase();
-
-    let contractAmt =
-    Number(sections[sec]?.amt || 0);
-
+                const desc = (sections[sec]?.desc || sec).toUpperCase();
+                const contractAmt = Number(sections[sec]?.amt || 0);
                 let totalClaimed = 0;
-interims.forEach(int => {
-    totalClaimed += Number(int.claim_breakdown?.[sec]?.amt || 0);
-
-    // Tambah VO claim bawah section ini
-    Object.entries(int.claim_breakdown?.[sec]?.vo || {}).forEach(([voName, voVal]) => {
-        totalClaimed += Number(voVal?.amt || 0);
-    });
-});
+                interims.forEach(int => totalClaimed += Number(int.claim_breakdown?.[sec]?.amt || 0));
                 
                 let ongoing = 0;
                 workorders.filter(w => w.status !== 'Claimed').forEach(w => {
