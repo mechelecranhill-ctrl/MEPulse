@@ -1,332 +1,446 @@
 <!DOCTYPE html>
-<html lang="ms">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Department Sections</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Department Sections</title>
 
-    <link rel="preload" href="MaintHelm.png" as="image">
-    <link rel="preload" href="CompHelm.png" as="image">
-    <link rel="preload" href="AssetFinHelm.png" as="image">
-    <link rel="preload" href="ProjectsHelm.png" as="image">
+<link rel="preload" href="MaintHelm.png" as="image">
+<link rel="preload" href="CompHelm.png" as="image">
+<link rel="preload" href="AssetFinHelm.png" as="image">
+<link rel="preload" href="ProjectsHelm.png" as="image">
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: Inter, system-ui, -apple-system, sans-serif;
-            -webkit-tap-highlight-color: transparent;
+<style>
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Inter,system-ui;
+}
+
+:root {
+--bg-color: #a1c4fd;
+--glass-white: rgba(255, 255, 255, 0.45);
+--glass-border: rgba(255, 255, 255, 0.6);
+--text-primary: #1d1d1f;
+--text-secondary: rgba(0,0,0,0.6);
+--ios-blue: #007AFF;
+--input-bg: rgba(255, 255, 255, 0.4);
+}
+
+/* ── DAFTAR PROPERTY UNTUK ANIMASI GRADIENT ── */
+@property --gradient-1 {
+  syntax: '<color>';
+  initial-value: #0b3d91;
+  inherits: false;
+}
+@property --gradient-2 {
+  syntax: '<color>';
+  initial-value: #0077b6;
+  inherits: false;
+}
+@property --gradient-3 {
+  syntax: '<color>';
+  initial-value: #00b4d8;
+  inherits: false;
+}
+
+/* FIX TYPO: Menukar bullet point (•) kepada selector universal (*) */
+* {
+box-sizing: border-box;
+-webkit-tap-highlight-color: transparent;
+font-family: Inter, system-ui;
+}
+
+html, body {
+height: 100dvh;
+width: 100%;
+margin: 0;
+padding: 0;
+overflow: hidden;
+background: var(--bg-color);
+}
+
+body {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    position: relative;
+    background:
+        radial-gradient(circle at top, rgba(255,255,255,.15), transparent 35%),
+        linear-gradient(60deg, var(--gradient-1, #0b3d91) 0%, var(--gradient-2, #0077b6) 40%, var(--gradient-3, #00b4d8) 100%);
+    background-attachment: fixed;
+    transition: --gradient-1 0.8s ease-in-out, --gradient-2 0.8s ease-in-out, --gradient-3 0.8s ease-in-out;
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    inset: -20%;
+    background:
+        radial-gradient(circle at 20% 80%, rgba(255,255,255,.18), transparent 25%),
+        radial-gradient(circle at 80% 20%, rgba(255,255,255,.10), transparent 30%);
+    filter: blur(40px);
+    animation: fogMove 10s ease-in-out infinite alternate;
+    z-index: 0;
+    will-change: transform; /* OPTIMASI: Mengurangkan beban CPU untuk animasi latar belakang */
+}
+
+@keyframes fogMove{
+/* OPTIMASI: Menggunakan translate3d untuk mengaktifkan pecutan GPU hardware */
+from{ transform: translate3d(-30px, 0, 0); }
+to{ transform: translate3d(30px, -20px, 0); }
+}
+
+.stage {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+}
+
+.wheel {
+    position: absolute;
+    width: 650px;
+    height: 650px;
+    left: -325px;
+    top: 50%;
+    transform: translateY(-50%) rotate(0deg);
+    transition: transform 0.6s cubic-bezier(.22,1,.36,1); /* OPTIMASI: Mempercepat sedikit respon putaran */
+    transform-origin: center center;
+    pointer-events: auto;
+    will-change: transform; /* OPTIMASI: Memberitahu pelayar untuk bersedia memusingkan roda tanpa lag */
+}
+
+.item{
+position:absolute;
+width:120px;
+height:120px;
+border-radius:18px;
+background:transparent;
+border:none;
+display:flex;
+justify-content:center;
+align-items:center;
+text-align:center;
+color:white;
+font-weight:600;
+backdrop-filter:none;
+transition: transform 0.4s, opacity 0.4s;
+opacity:0.4;
+transform:scale(0.9);
+pointer-events: auto; /* BUG FIX: Membolehkan item dikesan klik pada desktop/mobile */
+cursor: pointer;
+}
+
+.item.active{
+background:transparent;
+border:none;
+box-shadow:none;
+opacity:1;
+transform:scale(1.25);
+pointer-events: auto;
+cursor: pointer;
+}
+
+.panel{
+position:absolute;
+z-index:2;
+right:80px;
+color:white;
+}
+.panel h1{ font-size:46px; }
+.panel p{ opacity:0.6; }
+
+.info-card {
+    position: absolute;
+    z-index: 10;
+    right: 80px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 340px;
+    padding: 24px;
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(18px);
+    color: white;
+    opacity: 0;
+    animation: none;
+    pointer-events: auto;
+    will-change: transform, opacity;
+}
+
+@keyframes fadeInRight{
+from{ opacity:0; transform:translateY(-50%) translateX(50px); }
+to{ opacity:1; transform:translateY(-50%) translateX(0); }
+}
+.info-card.show{
+animation:fadeInRight .45s ease forwards;
+}
+
+.info-card h2{ margin-bottom:10px; font-size:22px; }
+.info-card p{ opacity:.7; line-height:1.6; }
+
+.unit-card{
+padding:10px 14px;
+margin-bottom:8px;
+border-radius:12px;
+background:rgba(255,255,255,.08);
+border:1px solid rgba(255,255,255,.15);
+color:white;
+}
+
+.section-helm{
+width:160px;
+height:160px;
+object-fit:contain;
+pointer-events:none;
+transition: transform 0.3s, filter 0.3s;
+}
+
+.item.active .section-helm{
+transform:scale(1.15);
+filter:
+drop-shadow(0 0 10px rgba(255,255,255,.6))
+drop-shadow(0 0 20px rgba(56,189,248,.4));
+}
+
+/* ── OPEN BUTTON ── */
+#openBtn{
+display:block;
+width:100%;
+margin-top:16px;
+padding:12px 0;
+border-radius:14px;
+border:none;
+background:rgba(56,189,248,0.3);
+border:1px solid rgba(56,189,248,0.5);
+color:white;
+font-size:15px;
+font-weight:600;
+letter-spacing:0.3px;
+cursor:pointer;
+backdrop-filter:blur(10px);
+transition:background 0.2s, transform 0.15s;
+}
+#openBtn:active{
+background:rgba(56,189,248,0.5);
+transform:scale(0.97);
+}
+
+/* ── FLOATING HELM ── */
+.floating-helm{
+position:fixed;
+object-fit:contain;
+z-index:1001;
+pointer-events:none;
+transition:
+top 0.5s cubic-bezier(.22,1,.36,1),
+left 0.5s cubic-bezier(.22,1,.36,1),
+width 0.5s cubic-bezier(.22,1,.36,1),
+height 0.5s cubic-bezier(.22,1,.36,1);
+filter:
+drop-shadow(0 0 10px rgba(56,189,248,.8))
+drop-shadow(0 0 20px rgba(56,189,248,.5));
+}
+
+.nav-controls{
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 18px;
+    z-index: 9999;
+}
+
+.nav-controls button{
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.08);
+    color: white;
+    font-size: 18px;
+    backdrop-filter: blur(10px);
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.nav-controls button:active{
+    transform: scale(0.92);
+}
+
+/* ── MOBILE ── */
+@media (max-width:768px){
+.panel{ display:none; }
+
+.info-card{
+position:fixed;
+left:20px;
+right:20px;
+top:auto;
+bottom:20px;
+width:auto;
+z-index:10000;
+opacity:0;
+visibility:hidden;
+transform:translateY(40px);
+transition:opacity .35s ease, transform .35s ease, visibility .35s;
+}
+
+.info-card.show-mobile{
+opacity:1;
+visibility:visible;
+transform:translateY(0);
+}
+
+body.hide-wheel .wheel{
+opacity:0;
+transform:translateY(-50%) scale(0.6);
+pointer-events:none;
+transition:0.4s ease;
+}
+
+body.hide-wheel .item{
+opacity:0;
+transition:0.3s ease;
+}
+
+body.hide-wheel .item.active{
+opacity:0 !important;
+}
+}
+/* =========================
+   DESKTOP INFO PANEL
+   ========================= */
+@media (min-width:769px){
+
+    .panel{
+        display:none;
+    }
+
+    .info-card{
+        position: fixed !important;
+
+        top: 70px !important;
+        right: 20px !important;
+
+        width: calc(50vw - 20px) !important;
+
+        height: calc(100vh - 110px) !important;
+
+        padding: 40px !important;
+
+        border-radius: 30px !important;
+
+        border: 1px solid rgba(255,255,255,.12);
+
+        background: rgba(255,255,255,.08);
+        backdrop-filter: blur(20px);
+
+        display: flex;
+        flex-direction: column;
+overflow: hidden;
+
+        opacity: 0;
+        visibility: visible !important;
+    }
+
+    .info-card h2{
+        font-size:38px;
+        margin-bottom:24px;
+        line-height:1.2;
+    }
+
+    .info-card p{
+        font-size:16px;
+        line-height:1.8;
+    }
+
+    .unit-card{
+        padding:14px 18px;
+        margin-bottom:12px;
+
+        border-radius:14px;
+
+        background:rgba(255,255,255,.08);
+        border:1px solid rgba(255,255,255,.15);
+
+        font-size:15px;
+    }
+
+    #cardDesc{
+        flex:1;
+        overflow-y:auto;
+        padding-right:8px;
+    }
+
+    #cardDesc::-webkit-scrollbar{
+        width:6px;
+    }
+
+    #cardDesc::-webkit-scrollbar-thumb{
+        background:rgba(255,255,255,.2);
+        border-radius:20px;
+    }
+
+    #openBtn{
+        margin-top:20px;
+        flex-shrink:0;
+    }
+
+    @keyframes fadeInRightDesktop{
+        from{
+            opacity:0;
+            transform:translateX(60px);
         }
-
-        :root {
-            --bg-color: #0b3d91;
-            --ios-blue: #007AFF;
-            --gradient-1: #0b3d91;
-            --gradient-2: #0077b6;
-            --gradient-3: #00b4d8;
+        to{
+            opacity:1;
+            transform:translateX(0);
         }
+    }
 
-        /* Daftar CSS Properties untuk memastikan animasi kecerunan lancar */
-        @property --gradient-1 { syntax: '<color>'; initial-value: #0b3d91; inherits: false; }
-        @property --gradient-2 { syntax: '<color>'; initial-value: #0077b6; inherits: false; }
-        @property --gradient-3 { syntax: '<color>'; initial-value: #00b4d8; inherits: false; }
+    .info-card.show{
+        animation:fadeInRightDesktop .45s ease forwards !important;
+    }
+}
+</style>
 
-        html, body {
-            height: 100dvh;
-            width: 100%;
-            overflow: hidden;
-            background: var(--bg-color);
-        }
-
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            position: relative;
-            background:
-                radial-gradient(circle at top, rgba(255,255,255,.15), transparent 35%),
-                linear-gradient(60deg, var(--gradient-1) 0%, var(--gradient-2) 40%, var(--gradient-3) 100%);
-            background-attachment: fixed;
-            transition: --gradient-1 0.8s ease, --gradient-2 0.8s ease, --gradient-3 0.8s ease, background-color 0.8s ease;
-        }
-
-        body::before {
-            content: "";
-            position: fixed;
-            inset: -20%;
-            background:
-                radial-gradient(circle at 20% 80%, rgba(255,255,255,.18), transparent 25%),
-                radial-gradient(circle at 80% 20%, rgba(255,255,255,.10), transparent 30%);
-            filter: blur(40px);
-            animation: fogMove 12s ease-in-out infinite alternate;
-            z-index: 0;
-            will-change: transform;
-        }
-
-        @keyframes fogMove {
-            from { transform: translate3d(-20px, 0, 0); }
-            to { transform: translate3d(20px, -15px, 0); }
-        }
-
-        .stage {
-            position: relative;
-            z-index: 1;
-            width: 100%;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            pointer-events: none;
-        }
-
-        .wheel {
-            position: absolute;
-            width: 650px;
-            height: 650px;
-            left: -325px;
-            top: 50%;
-            transform: translate3d(0, -50%, 0) rotate(0deg);
-            transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
-            transform-origin: center center;
-            pointer-events: auto;
-            will-change: transform;
-        }
-
-        .item {
-            position: absolute;
-            width: 120px;
-            height: 120px;
-            border-radius: 18px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            color: white;
-            font-weight: 600;
-            transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.5s ease;
-            opacity: 0.35;
-            transform: scale(0.85);
-            pointer-events: auto; 
-            cursor: pointer;
-        }
-
-        .item.active {
-            opacity: 1;
-            transform: scale(1.25);
-            cursor: pointer;
-        }
-
-        .panel {
-            position: absolute;
-            z-index: 2;
-            left: 360px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: white;
-            pointer-events: none;
-        }
-        .panel h1 { font-size: 48px; letter-spacing: -1px; }
-        .panel p { opacity: 0.6; font-size: 16px; margin-top: 4px; }
-
-        .info-card {
-            position: absolute;
-            z-index: 10;
-            right: 80px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 340px;
-            padding: 24px;
-            border-radius: 24px;
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            color: white;
-            opacity: 0;
-            pointer-events: auto;
-            will-change: transform, opacity;
-        }
-
-        @keyframes fadeInRight {
-            from { opacity: 0; transform: translate3d(40px, -50%, 0); }
-            to { opacity: 1; transform: translate3d(0, -50%, 0); }
-        }
-        
-        .info-card.show {
-            animation: fadeInRight 0.45s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-        }
-
-        .info-card h2 { margin-bottom: 12px; font-size: 24px; font-weight: 700; }
-
-        .unit-card {
-            padding: 12px 14px;
-            margin-bottom: 8px;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: white;
-            font-size: 14px;
-        }
-
-        .section-helm {
-            width: 140px;
-            height: 140px;
-            object-fit: contain;
-            pointer-events: none;
-            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), filter 0.4s ease;
-        }
-
-        .item.active .section-helm {
-            transform: scale(1.1);
-            filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.5)) drop-shadow(0 0 25px rgba(56, 189, 248, 0.4));
-        }
-
-        #openBtn {
-            width: 100%;
-            margin-top: 16px;
-            padding: 14px 0;
-            border-radius: 14px;
-            border: 1px solid rgba(56, 189, 248, 0.5);
-            background: rgba(56, 189, 248, 0.25);
-            color: white;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s, transform 0.1s;
-        }
-        #openBtn:hover { background: rgba(56, 189, 248, 0.35); }
-        #openBtn:active { transform: scale(0.98); }
-
-        .floating-helm {
-            position: fixed;
-            object-fit: contain;
-            z-index: 1001;
-            pointer-events: none;
-            transition: top 0.5s cubic-bezier(0.25, 1, 0.5, 1), left 0.5s cubic-bezier(0.25, 1, 0.5, 1), width 0.5s cubic-bezier(0.25, 1, 0.5, 1), height 0.5s cubic-bezier(0.25, 1, 0.5, 1);
-            filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.6));
-        }
-
-        .nav-controls {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 18px;
-            z-index: 9999;
-        }
-
-        .nav-controls button {
-            width: 52px;
-            height: 52px;
-            border-radius: 14px;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            background: rgba(255, 255, 255, 0.08);
-            color: white;
-            font-size: 18px;
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            cursor: pointer;
-            transition: background 0.2s, transform 0.1s;
-        }
-        .nav-controls button:hover { background: rgba(255, 255, 255, 0.15); }
-        .nav-controls button:active { transform: scale(0.92); }
-
-        /* ── RESPONSIVE MOBILE ── */
-        @media (max-width: 768px) {
-            .panel { display: none; }
-            .wheel { left: -350px; }
-
-            .info-card {
-                position: fixed !important;
-                left: 20px !important;
-                right: 20px !important;
-                top: auto !important;
-                bottom: 20px !important;
-                width: auto !important;
-                height: auto !important;
-                transform: translate3d(0, 40px, 0);
-                opacity: 0;
-                visibility: hidden;
-                transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.25, 1, 0.5, 1), visibility 0.35s;
-            }
-
-            .info-card.show-mobile {
-                opacity: 1;
-                visibility: visible;
-                transform: translate3d(0, 0, 0);
-            }
-
-            body.hide-wheel .wheel {
-                opacity: 0;
-                transform: translate3d(0, -50%, 0) scale(0.6);
-                pointer-events: none;
-            }
-        }
-
-        /* ── DESKTOP SCREEN (> 768px) ── */
-        @media (min-width: 769px) {
-            .info-card {
-                position: fixed !important;
-                top: 40px !important;
-                right: 40px !important;
-                transform: none;
-                width: calc(45vw - 40px) !important;
-                height: calc(100vh - 80px) !important;
-                padding: 40px !important;
-                border-radius: 30px !important;
-                display: flex;
-                flex-direction: column;
-                overflow: hidden;
-            }
-
-            .info-card h2 { font-size: 36px; line-height: 1.2; margin-bottom: 20px; }
-            #cardDesc { flex: 1; overflow-y: auto; padding-right: 8px; }
-            #cardDesc::-webkit-scrollbar { width: 6px; }
-            #cardDesc::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 10px; }
-
-            @keyframes fadeInRightDesktop {
-                from { opacity: 0; transform: translate3d(50px, 0, 0); }
-                to { opacity: 1; transform: translate3d(0, 0, 0); }
-            }
-
-            .info-card.show {
-                animation: fadeInRightDesktop 0.45s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
-            }
-        }
-    </style>
-
-    <link rel="stylesheet" href="style.css">
-    <script src="auth.js"></script>
-    <script src="session.js"></script>
-    <script src="sidebar.js" defer></script>
+<link rel="stylesheet" href="style.css">
+<script src="auth.js"></script>
+<script src="session.js"></script>
+<script src="sidebar.js" defer></script>
 </head>
 
 <body>
 
-    <app-sidebar></app-sidebar>
+<app-sidebar></app-sidebar>
 
-    <div class="stage">
-        <div class="wheel" id="wheel"></div>
-    </div>
+<div class="stage">
+<div class="wheel" id="wheel"></div>
+</div>
 
-    <div class="panel">
-        <h1 id="title">M&E</h1>
-        <p>Department Sections</p>
-    </div>
+<div class="panel">
+<h1 id="title">M&E</h1>
+<p>Department Sections</p>
+</div>
 
-    <div class="nav-controls">
-        <button id="prevBtn" aria-label="Previous Section"><i class="fa fa-chevron-left"></i></button>
-        <button id="nextBtn" aria-label="Next Section"><i class="fa fa-chevron-right"></i></button>
-    </div>
-
-    <div class="info-card" id="infoCard">
-        <h2 id="cardTitle"></h2>
-        <div id="cardDesc"></div>
-        <button id="openBtn">Open Dashboard</button>
-    </div>
+<div class="nav-controls">
+    <button id="prevBtn"><i class="fa fa-chevron-left"></i></button>
+    <button id="nextBtn"><i class="fa fa-chevron-right"></i></button>
+</div>
+<div class="info-card" id="infoCard">
+<h2 id="cardTitle"></h2>
+<div id="cardDesc"></div>
+<button id="openBtn">Open Dashboard</button>
+</div>
 
 <script>
 window.addEventListener("DOMContentLoaded", async () => {
@@ -334,9 +448,13 @@ window.addEventListener("DOMContentLoaded", async () => {
     loadSections();
 });
 
-const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
-const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
+var SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
+var SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
+
+const headers = {
+    apikey: SB_KEY,
+    Authorization: `Bearer ${SB_KEY}`
+};
 
 const wheel = document.getElementById("wheel");
 const title = document.getElementById("title");
@@ -347,8 +465,8 @@ const openBtn = document.getElementById("openBtn");
 const prevBtn = document.getElementById("prevBtn");
 const nextBtn = document.getElementById("nextBtn");
 
-const isMobile = () => window.innerWidth <= 768;
-const getRadius = () => isMobile() ? 180 : 240;
+const isMobile = window.innerWidth <= 768;
+const radius = isMobile ? 180 : 240;
 
 let index = 0;
 let baseAngle = 0;
@@ -357,11 +475,17 @@ let lock = false;
 let items = [];
 let itemEls = [];
 let currentFloating = null;
-let activeSection = null;
+let activeSection = null; /* BUG FIX: Ditukar kepada null untuk konsistensi jenis data objek */
 
-prevBtn.addEventListener("click", () => prev());
-nextBtn.addEventListener("click", () => next());
+prevBtn.addEventListener("click", () => {
+    prev();
+});
 
+nextBtn.addEventListener("click", () => {
+    next();
+});
+
+/* ── HELM SRC ── */
 function getHelmSrc(name){
     const n = name.toUpperCase();
     if(n.includes("SELENGGARA")) return "MaintHelm.png";
@@ -371,6 +495,7 @@ function getHelmSrc(name){
     return null;
 }
 
+/* ── BACKGROUND COLOR MATCHING ── */
 function getSectionColor(name) {
     const n = name.toUpperCase();
     if (n.includes("SELENGGARA")) {
@@ -382,32 +507,37 @@ function getSectionColor(name) {
     if (n.includes("ASET")) {
         return { base: "#7c2d12", color1: "#6c2a0d", color2: "#9a3412", color3: "#b45309" };
     }
+    if (n.includes("PROJEK")) {
+        return { base: "#0b3d91", color1: "#0b3d91", color2: "#0077b6", color3: "#00b4d8" };
+    }
     return { base: "#0b3d91", color1: "#0b3d91", color2: "#0077b6", color3: "#00b4d8" };
 }
 
+/* ── BUTTON REDIRECT ── */
 openBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     if(!activeSection) {
         alert("Sila pilih seksyen terlebih dahulu.");
         return;
     }
-    window.location.href = `dashboard-contract.html?section=${activeSection.id}`;
+    const targetUrl = `dashboard-contract.html?section=${activeSection.id}`;
+    window.location.href = targetUrl;
 });
 
+/* ── LOAD DATA ── */
 async function loadSections(){
     const cached = localStorage.getItem("sections_cache");
     if(cached){
         items = JSON.parse(cached);
         stepAngle = 360 / items.length;
         createWheel();
-        // Lakukan senyap-senyap update latar belakang untuk fasa awal
-        refreshSections(true); 
+        refreshSections(); // Berjalan di latar belakang tanpa block UI
         return;
     }
-    await refreshSections(false);
+    await refreshSections();
 }
 
-async function refreshSections(isBackgroundRefresh = false){
+async function refreshSections(){
     try{
         const [secRes, unitRes] = await Promise.all([
             fetch(`${SB_URL}/rest/v1/me_sections?select=id,section_name`, { headers }),
@@ -425,50 +555,34 @@ async function refreshSections(isBackgroundRefresh = false){
 
         localStorage.setItem("sections_cache", JSON.stringify(items));
         stepAngle = 360 / items.length;
-        
-        if(!isBackgroundRefresh) {
-            createWheel();
-        }
+        createWheel();
+
     }catch(err){
-        console.error("Gagal mendapatkan data:", err);
+        console.error(err);
     }
 }
 
+/* ── CREATE WHEEL ── */
 function createWheel(){
     wheel.innerHTML = "";
-    const currentRadius = getRadius();
 
-    items.forEach((item, i) => {
+    items.forEach(item => {
         const el = document.createElement("div");
         el.className = "item";
-        
         const src = getHelmSrc(item.title);
         if(src){
-            el.innerHTML = `<img src="${src}" class="section-helm" alt="${item.title}">`;
+            el.innerHTML = `<img src="${src}" class="section-helm">`;
         } else {
             el.innerText = item.title;
         }
-        
-        // Atur posisi awal item roda
-        const theta = (i / items.length) * Math.PI * 2;
-        const x = Math.cos(theta) * currentRadius;
-        const y = Math.sin(theta) * currentRadius;
-        el.style.left = `calc(50% + ${x}px - 60px)`; 
-        el.style.top = `calc(50% + ${y}px - 60px)`;
-
         wheel.appendChild(el);
     });
 
     itemEls = document.querySelectorAll(".item");
-    setupItemEvents();
-    update();
-    render();
-}
 
-function setupItemEvents() {
     itemEls.forEach((el, i) => {
         el.addEventListener("click", (e) => {
-            if(!isMobile()) {
+            if(!isMobile) {
                 let diff = i - index;
                 if (diff > items.length / 2) diff -= items.length;
                 if (diff < -items.length / 2) diff += items.length;
@@ -514,12 +628,27 @@ function setupItemEvents() {
             setTimeout(() => card.classList.add("show-mobile"), 120);
         });
     });
+
+    positionItems();
+    update();
+    render();
 }
 
 function dismissFloating(){
     if(currentFloating){ currentFloating.remove(); currentFloating = null; }
 }
 
+function positionItems(){
+    itemEls.forEach((el, i) => {
+        const theta = (i / items.length) * Math.PI * 2;
+        const x = Math.cos(theta) * radius;
+        const y = Math.sin(theta) * radius;
+        el.style.left = `calc(50% + ${x}px - 60px)`; 
+        el.style.top = `calc(50% + ${y}px - 60px)`;
+    });
+}
+
+/* ── UPDATE DATA CARD ── */
 function update(){
     if(itemEls.length === 0) return;
     
@@ -527,7 +656,11 @@ function update(){
     itemEls[index].classList.add("active");
 
     const item = items[index];
-    activeSection = { id: item.id, name: item.title };
+    
+    activeSection = {
+        id: item.id,
+        name: item.title
+    };
 
     const colors = getSectionColor(item.title);
     document.body.style.setProperty('--bg-color', colors.base);
@@ -538,53 +671,64 @@ function update(){
     title.innerText = item.title;
     cardTitle.innerText = item.title;
 
-    cardDesc.innerHTML = `<div style="margin-bottom:12px; font-weight:600; opacity:0.8;">${item.units.length} Unit Di bawah Seksyen</div>` + 
+    cardDesc.innerHTML = `<div style="margin-bottom:10px">${item.units.length} Unit</div>` + 
         item.units.map(u => `<div class="unit-card">${u.unit_name}</div>`).join("");
 
-    if(!isMobile()){
-        card.classList.add("show");
+    if(!isMobile){
+        if(!card.classList.contains("show")){
+            card.classList.add("show");
+        }
     }
 }
 
+/* ── RENDER WHEEL ROTATION ── */
 function render(){
     if(itemEls.length === 0) return;
     
+    /* OPTIMASI LAGGING: Menggunakan hardware acceleration translate3d untuk kelancaran putaran */
     wheel.style.transform = `translate3d(0, -50%, 0) rotate(${baseAngle}deg)`; 
     itemEls.forEach((el, i) => { 
-        const isCurrent = i === index;
-        el.style.transform = `rotate(${-baseAngle}deg) scale(${isCurrent ? 1.25 : 0.85})`; 
+        if (i === index) {
+            el.style.transform = `rotate(${-baseAngle}deg) scale(1.25)`;
+        } else {
+            el.style.transform = `rotate(${-baseAngle}deg) scale(0.9)`; 
+        }
     }); 
 }
 
-function next(){ index = (index + 1) % items.length; baseAngle -= stepAngle; update(); render(); }
-function prev(){ index = (index - 1 + items.length) % items.length; baseAngle += stepAngle; update(); render(); }
+function next(){ index=(index+1)%items.length; baseAngle-=stepAngle; update(); render(); }
+function prev(){ index=(index-1+items.length)%items.length; baseAngle+=stepAngle; update(); render(); }
 
-// Kekunci Pintar & Event Scroll global
+/* ── SCROLL WHEEL ── */
 let buffer = 0;
 window.addEventListener("wheel", e => {
     if(lock) return;
     lock = true;
     buffer += e.deltaY;
-    if(buffer > 60){ next(); buffer = 0; }
-    if(buffer < -60){ prev(); buffer = 0; }
-    setTimeout(() => lock = false, 100);
-}, { passive: true });
+    if(buffer > 80){ next(); buffer=0; }
+    if(buffer < -80){ prev(); buffer=0; }
+    setTimeout(() => lock=false, 150); /* OPTIMASI: Selang masa ditambah sedikit untuk kestabilan event scroll */
+}, { passive:true });
 
+/* ── SWIPE MOBILE ── */
 let startX = 0;
+const isCardOpen = () => card.classList.contains("show-mobile");
+
 window.addEventListener("touchstart", e => {
-    if(card.classList.contains("show-mobile")) return;
+    if(isCardOpen()) return;
     startX = e.touches[0].clientX;
-}, { passive: true });
+}, { passive:true });
 
 window.addEventListener("touchend", e => {
-    if(card.classList.contains("show-mobile")) return;
+    if(isCardOpen()) return;
     const diff = startX - e.changedTouches[0].clientX;
     if(Math.abs(diff) < 40) return;
     if(diff > 0) next(); else prev();
-}, { passive: true });
+}, { passive:true });
 
+/* ── DISMISS ON CLICK OUTSIDE ── */
 document.addEventListener("click", e => {
-    if(!isMobile()) return;
+    if(!isMobile) return;
     if(!card.contains(e.target) && !e.target.closest(".item") && e.target.id !== "openBtn"){
         card.classList.remove("show-mobile");
         document.body.classList.remove("hide-wheel");
@@ -593,22 +737,12 @@ document.addEventListener("click", e => {
 });
 
 window.addEventListener("keydown", (e) => {
-    if(e.key === "ArrowLeft" || e.key === "ArrowUp") prev();
-    if(e.key === "ArrowRight" || e.key === "ArrowDown") next();
-});
+    if(e.key === "ArrowLeft" || e.key === "ArrowUp"){
+        prev();
+    }
 
-window.addEventListener("resize", () => {
-    if(items.length > 0) {
-        // Bina semula susun atur roda jika saiz skrin berubah secara drastik (cth: orientasi telefon)
-        const currentRadius = getRadius();
-        itemEls.forEach((el, i) => {
-            const theta = (i / items.length) * Math.PI * 2;
-            const x = Math.cos(theta) * currentRadius;
-            const y = Math.sin(theta) * currentRadius;
-            el.style.left = `calc(50% + ${x}px - 60px)`; 
-            el.style.top = `calc(50% + ${y}px - 60px)`;
-        });
-        render();
+    if(e.key === "ArrowRight" || e.key === "ArrowDown"){
+        next();
     }
 });
 </script>
