@@ -11,7 +11,8 @@ const channel = new BroadcastChannel("auth_channel");
    STATE
 ========================= */
 let warningShown = false;
-let sessionExpired = false;
+// BUG FIX: Ambil status expired dari localStorage sekiranya pengguna refresh semasa modal keluar
+let sessionExpired = localStorage.getItem("sessionExpired") === "true";
 
 let countdown = 10;
 let countdownInterval = null;
@@ -22,8 +23,6 @@ let lastMouseTime = Date.now();
 /* =========================
    INIT SESSION
 ========================= */
-// BUG FIX 1: Pastikan 'loggedIn' disemak dahulu sebelum set 'lastActivity'.
-// Jika pengguna sudah log keluar, jangan overwrite aktiviti baru.
 if (localStorage.getItem("loggedIn") === "true" && !localStorage.getItem("lastActivity")) {
     localStorage.setItem("lastActivity", Date.now());
 }
@@ -35,7 +34,14 @@ async function checkSession() {
     const loggedIn = localStorage.getItem("loggedIn");
 
     if (loggedIn !== "true") {
+        clearAuthStates();
         window.location.replace("login.html");
+        return false;
+    }
+
+    // BUG FIX: Jika memang sudah dikesan expired sebelum refresh, terus sekat & tunjuk modal
+    if (sessionExpired) {
+        showExpiredModal();
         return false;
     }
 
@@ -43,15 +49,11 @@ async function checkSession() {
     const idle = Date.now() - last;
 
     if (idle > SESSION_TIMEOUT) {
-        // BUG FIX 2: Jangan guna localStorage.clear() secara agresif di sini 
-        // kerana ia akan memadam data kekal seperti 'sections_cache' Supabase anda.
-        localStorage.removeItem("loggedIn");
-        localStorage.removeItem("lastActivity");
-        window.location.replace("login.html");
+        showExpiredModal();
         return false;
     }
 
-    // Sambung aktiviti baru jika sesi masih sah selepas di-refresh
+    // Sambung aktiviti baru JIKA sesi benar-benar masih sah
     updateActivity();
     return true;
 }
@@ -93,6 +95,7 @@ window.addEventListener("scroll", () => {
 ========================= */
 function checkIdleOnResume() {
     if (localStorage.getItem("loggedIn") !== "true") return;
+    if (sessionExpired) return;
 
     const last = Number(localStorage.getItem("lastActivity")) || 0;
     const idle = Date.now() - last;
@@ -135,8 +138,8 @@ function getUserState() {
    EXPIRED MODAL
 ========================= */
 function showExpiredModal() {
-    if (sessionExpired) return;
     sessionExpired = true;
+    localStorage.setItem("sessionExpired", "true"); // BUG FIX: Kunci status expired dalam storage
 
     // Singkirkan modal amaran jika ada
     const existingWarning = document.getElementById("sessionWarningModal");
@@ -172,7 +175,7 @@ function showExpiredModal() {
    WARNING MODAL
 ========================= */
 function showWarning() {
-    if (warningShown) return;
+    if (warningShown || sessionExpired) return;
     warningShown = true;
     countdown = 10;
 
@@ -221,12 +224,19 @@ function showWarning() {
 }
 
 /* =========================
+   CLEAR AUTH STATES HELPERS
+========================= */
+function clearAuthStates() {
+    localStorage.removeItem("loggedIn");
+    localStorage.removeItem("lastActivity");
+    localStorage.removeItem("sessionExpired"); // Reset balik state key ini
+}
+
+/* =========================
    FORCE LOGOUT
 ========================= */
 function forceLogout(broadcast = true) {
-    // BUG FIX 3: Elakkan clear() total untuk pelihara cache Supabase app anda
-    localStorage.removeItem("loggedIn");
-    localStorage.removeItem("lastActivity");
+    clearAuthStates();
 
     if (broadcast) {
         channel.postMessage({ type: "LOGOUT" });
