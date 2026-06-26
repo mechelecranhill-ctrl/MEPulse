@@ -22,7 +22,9 @@ let lastMouseTime = Date.now();
 /* =========================
    INIT SESSION
 ========================= */
-if (!localStorage.getItem("lastActivity")) {
+// BUG FIX 1: Pastikan 'loggedIn' disemak dahulu sebelum set 'lastActivity'.
+// Jika pengguna sudah log keluar, jangan overwrite aktiviti baru.
+if (localStorage.getItem("loggedIn") === "true" && !localStorage.getItem("lastActivity")) {
     localStorage.setItem("lastActivity", Date.now());
 }
 
@@ -30,7 +32,6 @@ if (!localStorage.getItem("lastActivity")) {
    CHECK LOGIN GUARD
 ========================= */
 async function checkSession() {
-
     const loggedIn = localStorage.getItem("loggedIn");
 
     if (loggedIn !== "true") {
@@ -42,11 +43,16 @@ async function checkSession() {
     const idle = Date.now() - last;
 
     if (idle > SESSION_TIMEOUT) {
-        localStorage.clear();
+        // BUG FIX 2: Jangan guna localStorage.clear() secara agresif di sini 
+        // kerana ia akan memadam data kekal seperti 'sections_cache' Supabase anda.
+        localStorage.removeItem("loggedIn");
+        localStorage.removeItem("lastActivity");
         window.location.replace("login.html");
         return false;
     }
 
+    // Sambung aktiviti baru jika sesi masih sah selepas di-refresh
+    updateActivity();
     return true;
 }
 
@@ -54,9 +60,7 @@ async function checkSession() {
    ACTIVITY TRACKING
 ========================= */
 function updateActivity() {
-
     if (sessionExpired) return;
-
     localStorage.setItem("lastActivity", Date.now());
     warningShown = false;
 }
@@ -75,22 +79,20 @@ function updateActivity() {
 let scrollTimer = null;
 
 window.addEventListener("scroll", () => {
-
     lastScrollTime = Date.now();
     updateActivity();
 
     clearTimeout(scrollTimer);
-
     scrollTimer = setTimeout(() => {
         lastScrollTime = Date.now();
     }, 1500);
-
 }, { passive: true });
 
 /* =========================
    PWA RESUME FIX
 ========================= */
 function checkIdleOnResume() {
+    if (localStorage.getItem("loggedIn") !== "true") return;
 
     const last = Number(localStorage.getItem("lastActivity")) || 0;
     const idle = Date.now() - last;
@@ -113,11 +115,8 @@ window.addEventListener("pageshow", checkIdleOnResume);
    USER STATE
 ========================= */
 function getUserState() {
-
     const now = Date.now();
-
     const last = Number(localStorage.getItem("lastActivity")) || 0;
-
     const idleTime = now - last;
 
     const recentScroll = now - lastScrollTime;
@@ -136,9 +135,12 @@ function getUserState() {
    EXPIRED MODAL
 ========================= */
 function showExpiredModal() {
-
     if (sessionExpired) return;
     sessionExpired = true;
+
+    // Singkirkan modal amaran jika ada
+    const existingWarning = document.getElementById("sessionWarningModal");
+    if (existingWarning) existingWarning.remove();
 
     if (document.getElementById("sessionExpiredModal")) return;
 
@@ -148,12 +150,12 @@ function showExpiredModal() {
     modal.innerHTML = `
     <div style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;justify-content:center;align-items:center;z-index:999999;">
         <div style="width:320px;background:white;border-radius:18px;padding:22px;text-align:center;font-family:system-ui;">
-            <h3>Session Expired</h3>
-            <p style="margin:12px 0;color:#666;">
+            <h3 style="color:#1d1d1f;">Session Expired</h3>
+            <p style="margin:12px 0;color:#666;font-size:14px;">
                 Your session has expired due to inactivity.
             </p>
             <button id="loginAgainBtn"
-                style="width:100%;padding:12px;border:none;border-radius:12px;background:#007AFF;color:white;font-weight:700;">
+                style="width:100%;padding:12px;border:none;border-radius:12px;background:#007AFF;color:white;font-weight:700;cursor:pointer;">
                 Login Again
             </button>
         </div>
@@ -170,28 +172,26 @@ function showExpiredModal() {
    WARNING MODAL
 ========================= */
 function showWarning() {
-
     if (warningShown) return;
-
     warningShown = true;
     countdown = 10;
 
-    if (countdownInterval) {
-        clearInterval(countdownInterval);
-    }
+    if (countdownInterval) clearInterval(countdownInterval);
+    if (document.getElementById("sessionWarningModal")) return;
 
     const modal = document.createElement("div");
+    modal.id = "sessionWarningModal";
 
     modal.innerHTML = `
     <div style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;justify-content:center;align-items:center;z-index:999999;">
         <div style="width:320px;background:white;border-radius:18px;padding:20px;text-align:center;font-family:system-ui;">
-            <h3>Session Expiring</h3>
-            <p>You are inactive</p>
-            <p style="font-weight:700;color:#007AFF;">
+            <h3 style="color:#1d1d1f;">Session Expiring</h3>
+            <p style="margin:6px 0;color:#666;font-size:14px;">You are inactive</p>
+            <p style="font-weight:700;color:#007AFF;margin-bottom:12px;">
                 Auto logout in <span id="cd">10</span>s
             </p>
             <button id="extendBtn"
-                style="width:100%;margin-top:10px;padding:12px;background:#34C759;color:white;border:none;font-weight:700;border-radius:12px;">
+                style="width:100%;padding:12px;background:#34C759;color:white;border:none;font-weight:700;border-radius:12px;cursor:pointer;">
                 Extend Session
             </button>
         </div>
@@ -202,9 +202,7 @@ function showWarning() {
     const cd = modal.querySelector("#cd");
 
     countdownInterval = setInterval(() => {
-
         countdown--;
-
         if (cd) cd.textContent = countdown;
 
         if (countdown <= 0) {
@@ -212,14 +210,11 @@ function showWarning() {
             modal.remove();
             showExpiredModal();
         }
-
     }, 1000);
 
     modal.querySelector("#extendBtn").onclick = () => {
-
         clearInterval(countdownInterval);
         modal.remove();
-
         warningShown = false;
         updateActivity();
     };
@@ -229,8 +224,9 @@ function showWarning() {
    FORCE LOGOUT
 ========================= */
 function forceLogout(broadcast = true) {
-
-    localStorage.clear();
+    // BUG FIX 3: Elakkan clear() total untuk pelihara cache Supabase app anda
+    localStorage.removeItem("loggedIn");
+    localStorage.removeItem("lastActivity");
 
     if (broadcast) {
         channel.postMessage({ type: "LOGOUT" });
@@ -249,8 +245,7 @@ channel.onmessage = (e) => {
    MAIN ENGINE LOOP
 ========================= */
 setInterval(() => {
-
-    if (sessionExpired) return;
+    if (sessionExpired || localStorage.getItem("loggedIn") !== "true") return;
 
     const state = getUserState();
     const idle = state.idleTime;
@@ -267,5 +262,4 @@ setInterval(() => {
         idle > SESSION_TIMEOUT) {
         showExpiredModal();
     }
-
 }, CHECK_INTERVAL);
