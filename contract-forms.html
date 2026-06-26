@@ -94,6 +94,32 @@
         .excel-table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; font-size: 11px; margin-top: 10px; }
         .excel-table th { background: #f1f1f1; padding: 8px; text-align: left; }
         .excel-table td { padding: 8px; border-bottom: 1px solid #eee; }
+        .w-id-cards-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            margin-top: 8px;
+        }
+        .w-id-card {
+            background: rgba(255,255,255,0.22);
+            border: 1px solid rgba(255,255,255,0.35);
+            border-radius: 14px;
+            padding: 12px;
+        }
+        .w-id-card .w-id-card-label {
+            font-size: 12px;
+            font-weight: 800;
+            color: #0b3d91;
+            background: rgba(255,255,255,0.5);
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 999px;
+            margin-bottom: 8px;
+        }
+        .w-id-card .funding-grid {
+            margin-top: 8px;
+        }
+
         .funding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(255,255,255,0.2); padding: 10px; border-radius: 12px; }
         .sec-desc { font-size: 9px; color: #555; display: block; margin-bottom: 4px; line-height: 1.2; font-weight: 500; text-transform: none; }
 
@@ -404,6 +430,14 @@ color: #0b3d91;
         padding: 12px;
     }
 
+    .w-id-cards-container{
+        grid-template-columns: 1fr !important;
+    }
+
+    .w-id-card .funding-grid{
+        grid-template-columns: 1fr;
+    }
+
     #i_section_inputs_container{
         grid-template-columns: 1fr !important;
     }
@@ -531,10 +565,9 @@ color: #0b3d91;
     <option value="">Pilih Kontrak Dahulu</option>
 </select>
 
-<input type="text" id="w_location" placeholder="Location (Example: JEMENTAH)">
+<label>Location & Cost Breakdown</label>
+<div id="w_id_cards_container" class="w-id-cards-container"></div>
 
-                    <label>Cost Breakdown</label>
-                    <div id="w_sections_container" class="funding-grid"></div>
                     <div style="margin-top:15px; padding:10px; background:rgba(0,122,255,0.1); border-radius:10px; display:flex; justify-content:space-between;">
                         <strong>Total:</strong><span id="total_display" style="color:var(--ios-blue); font-weight:bold;">RM 0.00</span>
                     </div>
@@ -854,6 +887,8 @@ oninput="formatCurrencyInput(this); calculateContractSum()">
     let workIdRowCounter = 0;
     let originalLoadedWorkIds = []; // work_id strings that were loaded from DB for the current sequence group
     let currentWorkSequenceNo = null; // sequence_no shared by the loaded group (if editing existing)
+    let currentContractSections = {}; // sections breakdown of the currently selected contract (for rendering cards)
+    let workIdCardDataMap = {}; // work_id string -> { location, section_category: {sec: {amt, extra}} } loaded from DB, used to prefill cards
 
 
 const REGION_MAP = {
@@ -1171,54 +1206,69 @@ document.getElementById('workOrderForm').addEventListener('submit', async (e) =>
             sequenceToUse = `${areaCode}${nextNum}`;
         }
 
-        // 5. PROSES KOS & PAYLOAD (kongsi sama untuk semua work_id dalam batch ini)
-        const breakdown = {};
-        let totalAmount = 0;
-        let additionalTotal = 0;
-
-        document.querySelectorAll('.w_sec_amt').forEach(i => {
-
-            const base = parseFloat(i.dataset.rawValue || 0);
-
-            const extraInput = document.querySelector(
-                `.w_sec_extra[data-sec="${i.dataset.sec}"]`
-            );
-
-            const extra = parseFloat(extraInput?.dataset.rawValue || 0);
-
-            // section_category hanya simpan amt
-            breakdown[i.dataset.sec] = {
-                amt: base,
-                extra: extra
-            };
-
-            totalAmount += base;
-            additionalTotal += extra;
-
-        });
-
-        const sharedPayload = {
+        // 5. PROSES KOS & LOCATION SETIAP KAD (berasingan ikut Work ID)
+        const sharedFields = {
             contract_id: contractId,
             sequence_no: sequenceToUse,
             qpb_date: document.getElementById('w_qpb_date').value,
-            location: document.getElementById('w_location').value,
             district: districtSelected,
-            description: document.getElementById('w_desc').value,
-            section_category: breakdown,
-            additional: additionalTotal,
-            amount_spent: totalAmount + additionalTotal
+            description: document.getElementById('w_desc').value
         };
 
-        // 6. UPSERT SETIAP WORK ID DALAM LIST SEMASA
+        const perWorkIdPayload = {}; // work_id -> full payload untuk row tersebut
+
+        document.querySelectorAll('#w_id_cards_container .w-id-card').forEach(card=>{
+
+            const workId = card.dataset.workId;
+            if(!workId) return;
+
+            const locationInput = card.querySelector('.w_card_location');
+            const location = locationInput ? locationInput.value : '';
+
+            const breakdown = {};
+            let totalAmount = 0;
+            let additionalTotal = 0;
+
+            card.querySelectorAll('.w_sec_amt').forEach(i=>{
+
+                const sec = i.dataset.sec;
+                const base = parseFloat(i.dataset.rawValue || 0);
+
+                const extraInput = card.querySelector(
+                    `.w_sec_extra[data-sec="${escapeAttr(sec)}"]`
+                );
+
+                const extra = parseFloat(extraInput?.dataset.rawValue || 0);
+
+                breakdown[sec] = { amt: base, extra: extra };
+
+                totalAmount += base;
+                additionalTotal += extra;
+
+            });
+
+            perWorkIdPayload[workId] = {
+                ...sharedFields,
+                work_id: workId,
+                location: location,
+                section_category: breakdown,
+                additional: additionalTotal,
+                amount_spent: totalAmount + additionalTotal
+            };
+
+        });
+
+        // 6. UPSERT SETIAP WORK ID DALAM LIST SEMASA (ikut payload kad masing-masing)
         for(const workIdValue of currentWorkIds){
+
+            const payload = perWorkIdPayload[workIdValue];
+            if(!payload) continue; // sepatutnya tidak berlaku, tapi jaga-jaga
 
             const checkRes = await fetch(
 `${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}`,
 { headers });
 
             const existing = await checkRes.json();
-
-            const payload = { ...sharedPayload, work_id: workIdValue };
 
             if(existing.length > 0){
 
@@ -1392,7 +1442,6 @@ console.error(e);
 
         resetWorkIdRows();
         document.getElementById('w_qpb_date').value = '';
-document.getElementById('w_location').value = '';
 document.getElementById('w_desc').value = '';
 
 document.getElementById('total_display').innerText =
@@ -1402,10 +1451,6 @@ const opt = document.getElementById('w_contract_id').selectedOptions[0];
 
 const dSel = document.getElementById('w_dist');
 dSel.innerHTML = '<option value="">Choose District</option>';
-
-        const container = document.getElementById('w_sections_container');
-
-container.innerHTML = '';
 
 if(opt && opt.dataset.dist){
 
@@ -1419,42 +1464,10 @@ dSel.innerHTML += `<option value="${district}">${district}</option>`;
 
 }
 
-if(opt && opt.dataset.b){
+// Simpan sections kontrak semasa secara global supaya kad-kad Work ID boleh guna semula
+currentContractSections = (opt && opt.dataset.b) ? JSON.parse(opt.dataset.b) : {};
 
-const b = JSON.parse(opt.dataset.b);
-
-Object.keys(b).sort().forEach(sec=>{
-
-const desc = (b[sec].desc || '').trim().toUpperCase();
-
-const isProvisional = desc.includes('PROVISIONAL');
-
-container.innerHTML += `
-<div class="funding-item">
-
-<label>${sec}</label>
-<span class="sec-desc">${b[sec].desc}</span>
-
-<input type="text"
-class="w_sec_amt"
-data-sec="${sec}"
-placeholder="0.00"
-oninput="formatCurrencyInput(this); calcTotalWork()">
-
-${isProvisional ? `
-<input type="text"
-class="w_sec_extra"
-data-sec="${sec}"
-placeholder="0.00"
-oninput="formatCurrencyInput(this); calcTotalWork()">
-` : ``}
-
-</div>
-`;
-
-});
-
-}
+renderWorkIdCards();
 
 }
 
@@ -1600,12 +1613,15 @@ function addWorkIdRow(prefix = 'C', num = ''){
                class="w_id_num"
                placeholder="123456"
                value="${num}"
-               oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
+               oninput="this.value=this.value.replace(/[^0-9]/g,'');renderWorkIdCards();autoDetectWork()">
         <div onclick="removeWorkIdRow('${rowId}')"
              style="color:red; cursor:pointer; flex-shrink:0; padding:0 6px;">✕</div>
     `;
 
-    row.querySelector('.w_id_prefix').addEventListener('change', autoDetectWork);
+    row.querySelector('.w_id_prefix').addEventListener('change', () => {
+        renderWorkIdCards();
+        autoDetectWork();
+    });
 
     container.appendChild(row);
 }
@@ -1620,6 +1636,7 @@ function removeWorkIdRow(rowId){
         addWorkIdRow();
     }
 
+    renderWorkIdCards();
     autoDetectWork();
 }
 
@@ -1628,8 +1645,10 @@ function resetWorkIdRows(){
     workIdRowCounter = 0;
     originalLoadedWorkIds = [];
     currentWorkSequenceNo = null;
+    workIdCardDataMap = {};
     lastWorkIdNum = '';
     addWorkIdRow();
+    renderWorkIdCards();
 }
 
 function getCurrentWorkIdsFromRows(){
@@ -1667,7 +1686,128 @@ function normalizeWorkIdWithPrefix(prefix, raw){
     return `${usedPrefix} ${match[2]}${suffix}`;
 }
 
-    function calcTotalWorkPlaceholder(){ /* kept for backward compatibility, unused */ }
+/* ============================================================
+   WORK ORDER — Per-Work-ID cards (Location + Cost Breakdown)
+   ============================================================ */
+
+function buildSectionFieldsHtml(workId, sectionData){
+
+    let html = '';
+
+    Object.keys(currentContractSections).sort().forEach(sec=>{
+
+        const desc = (currentContractSections[sec].desc || '').trim().toUpperCase();
+        const isProvisional = desc.includes('PROVISIONAL');
+
+        const existingAmt = (sectionData && sectionData[sec] && sectionData[sec].amt) || 0;
+        const existingExtra = (sectionData && sectionData[sec] && sectionData[sec].extra) || 0;
+
+        html += `
+<div class="funding-item">
+
+<label>${sec}</label>
+<span class="sec-desc">${currentContractSections[sec].desc || ''}</span>
+
+<input type="text"
+class="w_sec_amt"
+data-sec="${escapeAttr(sec)}"
+data-work-id="${escapeAttr(workId)}"
+data-raw-value="${existingAmt}"
+value="${Number(existingAmt).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}"
+placeholder="0.00"
+oninput="formatCurrencyInput(this); calcTotalWork()">
+
+${isProvisional ? `
+<input type="text"
+class="w_sec_extra"
+data-sec="${escapeAttr(sec)}"
+data-work-id="${escapeAttr(workId)}"
+data-raw-value="${existingExtra}"
+value="${Number(existingExtra).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}"
+placeholder="0.00"
+oninput="formatCurrencyInput(this); calcTotalWork()">
+` : ``}
+
+</div>
+`;
+
+    });
+
+    return html;
+}
+
+function renderWorkIdCards(){
+
+    const container = document.getElementById('w_id_cards_container');
+    if(!container) return;
+
+    // 1. Simpan dahulu nilai semasa (location + breakdown) setiap kad sedia ada,
+    //    supaya tidak hilang bila kita re-render akibat ID list berubah.
+    const preservedData = { ...workIdCardDataMap };
+
+    document.querySelectorAll('.w-id-card').forEach(card=>{
+
+        const workId = card.dataset.workId;
+        if(!workId) return;
+
+        const locationInput = card.querySelector('.w_card_location');
+        const location = locationInput ? locationInput.value : '';
+
+        const sectionData = {};
+
+        card.querySelectorAll('.w_sec_amt').forEach(i=>{
+            const sec = i.dataset.sec;
+            if(!sectionData[sec]) sectionData[sec] = {};
+            sectionData[sec].amt = parseFloat(i.dataset.rawValue || 0);
+        });
+
+        card.querySelectorAll('.w_sec_extra').forEach(i=>{
+            const sec = i.dataset.sec;
+            if(!sectionData[sec]) sectionData[sec] = {};
+            sectionData[sec].extra = parseFloat(i.dataset.rawValue || 0);
+        });
+
+        preservedData[workId] = { location, section_category: sectionData };
+
+    });
+
+    // 2. Bina semula container ikut ID semasa dalam senarai atas
+    const currentIds = getCurrentWorkIdsFromRows();
+
+    container.innerHTML = '';
+
+    currentIds.forEach(workId=>{
+
+        const existing = preservedData[workId] || {};
+        const location = existing.location || '';
+        const sectionData = existing.section_category || {};
+
+        const card = document.createElement('div');
+        card.className = 'w-id-card';
+        card.dataset.workId = workId;
+
+        card.innerHTML = `
+            <span class="w-id-card-label">${workId}</span>
+            <label>Location</label>
+            <input type="text"
+                   class="w_card_location"
+                   placeholder="Location (Example: JEMENTAH)"
+                   value="${escapeAttr(location)}">
+            <label>Cost Breakdown</label>
+            <div class="funding-grid">
+                ${buildSectionFieldsHtml(workId, sectionData)}
+            </div>
+        `;
+
+        container.appendChild(card);
+
+    });
+
+    // 3. Kemaskini cache global supaya konsisten dengan apa yang baru dirender
+    workIdCardDataMap = preservedData;
+
+    calcTotalWork();
+}
 
 /* ============================================================
    INTERIM — Section -> VO (nested) claim input rendering
@@ -2249,46 +2389,26 @@ group.forEach(w=>{
     addWorkIdRow(prefix, num);
 });
 
+// Susun semula data location + section_category SETIAP Work ID (berasingan ikut row asal)
+workIdCardDataMap = {};
+group.forEach(w=>{
+    workIdCardDataMap[w.work_id] = {
+        location: w.location || '',
+        section_category: w.section_category || {}
+    };
+});
+
 const w = group[0];
 
 document.getElementById('w_qpb_date').value = w.qpb_date || '';
-document.getElementById('w_location').value = w.location || '';
 document.getElementById('w_desc').value = w.description || '';
 
 setTimeout(()=>{
 document.getElementById('w_dist').value = w.district || '';
 },100);
 
-if(w.section_category){
-
-Object.keys(w.section_category).forEach(sec=>{
-
-const amt = document.querySelector(`.w_sec_amt[data-sec="${sec}"]`);
-const extra = document.querySelector(`.w_sec_extra[data-sec="${sec}"]`);
-
-if(amt){
-    amt.dataset.rawValue = w.section_category[sec].amt || 0;
-    amt.value = Number(amt.dataset.rawValue).toLocaleString('en-MY', {minimumFractionDigits:2, maximumFractionDigits:2});
-}
-if(extra){
-
-    const extraVal =
-        w.section_category?.[sec]?.extra || 0;
-
-    extra.dataset.rawValue = extraVal;
-
-    extra.value = Number(extraVal).toLocaleString(
-        'en-MY',
-        {
-            minimumFractionDigits:2,
-            maximumFractionDigits:2
-        }
-    );
-}
-
-});
-
-}
+// Render kad-kad ikut data yang baru dimuatkan (location & breakdown berasingan setiap Work ID)
+renderWorkIdCards();
 
 calcTotalWork();
 
