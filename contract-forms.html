@@ -514,18 +514,26 @@ color: #0b3d91;
                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
 
 <div>
-    <label>Work Order Id</label>
-    <div style="display:flex; gap:8px;">
-        <select id="w_id_prefix" style="width:80px; flex-shrink:0;">
-            <option value="C">C</option>
-            <option value="K">K</option>
-        </select>
-        <textarea id="w_id_paste_area" rows="2" placeholder="Masukkan atau paste ID di sini... (Guna enter/koma untuk multiple)" style="background:rgba(255,255,255,0.4);"></textarea>
-    </div>
-    <button type="button" class="btn-primary" onclick="addWorkIdsToList()" style="background:#8e8e93; margin-top:8px; padding:8px; font-size:12px;">
-        + Tambah ID
-    </button>
-    <div id="w_id_list_tags" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;"></div>
+<label>Work Order Id</label>
+
+<div style="display:flex;gap:8px;">
+
+<select id="w_id_prefix"
+        onchange="autoDetectWork()"
+        style="width:80px;flex-shrink:0;">
+    <option value="C">C</option>
+    <option value="K">K</option>
+</select>
+
+<input
+type="text"
+id="w_id_num"
+placeholder="123456"
+required
+oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
+
+</div>
+
 </div>
 
 <div>
@@ -860,7 +868,6 @@ oninput="formatCurrencyInput(this); calculateContractSum()">
     let originalContractDistrict = '';
     let originalContractArea = '';
     let lastWorkIdNum = '';
-    let w_attachedIds = [];
 
 
 const REGION_MAP = {
@@ -928,51 +935,6 @@ renderDistrictChecklist();
         centerActiveForm(activeBtn);
             }
     }
-
-    function addWorkIdsToList() {
-    const area = document.getElementById('w_id_paste_area');
-    const prefix = document.getElementById('w_id_prefix').value;
-    
-    // Pecahkan input berdasarkan enter, koma atau tab
-    const rawIds = area.value.split(/\r?\n|,|\t/);
-    
-    const cleanIds = rawIds
-        .map(s => s.trim())
-        .filter(s => s !== '')
-        .map(id => {
-            // Jika user tak tulis prefix C/K, kita tolong tambahkan berdasarkan selection dropdown
-            if (!id.toUpperCase().startsWith('C') && !id.toUpperCase().startsWith('K')) {
-                return normalizeWorkId(`${prefix} ${id}`);
-            }
-            return normalizeWorkId(id);
-        })
-        .filter(id => id !== '' && !w_attachedIds.includes(id));
-
-    w_attachedIds = [...w_attachedIds, ...cleanIds];
-    area.value = '';
-    renderWorkIDTags();
-    
-    // Auto-detect berdasarkan ID pertama yang dimasukkan jika ada rekod lama di DB
-    if (w_attachedIds.length === 1) {
-        autoDetectWorkWithId(w_attachedIds[0]);
-    }
-}
-
-function renderWorkIDTags() {
-    const container = document.getElementById('w_id_list_tags');
-    container.innerHTML = '';
-    w_attachedIds.forEach(id => {
-        const span = document.createElement('span');
-        span.style = "background:#e5e5ea; padding:4px 10px; border-radius:15px; font-size:11px; display:flex; align-items:center; gap:5px; color:#333; font-weight:600;";
-        span.innerHTML = `${id} <i class="fa fa-times" onclick="removeWorkID('${id}')" style="cursor:pointer; color:red;"></i>`;
-        container.appendChild(span);
-    });
-}
-
-    function removeWorkID(id) {
-    w_attachedIds = w_attachedIds.filter(item => item !== id);
-    renderWorkIDTags();
-}
 
 function renderDistrictChecklist() {
 
@@ -1170,121 +1132,125 @@ location.reload();
 document.getElementById('workOrderForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     
-    // 1. VALIDASI UTAMA
-    if (w_attachedIds.length === 0) {
-        alert("Sila masukkan sekurang-kurangnya satu Work Order ID!");
-        return;
-    }
-
     const contractId = document.getElementById('w_contract_id').value;
     const districtSelected = document.getElementById('w_dist').value; 
     const contractOpt = document.getElementById('w_contract_id').selectedOptions[0];
 
-    // 2. KIRA JUMLAH KOS DAN SEMAK SYARAT RM 20,000
-    let totalAmount = 0;
-    let additionalTotal = 0;
-    const breakdown = {};
-
-    document.querySelectorAll('.w_sec_amt').forEach(i => {
-        const base = parseFloat(i.dataset.rawValue || 0);
-        const extraInput = document.querySelector(`.w_sec_extra[data-sec="${i.dataset.sec}"]`);
-        const extra = parseFloat(extraInput?.dataset.rawValue || 0);
-
-        breakdown[i.dataset.sec] = { amt: base, extra: extra };
-        totalAmount += base;
-        additionalTotal += extra;
-    });
-
-    const grandTotal = totalAmount + additionalTotal;
-
-    // Syarat: Mesti BAWAH RM 20,000.00 (atau tukar kepada <= 20000 mengikut keperluan anda)
-    if (grandTotal >= 20000) {
-        alert(`Had Gagal: Jumlah kos berkongsi (RM ${grandTotal.toLocaleString()}) mestilah di bawah RM 20,000.00!`);
-        return;
-    }
-
     try {
-        // 3. GENERATE ATAU GUNA SEQUENCE NO SEDIA ADA
+        // 1. AMBIL KOD KAWASAN: Pecahkan string "SGT,MR,BP,KLG,MRS"
         const areaMapping = contractOpt.dataset.area || ""; 
         const districtsMapping = contractOpt.dataset.dist || "";
+        
         const areaCodes = areaMapping.split(',').map(s => s.trim().toUpperCase());
         const districts = districtsMapping.split(',').map(s => s.trim().toUpperCase());
+        
+        // Cari kedudukan daerah yang dipilih (Contoh: SEGAMAT adalah index 0)
         const index = districts.indexOf(districtSelected.trim().toUpperCase());
+        
+        // Ambil kod yang sepadan dengan index tersebut (Contoh: index 0 = SGT)
         let areaCode = (index !== -1 && areaCodes[index]) ? areaCodes[index] : "WO";
 
-        // Semak jika salah satu ID yang dimasukkan sudah mempunyai sequence sedia ada di DB
-        let sequenceToUse = null;
-        for (let idToCheck of w_attachedIds) {
-            const checkRes = await fetch(
-                `${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(idToCheck)}`,
-                { headers }
-            );
-            const existing = await checkRes.json();
-            if (existing.length > 0) {
-                sequenceToUse = existing[0].sequence_no;
-                break; // Guna sequence yang dijumpai
-            }
-        }
+        // 2. KIRA SEQUENCE: Cari jumlah rekod sedia ada bagi daerah ini dalam kontrak ini
+        const seqRes = await fetch(
+`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&district=eq.${encodeURIComponent(districtSelected)}&select=sequence_no`,
+{ headers });
 
-        // Jika tiada langsung dalam rekod DB, buat sequence baru
-        if (!sequenceToUse) {
-            const seqRes = await fetch(
-                `${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&district=eq.${encodeURIComponent(districtSelected)}&select=sequence_no`,
-                { headers }
-            );
-            const existingWorks = await seqRes.json();
-            let maxSeq = 0;
-            existingWorks.forEach(w => {
-                const num = parseInt((w.sequence_no || '').replace(/\D/g, '')) || 0;
-                if (num > maxSeq) maxSeq = num;
-            });
-            const nextNum = (maxSeq + 1).toString().padStart(3, '0');
-            sequenceToUse = `${areaCode}${nextNum}`;
-        }
+const existingWorks = await seqRes.json();
 
-        // 4. PROSES SIMPAN / KEMASKINI SECARA BERKELOMPOK (BULK UPSERT)
-        let bulkPayload = [];
+let maxSeq = 0;
+
+existingWorks.forEach(w=>{
+    const num = parseInt((w.sequence_no || '').replace(/\D/g,'')) || 0;
+    if(num > maxSeq) maxSeq = num;
+});
+
+const nextNum = (maxSeq + 1).toString().padStart(3,'0');
         
-        for (let idToSave of w_attachedIds) {
-            // Dapatkan ID rekod lama jika ada untuk operasi UPDATE (PATCH/UPSERT)
-            const findRes = await fetch(
-                `${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(idToSave)}&select=id`,
-                { headers }
-            );
-            const rows = await findRes.json();
+        // 3. BINA FORMAT: Contoh SGT + 001 = SGT001
+        const customSequence = `${areaCode}${nextNum}`;
 
-            let payloadItem = {
-                contract_id: contractId,
-                work_id: idToSave,
-                sequence_no: sequenceToUse,
-                qpb_date: document.getElementById('w_qpb_date').value,
-                location: document.getElementById('w_location').value,
-                district: districtSelected,
-                description: document.getElementById('w_desc').value,
-                section_category: breakdown,
-                additional: additionalTotal,
-                amount_spent: grandTotal
-            };
+        // 4. PROSES KOS & PAYLOAD
+const breakdown = {};
+let totalAmount = 0;
+let additionalTotal = 0;
 
-            if (rows.length > 0) {
-                payloadItem.id = rows[0].id; // Letak primary key id untuk update row sedia ada
-            }
+document.querySelectorAll('.w_sec_amt').forEach(i => {
 
-            bulkPayload.push(payloadItem);
-        }
+    const base = parseFloat(i.dataset.rawValue || 0);
 
-        // Hantar data ke Supabase menggunakan method POST dengan header resolution=merge-duplicates
-        const res = await fetch(`${SB_URL}/rest/v1/work_orders`, {
-            method: 'POST',
-            headers: {
-                ...headers,
-                'Prefer': 'resolution=merge-duplicates,return=representation'
-            },
-            body: JSON.stringify(bulkPayload)
-        });
+const extraInput = document.querySelector(
+    `.w_sec_extra[data-sec="${i.dataset.sec}"]`
+);
+
+const extra = parseFloat(extraInput?.dataset.rawValue || 0);
+
+    // section_category hanya simpan amt
+    breakdown[i.dataset.sec] = {
+    amt: base,
+    extra: extra
+};
+
+    totalAmount += base;
+    additionalTotal += extra;
+
+});
+
+const workIdValue = normalizeWorkId(
+    document.getElementById('w_id_num').value
+);
+
+const checkRes = await fetch(
+`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}`,
+{ headers });
+
+const existing = await checkRes.json();
+
+let sequenceToUse = customSequence;
+let res;
+
+if(existing.length > 0){
+    sequenceToUse = existing[0].sequence_no;
+}
+
+const payload = {
+    contract_id: contractId,
+    work_id: workIdValue,
+    sequence_no: sequenceToUse,
+    qpb_date: document.getElementById('w_qpb_date').value,
+    location: document.getElementById('w_location').value,
+    district: districtSelected,
+    description: document.getElementById('w_desc').value,
+    section_category: breakdown,
+    additional: additionalTotal,
+    amount_spent: totalAmount + additionalTotal
+};
+
+if(existing.length > 0){
+
+    // UPDATE
+    res = await fetch(
+    `${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`,
+    {
+        method: 'PATCH',
+        headers: headers,
+        body: JSON.stringify(payload)
+    });
+
+}else{
+
+    // INSERT
+    res = await fetch(
+    `${SB_URL}/rest/v1/work_orders`,
+    {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(payload)
+    });
+
+}
 
         if (res.ok) { 
-            alert(`Berjaya! Sebanyak ${w_attachedIds.length} ID Work Order berkongsi No. Rujukan: ${sequenceToUse}`); 
+            alert(`Berjaya didaftar! No. Rujukan: ${sequenceToUse}`); 
             location.reload(); 
         } else {
             const err = await res.json();
@@ -1292,9 +1258,10 @@ document.getElementById('workOrderForm').addEventListener('submit', async (e) =>
         }
     } catch (error) {
         console.error(error);
-        alert("Gagal memproses pendaftaran kumpulan Work Order.");
+        alert("Gagal memproses nombor turutan.");
     }
 });
+}
 
     async function fetchUnits() {
 
@@ -2115,52 +2082,120 @@ amt += value;
 
     let detectTimer = null;
 
-// Gantikan fungsi lama autoDetectWork() kepada dua fungsi di bawah ini:
-function autoDetectWork() {
-    // Fungsi dikosongkan/diabaikan kerana tindakan diuruskan oleh fungsi 'addWorkIdsToList'
+function autoDetectWork(){
+    const num = document.getElementById('w_id_num').value.trim();
+    
+    if(num === lastWorkIdNum) return; 
+    lastWorkIdNum = num;
+
+    clearTimeout(detectTimer);
+    detectTimer = setTimeout(async ()=>{
+ 
+const contractId = document.getElementById('w_contract_id').value;
+const num = document.getElementById('w_id_num').value.trim();
+const workId = normalizeWorkId(num);
+
+if(!contractId || num.length < 3) return;
+
+try{
+
+const res = await fetch(
+`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workId)}&select=*`,
+{ headers }
+);
+
+const data = await res.json();
+
+if(data.length === 0){
+
+    document.getElementById('w_qpb_date').value = '';
+    document.getElementById('w_location').value = '';
+    document.getElementById('w_desc').value = '';
+
+    document.querySelectorAll('.w_sec_amt').forEach(i=>{
+        i.value='';
+        i.dataset.rawValue='0';
+    });
+
+    document.querySelectorAll('.w_sec_extra').forEach(i=>{
+        i.value='';
+        i.dataset.rawValue='0';
+    });
+
+    calcTotalWork();
+
+    return;
 }
 
-async function autoDetectWorkWithId(workId) {
-    const contractId = document.getElementById('w_contract_id').value;
-    if (!contractId || workId.length < 3) return;
+const w = data[0];
 
-    try {
-        const res = await fetch(
-            `${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workId)}&select=*`,
-            { headers }
-        );
-        const data = await res.json();
-        if (data.length === 0) return;
+if(w.work_id){
 
-        const w = data[0];
-        document.getElementById('w_qpb_date').value = w.qpb_date || '';
-        document.getElementById('w_location').value = w.location || '';
-        document.getElementById('w_desc').value = w.description || '';
+const parts = w.work_id.split(' ');
 
-        setTimeout(() => {
-            document.getElementById('w_dist').value = w.district || '';
-        }, 100);
+if(parts.length > 1){
 
-        if (w.section_category) {
-            Object.keys(w.section_category).forEach(sec => {
-                const amt = document.querySelector(`.w_sec_amt[data-sec="${sec}"]`);
-                const extra = document.querySelector(`.w_sec_extra[data-sec="${sec}"]`);
+document.getElementById('w_id_prefix').value =
+parts[0];
 
-                if (amt) {
-                    amt.dataset.rawValue = w.section_category[sec].amt || 0;
-                    amt.value = Number(amt.dataset.rawValue).toLocaleString('en-MY', {minimumFractionDigits:2, maximumFractionDigits:2});
-                }
-                if (extra) {
-                    const extraVal = w.section_category[sec].extra || 0;
-                    extra.dataset.rawValue = extraVal;
-                    extra.value = Number(extraVal).toLocaleString('en-MY', {minimumFractionDigits:2, maximumFractionDigits:2});
-                }
-            });
+document.getElementById('w_id_num').value =
+parts[1];
+
+}
+
+}
+
+document.getElementById('w_qpb_date').value = w.qpb_date || '';
+document.getElementById('w_location').value = w.location || '';
+document.getElementById('w_desc').value = w.description || '';
+
+setTimeout(()=>{
+document.getElementById('w_dist').value = w.district || '';
+},100);
+
+if(w.section_category){
+
+Object.keys(w.section_category).forEach(sec=>{
+
+const amt = document.querySelector(`.w_sec_amt[data-sec="${sec}"]`);
+const extra = document.querySelector(`.w_sec_extra[data-sec="${sec}"]`);
+
+if(amt){
+    amt.dataset.rawValue = w.section_category[sec].amt || 0;
+    amt.value = Number(amt.dataset.rawValue).toLocaleString('en-MY', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+if(extra){
+
+    const extraVal =
+        w.section_category?.[sec]?.extra || 0;
+
+    extra.dataset.rawValue = extraVal;
+
+    extra.value = Number(extraVal).toLocaleString(
+        'en-MY',
+        {
+            minimumFractionDigits:2,
+            maximumFractionDigits:2
         }
-        calcTotalWork();
-    } catch (e) {
-        console.error("Auto detect error:", e);
-    }
+    );
+}
+
+});
+
+}
+
+calcTotalWork();
+
+console.log("Existing Work Order loaded");
+
+}catch(e){
+
+console.error("Auto detect error:", e);
+
+}
+
+},500);
+
 }
     let interimDetectTimer = null;
 
