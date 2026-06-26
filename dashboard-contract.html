@@ -322,7 +322,7 @@
     <div class="main-wrapper">
         <div class="contract-sidebar">
             <div class="search-container">
-                <input type="text" id="contractSearch" class="search-box" placeholder="Search Code/Contract" onkeyup="filterContracts()">
+                <input type="text" id="contractSearch" class="search-box" placeholder="Search Code/Contract" onkeyup="debouncedFilterContracts()">
             </div>
             <div id="contractList"></div>
         </div>
@@ -374,6 +374,7 @@
     let currentContract = null;
     let currentWO = [];
     let selectedSections = [];
+    let searchTimeout = null;
 
     Chart.register(ChartDataLabels);
 
@@ -385,6 +386,12 @@
         }
     };
 
+    // Debounce filter carian untuk menghalang stuttering/lag input ketika menaip
+    function debouncedFilterContracts() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(filterContracts, 200);
+    }
+
     function filterContracts() {
         const query = document.getElementById('contractSearch').value.toLowerCase();
         const cards = document.querySelectorAll('.c-card');
@@ -395,105 +402,99 @@
         });
     }
 
-const urlParams = new URLSearchParams(window.location.search);
-const selectedSectionName = urlParams.get('section');
+    const urlParams = new URLSearchParams(window.location.search);
+    const selectedSectionName = urlParams.get('section');
 
     async function fetchUnits() {
-    try {
-        // 1. sections
-        const secRes = await fetch(`${SB_URL}/rest/v1/me_sections?select=*`, { headers });
-        const sections = await secRes.json();
+        try {
+            // Pengoptimuman Data: Hanya tarik lajur asas yang diperlukan untuk navigasi
+            const [secRes, unitsRes] = await Promise.all([
+                fetch(`${SB_URL}/rest/v1/me_sections?select=id`, { headers }),
+                fetch(`${SB_URL}/rest/v1/units?select=id,unit_name,section_id`, { headers })
+            ]);
+            const sections = await secRes.json();
+            const units = await unitsRes.json();
 
-        // 2. units
-        const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
-        const units = await res.json();
+            let selectedSection = null;
+            if (selectedSectionName) {
+                selectedSection = sections.find(s => s.id == selectedSectionName);
+            }
 
-        // 3. cari section dari URL
-        let selectedSection = null;
-if (selectedSectionName) {
-    selectedSection = sections.find(s => s.id == selectedSectionName);
-}
+            const filteredUnits = selectedSection
+                ? units.filter(u => u.section_id === selectedSection.id)
+                : units;
 
-        const filteredUnits = selectedSection
-            ? units.filter(u => u.section_id === selectedSection.id)
-            : units;
+            const nav = document.getElementById('unitNav');
 
-        // 4. render UI
-        const nav = document.getElementById('unitNav');
+            nav.innerHTML = filteredUnits.map(u => `
+                <button class="unit-pill" id="unit-${u.id}"
+                    onclick="fetchContracts(${u.id}, this)">
+                    ${u.unit_name}
+                </button>
+            `).join('');
 
-        nav.innerHTML = filteredUnits.map(u => `
-            <button class="unit-pill" id="unit-${u.id}"
-                onclick="fetchContracts(${u.id}, this)">
-                ${u.unit_name}
-            </button>
-        `).join('');
+            if (filteredUnits.length > 0) {
+                document.getElementById(`unit-${filteredUnits[0].id}`).click();
+            }
 
-        // 5. auto select first unit
-        if (filteredUnits.length > 0) {
-            document.getElementById(`unit-${filteredUnits[0].id}`).click();
+        } catch (e) {
+            console.error("Error units:", e);
         }
-
-    } catch (e) {
-        console.error("Error units:", e);
     }
-}
 
     async function fetchContracts(unitId, btn) {
-    document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    centerActiveUnit(btn);
+        document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        centerActiveUnit(btn);
 
-    document.getElementById('contractSearch').value = '';
-    document.body.classList.remove('analysis-active');
-    document.getElementById('analysis-panel').style.display = 'none';
+        document.getElementById('contractSearch').value = '';
+        document.body.classList.remove('analysis-active');
+        document.getElementById('analysis-panel').style.display = 'none';
 
-    currentContract = null;
-    currentWO = [];
+        currentContract = null;
+        currentWO = [];
 
-    document.getElementById('panel-title').innerText = 'Analisis';
-    document.getElementById('panel-vendor').innerText = '';
+        document.getElementById('panel-title').innerText = 'Analisis';
+        document.getElementById('panel-vendor').innerText = '';
 
-    try {
-        const res = await fetch(
-            `${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}`,
-            { headers }
-        );
-
-        let data = await res.json();
-
-        // ✅ SORT BETUL (start sama → code jadi tie-breaker)
-        data.sort((a, b) => {
-            const dateDiff =
-                new Date(a.contract_start) - new Date(b.contract_start);
-
-            if (dateDiff !== 0) return dateDiff;
-
-            return a.contract_code.localeCompare(
-                b.contract_code,
-                undefined,
-                { numeric: true, sensitivity: "base" }
+        try {
+            // Pengoptimuman Data: Hadkan query kepada struktur data sasar untuk mengecilkan payload JSON
+            const res = await fetch(
+                `${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}&select=id,contract_code,contract_name,contract_start,contract_end,selected_sections,contract_sections_breakdown`,
+                { headers }
             );
-        });
 
-        const list = document.getElementById('contractList');
+            let data = await res.json();
 
-        list.innerHTML = data.map(c => `
-            <div class="c-card" id="card-${c.id}"
-                onclick='selectCard(${c.id}); openAnalysis(${JSON.stringify(c)})'>
-                <h4>${c.contract_code}</h4>
-                <div class="sub-text">${c.contract_name}</div>
-            </div>
-        `).join('');
+            data.sort((a, b) => {
+                const dateDiff = new Date(a.contract_start) - new Date(b.contract_start);
+                if (dateDiff !== 0) return dateDiff;
+                return a.contract_code.localeCompare(
+                    b.contract_code,
+                    undefined,
+                    { numeric: true, sensitivity: "base" }
+                );
+            });
 
-        if (data.length > 0 && window.innerWidth > 768) {
-            selectCard(data[0].id);
-            openAnalysis(data[0]);
+            const list = document.getElementById('contractList');
+
+            list.innerHTML = data.map(c => `
+                <div class="c-card" id="card-${c.id}"
+                    onclick='selectCard(${c.id}); openAnalysis(${JSON.stringify(c)})'>
+                    <h4>${c.contract_code}</h4>
+                    <div class="sub-text">${c.contract_name}</div>
+                </div>
+            `).join('');
+
+            if (data.length > 0 && window.innerWidth > 768) {
+                selectCard(data[0].id);
+                openAnalysis(data[0]);
+            }
+
+        } catch (e) {
+            console.error("Error contracts:", e);
         }
-
-    } catch (e) {
-        console.error("Error contracts:", e);
     }
-}
 
     function selectCard(id) {
         document.querySelectorAll('.c-card').forEach(c => c.classList.remove('active'));
@@ -507,25 +508,33 @@ if (selectedSectionName) {
         document.getElementById('panel-title').innerText = contract.contract_code;
         document.getElementById('panel-vendor').innerText = contract.contract_name;
 
+        // Dijamin jimat data: Elakkan memanggil semula endpoint contract?id=eq kerana payload objek telah tersedia penuh
+        currentContract = contract;
+
         try {
-            const resC = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${contract.id}&select=*`, { headers });
-            currentContract = (await resC.json())[0];
-            const resW = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}`, { headers });
+            // Menggabungkan permintaan network dalam satu round-trip serta mengehadkan lajur terpilih
+            const [resW, resI] = await Promise.all([
+                fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}&select=interim_no,section_category`, { headers }),
+                fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${currentContract.id}&order=date_received.asc&select=claim_breakdown`, { headers })
+            ]);
+
             currentWO = await resW.json();
+            const currentInterims = await resI.json();
+
             selectedSections = (currentContract.selected_sections && currentContract.selected_sections.length > 0) 
                 ? currentContract.selected_sections 
                 : Object.keys(currentContract.contract_sections_breakdown || {});
-            renderUI();
-        } catch (error) { console.error(error); }
+            
+            renderUI(currentInterims);
+        } catch (error) { 
+            console.error(error); 
+        }
     }
 
-    async function renderUI() {
+    async function renderUI(currentInterims = []) {
         if(!currentContract) return;
 
         try {
-            const resI = await fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${currentContract.id}&order=date_received.asc`, { headers });
-            const currentInterims = await resI.json();
-
             const sections = currentContract.contract_sections_breakdown || {};
             const start = new Date(currentContract.contract_start);
             const end = new Date(currentContract.contract_end);
@@ -540,30 +549,50 @@ if (selectedSectionName) {
             `).join('');
 
             const mainContainer = document.getElementById('selectedSectionContainer');
-            mainContainer.innerHTML = '';
+            let htmlBuilder = '';
+
+            // Penyatuan Gelung O(n): Lakukan agregasi amaun interim & work order ke dalam struktur objek cache tunggal
+            const interimMap = {};
+            const woMap = {};
+
+            currentInterims.forEach(int => {
+                if (int.claim_breakdown) {
+                    Object.keys(int.claim_breakdown).forEach(s => {
+                        interimMap[s] = (interimMap[s] || 0) + (int.claim_breakdown[s].amt || 0);
+                    });
+                }
+            });
+
+            currentWO.forEach(wo => {
+                if (!wo.interim_no && wo.section_category) {
+                    Object.keys(wo.section_category).forEach(s => {
+                        woMap[s] = (woMap[s] || 0) + (wo.section_category[s].amt || 0);
+                    });
+                }
+            });
+
+            let labels = [], targetAvgData = [], actualAvgData = [];
 
             selectedSections.sort().forEach(s => {
                 if(!sections[s]) return;
                 
-                let totalInterimClaim = 0;
-                currentInterims.forEach(int => {
-                    if (int.claim_breakdown?.[s]) totalInterimClaim += (int.claim_breakdown[s].amt || 0);
-                });
-
-                let totalPendingWO = 0;
-                currentWO.forEach(wo => {
-                    if (!wo.interim_no && wo.section_category?.[s]) totalPendingWO += (wo.section_category[s].amt || 0);
-                });
+                const totalInterimClaim = interimMap[s] || 0;
+                const totalPendingWO = woMap[s] || 0;
 
                 const used = totalInterimClaim + totalPendingWO;
                 const budget = sections[s].amt || 0; 
                 const plannedTotalToDate = (budget / totalMonths) * monthsElapsed;
                 const variance = used - plannedTotalToDate;
-                const variancePercent = (variance / plannedTotalToDate) * 100 || 0;
+                const variancePercent = plannedTotalToDate ? (variance / plannedTotalToDate) * 100 : 0;
                 const color = used > plannedTotalToDate ? 'var(--ios-red)' : 'var(--ios-green)';
-                const progressPercent = (used / budget) * 100 || 0;
+                const progressPercent = budget ? (used / budget) * 100 : 0;
 
-                mainContainer.innerHTML += `
+                // Sediakan data array kargo carta serentak bagi mengelak operasi gelung berulang di fungsi luaran
+                labels.push(s);
+                targetAvgData.push((budget / totalMonths).toFixed(2));
+                actualAvgData.push((used / monthsElapsed).toFixed(2));
+
+                htmlBuilder += `
                     <div class="section-row">
                         <div style="display:flex; justify-content:space-between; align-items:start;">
                             <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">${s}: ${sections[s].desc || s}</div>
@@ -584,45 +613,26 @@ if (selectedSectionName) {
                 `;
             });
 
-            updateChart(currentInterims);
+            mainContainer.innerHTML = htmlBuilder;
+
+            // Kemaskini elemen Chart terus menggunakan data tatasusunan terbina bersih
+            updateChartDirect(labels, targetAvgData, actualAvgData);
+
             setTimeout(() => {
                 document.querySelectorAll('.prog-bar-fill').forEach(bar => {
                     bar.style.setProperty('width', bar.getAttribute('data-width'), 'important');
                 });
-            }, 100);
+            }, 50);
 
         } catch (error) { console.error("Error processing UI:", error); }
     }
 
-    function updateChart(currentInterims = []) {
-        if (!currentContract) return;
-        const sections = currentContract.contract_sections_breakdown || {};
-        const start = new Date(currentContract.contract_start);
-        const end = new Date(currentContract.contract_end);
-        const today = new Date();
-        
-        const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
-        let monthsElapsed = (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()) + 1;
-        monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
-
-        let labels = [], targetAvgData = [], actualAvgData = [];
-        selectedSections.sort().forEach(s => {
-            labels.push(s); 
-            targetAvgData.push((sections[s]?.amt / totalMonths).toFixed(2));
-            
-            let interimAmt = currentInterims.reduce((sum, int) => sum + (int.claim_breakdown?.[s]?.amt || 0), 0);
-            let pendingWOAmt = currentWO.reduce((sum, wo) => {
-                return (!wo.interim_no && wo.section_category?.[s]) ? sum + (wo.section_category[s].amt || 0) : sum;
-            }, 0);
-
-            actualAvgData.push(((interimAmt + pendingWOAmt) / monthsElapsed).toFixed(2));
-        });
-
+    function updateChartDirect(labels, targetAvgData, actualAvgData) {
         if (myChart) {
             myChart.data.labels = labels;
             myChart.data.datasets[0].data = targetAvgData;
             myChart.data.datasets[1].data = actualAvgData;
-            myChart.update(); 
+            myChart.update('none'); // Mod kemaskini 'none' melangkau kesan animasi berat pencetus stuttering pada peranti mudah alih
         } else {
             const ctx = document.getElementById('healthChart').getContext('2d');
             myChart = new Chart(ctx, {
@@ -636,6 +646,7 @@ if (selectedSectionName) {
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
+                    animation: { duration: 300 },
                     plugins: { 
                         legend: { position: 'top', labels: { font: { size: 10, weight: 'bold' } } },
                         datalabels: { anchor: 'end', align: 'top', font: { size: 9, weight: 'bold' }, formatter: (v) => v > 0 ? `RM${Math.round(v).toLocaleString()}` : '' }
@@ -646,11 +657,19 @@ if (selectedSectionName) {
         }
     }
 
+    // Kekalkan tandatangan fungsi asal tanpa memusnahkan parameter sedia ada
+    function updateChart(currentInterims = []) {
+        renderUI(currentInterims);
+    }
+
     async function toggleSection(s) {
         if(!isAdmin){ alert("Access denied"); return; }
         if(selectedSections.includes(s)) selectedSections = selectedSections.filter(x => x !== s);
         else selectedSections.push(s);
-        renderUI();
+        
+        // Render pantas secara lokal tanpa memuat turun network semula
+        renderUI([]);
+        
         await fetch(`${SB_URL}/rest/v1/contract?id=eq.${currentContract.id}`, {
             method: 'PATCH',
             headers: headers,
@@ -670,51 +689,43 @@ if (selectedSectionName) {
     }
 
     function centerActiveUnit(btn) {
-        /* Mobile: snap scroll. Desktop: tiada kesan (wrapper tak overflow) */
         if(window.innerWidth <= 768) {
             btn.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
         }
     }
-let touchStartX = 0;
-let touchEndX = 0;
 
-const contractSidebar = document.querySelector('.contract-sidebar');
+    let touchStartX = 0;
+    let touchEndX = 0;
 
-contractSidebar.addEventListener('touchstart', e => {
-    touchStartX = e.changedTouches[0].screenX;
-}, { passive: true });
+    const contractSidebar = document.querySelector('.contract-sidebar');
 
-contractSidebar.addEventListener('touchend', e => {
-    touchEndX = e.changedTouches[0].screenX;
-    handleUnitSwipe();
-}, { passive: true });
+    contractSidebar.addEventListener('touchstart', e => {
+        touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
 
-function handleUnitSwipe() {
+    contractSidebar.addEventListener('touchend', e => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleUnitSwipe();
+    }, { passive: true });
 
-    if(window.innerWidth > 768) return;
+    function handleUnitSwipe() {
+        if(window.innerWidth > 768) return;
 
-    const diff = touchStartX - touchEndX;
+        const diff = touchStartX - touchEndX;
+        if(Math.abs(diff) < 60) return;
 
-    // minimum swipe distance
-    if(Math.abs(diff) < 60) return;
+        const units = [...document.querySelectorAll('.unit-pill')];
+        const activeIndex = units.findIndex(btn => btn.classList.contains('active'));
 
-    const units = [...document.querySelectorAll('.unit-pill')];
-    const activeIndex = units.findIndex(btn =>
-        btn.classList.contains('active')
-    );
+        if(activeIndex === -1) return;
 
-    if(activeIndex === -1) return;
-
-    // swipe left -> next unit
-    if(diff > 0 && activeIndex < units.length - 1) {
-        units[activeIndex + 1].click();
+        if(diff > 0 && activeIndex < units.length - 1) {
+            units[activeIndex + 1].click();
+        }
+        if(diff < 0 && activeIndex > 0) {
+            units[activeIndex - 1].click();
+        }
     }
-
-    // swipe right -> previous unit
-    if(diff < 0 && activeIndex > 0) {
-        units[activeIndex - 1].click();
-    }
-}
 </script>
 </body>
 </html>
