@@ -94,8 +94,68 @@
         .excel-table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; font-size: 11px; margin-top: 10px; }
         .excel-table th { background: #f1f1f1; padding: 8px; text-align: left; }
         .excel-table td { padding: 8px; border-bottom: 1px solid #eee; }
+        .w-id-cards-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            margin-top: 8px;
+        }
+        .w-id-card {
+            background: rgba(255,255,255,0.22);
+            border: 1px solid rgba(255,255,255,0.35);
+            border-radius: 14px;
+            padding: 12px;
+        }
+        .w-id-card .w-id-card-label {
+            font-size: 12px;
+            font-weight: 800;
+            color: #0b3d91;
+            background: rgba(255,255,255,0.5);
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 999px;
+            margin-bottom: 8px;
+        }
+        .w-id-card .funding-grid {
+            margin-top: 8px;
+        }
+
         .funding-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(255,255,255,0.2); padding: 10px; border-radius: 12px; }
         .sec-desc { font-size: 9px; color: #555; display: block; margin-bottom: 4px; line-height: 1.2; font-weight: 500; text-transform: none; }
+
+        .interim-section-block {
+            background: rgba(255,255,255,0.22);
+            border: 1px solid rgba(255,255,255,0.35);
+            border-radius: 14px;
+            padding: 12px;
+            margin-bottom: 10px;
+            grid-column: 1 / -1;
+        }
+        .interim-section-block .sec-main-label {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: .5px;
+            color: #2b2b2b;
+            display: block;
+            margin-bottom: 2px;
+        }
+        .interim-vo-sub {
+            margin-top: 10px;
+            margin-left: 14px;
+            padding: 10px 10px 10px 12px;
+            border-left: 3px solid var(--ios-orange);
+            background: rgba(255,255,255,0.28);
+            border-radius: 0 10px 10px 0;
+        }
+        .interim-vo-sub .vo-sub-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: #b35900;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 2px;
+        }
                     
         .glass-header { 
             width: 100%; height: 60px; 
@@ -153,13 +213,6 @@ transition: 0.3s;
 .form-tabs button.active{
     background: white;
 color: #0b3d91;
-}
-
-.district-wrapper{
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    margin-top: 6px;
 }
 
 .district-group{
@@ -377,6 +430,14 @@ color: #0b3d91;
         padding: 12px;
     }
 
+    .w-id-cards-container{
+        grid-template-columns: 1fr !important;
+    }
+
+    .w-id-card .funding-grid{
+        grid-template-columns: 1fr;
+    }
+
     #i_section_inputs_container{
         grid-template-columns: 1fr !important;
     }
@@ -484,30 +545,11 @@ color: #0b3d91;
 
                     <label>Units</label><select id="w_unit_id" onchange="loadContractsByUnit('w')" required><option value="">Choose Unit</option></select>
                     <label>Contracts</label><select id="w_contract_id" onchange="onContractSelect()" required><option value="">Choose Unit First</option></select>
-                   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                   <label>Work Order Id(s)</label>
+<div id="w_id_rows_container"></div>
+<button type="button" onclick="addWorkIdRow()" style="background:none; color:var(--ios-blue); border:1px dashed var(--ios-blue); font-size:12px; padding:10px; width:100%; border-radius:10px; cursor:pointer; margin-top:5px;">+ Add Work ID</button>
 
-<div>
-<label>Work Order Id</label>
-
-<div style="display:flex;gap:8px;">
-
-<select id="w_id_prefix"
-        onchange="autoDetectWork()"
-        style="width:80px;flex-shrink:0;">
-    <option value="C">C</option>
-    <option value="K">K</option>
-</select>
-
-<input
-type="text"
-id="w_id_num"
-placeholder="123456"
-required
-oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
-
-</div>
-
-</div>
+                   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top:10px;">
 
 <div>
 <label>Blueform Date</label>
@@ -523,10 +565,9 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
     <option value="">Pilih Kontrak Dahulu</option>
 </select>
 
-<input type="text" id="w_location" placeholder="Location (Example: JEMENTAH)">
+<label>Location & Cost Breakdown</label>
+<div id="w_id_cards_container" class="w-id-cards-container"></div>
 
-                    <label>Cost Breakdown</label>
-                    <div id="w_sections_container" class="funding-grid"></div>
                     <div style="margin-top:15px; padding:10px; background:rgba(0,122,255,0.1); border-radius:10px; display:flex; justify-content:space-between;">
                         <strong>Total:</strong><span id="total_display" style="color:var(--ios-blue); font-weight:bold;">RM 0.00</span>
                     </div>
@@ -588,20 +629,22 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
 
     <div>
         <label>Salvage Value (RM)</label>
-        <input type="number"
-               id="i_salvage"
-               value="0"
-               step="0.01"
-               oninput="calcInterimManualTotal()">
+        <input type="text"
+       id="i_salvage"
+       data-raw-value="0"
+       value="0.00"
+       placeholder="0.00"
+       oninput="formatCurrencyInput(this); calcInterimManualTotal()">
     </div>
 
     <div>
         <label>Performance Guarantee (RM)</label>
-        <input type="number"
-               id="i_pg_sum"
-               value="0"
-               step="0.01"
-               oninput="calcInterimManualTotal()">
+        <input type="text"
+       id="i_pg_sum"
+       data-raw-value="0"
+       value="0.00"
+       placeholder="0.00"
+       oninput="formatCurrencyInput(this); calcInterimManualTotal()">
     </div>
 
 </div>
@@ -610,12 +653,12 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
 
     <div>
     <label>Tax Amount (RM)</label>
-    <input type="number"
-           id="i_tax_amount"
-           value="0"
-           step="0.01"
-           placeholder="0.00"
-           oninput="calcInterimManualTotal()">
+    <input type="text"
+       id="i_tax_amount"
+       data-raw-value="0"
+       value="0.00"
+       placeholder="0.00"
+       oninput="formatCurrencyInput(this); calcInterimManualTotal()">
 </div>
 
 </div>
@@ -623,7 +666,7 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
         <div id="i_section_inputs_container"
              style="margin-top:15px;
              display:grid;
-             grid-template-columns:1fr 1fr;
+             grid-template-columns:1fr;
              gap:10px;">
         </div>
 
@@ -699,15 +742,17 @@ oninput="this.value=this.value.replace(/[^0-9]/g,'');autoDetectWork()">
 
                 <label>Contracts</label>
                 <select id="vo_contract_id" onchange="onVOContractSelect()" required><option value="">Choose Contract</option></select>
+                
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-    <div>
-        <label>VO Name</label>
-        <input type="text"
-               id="vo_name"
-               placeholder="Example: PPJHK NO. 1"
-               required>
-    </div>
-</div>
+                    <div>
+                        <label>VO Name</label>
+                        <input type="text" id="vo_name" placeholder="Example: PPJHK NO. 1" required>
+                    </div>
+                    <div>
+                        <label>VO Date</label>
+                        <input type="date" id="vo_date" required>
+                    </div>
+                </div>
 
 <label>Cost Breakdown</label>
 
@@ -736,9 +781,7 @@ RM 0.00
 
 </div>
 
-                <label>Description</label>
-                <textarea id="vo_desc" rows="3" placeholder="Description"></textarea>
-                <button onclick="submitVO()" class="btn-primary" style="background:var(--ios-red);">Submit Variation Order</button>
+                <button onclick="submitVO()" class="btn-primary" style="background:var(--ios-red); margin-top: 20px;">Submit Variation Order</button>
             </div>
         </div>
 
@@ -775,10 +818,13 @@ oninput="autoDetectContract()">
 
     <div>
         <label>Performance Guarantee Total (RM)</label>
-        <input type="number"
-               id="c_pg_total"
-               step="0.01"
-               placeholder="0.00">
+        <input type="text"
+       id="c_pg_total"
+       data-raw-value="0"
+       value="0.00"
+       placeholder="0.00"
+       oninput="formatCurrencyInput(this)">
+
     </div>
 
 </div>
@@ -837,6 +883,13 @@ oninput="formatCurrencyInput(this); calculateContractSum()">
     let originalContractArea = '';
     let lastWorkIdNum = '';
 
+    // ===== Multi Work-ID support =====
+    let workIdRowCounter = 0;
+    let originalLoadedWorkIds = []; // work_id strings that were loaded from DB for the current sequence group
+    let currentWorkSequenceNo = null; // sequence_no shared by the loaded group (if editing existing)
+    let currentContractSections = {}; // sections breakdown of the currently selected contract (for rendering cards)
+    let workIdCardDataMap = {}; // work_id string -> { location, section_category: {sec: {amt, extra}} } loaded from DB, used to prefill cards
+
 
 const REGION_MAP = {
     UTARA: [
@@ -881,6 +934,7 @@ showPage(
 
 setupFormListeners();
 renderDistrictChecklist();
+addWorkIdRow(); // seed with one empty Work ID row
 
 }
 
@@ -1027,7 +1081,9 @@ function formatCurrencyInput(input) {
                 contractor: document.getElementById('c_contractor').value,
 insurance_no: document.getElementById('c_insurance_no').value,
     performance_guarantee_total:
-        parseFloat(document.getElementById('c_pg_total').value) || 0,
+    parseFloat(
+        document.getElementById('c_pg_total').dataset.rawValue || 0
+    ),
                 district: document.getElementById('c_dist').value,
                 area_code: document.getElementById('c_area').value,
                 contract_sections_breakdown: sections,
@@ -1116,112 +1172,147 @@ document.getElementById('workOrderForm').addEventListener('submit', async (e) =>
         // Ambil kod yang sepadan dengan index tersebut (Contoh: index 0 = SGT)
         let areaCode = (index !== -1 && areaCodes[index]) ? areaCodes[index] : "WO";
 
-        // 2. KIRA SEQUENCE: Cari jumlah rekod sedia ada bagi daerah ini dalam kontrak ini
-        const seqRes = await fetch(
+        // 2. KUMPUL SEMUA WORK ID DARI BARIS-BARIS YANG ADA
+        const currentWorkIds = getCurrentWorkIdsFromRows();
+
+        if(currentWorkIds.length === 0){
+            alert("Sila masukkan sekurang-kurangnya satu Work Order ID!");
+            return;
+        }
+
+        // 3. TENTUKAN sequence_no:
+        //    - Jika kita sedang edit group sedia ada (currentWorkSequenceNo wujud), guna itu.
+        //    - Jika tidak, generate baru berdasarkan jumlah rekod sedia ada bagi daerah ini.
+        let sequenceToUse = currentWorkSequenceNo;
+
+        if(!sequenceToUse){
+
+            const seqRes = await fetch(
 `${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&district=eq.${encodeURIComponent(districtSelected)}&select=sequence_no`,
 { headers });
 
-const existingWorks = await seqRes.json();
+            const existingWorks = await seqRes.json();
 
-let maxSeq = 0;
+            let maxSeq = 0;
 
-existingWorks.forEach(w=>{
-    const num = parseInt((w.sequence_no || '').replace(/\D/g,'')) || 0;
-    if(num > maxSeq) maxSeq = num;
-});
+            existingWorks.forEach(w=>{
+                const num = parseInt((w.sequence_no || '').replace(/\D/g,'')) || 0;
+                if(num > maxSeq) maxSeq = num;
+            });
 
-const nextNum = (maxSeq + 1).toString().padStart(3,'0');
-        
-        // 3. BINA FORMAT: Contoh SGT + 001 = SGT001
-        const customSequence = `${areaCode}${nextNum}`;
+            const nextNum = (maxSeq + 1).toString().padStart(3,'0');
 
-        // 4. PROSES KOS & PAYLOAD
-const breakdown = {};
-let totalAmount = 0;
-let additionalTotal = 0;
+            // 4. BINA FORMAT: Contoh SGT + 001 = SGT001
+            sequenceToUse = `${areaCode}${nextNum}`;
+        }
 
-document.querySelectorAll('.w_sec_amt').forEach(i => {
+        // 5. PROSES KOS & LOCATION SETIAP KAD (berasingan ikut Work ID)
+        const sharedFields = {
+            contract_id: contractId,
+            sequence_no: sequenceToUse,
+            qpb_date: document.getElementById('w_qpb_date').value,
+            district: districtSelected,
+            description: document.getElementById('w_desc').value
+        };
 
-    const base = parseFloat(i.dataset.rawValue || 0);
+        const perWorkIdPayload = {}; // work_id -> full payload untuk row tersebut
 
-const extraInput = document.querySelector(
-    `.w_sec_extra[data-sec="${i.dataset.sec}"]`
-);
+        document.querySelectorAll('#w_id_cards_container .w-id-card').forEach(card=>{
 
-const extra = parseFloat(extraInput?.dataset.rawValue || 0);
+            const workId = card.dataset.workId;
+            if(!workId) return;
 
-    // section_category hanya simpan amt
-    breakdown[i.dataset.sec] = {
-    amt: base,
-    extra: extra
-};
+            const locationInput = card.querySelector('.w_card_location');
+            const location = locationInput ? locationInput.value : '';
 
-    totalAmount += base;
-    additionalTotal += extra;
+            const breakdown = {};
+            let totalAmount = 0;
+            let additionalTotal = 0;
 
-});
+            card.querySelectorAll('.w_sec_amt').forEach(i=>{
 
-const workIdValue = normalizeWorkId(
-    document.getElementById('w_id_num').value
-);
+                const sec = i.dataset.sec;
+                const base = parseFloat(i.dataset.rawValue || 0);
 
-const checkRes = await fetch(
+                const extraInput = card.querySelector(
+                    `.w_sec_extra[data-sec="${escapeAttr(sec)}"]`
+                );
+
+                const extra = parseFloat(extraInput?.dataset.rawValue || 0);
+
+                breakdown[sec] = { amt: base, extra: extra };
+
+                totalAmount += base;
+                additionalTotal += extra;
+
+            });
+
+            perWorkIdPayload[workId] = {
+                ...sharedFields,
+                work_id: workId,
+                location: location,
+                section_category: breakdown,
+                additional: additionalTotal,
+                amount_spent: totalAmount + additionalTotal
+            };
+
+        });
+
+        // 6. UPSERT SETIAP WORK ID DALAM LIST SEMASA (ikut payload kad masing-masing)
+        for(const workIdValue of currentWorkIds){
+
+            const payload = perWorkIdPayload[workIdValue];
+            if(!payload) continue; // sepatutnya tidak berlaku, tapi jaga-jaga
+
+            const checkRes = await fetch(
 `${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}`,
 { headers });
 
-const existing = await checkRes.json();
+            const existing = await checkRes.json();
 
-let sequenceToUse = customSequence;
-let res;
+            if(existing.length > 0){
 
-if(existing.length > 0){
-    sequenceToUse = existing[0].sequence_no;
-}
+                await fetch(
+                `${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`,
+                {
+                    method: 'PATCH',
+                    headers: headers,
+                    body: JSON.stringify(payload)
+                });
 
-const payload = {
-    contract_id: contractId,
-    work_id: workIdValue,
-    sequence_no: sequenceToUse,
-    qpb_date: document.getElementById('w_qpb_date').value,
-    location: document.getElementById('w_location').value,
-    district: districtSelected,
-    description: document.getElementById('w_desc').value,
-    section_category: breakdown,
-    additional: additionalTotal,
-    amount_spent: totalAmount + additionalTotal
-};
+            }else{
 
-if(existing.length > 0){
+                await fetch(
+                `${SB_URL}/rest/v1/work_orders`,
+                {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(payload)
+                });
 
-    // UPDATE
-    res = await fetch(
-    `${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`,
-    {
-        method: 'PATCH',
-        headers: headers,
-        body: JSON.stringify(payload)
-    });
+            }
 
-}else{
-
-    // INSERT
-    res = await fetch(
-    `${SB_URL}/rest/v1/work_orders`,
-    {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(payload)
-    });
-
-}
-
-        if (res.ok) { 
-            alert(`Berjaya didaftar! No. Rujukan: ${sequenceToUse}`); 
-            location.reload(); 
-        } else {
-            const err = await res.json();
-            alert("Ralat: " + err.message);
         }
+
+        // 7. PADAM WORK ID YANG ASALNYA WUJUD (loaded) TAPI DIBUANG DARI LIST SEKARANG
+        const removedWorkIds = originalLoadedWorkIds.filter(
+            id => !currentWorkIds.includes(id)
+        );
+
+        for(const removedId of removedWorkIds){
+
+            await fetch(
+            `${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(removedId)}`,
+            {
+                method: 'DELETE',
+                headers: headers
+            });
+
+        }
+
+        alert(`Berjaya didaftar! No. Rujukan: ${sequenceToUse}`);
+        location.reload();
+
     } catch (error) {
         console.error(error);
         alert("Gagal memproses nombor turutan.");
@@ -1335,6 +1426,7 @@ opt.text = c.contract_code;
 opt.dataset.b = JSON.stringify(c.contract_sections_breakdown);
 opt.dataset.dist = (c.district || '').toUpperCase();
 opt.dataset.area = c.area_code;
+    opt.dataset.vo = JSON.stringify(c.vo_breakdown || {});
 
 contractSelect.appendChild(opt);
 
@@ -1348,9 +1440,8 @@ console.error(e);
 
     function onContractSelect(){
 
-        document.getElementById('w_id_num').value = '';
+        resetWorkIdRows();
         document.getElementById('w_qpb_date').value = '';
-document.getElementById('w_location').value = '';
 document.getElementById('w_desc').value = '';
 
 document.getElementById('total_display').innerText =
@@ -1360,10 +1451,6 @@ const opt = document.getElementById('w_contract_id').selectedOptions[0];
 
 const dSel = document.getElementById('w_dist');
 dSel.innerHTML = '<option value="">Choose District</option>';
-
-        const container = document.getElementById('w_sections_container');
-
-container.innerHTML = '';
 
 if(opt && opt.dataset.dist){
 
@@ -1377,42 +1464,10 @@ dSel.innerHTML += `<option value="${district}">${district}</option>`;
 
 }
 
-if(opt && opt.dataset.b){
+// Simpan sections kontrak semasa secara global supaya kad-kad Work ID boleh guna semula
+currentContractSections = (opt && opt.dataset.b) ? JSON.parse(opt.dataset.b) : {};
 
-const b = JSON.parse(opt.dataset.b);
-
-Object.keys(b).sort().forEach(sec=>{
-
-const desc = (b[sec].desc || '').trim().toUpperCase();
-
-const isProvisional = desc.includes('PROVISIONAL');
-
-container.innerHTML += `
-<div class="funding-item">
-
-<label>${sec}</label>
-<span class="sec-desc">${b[sec].desc}</span>
-
-<input type="text"
-class="w_sec_amt"
-data-sec="${sec}"
-placeholder="0.00"
-oninput="formatCurrencyInput(this); calcTotalWork()">
-
-${isProvisional ? `
-<input type="text"
-class="w_sec_extra"
-data-sec="${sec}"
-placeholder="0.00"
-oninput="formatCurrencyInput(this); calcTotalWork()">
-` : ``}
-
-</div>
-`;
-
-});
-
-}
+renderWorkIdCards();
 
 }
 
@@ -1525,13 +1580,241 @@ if(!match) return '';
 
 const prefix =
 match[1] ||
-document.getElementById('w_id_prefix')?.value ||
 'C';
 
 const suffix = match[3] || '';
 
 return `${prefix} ${match[2]}${suffix}`;
 
+}
+
+/* ============================================================
+   WORK ORDER — Multiple Work ID rows (shared sequence_no)
+   ============================================================ */
+
+function addWorkIdRow(prefix = 'C', num = ''){
+
+    const container = document.getElementById('w_id_rows_container');
+
+    workIdRowCounter++;
+    const rowId = `w_id_row_${workIdRowCounter}`;
+
+    const row = document.createElement('div');
+    row.className = 'w-id-row';
+    row.id = rowId;
+    row.style = "display:flex; gap:8px; align-items:center; margin-bottom:8px;";
+
+    row.innerHTML = `
+        <select class="w_id_prefix" style="width:80px;flex-shrink:0;">
+            <option value="C" ${prefix === 'C' ? 'selected' : ''}>C</option>
+            <option value="K" ${prefix === 'K' ? 'selected' : ''}>K</option>
+        </select>
+        <input type="text"
+               class="w_id_num"
+               placeholder="123456"
+               value="${num}"
+               oninput="this.value=this.value.replace(/[^0-9]/g,'');renderWorkIdCards();autoDetectWork()">
+        <div onclick="removeWorkIdRow('${rowId}')"
+             style="color:red; cursor:pointer; flex-shrink:0; padding:0 6px;">✕</div>
+    `;
+
+    row.querySelector('.w_id_prefix').addEventListener('change', () => {
+        renderWorkIdCards();
+        autoDetectWork();
+    });
+
+    container.appendChild(row);
+}
+
+function removeWorkIdRow(rowId){
+    const row = document.getElementById(rowId);
+    if(row) row.remove();
+
+    // Mesti kekal sekurang-kurangnya satu baris
+    const container = document.getElementById('w_id_rows_container');
+    if(container.children.length === 0){
+        addWorkIdRow();
+    }
+
+    renderWorkIdCards();
+    autoDetectWork();
+}
+
+function resetWorkIdRows(){
+    document.getElementById('w_id_rows_container').innerHTML = '';
+    workIdRowCounter = 0;
+    originalLoadedWorkIds = [];
+    currentWorkSequenceNo = null;
+    workIdCardDataMap = {};
+    lastWorkIdNum = '';
+    addWorkIdRow();
+    renderWorkIdCards();
+}
+
+function getCurrentWorkIdsFromRows(){
+
+    const ids = [];
+
+    document.querySelectorAll('#w_id_rows_container .w-id-row').forEach(row=>{
+
+        const prefix = row.querySelector('.w_id_prefix').value;
+        const num = row.querySelector('.w_id_num').value.trim();
+
+        if(num.length > 0){
+            const normalized = normalizeWorkIdWithPrefix(prefix, num);
+            if(normalized && !ids.includes(normalized)){
+                ids.push(normalized);
+            }
+        }
+
+    });
+
+    return ids;
+}
+
+function normalizeWorkIdWithPrefix(prefix, raw){
+
+    raw = (raw || '').trim().toUpperCase();
+
+    const match = raw.match(/^([CK])?\s*(\d+)\s*([A-Z]?)$/);
+
+    if(!match) return '';
+
+    const usedPrefix = match[1] || prefix || 'C';
+    const suffix = match[3] || '';
+
+    return `${usedPrefix} ${match[2]}${suffix}`;
+}
+
+/* ============================================================
+   WORK ORDER — Per-Work-ID cards (Location + Cost Breakdown)
+   ============================================================ */
+
+function buildSectionFieldsHtml(workId, sectionData){
+
+    let html = '';
+
+    Object.keys(currentContractSections).sort().forEach(sec=>{
+
+        const desc = (currentContractSections[sec].desc || '').trim().toUpperCase();
+        const isProvisional = desc.includes('PROVISIONAL');
+
+        const existingAmt = (sectionData && sectionData[sec] && sectionData[sec].amt) || 0;
+        const existingExtra = (sectionData && sectionData[sec] && sectionData[sec].extra) || 0;
+
+        html += `
+<div class="funding-item">
+
+<label>${sec}</label>
+<span class="sec-desc">${currentContractSections[sec].desc || ''}</span>
+
+<input type="text"
+class="w_sec_amt"
+data-sec="${escapeAttr(sec)}"
+data-work-id="${escapeAttr(workId)}"
+data-raw-value="${existingAmt}"
+value="${Number(existingAmt).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}"
+placeholder="0.00"
+oninput="formatCurrencyInput(this); calcTotalWork()">
+
+${isProvisional ? `
+<input type="text"
+class="w_sec_extra"
+data-sec="${escapeAttr(sec)}"
+data-work-id="${escapeAttr(workId)}"
+data-raw-value="${existingExtra}"
+value="${Number(existingExtra).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}"
+placeholder="0.00"
+oninput="formatCurrencyInput(this); calcTotalWork()">
+` : ``}
+
+</div>
+`;
+
+    });
+
+    return html;
+}
+
+function renderWorkIdCards(){
+
+    const container = document.getElementById('w_id_cards_container');
+    if(!container) return;
+
+    // 1. Simpan dahulu nilai semasa (location + breakdown) setiap kad sedia ada,
+    //    supaya tidak hilang bila kita re-render akibat ID list berubah.
+    const preservedData = { ...workIdCardDataMap };
+
+    document.querySelectorAll('.w-id-card').forEach(card=>{
+
+        const workId = card.dataset.workId;
+        if(!workId) return;
+
+        const locationInput = card.querySelector('.w_card_location');
+        const location = locationInput ? locationInput.value : '';
+
+        const sectionData = {};
+
+        card.querySelectorAll('.w_sec_amt').forEach(i=>{
+            const sec = i.dataset.sec;
+            if(!sectionData[sec]) sectionData[sec] = {};
+            sectionData[sec].amt = parseFloat(i.dataset.rawValue || 0);
+        });
+
+        card.querySelectorAll('.w_sec_extra').forEach(i=>{
+            const sec = i.dataset.sec;
+            if(!sectionData[sec]) sectionData[sec] = {};
+            sectionData[sec].extra = parseFloat(i.dataset.rawValue || 0);
+        });
+
+        preservedData[workId] = { location, section_category: sectionData };
+
+    });
+
+    // 2. Bina semula container ikut ID semasa dalam senarai atas
+    const currentIds = getCurrentWorkIdsFromRows();
+
+    container.innerHTML = '';
+
+    currentIds.forEach(workId=>{
+
+        const existing = preservedData[workId] || {};
+        const location = existing.location || '';
+        const sectionData = existing.section_category || {};
+
+        const card = document.createElement('div');
+        card.className = 'w-id-card';
+        card.dataset.workId = workId;
+
+        card.innerHTML = `
+            <span class="w-id-card-label">${workId}</span>
+            <label>Location</label>
+            <input type="text"
+                   class="w_card_location"
+                   placeholder="Location (Example: JEMENTAH)"
+                   value="${escapeAttr(location)}">
+            <label>Cost Breakdown</label>
+            <div class="funding-grid">
+                ${buildSectionFieldsHtml(workId, sectionData)}
+            </div>
+        `;
+
+        container.appendChild(card);
+
+    });
+
+    // 3. Kemaskini cache global supaya konsisten dengan apa yang baru dirender
+    workIdCardDataMap = preservedData;
+
+    calcTotalWork();
+}
+
+/* ============================================================
+   INTERIM — Section -> VO (nested) claim input rendering
+   ============================================================ */
+
+function escapeAttr(str){
+    return String(str).replace(/"/g, '&quot;');
 }
 
 function onInterimContractSelect(skipReset = false) {
@@ -1546,39 +1829,66 @@ if(!skipReset){
     resetInterimForm(false);
 }
 
-if(opt && opt.dataset.b){
+if(!opt || !opt.dataset.b){
+    return;
+}
 
 const sections = JSON.parse(opt.dataset.b);
+const contractVO = opt.dataset.vo
+    ? JSON.parse(opt.dataset.vo)
+    : {};
 
-Object.keys(sections).sort().forEach(sec=>{
+// Bina map: SECTION_NAME -> [ {voName, voData}, ... ]
+const voBySection = {};
+Object.keys(contractVO).sort().forEach(voName => {
+    const vo = contractVO[voName] || {};
+    const voSectionBreakdown = vo.breakdown || {};
 
-container.innerHTML += `
-<div style="
-background:rgba(255,255,255,0.2);
-padding:10px;
-border-radius:12px;
-">
-
-<label style="font-size:10px;">
-${sec}
-</label>
-
-<span class="sec-desc">
-${sections[sec].desc || ''}
-</span>
-
-<input type="text"
-class="i_sec_claim_val"
-data-sec="${sec}"
-placeholder="0.00"
-oninput="formatCurrencyInput(this); calcInterimManualTotal()">
-
-</div>
-`;
-
+    Object.keys(voSectionBreakdown).forEach(secName => {
+        if(!voBySection[secName]) voBySection[secName] = [];
+        voBySection[secName].push({
+            voName: voName,
+            amt: voSectionBreakdown[secName].amt || 0,
+            desc: `VO Date: ${vo.date || '-'} | Variation Order`
+        });
+    });
 });
 
-}
+// Render ikut urutan Section asal kontrak (A, B, C, ...)
+Object.keys(sections).sort().forEach(sec => {
+
+    const secData = sections[sec];
+    const secKey = sec; 
+    const relatedVOs = voBySection[sec] || [];
+
+    let voHtml = '';
+    relatedVOs.forEach(vo => {
+        const voKey = `${sec}|VO:${vo.voName}`;
+        voHtml += `
+<div class="interim-vo-sub">
+    <span class="vo-sub-label"><i class="fa-solid fa-turn-down" style="font-size:9px;"></i> ${vo.voName}</span>
+    <span class="sec-desc">${vo.desc}</span>
+    <input type="text"
+        class="i_sec_claim_val"
+        data-sec="${escapeAttr(voKey)}"
+        placeholder="0.00"
+        oninput="formatCurrencyInput(this); calcInterimManualTotal()">
+</div>`;
+    });
+
+    container.innerHTML += `
+<div class="interim-section-block">
+    <span class="sec-main-label">${sec}</span>
+    <span class="sec-desc">${secData.desc || ''}</span>
+    <input type="text"
+        class="i_sec_claim_val"
+        data-sec="${escapeAttr(secKey)}"
+        placeholder="0.00"
+        oninput="formatCurrencyInput(this); calcInterimManualTotal()">
+    ${voHtml}
+</div>`;
+
+});
 
 }
     function resetInterimForm(clearNo=true){
@@ -1598,9 +1908,11 @@ document.getElementById('i_no').value = '';
 }
 
 document.getElementById('i_date_received').value = '';
-document.getElementById('i_salvage').value = 0;
-document.getElementById('i_pg_sum').value = 0;
-document.getElementById('i_tax_amount').value = 0;
+['i_salvage','i_pg_sum','i_tax_amount'].forEach(id=>{
+    const el = document.getElementById(id);
+    el.value = '0.00';
+    el.dataset.rawValue = '0';
+});
 
 
 attachedWorkOrders = [];
@@ -1661,9 +1973,17 @@ function addWorkOrdersToList() {
     total += parseFloat(input.dataset.rawValue || 0);
 });
 
-    const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
-    const pg = parseFloat(document.getElementById('i_pg_sum').value) || 0;
-    const taxAmount = parseFloat(document.getElementById('i_tax_amount').value) || 0;
+    const salvage = parseFloat(
+    document.getElementById('i_salvage').dataset.rawValue || 0
+);
+
+const pg = parseFloat(
+    document.getElementById('i_pg_sum').dataset.rawValue || 0
+);
+
+const taxAmount = parseFloat(
+    document.getElementById('i_tax_amount').dataset.rawValue || 0
+);
 
 const net = total - salvage - pg + taxAmount;
        document.getElementById('i_total_display').innerHTML = `
@@ -1715,14 +2035,37 @@ document.querySelectorAll('.i_sec_claim_val').forEach(i=>{
     const val = parseFloat(i.dataset.rawValue || 0);
 
     if(val > 0){
-        breakdown[i.dataset.sec] = { amt: val };
+        const secKey = i.dataset.sec; 
+        const parts = secKey.split('|VO:');
+
+        if(parts.length === 2){
+            const sectionName = parts[0];           
+            const voName = parts[1];                
+
+            if(!breakdown[sectionName]) breakdown[sectionName] = { amt: 0 };
+            if(!breakdown[sectionName].vo) breakdown[sectionName].vo = {};
+            breakdown[sectionName].vo[voName] = { amt: val };
+
+        } else {
+            if(!breakdown[secKey]) breakdown[secKey] = { amt: 0 };
+            breakdown[secKey].amt = val;
+        }
+
         total += val;
     }
 });
 
-const salvage = parseFloat(document.getElementById('i_salvage').value) || 0;
-const pg = parseFloat(document.getElementById('i_pg_sum').value) || 0;
-const taxAmount = parseFloat(document.getElementById('i_tax_amount').value) || 0;
+const salvage = parseFloat(
+    document.getElementById('i_salvage').dataset.rawValue || 0
+);
+
+const pg = parseFloat(
+    document.getElementById('i_pg_sum').dataset.rawValue || 0
+);
+
+const taxAmount = parseFloat(
+    document.getElementById('i_tax_amount').dataset.rawValue || 0
+);
 
 const net = total - salvage - pg + taxAmount;
 
@@ -1908,6 +2251,7 @@ return total;
         try {
             const cId = document.getElementById('vo_contract_id').value;
             const voName = document.getElementById('vo_name').value.trim().toUpperCase();
+            const voDate = document.getElementById('vo_date').value;
             let amt = 0;
 
 const breakdown = {};
@@ -1933,8 +2277,8 @@ amt += value;
 
 });
             if(!cId) return alert("Sila pilih kontrak!");
-            if(!voName || isNaN(amt)){
-    return alert("Sila isi Nama VO dan Amaun!");
+            if(!voName || !voDate || isNaN(amt)){
+    return alert("Sila isi Nama VO, Tarikh VO dan Amaun!");
 }
 
             // 1. Ambil data kontrak terkini
@@ -1946,17 +2290,12 @@ amt += value;
             const contract = data[0];
             let vBreak = contract.vo_breakdown || {};
             
-            // 2. Tambah rekod VO baru ke dalam breakdown
+            // 2. Tambah rekod VO baru termasuk maklumat tarikh
             vBreak[voName] = {
-
-amt: amt,
-
-breakdown: breakdown,
-
-desc:
-document.getElementById('vo_desc').value
-
-};
+                amt: amt,
+                date: voDate,
+                breakdown: breakdown
+            };
             
             // 3. Kemaskini (PATCH) data ke Supabase
             const resUpd = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${cId}`, { 
@@ -1984,111 +2323,100 @@ document.getElementById('vo_desc').value
     let detectTimer = null;
 
 function autoDetectWork(){
-    const num = document.getElementById('w_id_num').value.trim();
-    
-    // Jika nombor ditaip sama macam sebelum ini, jangan hantar API request!
-    if(num === lastWorkIdNum) return; 
-    lastWorkIdNum = num;
+
+    const currentIds = getCurrentWorkIdsFromRows();
+    const idsKey = currentIds.join('|');
+
+    if(idsKey === lastWorkIdNum) return;
+    lastWorkIdNum = idsKey;
 
     clearTimeout(detectTimer);
     detectTimer = setTimeout(async ()=>{
- 
-const contractId = document.getElementById('w_contract_id').value;
-const num = document.getElementById('w_id_num').value.trim();
-const workId = normalizeWorkId(num);
 
-if(!contractId || num.length < 3) return;
+const contractId = document.getElementById('w_contract_id').value;
+const idsToCheck = getCurrentWorkIdsFromRows();
+
+if(!contractId || idsToCheck.length === 0) return;
 
 try{
 
+// Cari jika MANA-MANA satu Work ID dalam list wujud dalam DB untuk kontrak ini
+// Nota: dalam sintaks PostgREST or=(col.eq.val,...), tanda kurungan & koma TIDAK boleh
+// di-encode, hanya nilai sebenar di dalamnya yang perlu di-encode.
+const orFilter = idsToCheck
+    .map(id => `work_id.eq.${encodeURIComponent(id)}`)
+    .join(',');
+
 const res = await fetch(
-`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workId)}&select=*`,
+`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&or=(${orFilter})&select=*`,
 { headers }
 );
 
-const data = await res.json();
+const matches = await res.json();
 
-if(data.length === 0){
+if(!Array.isArray(matches) || matches.length === 0){
 
-    document.getElementById('w_qpb_date').value = '';
-    document.getElementById('w_location').value = '';
-    document.getElementById('w_desc').value = '';
-
-    document.querySelectorAll('.w_sec_amt').forEach(i=>{
-        i.value='';
-        i.dataset.rawValue='0';
-    });
-
-    document.querySelectorAll('.w_sec_extra').forEach(i=>{
-        i.value='';
-        i.dataset.rawValue='0';
-    });
-
-    calcTotalWork();
+    // Tiada rekod wujud — anggap semuanya entri baru
+    currentWorkSequenceNo = null;
+    originalLoadedWorkIds = [];
 
     return;
 }
 
-const w = data[0];
+// Wujud sekurang-kurangnya satu match — load SEMUA row dengan sequence_no yang sama
+const sharedSeq = matches[0].sequence_no;
 
-if(w.work_id){
+const groupRes = await fetch(
+`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&sequence_no=eq.${encodeURIComponent(sharedSeq || '')}&select=*`,
+{ headers }
+);
 
-const parts = w.work_id.split(' ');
+const group = await groupRes.json();
 
-if(parts.length > 1){
+if(group.length === 0) return;
 
-document.getElementById('w_id_prefix').value =
-parts[0];
+currentWorkSequenceNo = sharedSeq;
+originalLoadedWorkIds = group.map(w => w.work_id);
 
-document.getElementById('w_id_num').value =
-parts[1];
+// Isi balik baris-baris Work ID dalam UI mengikut group penuh
+document.getElementById('w_id_rows_container').innerHTML = '';
+workIdRowCounter = 0;
 
-}
+group.forEach(w=>{
+    const parts = (w.work_id || '').split(' ');
+    const prefix = parts[0] || 'C';
+    const num = parts[1] || '';
+    addWorkIdRow(prefix, num);
+});
 
-}
+// Susun semula data location + section_category SETIAP Work ID (berasingan ikut row asal)
+workIdCardDataMap = {};
+group.forEach(w=>{
+    workIdCardDataMap[w.work_id] = {
+        location: w.location || '',
+        section_category: w.section_category || {}
+    };
+});
+
+const w = group[0];
 
 document.getElementById('w_qpb_date').value = w.qpb_date || '';
-document.getElementById('w_location').value = w.location || '';
 document.getElementById('w_desc').value = w.description || '';
 
 setTimeout(()=>{
 document.getElementById('w_dist').value = w.district || '';
 },100);
 
-if(w.section_category){
-
-Object.keys(w.section_category).forEach(sec=>{
-
-const amt = document.querySelector(`.w_sec_amt[data-sec="${sec}"]`);
-const extra = document.querySelector(`.w_sec_extra[data-sec="${sec}"]`);
-
-if(amt){
-    amt.dataset.rawValue = w.section_category[sec].amt || 0;
-    amt.value = Number(amt.dataset.rawValue).toLocaleString('en-MY', {minimumFractionDigits:2, maximumFractionDigits:2});
-}
-if(extra){
-
-    const extraVal =
-        w.section_category?.[sec]?.extra || 0;
-
-    extra.dataset.rawValue = extraVal;
-
-    extra.value = Number(extraVal).toLocaleString(
-        'en-MY',
-        {
-            minimumFractionDigits:2,
-            maximumFractionDigits:2
-        }
-    );
-}
-
-});
-
-}
+// Render kad-kad ikut data yang baru dimuatkan (location & breakdown berasingan setiap Work ID)
+renderWorkIdCards();
 
 calcTotalWork();
 
-console.log("Existing Work Order loaded");
+// Pastikan lastWorkIdNum sepadan dengan keadaan yang baru sahaja dimuatkan,
+// supaya kita tidak terus re-trigger detect loop.
+lastWorkIdNum = getCurrentWorkIdsFromRows().join('|');
+
+console.log("Existing Work Order group loaded:", sharedSeq);
 
 }catch(e){
 
@@ -2155,14 +2483,23 @@ document.getElementById('interim_submit_btn').style.background =
 document.getElementById('i_date_received').value =
 (i.date_received || '').split('T')[0];
 
-document.getElementById('i_salvage').value =
-i.salvage_value || 0;
+[
+    ['i_salvage', i.salvage_value],
+    ['i_pg_sum', i.performance_guarantee_sum],
+    ['i_tax_amount', i.tax]
+].forEach(([id,val])=>{
 
-document.getElementById('i_pg_sum').value =
-i.performance_guarantee_sum || 0;
+    const num = Number(val || 0);
+    const el = document.getElementById(id);
 
-    document.getElementById('i_tax_amount').value =
-i.tax || 0;
+    el.dataset.rawValue = num;
+
+    el.value = num.toLocaleString('en-MY',{
+        minimumFractionDigits:2,
+        maximumFractionDigits:2
+    });
+
+});
 
 onInterimContractSelect(true);
 
@@ -2170,26 +2507,43 @@ setTimeout(async ()=>{
 
 if(i.claim_breakdown){
 
-Object.keys(i.claim_breakdown).forEach(sec=>{
+    Object.keys(i.claim_breakdown).forEach(sec=>{
 
-const input = document.querySelector(
-`.i_sec_claim_val[data-sec="${sec}"]`
-);
+        const secInput = document.querySelector(
+            `.i_sec_claim_val[data-sec="${CSS.escape(sec)}"]`
+        );
 
-if(input){
+        if(secInput){
+            const val = Number(i.claim_breakdown[sec].amt || 0);
+            secInput.dataset.rawValue = val;
+            secInput.value = val.toLocaleString('en-MY',{
+                minimumFractionDigits:2,
+                maximumFractionDigits:2
+            });
+        }
 
-    const val = Number(i.claim_breakdown[sec].amt || 0);
+        const voData = i.claim_breakdown[sec].vo || {};
 
-    input.dataset.rawValue = val;
+        Object.keys(voData).forEach(voName=>{
 
-    input.value = val.toLocaleString('en-MY',{
-        minimumFractionDigits:2,
-        maximumFractionDigits:2
+            const voKey = `${sec}|VO:${voName}`;
+
+            const voInput = document.querySelector(
+                `.i_sec_claim_val[data-sec="${CSS.escape(voKey)}"]`
+            );
+
+            if(voInput){
+                const val = Number(voData[voName].amt || 0);
+                voInput.dataset.rawValue = val;
+                voInput.value = val.toLocaleString('en-MY',{
+                    minimumFractionDigits:2,
+                    maximumFractionDigits:2
+                });
+            }
+
+        });
+
     });
-
-}
-
-});
 
 }
 
@@ -2301,8 +2655,17 @@ c.contractor || '';
 document.getElementById('c_insurance_no').value =
 c.insurance_no || '';
 
-document.getElementById('c_pg_total').value =
+const pgInput = document.getElementById('c_pg_total');
+
+pgInput.dataset.rawValue =
 c.performance_guarantee_total || 0;
+
+pgInput.value =
+Number(c.performance_guarantee_total || 0)
+.toLocaleString('en-MY',{
+    minimumFractionDigits:2,
+    maximumFractionDigits:2
+});
 
 document.getElementById('c_dist').value =
 c.district || '';
@@ -2418,13 +2781,11 @@ async function updateWorkOrderSequenceNumbers(contractId, districtText, areaText
     const districts = districtText.split(',').map(x => x.trim().toUpperCase());
     const areas = areaText.split(',').map(x => x.trim().toUpperCase());
 
-    // 1. Tarik semua data work order untuk kontrak ini (Hanya 1 GET request)
     const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&select=id,sequence_no,district`, { headers });
     const works = await res.json();
 
     let bulkUpdatePayload = [];
 
-    // 2. Proses susunan dalam JavaScript (Sangat laju, tak beban database)
     districts.forEach((district, index) => {
         const areaCode = areas[index] || 'WO';
 
@@ -2438,8 +2799,6 @@ async function updateWorkOrderSequenceNumbers(contractId, districtText, areaText
 
         districtWorks.forEach((work, i) => {
             const newSeq = areaCode + String(i + 1).padStart(3, '0');
-            
-            // Masukkan ID dan data baru ke dalam senarai pukal
             bulkUpdatePayload.push({
                 id: work.id,
                 sequence_no: newSeq
@@ -2447,10 +2806,9 @@ async function updateWorkOrderSequenceNumbers(contractId, districtText, areaText
         });
     });
 
-    // 3. Hantar SEMUA data kemaskini dalam SATU call sahaja (Bulk Upsert)
     if (bulkUpdatePayload.length > 0) {
         await fetch(`${SB_URL}/rest/v1/work_orders`, {
-            method: 'POST', // Supabase guna POST + Prefer: resolution=merge untuk Bulk Update
+            method: 'POST', 
             headers: {
                 ...headers,
                 'Prefer': 'resolution=merge-duplicates'
@@ -2461,7 +2819,6 @@ async function updateWorkOrderSequenceNumbers(contractId, districtText, areaText
 }
 
     function centerActiveForm(btn) {
-        /* Mobile: snap scroll. Desktop: tiada kesan (wrapper tak overflow) */
         if(window.innerWidth <= 768) {
             btn.scrollIntoView({ 
                 behavior: "smooth", 
@@ -2509,12 +2866,10 @@ function handleFormSwipe(dx) {
 
     if(activeIndex === -1) return;
 
-    // Swipe kiri → page seterusnya
     if(dx < 0 && activeIndex < tabs.length - 1){
         tabs[activeIndex + 1].click();
     }
 
-    // Swipe kanan → page sebelumnya
     if(dx > 0 && activeIndex > 0){
         tabs[activeIndex - 1].click();
     }
