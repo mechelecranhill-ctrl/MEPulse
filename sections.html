@@ -534,14 +534,14 @@ async function loadSections(){
     await refreshSections();
 }
 
-/* ── REFRESH DATA & STRUKTUR METRIK BARU ── */
+/* ── REFRESH DATA MENGGUNAKAN CONTRACT_SUM DARI SUPABASE ── */
 async function refreshSections(){
     try{
+        // Fetch data dengan lajur contract_sum sedia ada anda
         const [secRes, unitRes, contractRes] = await Promise.all([
             fetch(`${SB_URL}/rest/v1/me_sections?select=id,section_name`, { headers }),
-            fetch(`${SB_URL}/rest/v1/units?select=id,section_id`, { headers }),
-            // Nota: Jika lajur amaun bajet ditambah kelak, anda boleh select lajur tersebut di sini.
-            fetch(`${SB_URL}/rest/v1/contract?select=id,contract_end,unit_id`, { headers })
+            fetch(`${SB_URL}/rest/v1/units?select=id,section_id,unit_name`, { headers }),
+            fetch(`${SB_URL}/rest/v1/contract?select=id,contract_end,unit_id,contract_sum`, { headers })
         ]);
 
         if(!secRes.ok || !unitRes.ok || !contractRes.ok) throw new Error("Gagal mengambil data dari Supabase");
@@ -556,35 +556,55 @@ async function refreshSections(){
             const secUnitIds = secUnits.map(u => u.id);
             const secContracts = contracts.filter(c => secUnitIds.includes(c.unit_id));
 
-            let activeCount = secContracts.length; 
+            let totalValueSum = 0;
             let expiringCount = 0;
+            let criticalDeficitCount = 0; // Risiko tinggi (kontrak < 2 bulan)
 
             secContracts.forEach(c => {
-                if(!c.contract_end) return;
-                const endDate = new Date(c.contract_end);
-                
-                const timeDiff = endDate.getTime() - today.getTime();
-                const monthsLeft = timeDiff / (1000 * 60 * 60 * 24 * 30.44); 
+                // 1. Kira Total Value guna contract_sum
+                if(c.contract_sum) {
+                    totalValueSum += parseFloat(c.contract_sum);
+                }
 
-                if(monthsLeft <= 6) {
-                    expiringCount++;
+                // 2. Kira Critical Renewals & Deficit Risk
+                if(c.contract_end) {
+                    const endDate = new Date(c.contract_end);
+                    const timeDiff = endDate.getTime() - today.getTime();
+                    const monthsLeft = timeDiff / (1000 * 60 * 60 * 24 * 30.44); 
+
+                    // Kurang atau sama dengan 6 bulan
+                    if(monthsLeft <= 6) {
+                        expiringCount++;
+                    }
+                    // Sangat kritikal / Risiko tinggi jika kurang 2 bulan
+                    if(monthsLeft <= 2) {
+                        criticalDeficitCount++;
+                    }
                 }
             });
 
-            // Simulasi Dinamik untuk nilai Kewangan & SLA berasaskan data kontrak sebenar 
-            // Anda boleh tukar formula ini sebaik sahaja lajur nilai kewangan sebenar wujud dalam DB.
-            const calculatedValue = activeCount > 0 ? `RM ${(activeCount * 320).toFixed(0)}K` : "RM 0";
-            const pseudoSLA = activeCount > 0 ? `${Math.floor(88 + (activeCount % 3) * 4)}%` : "100%";
-            const deficitRiskCount = activeCount > 1 ? Math.floor(activeCount / 3) : 0;
+            // Format paparan RM (Contoh: RM 1.2M atau RM 450K)
+            let formattedValue = "RM 0";
+            if(totalValueSum >= 1000000) {
+                formattedValue = `RM ${(totalValueSum / 1000000).toFixed(1)}M`;
+            } else if(totalValueSum >= 1000) {
+                formattedValue = `RM ${(totalValueSum / 1000).toFixed(0)}K`;
+            } else if(totalValueSum > 0) {
+                formattedValue = `RM ${totalValueSum}`;
+            }
+
+            // Memandangkan SLA belum ada lajur, kita paparkan jumlah Unit Aktif 
+            // di bawah Seksyen ini sebagai metrik pengurusan operasi
+            const totalUnitsActive = secUnits.length;
             
             return {
                 id: sec.id,
                 title: sec.section_name,
                 stats: {
-                    totalValue: calculatedValue,
+                    totalValue: formattedValue,
                     criticalRenew: expiringCount,
-                    deficitRisk: deficitRiskCount,            
-                    slaCompliance: pseudoSLA      
+                    deficitRisk: criticalDeficitCount,            
+                    slaCompliance: `${totalUnitsActive} Units` // Ditukar sementara kepada jumlah unit
                 }
             };
         });
@@ -594,7 +614,7 @@ async function refreshSections(){
         createWheel();
 
     }catch(err){
-        console.error("Ralat pemprosesan logik data metrik baharu:", err);
+        console.error("Ralat pemprosesan logik data contract_sum:", err);
     }
 }
 
