@@ -533,7 +533,7 @@ async function loadSections(){
     await refreshSections();
 }
 
-/* ── REFRESH DATA & TAPIS HANYA MENGGUNAKAN ID DAN TARIKH TAMAT KONTRAK ── */
+/* ── REFRESH DATA & TAPIS MENGGUNAKAN LOGIK TARIKH BARU ── */
 async function refreshSections(){
     try{
         const [secRes, unitRes, contractRes] = await Promise.all([
@@ -554,19 +554,18 @@ async function refreshSections(){
             const secUnitIds = secUnits.map(u => u.id);
             const secContracts = contracts.filter(c => secUnitIds.includes(c.unit_id));
 
-            // 1. Active Contracts = Jumlah semua kontrak yang tersambung dengan seksyen ini
             let activeCount = secContracts.length; 
             let expiringCount = 0;
 
             secContracts.forEach(c => {
-                // 2. Expiring Soon = Kira jika contract_end ada dan berbaki <= 5 bulan dari sekarang
                 if(!c.contract_end) return;
                 const endDate = new Date(c.contract_end);
                 
                 const timeDiff = endDate.getTime() - today.getTime();
                 const monthsLeft = timeDiff / (1000 * 60 * 60 * 24 * 30.44); 
 
-                if(monthsLeft <= 5 && monthsLeft >= 0) {
+                // Menapis kontrak yang tinggal <= 5 bulan DAN kontrak yang dah lepas tarikh tamat (monthsLeft bernilai negatif)
+                if(monthsLeft <= 5) {
                     expiringCount++;
                 }
             });
@@ -577,8 +576,8 @@ async function refreshSections(){
                 stats: {
                     active: activeCount,
                     expiring: expiringCount,
-                    burst: 0,            // Kekalkan 0 memandangkan kolum 'status' tiada
-                    underutilised: 0      // Kekalkan 0 memandangkan kolum 'status' tiada
+                    burst: 0,            
+                    underutilised: 0      
                 }
             };
         });
@@ -677,7 +676,6 @@ function positionItems(){
     });
 }
 
-/* ── PAPAR 4 KAD ASAL ── */
 function update(){
     if(itemEls.length === 0) return;
     
