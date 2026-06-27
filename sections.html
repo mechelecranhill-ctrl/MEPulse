@@ -522,7 +522,7 @@ function getSectionColor(name) {
 openBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     if(!activeSection) {
-        alert("Sila pilih seksyen terlebih dahulu.");
+        alert("Please select a section first.");
         return;
     }
     const targetUrl = `dashboard-contract.html?section=${activeSection.id}`;
@@ -544,7 +544,6 @@ async function loadSections(){
 /* ── REFRESH DATA & KIRA STATISTIK KONTRAK ── */
 async function refreshSections(){
     try{
-        // Nota: Anda boleh menukar url endpoint 'contracts' mengikut nama table kontrak Supabase sebenar anda
         const [secRes, contractRes] = await Promise.all([
             fetch(`${SB_URL}/rest/v1/me_sections?select=id,section_name`, { headers }),
             fetch(`${SB_URL}/rest/v1/contracts?select=id,status,section_id`, { headers }).then(res => res.ok ? res.json() : [])
@@ -556,8 +555,6 @@ async function refreshSections(){
         items = sections.map(sec => {
             const secContracts = contracts.filter(c => c.section_id === sec.id);
             
-            // Pengiraan mengikut status kontrak bagi setiap seksyen
-            // Jika dipulangkan dari DB, pastikan nama status sepadan (cth: 'Aktif', 'Dah Nak Tamat')
             return {
                 id: sec.id,
                 title: sec.section_name,
@@ -687,33 +684,48 @@ function update(){
     title.innerText = item.title;
     cardTitle.innerText = item.title;
 
-    // Default stats sekiranya API gagal atau data kosong
-    const stats = item.stats || { active: 0, expiring: 0, burst: 0, underutilised: 0 };
+    // Semak jika nama seksyen mengandungi Selenggara atau Pematuhan
+    const nameUpper = item.title.toUpperCase();
+    const isContractSection = nameUpper.includes("SELENGGARA") || nameUpper.includes("PEMATUHAN");
 
-    cardDesc.innerHTML = `
-        <div class="contract-grid">
-            <div class="contract-card c-active">
-                <i class="fa-solid fa-circle-check"></i>
-                <div class="count">${stats.active}</div>
-                <div class="label">Kontrak Aktif</div>
+    if (isContractSection) {
+        const stats = item.stats || { active: 0, expiring: 0, burst: 0, underutilised: 0 };
+
+        cardDesc.innerHTML = `
+            <div class="contract-grid">
+                <div class="contract-card c-active">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <div class="count">${stats.active}</div>
+                    <div class="label">Active Contracts</div>
+                </div>
+                <div class="contract-card c-expiring">
+                    <i class="fa-solid fa-hourglass-half"></i>
+                    <div class="count">${stats.expiring}</div>
+                    <div class="label">Expiring Soon</div>
+                </div>
+                <div class="contract-card c-burst">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <div class="count">${stats.burst}</div>
+                    <div class="label">Near Budget Cap</div>
+                </div>
+                <div class="contract-card c-under">
+                    <i class="fa-solid fa-chart-line" style="transform: scaleY(-1);"></i>
+                    <div class="count">${stats.underutilised}</div>
+                    <div class="label">Underutilized</div>
+                </div>
             </div>
-            <div class="contract-card c-expiring">
-                <i class="fa-solid fa-hourglass-half"></i>
-                <div class="count">${stats.expiring}</div>
-                <div class="label">Dah Nak Tamat</div>
+        `;
+        openBtn.style.display = "block"; 
+    } else {
+        // Mesej alternatif profesional untuk seksyen selain Selenggara dan Pematuhan
+        cardDesc.innerHTML = `
+            <div style="padding: 30px 10px; text-align: center; opacity: 0.6; font-size: 14px;">
+                <i class="fa-solid fa-folder-open" style="font-size: 36px; margin-bottom: 12px; display: block; opacity: 0.4;"></i>
+                No operational contract tracking required for this section.
             </div>
-            <div class="contract-card c-burst">
-                <i class="fa-solid fa-triangle-exclamation"></i>
-                <div class="count">${stats.burst}</div>
-                <div class="label">Dah Nak Burst</div>
-            </div>
-            <div class="contract-card c-under">
-                <i class="fa-solid fa-chart-line-down" style="transform: scaleY(-1);"></i>
-                <div class="count">${stats.underutilised}</div>
-                <div class="label">Underutilised</div>
-            </div>
-        </div>
-    `;
+        `;
+        openBtn.style.display = "none"; 
+    }
 
     if(!isMobile){
         if(!card.classList.contains("show")){
