@@ -541,10 +541,10 @@ async function loadSections(){
     await refreshSections();
 }
 
-/* ── REFRESH DATA & KIRA STATISTIK KONTRAK MENGIKUT HUBUNGAN (me_sections -> units -> contracts) ── */
+/* ── REFRESH DATA & KIRA STATISTIK KONTRAK RINGKAS ── */
 async function refreshSections(){
     try{
-        // Guna query hubungan Supabase untuk mengambil sections -> units -> contracts
+        // Tarik data me_sections -> units -> contracts
         const res = await fetch(`${SB_URL}/rest/v1/me_sections?select=id,section_name,units(id,contracts(id,status,contract_end))`, { headers });
         if(!res.ok) throw new Error("Gagal mengambil data dari Supabase");
         
@@ -552,7 +552,6 @@ async function refreshSections(){
         const today = new Date();
 
         items = sections.map(sec => {
-            // Kumpul semua kontrak dari semua unit di dalam seksyen ini
             let allContracts = [];
             if(sec.units && Array.isArray(sec.units)){
                 sec.units.forEach(unit => {
@@ -562,32 +561,27 @@ async function refreshSections(){
                 });
             }
 
-            let activeCount = 0;
+            // 1. Kontrak Aktif = jumlah keseluruhan kontrak yang berkaitan dengan seksyen itu
+            let activeCount = allContracts.length; 
             let expiringCount = 0;
             let burstCount = 0;
             let underutilisedCount = 0;
 
             allContracts.forEach(c => {
-                if(!c.contract_end) return;
-                
-                const endDate = new Date(c.contract_end);
-                
-                // Semak jika kontrak belum tamat (contract_end > today)
-                if(endDate > today) {
-                    activeCount++; // Kontrak Aktif mengambil semua kontrak dalam seksyen yang belum tamat
-
-                    // Kira baki masa dalam bulan untuk "Expiring Soon" (5 bulan atau kurang)
-                    const timeDiff = endDate.getTime() - today.getTime();
-                    const monthsLeft = timeDiff / (1000 * 60 * 60 * 24 * 30.44); // Purata hari sebulan
-
-                    if(monthsLeft <= 5 && monthsLeft >= 0) {
-                        expiringCount++;
-                    }
-                }
-
-                // Status tambahan sedia ada mengikut kolum status DB jika dipulangkan
+                // Status tambahan sedia ada
                 if(c.status === 'Dah Nak Burst') burstCount++;
                 if(c.status === 'Underutilised') underutilisedCount++;
+
+                // 2. Expiring Soon = tengok contract_end yang dalam seksyen tu sahaja (5 bulan atau kurang dari sekarang)
+                if(!c.contract_end) return;
+                const endDate = new Date(c.contract_end);
+                
+                const timeDiff = endDate.getTime() - today.getTime();
+                const monthsLeft = timeDiff / (1000 * 60 * 60 * 24 * 30.44); 
+
+                if(monthsLeft <= 5 && monthsLeft >= 0) {
+                    expiringCount++;
+                }
             });
             
             return {
@@ -719,7 +713,7 @@ function update(){
     title.innerText = item.title;
     cardTitle.innerText = item.title;
 
-    // Semak jika nama seksyen mengandungi Selenggara atau Pematuhan
+    // Grid hanya keluar untuk Selenggara atau Pematuhan
     const nameUpper = item.title.toUpperCase();
     const isContractSection = nameUpper.includes("SELENGGARA") || nameUpper.includes("PEMATUHAN");
 
@@ -752,7 +746,6 @@ function update(){
         `;
         openBtn.style.display = "block"; 
     } else {
-        // Mesej alternatif profesional untuk seksyen selain Selenggara dan Pematuhan
         cardDesc.innerHTML = `
             <div style="padding: 30px 10px; text-align: center; opacity: 0.6; font-size: 14px;">
                 <i class="fa-solid fa-folder-open" style="font-size: 36px; margin-bottom: 12px; display: block; opacity: 0.4;"></i>
