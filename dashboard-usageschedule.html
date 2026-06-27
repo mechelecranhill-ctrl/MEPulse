@@ -1531,6 +1531,22 @@ function renderMobileCards(data){
     }
 
     // ============================
+    // HELPER: Tapis voBreakdown yang aktif pada cutoffDate
+    // Hanya VO dengan vo_date <= cutoffDate yang dikira
+    // ============================
+    function getActiveVO(voBreakdown, cutoffDate) {
+        const active = {};
+        Object.entries(voBreakdown).forEach(([voName, vo]) => {
+            const voDate = vo.vo_date ? new Date(vo.vo_date) : null;
+            // VO dikira hanya jika vo_date wujud DAN vo_date <= cutoffDate
+            if(voDate && voDate <= cutoffDate) {
+                active[voName] = vo;
+            }
+        });
+        return active;
+    }
+
+    // ============================
     // BLUEFORM DATA — single WO
     // ============================
     async function buildBlueformData(id, sharedData = null) {
@@ -1647,6 +1663,11 @@ function renderMobileCards(data){
             sectionUsed["PROVISIONAL SUM"] += currentAdd;
         }
 
+        // ── Kira baki kontrak dengan ambil kira vo_date ──
+        const voBreakdown = c.vo_breakdown || {};
+        // Hanya VO yang vo_date <= cutoffDate yang dimasukkan ke bakiKontrak
+        const activeVO = getActiveVO(voBreakdown, cutoffDate);
+
         let bakiKontrak = Number(c.contract_sum || 0);
         allInterims.forEach(int => {
             const intDate = new Date(int.date_received);
@@ -1665,17 +1686,14 @@ function renderMobileCards(data){
             return new Date(w.qpb_date) <= cutoffDate;
         }).forEach(w => { bakiKontrak -= Number(w.amount_spent||0); });
 
-        // Tambah semua WO dalam group yang sama (sequence_no sama) ke sectionUsed
-        // sudah dikira di atas melalui allWO filter
-
-        const voBreakdown = c.vo_breakdown || {};
+        // Tambah hanya VO yang aktif (vo_date <= cutoffDate)
         let totalVO = 0;
-        Object.values(voBreakdown).forEach(vo => { totalVO += Number(vo.amt||0); });
+        Object.values(activeVO).forEach(vo => { totalVO += Number(vo.amt||0); });
         bakiKontrak += totalVO;
 
         return { data, c, b, s, totalWorkValue, provisionalExtra,
                  sectionUsed, totalSalvage, totalPG, totalTax,
-                 bakiKontrak, voBreakdown };
+                 bakiKontrak, voBreakdown, activeVO, cutoffDate };
     }
 
     // ============================
@@ -1683,7 +1701,6 @@ function renderMobileCards(data){
     // ============================
     async function buildBlueformDataGroup(ids, sharedData = null) {
 
-        // Fetch semua WO dalam group serentak
         const woResults = await Promise.all(
             ids.map(id =>
                 fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}&select=*,contract(*,units(unit_name))`, { headers })
@@ -1695,7 +1712,6 @@ function renderMobileCards(data){
         const c = primaryWO.contract;
         const b = c.contract_sections_breakdown || {};
 
-        // Gabungkan section_category dari semua WO
         const combinedSections = {};
         let combinedProvisional = 0;
 
@@ -1713,16 +1729,11 @@ function renderMobileCards(data){
         Object.values(combinedSections).forEach(sec => { totalSection += Number(sec?.amt || 0); });
         const totalWorkValue = totalSection + combinedProvisional;
 
-        // Gabungkan work_id dengan koma
         const combinedWorkId = woResults.map(w => w.work_id).join(', ');
-
-        // Gabungkan lokasi — unik sahaja, pisah koma
         const uniqueLocations = [...new Set(
             woResults.map(w => (w.location || '').trim()).filter(l => l !== '')
         )];
         const combinedLocation = uniqueLocations.join(', ');
-
-        // Gabungkan description
         const combinedDesc = woResults.map(w => w.description).join(' + ');
 
         let allInterims, allWO, localAreaPriority;
@@ -1747,8 +1758,6 @@ function renderMobileCards(data){
         }
 
         const groupIds = ids.map(Number);
-
-        // Guna tarikh terbaru dalam group sebagai cutoff
         const cutoffDate = new Date(Math.max(...woResults.map(wo => new Date(wo.qpb_date))));
 
         allWO.sort((a,b)=>{
@@ -1779,7 +1788,6 @@ function renderMobileCards(data){
             });
         });
 
-        // WO lain (bukan dalam group) yang sebelum/sama cutoff
         allWO.filter(w => {
             if(groupIds.includes(Number(w.id))) return false;
             if(w.status === "Claimed") return false;
@@ -1809,7 +1817,6 @@ function renderMobileCards(data){
             }
         });
 
-        // Tambah semua WO dalam group ini ke sectionUsed
         woResults.forEach(wo => {
             const cat = wo.section_category || {};
             Object.keys(cat).forEach(sec => {
@@ -1824,7 +1831,11 @@ function renderMobileCards(data){
             }
         });
 
-        // Kira baki kontrak
+        // ── Kira baki kontrak dengan ambil kira vo_date ──
+        const voBreakdown = c.vo_breakdown || {};
+        // Hanya VO yang vo_date <= cutoffDate
+        const activeVO = getActiveVO(voBreakdown, cutoffDate);
+
         let bakiKontrak = Number(c.contract_sum || 0);
 
         allInterims.forEach(int => {
@@ -1847,12 +1858,11 @@ function renderMobileCards(data){
 
         bakiKontrak -= totalWorkValue;
 
-        const voBreakdown = c.vo_breakdown || {};
+        // Tambah hanya VO yang aktif (vo_date <= cutoffDate)
         let totalVO = 0;
-        Object.values(voBreakdown).forEach(vo => { totalVO += Number(vo.amt||0); });
+        Object.values(activeVO).forEach(vo => { totalVO += Number(vo.amt||0); });
         bakiKontrak += totalVO;
 
-        // Override data untuk blueform
         const combinedData = {
             ...primaryWO,
             work_id: combinedWorkId,
@@ -1873,7 +1883,7 @@ function renderMobileCards(data){
             sectionUsed,
             totalSalvage, totalPG, totalTax,
             bakiKontrak,
-            voBreakdown
+            voBreakdown, activeVO, cutoffDate
         };
     }
 
@@ -1883,7 +1893,11 @@ function renderMobileCards(data){
     function buildBlueformHTML(payload) {
         const { data, c, b, s, totalWorkValue, provisionalExtra,
                 sectionUsed, totalSalvage, totalPG, totalTax,
-                bakiKontrak, voBreakdown } = payload;
+                bakiKontrak, voBreakdown, activeVO, cutoffDate } = payload;
+
+        // activeVO: hanya VO yang vo_date <= cutoffDate
+        // Fallback kalau activeVO tidak dihantar (backward compat)
+        const effectiveActiveVO = activeVO || voBreakdown;
 
         const seq = data.sequence_no || '';
         const refPrefix = c.reference || 'RSAJ/M&E/IP/11-';
@@ -1920,9 +1934,10 @@ function renderMobileCards(data){
                 </div>
             </div>`;
 
+            // ── VO: hanya yang aktif pada cutoffDate ──
             let voTotal = 0;
             let voLines = '';
-            Object.entries(voBreakdown).forEach(([voName, vo]) => {
+            Object.entries(effectiveActiveVO).forEach(([voName, vo]) => {
                 const voAmt = Number(vo.breakdown?.[key]?.amt || 0);
                 if(voAmt > 0){
                     voTotal += voAmt;
@@ -1951,7 +1966,6 @@ function renderMobileCards(data){
 
         function formatLocation(loc){
             if(!loc) return '';
-            // Kalau multiple locations (ada koma), format setiap satu
             const parts = loc.split(',').map(part => {
                 let txt = part.trim().toUpperCase();
                 txt = txt.replace(/\bKAMPUNG\b/g,'KG');
@@ -1971,8 +1985,15 @@ function renderMobileCards(data){
             else if(label.includes('PROACTIVE')) label = 'PROACTIVE MAINTENANCE';
             label = label.replace(/CHARGES/g,'').trim();
             const contractAmt = Number(b[sec]?.amt || 0);
+
+            // Tambah VO yang aktif sahaja ke contractAmt untuk pengiraan baki section
+            let voForSection = 0;
+            Object.values(effectiveActiveVO).forEach(vo => {
+                voForSection += Number(vo.breakdown?.[sec]?.amt || 0);
+            });
+
             const usedAmt = Number(sectionUsed[sec] || 0);
-            const baki = contractAmt - usedAmt;
+            const baki = (contractAmt + voForSection) - usedAmt;
             return `
             <div class="bf-row" style="font-size:9px;">
                 <div class="bf-label" style="width:220px;">
@@ -1982,6 +2003,11 @@ function renderMobileCards(data){
                 <div class="bf-value">RM ${baki.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
             </div>`;
         }).join('');
+
+        // Jumlah Harga Kontrak = contract_sum + jumlah VO yang aktif
+        let totalActiveVO = 0;
+        Object.values(effectiveActiveVO).forEach(vo => { totalActiveVO += Number(vo.amt || 0); });
+        const effectiveContractSum = Number(c.contract_sum || 0) + totalActiveVO;
 
         const contentHtml = `
             <div class="bf-row"><div class="bf-label"><span class="bf-no">1</span><span>   No. Rujukan</span></div><div class="bf-colon">:</div><div class="bf-value">${refPrefix}${formattedRef}</div></div>
@@ -2002,7 +2028,7 @@ function renderMobileCards(data){
             </div>
 
             <hr style="border:0.5px solid #000;margin:8px 0;">
-            <div class="bf-row"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Jumlah Harga Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value">RM ${Number(c.contract_sum || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+            <div class="bf-row"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Jumlah Harga Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value">RM ${effectiveContractSum.toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
 
             <div style="margin-top:8px;">
                 <div class="bf-row"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>BAKI</span></div><div class="bf-colon">:</div><div class="bf-value"></div></div>
@@ -2133,7 +2159,8 @@ function renderMobileCards(data){
     }
 
     // ============================
-    // BUILD INTERIM MATRIX — tidak diubah
+    // BUILD INTERIM MATRIX
+    // VO row dalam matrix juga ambil kira vo_date vs tarikh interim
     // ============================
     function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
         const sections = contract.contract_sections_breakdown || {};
@@ -2211,14 +2238,23 @@ function renderMobileCards(data){
             grandTotalOngoingBalance += afterWOBase;
             interimValsBase.forEach((v, i) => { grandTotalInterims[i] += v; });
 
+            // ── VO rows dalam matrix: papar VO mengikut vo_date vs tarikh setiap interim ──
             Object.entries(voBreakdown).forEach(([voName, voData]) => {
-                if(voData && voData.breakdown && voData.breakdown[sec]){
-                    const voContractAmt = Number(voData.breakdown[sec].amt || 0);
-                    let totalClaimVO = 0;
-                    let interimValsVO = [];
-                    interims.forEach(int => {
+                if(!voData || !voData.breakdown || !voData.breakdown[sec]) return;
+
+                const voContractAmt = Number(voData.breakdown[sec].amt || 0);
+                // vo_date untuk VO ini
+                const voDate = voData.vo_date ? new Date(voData.vo_date) : null;
+
+                let totalClaimVO = 0;
+                let interimValsVO = [];
+
+                interims.forEach(int => {
+                    const intDate = new Date(int.date_received);
+                    // VO hanya dikira dalam interim jika vo_date <= tarikh interim tersebut
+                    let val = 0;
+                    if(!voDate || voDate <= intDate) {
                         const cat = int.claim_breakdown || {};
-                        let val = 0;
                         if(cat[sec] && cat[sec].vo && cat[sec].vo[voName]){
                             val = Number(cat[sec].vo[voName].amt || 0);
                         } else if(cat[sec] && cat[sec].vo){
@@ -2226,34 +2262,39 @@ function renderMobileCards(data){
                                 if(key === voName) val += Number(item.amt || 0);
                             });
                         }
-                        totalClaimVO += val;
-                        interimValsVO.push(val);
-                    });
-
-                    if(voContractAmt > 0 || totalClaimVO > 0){
-                        let rowVO = `<tr style="color:#c0392b;background:#fffcfc;">
-                        <td></td><td>↳ ${voName}</td>
-                        <td style="text-align:right;">${formatRM(voContractAmt)}</td>`;
-                        interimValsVO.forEach(val => {
-                            rowVO += `<td style="text-align:right;color:#c0392b;">${val ? formatRM(val) : '-'}</td>`;
-                        });
-                        const balanceVO = voContractAmt - totalClaimVO;
-                        const ongoingV = 0;
-                        const afterWOVO = balanceVO - ongoingV;
-                        rowVO += `
-                        <td style="text-align:right;font-weight:600;">${formatRM(totalClaimVO)}</td>
-                        <td style="text-align:right;">${formatRM(balanceVO)}</td>
-                        <td style="text-align:right;">${formatRM(ongoingV)}</td>
-                        <td style="text-align:right;font-weight:bold;color:${afterWOVO < 0 ? 'red' : '#c0392b'};">${formatRM(afterWOVO)}</td>
-                        </tr>`;
-                        body += rowVO;
-
-                        grandTotalContract += voContractAmt;
-                        grandTotalContractBalance += balanceVO;
-                        grandTotalOngoing += ongoingV;
-                        grandTotalOngoingBalance += afterWOVO;
-                        interimValsBase.forEach((v, i) => { grandTotalInterims[i] += interimValsVO[i]; });
                     }
+                    totalClaimVO += val;
+                    interimValsVO.push(val);
+                });
+
+                // Papar row VO jika ada amaun kontrak atau tuntutan
+                // DAN hanya jika vo_date wujud (VO yang belum ada vo_date tidak dipapar langsung)
+                if(voDate && (voContractAmt > 0 || totalClaimVO > 0)){
+                    let rowVO = `<tr style="color:#c0392b;background:#fffcfc;">
+                    <td></td><td>↳ ${voName}</td>
+                    <td style="text-align:right;">${formatRM(voContractAmt)}</td>`;
+                    interimValsVO.forEach((val, i) => {
+                        // Greyed out jika interim sebelum vo_date
+                        const intDate = new Date(interims[i].date_received);
+                        const isActive = voDate <= intDate;
+                        rowVO += `<td style="text-align:right;color:${isActive ? '#c0392b' : '#ccc'};">${val ? formatRM(val) : (isActive ? '-' : '—')}</td>`;
+                    });
+                    const balanceVO = voContractAmt - totalClaimVO;
+                    const ongoingV = 0;
+                    const afterWOVO = balanceVO - ongoingV;
+                    rowVO += `
+                    <td style="text-align:right;font-weight:600;">${formatRM(totalClaimVO)}</td>
+                    <td style="text-align:right;">${formatRM(balanceVO)}</td>
+                    <td style="text-align:right;">${formatRM(ongoingV)}</td>
+                    <td style="text-align:right;font-weight:bold;color:${afterWOVO < 0 ? 'red' : '#c0392b'};">${formatRM(afterWOVO)}</td>
+                    </tr>`;
+                    body += rowVO;
+
+                    grandTotalContract += voContractAmt;
+                    grandTotalContractBalance += balanceVO;
+                    grandTotalOngoing += ongoingV;
+                    grandTotalOngoingBalance += afterWOVO;
+                    interimValsVO.forEach((v, i) => { grandTotalInterims[i] += v; });
                 }
             });
         });
