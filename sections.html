@@ -541,38 +541,43 @@ async function loadSections(){
     await refreshSections();
 }
 
-/* ── REFRESH DATA & KIRA STATISTIK KONTRAK RINGKAS ── */
+/* ── REFRESH DATA & KIRA STATISTIK KONTRAK RINGKAS BERDASARKAN HUBUNGAN STRUKTUR ── */
 async function refreshSections(){
     try{
-        // Tarik data me_sections -> units -> contracts
-        const res = await fetch(`${SB_URL}/rest/v1/me_sections?select=id,section_name,units(id,contracts(id,status,contract_end))`, { headers });
-        if(!res.ok) throw new Error("Gagal mengambil data dari Supabase");
-        
-        const sections = await res.json();
+        // 1. Tarik ketiga-tiga table secara berasingan untuk mengelakkan ralat hubungan foreign key API
+        const [secRes, unitRes, contractRes] = await Promise.all([
+            fetch(`${SB_URL}/rest/v1/me_sections?select=id,section_name`, { headers }),
+            fetch(`${SB_URL}/rest/v1/units?select=id,section_id`, { headers }),
+            fetch(`${SB_URL}/rest/v1/contract?select=id,status,contract_end,unit_id`, { headers })
+        ]);
+
+        if(!secRes.ok || !unitRes.ok || !contractRes.ok) throw new Error("Gagal mengambil data dari Supabase");
+
+        const sections = await secRes.json();
+        const units = await unitRes.json();
+        const contracts = await contractRes.json();
         const today = new Date();
 
         items = sections.map(sec => {
-            let allContracts = [];
-            if(sec.units && Array.isArray(sec.units)){
-                sec.units.forEach(unit => {
-                    if(unit.contracts && Array.isArray(unit.contracts)){
-                        allContracts = allContracts.concat(unit.contracts);
-                    }
-                });
-            }
+            // a. Cari semua unit di bawah seksyen semasa berdasarkan section_id
+            const secUnits = units.filter(u => u.section_id === sec.id);
+            const secUnitIds = secUnits.map(u => u.id);
 
-            // 1. Kontrak Aktif = jumlah keseluruhan kontrak yang berkaitan dengan seksyen itu
-            let activeCount = allContracts.length; 
+            // b. Ambil semua kontrak yang unit_id nya sepadan dengan unit di bawah seksyen ini
+            const secContracts = contracts.filter(c => secUnitIds.includes(c.unit_id));
+
+            // 1. Kontrak Aktif = Jumlah keseluruhan rekod kontrak yang ditemui berkaitan dengan seksyen ini
+            let activeCount = secContracts.length; 
             let expiringCount = 0;
             let burstCount = 0;
             let underutilisedCount = 0;
 
-            allContracts.forEach(c => {
-                // Status tambahan sedia ada
+            secContracts.forEach(c => {
+                // Status tambahan sedia ada mengikut kolum status
                 if(c.status === 'Dah Nak Burst') burstCount++;
                 if(c.status === 'Underutilised') underutilisedCount++;
 
-                // 2. Expiring Soon = tengok contract_end yang dalam seksyen tu sahaja (5 bulan atau kurang dari sekarang)
+                // 2. Expiring Soon = Tapis baki contract_end yang berada dalam tempoh 5 bulan atau kurang
                 if(!c.contract_end) return;
                 const endDate = new Date(c.contract_end);
                 
@@ -601,7 +606,7 @@ async function refreshSections(){
         createWheel();
 
     }catch(err){
-        console.error(err);
+        console.error("Ralat pemprosesan logik data kontrak:", err);
     }
 }
 
@@ -713,7 +718,7 @@ function update(){
     title.innerText = item.title;
     cardTitle.innerText = item.title;
 
-    // Grid hanya keluar untuk Selenggara atau Pematuhan
+    // Semak jika nama seksyen mengandungi Selenggara atau Pematuhan
     const nameUpper = item.title.toUpperCase();
     const isContractSection = nameUpper.includes("SELENGGARA") || nameUpper.includes("PEMATUHAN");
 
