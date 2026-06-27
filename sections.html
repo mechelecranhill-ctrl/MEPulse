@@ -30,6 +30,7 @@ font-family:Inter,system-ui;
 --input-bg: rgba(255, 255, 255, 0.4);
 }
 
+/* ── DAFTAR PROPERTY UNTUK ANIMASI GRADIENT ── */
 @property --gradient-1 {
   syntax: '<color>';
   initial-value: #0b3d91;
@@ -184,7 +185,7 @@ animation:fadeInRight .45s ease forwards;
 .info-card h2{ margin-bottom:10px; font-size:22px; }
 .info-card p{ opacity:.7; line-height:1.6; }
 
-/* ── PROFESSIONAL METRIC GRID ── */
+/* ── REKA BENTUK KAD KONTRAK BARU ── */
 .contract-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -219,11 +220,11 @@ animation:fadeInRight .45s ease forwards;
     line-height: 1.2;
 }
 
-/* Kategori Tag yang Profesional & Kemas */
-.tag-active i { color: #4ade80; }     /* Hijau - Aktif */
-.tag-expiring i { color: #fbbf24; }   /* Kuning - Amaran Masa */
-.tag-burst i { color: #f87171; }      /* Merah - Amaran Kewangan/Skop */
-.tag-underutil i { color: #38bdf8; }  /* Biru - Kurang Guna */
+/* Warna Status Ikon */
+.c-active i { color: #4ade80; }      /* Hijau */
+.c-expiring i { color: #fbbf24; }    /* Kuning */
+.c-burst i { color: #f87171; }      /* Merah */
+.c-under i { color: #60a5fa; }      /* Biru */
 
 .section-helm{
 width:160px;
@@ -323,6 +324,7 @@ visibility:hidden;
 transform:translateY(40px);
 transition:opacity .35s ease, transform .35s ease, visibility .35s;
 
+/* Ketinggian tetap yang dioptimumkan untuk grid kontrak */
 height: 390px;            
 display: flex;
 flex-direction: column;
@@ -539,21 +541,23 @@ async function loadSections(){
     await refreshSections();
 }
 
+/* ── REFRESH DATA & KIRA STATISTIK KONTRAK ── */
 async function refreshSections(){
     try{
-        const secRes = await fetch(`${SB_URL}/rest/v1/me_sections?select=id,section_name`, { headers });
-        const sections = await secRes.json();
+        // Nota: Anda boleh menukar url endpoint 'contracts' mengikut nama table kontrak Supabase sebenar anda
+        const [secRes, contractRes] = await Promise.all([
+            fetch(`${SB_URL}/rest/v1/me_sections?select=id,section_name`, { headers }),
+            fetch(`${SB_URL}/rest/v1/contracts?select=id,status,section_id`, { headers }).then(res => res.ok ? res.json() : [])
+        ]);
 
-        // Ambil data kontrak (Menapis mengikut kriteria table kontrak anda di Supabase)
-        // Jika nama table anda bukan 'contracts', sila tukar url ini mengikut nama table sebenar anda.
-        const contractRes = await fetch(`${SB_URL}/rest/v1/contracts?select=id,status,section_id`, { headers });
-        const contracts = contractRes.ok ? await contractRes.json() : [];
+        const sections = await secRes.json();
+        const contracts = Array.isArray(contractRes) ? contractRes : [];
 
         items = sections.map(sec => {
             const secContracts = contracts.filter(c => c.section_id === sec.id);
             
-            // Pengiraan mengikut padanan string status dari database.
-            // Sila sesuaikan 'Aktif', 'Dah Nak Tamat' mengikut nama status sebenar dalam database anda.
+            // Pengiraan mengikut status kontrak bagi setiap seksyen
+            // Jika dipulangkan dari DB, pastikan nama status sepadan (cth: 'Aktif', 'Dah Nak Tamat')
             return {
                 id: sec.id,
                 title: sec.section_name,
@@ -572,26 +576,11 @@ async function refreshSections(){
 
     }catch(err){
         console.error(err);
-        // Fallback untuk mod pembangunan jika API Supabase gagal dimuatkan
-        generateMockData();
     }
-}
-
-/* ── REKAYASA DATA PROVISIONAL (FALLBACK MOCK) ── */
-function generateMockData(){
-    items = [
-        { id: 1, title: "SEKSYEN SELENGGARA", stats: { active: 12, expiring: 3, burst: 1, underutilised: 2 } },
-        { id: 2, title: "SEKSYEN PEMATUHAN", stats: { active: 8, expiring: 1, burst: 0, underutilised: 4 } },
-        { id: 3, title: "SEKSYEN PENGURUSAN ASET", stats: { active: 5, expiring: 4, burst: 2, underutilised: 1 } },
-        { id: 4, title: "SEKSYEN PROJEK M&E", stats: { active: 15, expiring: 0, burst: 5, underutilised: 0 } }
-    ];
-    stepAngle = 360 / items.length;
-    createWheel();
 }
 
 function createWheel(){
     wheel.innerHTML = "";
-    if(items.length === 0) return;
 
     items.forEach(item => {
         const el = document.createElement("div");
@@ -675,8 +664,9 @@ function positionItems(){
     });
 }
 
+/* ── PAPAR GRID KONTRAK DINAMIK PADA KAD INFO ── */
 function update(){
-    if(itemEls.length === 0 || !items[index]) return;
+    if(itemEls.length === 0) return;
     
     itemEls.forEach(e => e.classList.remove("active"));
     itemEls[index].classList.add("active");
@@ -697,28 +687,28 @@ function update(){
     title.innerText = item.title;
     cardTitle.innerText = item.title;
 
+    // Default stats sekiranya API gagal atau data kosong
     const stats = item.stats || { active: 0, expiring: 0, burst: 0, underutilised: 0 };
 
-    /* Menggunakan Tag Class Berasaskan Amaran Industri Yang Sah */
     cardDesc.innerHTML = `
         <div class="contract-grid">
-            <div class="contract-card tag-active">
+            <div class="contract-card c-active">
                 <i class="fa-solid fa-circle-check"></i>
                 <div class="count">${stats.active}</div>
                 <div class="label">Kontrak Aktif</div>
             </div>
-            <div class="contract-card tag-expiring">
-                <i class="fa-solid fa-clock-history"></i>
+            <div class="contract-card c-expiring">
+                <i class="fa-solid fa-hourglass-half"></i>
                 <div class="count">${stats.expiring}</div>
                 <div class="label">Dah Nak Tamat</div>
             </div>
-            <div class="contract-card tag-burst">
+            <div class="contract-card c-burst">
                 <i class="fa-solid fa-triangle-exclamation"></i>
                 <div class="count">${stats.burst}</div>
                 <div class="label">Dah Nak Burst</div>
             </div>
-            <div class="contract-card tag-underutil">
-                <i class="fa-solid fa-chart-line" style="transform: scaleY(-1);"></i>
+            <div class="contract-card c-under">
+                <i class="fa-solid fa-chart-line-down" style="transform: scaleY(-1);"></i>
                 <div class="count">${stats.underutilised}</div>
                 <div class="label">Underutilised</div>
             </div>
