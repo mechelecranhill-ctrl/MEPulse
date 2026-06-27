@@ -541,28 +541,63 @@ async function loadSections(){
     await refreshSections();
 }
 
-/* ── REFRESH DATA & KIRA STATISTIK KONTRAK ── */
+/* ── REFRESH DATA & KIRA STATISTIK KONTRAK MENGIKUT HUBUNGAN (me_sections -> units -> contracts) ── */
 async function refreshSections(){
     try{
-        const [secRes, contractRes] = await Promise.all([
-            fetch(`${SB_URL}/rest/v1/me_sections?select=id,section_name`, { headers }),
-            fetch(`${SB_URL}/rest/v1/contracts?select=id,status,section_id`, { headers }).then(res => res.ok ? res.json() : [])
-        ]);
-
-        const sections = await secRes.json();
-        const contracts = Array.isArray(contractRes) ? contractRes : [];
+        // Guna query hubungan Supabase untuk mengambil sections -> units -> contracts
+        const res = await fetch(`${SB_URL}/rest/v1/me_sections?select=id,section_name,units(id,contracts(id,status,contract_end))`, { headers });
+        if(!res.ok) throw new Error("Gagal mengambil data dari Supabase");
+        
+        const sections = await res.json();
+        const today = new Date();
 
         items = sections.map(sec => {
-            const secContracts = contracts.filter(c => c.section_id === sec.id);
+            // Kumpul semua kontrak dari semua unit di dalam seksyen ini
+            let allContracts = [];
+            if(sec.units && Array.isArray(sec.units)){
+                sec.units.forEach(unit => {
+                    if(unit.contracts && Array.isArray(unit.contracts)){
+                        allContracts = allContracts.concat(unit.contracts);
+                    }
+                });
+            }
+
+            let activeCount = 0;
+            let expiringCount = 0;
+            let burstCount = 0;
+            let underutilisedCount = 0;
+
+            allContracts.forEach(c => {
+                if(!c.contract_end) return;
+                
+                const endDate = new Date(c.contract_end);
+                
+                // Semak jika kontrak belum tamat (contract_end > today)
+                if(endDate > today) {
+                    activeCount++; // Kontrak Aktif mengambil semua kontrak dalam seksyen yang belum tamat
+
+                    // Kira baki masa dalam bulan untuk "Expiring Soon" (5 bulan atau kurang)
+                    const timeDiff = endDate.getTime() - today.getTime();
+                    const monthsLeft = timeDiff / (1000 * 60 * 60 * 24 * 30.44); // Purata hari sebulan
+
+                    if(monthsLeft <= 5 && monthsLeft >= 0) {
+                        expiringCount++;
+                    }
+                }
+
+                // Status tambahan sedia ada mengikut kolum status DB jika dipulangkan
+                if(c.status === 'Dah Nak Burst') burstCount++;
+                if(c.status === 'Underutilised') underutilisedCount++;
+            });
             
             return {
                 id: sec.id,
                 title: sec.section_name,
                 stats: {
-                    active: secContracts.filter(c => c.status === 'Aktif').length || 0,
-                    expiring: secContracts.filter(c => c.status === 'Dah Nak Tamat').length || 0,
-                    burst: secContracts.filter(c => c.status === 'Dah Nak Burst').length || 0,
-                    underutilised: secContracts.filter(c => c.status === 'Underutilised').length || 0
+                    active: activeCount,
+                    expiring: expiringCount,
+                    burst: burstCount,
+                    underutilised: underutilisedCount
                 }
             };
         });
