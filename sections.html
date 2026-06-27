@@ -185,7 +185,7 @@ animation:fadeInRight .45s ease forwards;
 .info-card h2{ margin-bottom:10px; font-size:22px; }
 .info-card p{ opacity:.7; line-height:1.6; }
 
-/* ── REKA BENTUK KAD KONTRAK RINGKAS (2 COLUMNS) ── */
+/* ── REKA BENTUK GRID ASAL (4 COLUMNS) ── */
 .contract-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -223,6 +223,8 @@ animation:fadeInRight .45s ease forwards;
 /* Warna Status Ikon */
 .c-active i { color: #4ade80; }      /* Hijau */
 .c-expiring i { color: #fbbf24; }    /* Kuning */
+.c-burst i { color: #f87171; }      /* Merah */
+.c-under i { color: #60a5fa; }      /* Biru */
 
 .section-helm{
 width:160px;
@@ -322,7 +324,7 @@ visibility:hidden;
 transform:translateY(40px);
 transition:opacity .35s ease, transform .35s ease, visibility .35s;
 
-height: 320px;            
+height: 390px;            
 display: flex;
 flex-direction: column;
 justify-content: space-between; 
@@ -527,7 +529,6 @@ openBtn.addEventListener("click", (e) => {
 });
 
 async function loadSections(){
-    // Sentiasa padam cache lama untuk pastikan data terpapar segar dari database
     localStorage.removeItem("sections_cache");
     await refreshSections();
 }
@@ -535,7 +536,6 @@ async function loadSections(){
 /* ── REFRESH DATA & TAPIS HANYA MENGGUNAKAN ID DAN TARIKH TAMAT KONTRAK ── */
 async function refreshSections(){
     try{
-        // Tarik 3 table berasingan tanpa memanggil kolum 'status'
         const [secRes, unitRes, contractRes] = await Promise.all([
             fetch(`${SB_URL}/rest/v1/me_sections?select=id,section_name`, { headers }),
             fetch(`${SB_URL}/rest/v1/units?select=id,section_id`, { headers }),
@@ -550,11 +550,8 @@ async function refreshSections(){
         const today = new Date();
 
         items = sections.map(sec => {
-            // Tapis unit-unit kepunyaan seksyen semasa
             const secUnits = units.filter(u => u.section_id === sec.id);
             const secUnitIds = secUnits.map(u => u.id);
-
-            // Tapis semua kontrak yang berkait dengan unit-unit dalam seksyen ini
             const secContracts = contracts.filter(c => secUnitIds.includes(c.unit_id));
 
             // 1. Active Contracts = Jumlah semua kontrak yang tersambung dengan seksyen ini
@@ -579,7 +576,9 @@ async function refreshSections(){
                 title: sec.section_name,
                 stats: {
                     active: activeCount,
-                    expiring: expiringCount
+                    expiring: expiringCount,
+                    burst: 0,            // Kekalkan 0 memandangkan kolum 'status' tiada
+                    underutilised: 0      // Kekalkan 0 memandangkan kolum 'status' tiada
                 }
             };
         });
@@ -678,7 +677,7 @@ function positionItems(){
     });
 }
 
-/* ── PAPAR GRID KONTRAK RINGKAS (2 KOTAK SAHAJA) ── */
+/* ── PAPAR 4 KAD ASAL ── */
 function update(){
     if(itemEls.length === 0) return;
     
@@ -705,7 +704,7 @@ function update(){
     const isContractSection = nameUpper.includes("SELENGGARA") || nameUpper.includes("PEMATUHAN");
 
     if (isContractSection) {
-        const stats = item.stats || { active: 0, expiring: 0 };
+        const stats = item.stats || { active: 0, expiring: 0, burst: 0, underutilised: 0 };
 
         cardDesc.innerHTML = `
             <div class="contract-grid">
@@ -718,6 +717,16 @@ function update(){
                     <i class="fa-solid fa-hourglass-half"></i>
                     <div class="count">${stats.expiring}</div>
                     <div class="label">Expiring Soon</div>
+                </div>
+                <div class="contract-card c-burst">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <div class="count">${stats.burst}</div>
+                    <div class="label">Near Budget Cap</div>
+                </div>
+                <div class="contract-card c-under">
+                    <i class="fa-solid fa-chart-line" style="transform: scaleY(-1);"></i>
+                    <div class="count">${stats.underutilised}</div>
+                    <div class="label">Underutilized</div>
                 </div>
             </div>
         `;
