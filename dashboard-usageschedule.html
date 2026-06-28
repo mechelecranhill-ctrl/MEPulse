@@ -262,6 +262,11 @@
     background:#FF3B3020;
     color:#FF3B30;
 }
+
+.tag.claimed{
+    background:#34C75920;
+    color:#34C759;
+}
         .bf-baki-table{
             margin-left:35px;
             margin-top:4px;
@@ -1023,99 +1028,82 @@
 
 <script>
     const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
-    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
-    const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
+const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
 
-    let currentView = "AREA";
-    let allWorks = [];
-    let areaPriority = {};
-    let currentTableData = [];
-    let currentContractId = null;
-    
-    window.onload = () => {
+let currentView = "AREA";
+let allWorks = [];
+let areaPriority = {};
+let currentTableData = [];
+let currentContractId = null;
+
+window.onload = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const contractId = urlParams.get('id');
-
-    if(contractId){
-        loadSingleContract(contractId);
-    }
+    if(contractId){ loadSingleContract(contractId); }
 };
-    document.getElementById('tableSearch').addEventListener('keyup', function(e){
 
+function debounce(fn, delay){
+    let t;
+    return (...args)=>{
+        clearTimeout(t);
+        t = setTimeout(()=>fn(...args), delay);
+    };
+}
+
+document.getElementById('tableSearch').addEventListener('keyup', debounce(function(e){
     const term = e.target.value.toLowerCase().trim();
-
     if(term === ""){
-
         if(currentView === "DATE"){
             const sorted = [...allWorks].sort((a,b)=>{
                 const d1 = new Date(a.qpb_date || "1900-01-01");
                 const d2 = new Date(b.qpb_date || "1900-01-01");
-
-                if(d1.getTime() !== d2.getTime()){
-                    return d1 - d2;
-                }
-
+                if(d1.getTime() !== d2.getTime()) return d1 - d2;
                 const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
                 const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
-
                 return aSeq - bSeq;
             });
-
             renderTable(sorted,false);
         } else {
             renderTable(allWorks,true);
         }
-
         return;
     }
-
     let filteredWorks = allWorks.filter(w =>
         (w.work_id || '').toLowerCase().includes(term) ||
         (w.location || '').toLowerCase().includes(term) ||
         (w.description || '').toLowerCase().includes(term)
     );
-
     if(currentView === "DATE"){
         filteredWorks.sort((a,b)=>{
             const d1 = new Date(a.qpb_date || "1900-01-01");
             const d2 = new Date(b.qpb_date || "1900-01-01");
-
-            if(d1.getTime() !== d2.getTime()){
-                return d1 - d2;
-            }
-
+            if(d1.getTime() !== d2.getTime()) return d1 - d2;
             const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
             const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
-
             return aSeq - bSeq;
         });
-
         renderTable(filteredWorks,false);
     } else {
         renderTable(filteredWorks,true);
     }
-});
+}, 300));
 
-    async function openTemplate() {
+async function openTemplate() {
     const id = currentContractId;
     if(!id){ alert("Tiada kontrak dipilih."); return; }
-
     const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, { headers });
     const data = await res.json();
     const contract = data[0];
     const sections = contract.contract_sections_breakdown || {};
     const saved = contract.selected_sections || [];
     const savedPrefix = contract.reference || 'RSAJ/M&E/IP/11-';
-
     document.getElementById('refPrefixInput').value = savedPrefix;
-
     const container = document.getElementById('dynamicRowsContainer');
     container.innerHTML = '';
-
     Object.keys(sections).forEach(key => {
         const desc = sections[key]?.desc || '';
         const active = Array.isArray(saved) ? saved.includes(key) : (saved[key]?.active ?? true);
-
         const div = document.createElement('div');
         div.className = 'modal-row';
         div.innerHTML = `
@@ -1125,1140 +1113,1179 @@
         `;
         container.appendChild(div);
     });
-
     document.getElementById('templateModal').style.display = 'flex';
 }
 
 async function saveTemplate() {
     const id = currentContractId;
     const prefix = document.getElementById('refPrefixInput').value;
-
     await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, {
-        method: 'PATCH',
-        headers,
+        method: 'PATCH', headers,
         body: JSON.stringify({ reference: prefix })
     });
-
     alert("Prefix berjaya disimpan!");
     closeTemplate();
 }
-    
-    function closeTemplate() { document.getElementById('templateModal').style.display = 'none'; }
-    // ============================
-    // SORT WORK ORDER BY AREA + SEQUENCE
-    // ============================
-    function sortWorkOrders(data, areaPriority){
-        return data.sort((a,b)=>{
-            const aArea = (a.area_code || '').toUpperCase().trim();
-            const bArea = (b.area_code || '').toUpperCase().trim();
-            const aRank = areaPriority[aArea] ?? 999;
-            const bRank = areaPriority[bArea] ?? 999;
 
-            /* 1️⃣ AREA ORDER */
-            if(aRank !== bRank){
-                return aRank - bRank;
-            }
-            /* 2️⃣ SEQUENCE NUMBER */
-            const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
-            const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
-            return aSeq - bSeq;
-        });
-    }
-    async function loadSingleContract(id){
-        currentContractId = id;
+function closeTemplate() { document.getElementById('templateModal').style.display = 'none'; }
+
+function sortWorkOrders(data, areaPriority){
+    return data.sort((a,b)=>{
+        const aArea = (a.area_code || '').toUpperCase().trim();
+        const bArea = (b.area_code || '').toUpperCase().trim();
+        const aRank = areaPriority[aArea] ?? 999;
+        const bRank = areaPriority[bArea] ?? 999;
+        if(aRank !== bRank) return aRank - bRank;
+        const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
+        const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
+        return aSeq - bSeq;
+    });
+}
+
+async function loadSingleContract(id){
+    currentContractId = id;
     try{
         const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, { headers });
         const data = await res.json();
         const c = data[0];
-
-        /* BUILD AREA PRIORITY GLOBAL */
-areaPriority = {};
-
-const areaList = (c.area_code || '')
-    .split(',')
-    .map(a => a.trim().toUpperCase())
-    .filter(a => a.length > 0);
-
-areaList.forEach((a,i)=>{
-    areaPriority[a] = i + 1;
-});
-
+        areaPriority = {};
+        const areaList = (c.area_code || '').split(',').map(a => a.trim().toUpperCase()).filter(a => a.length > 0);
+        areaList.forEach((a,i)=>{ areaPriority[a] = i + 1; });
         document.getElementById('viewTitle').innerText = c.contract_code;
         document.getElementById('viewSubtitle').innerText = c.contract_name;
-
         document.getElementById('tableWrapper').style.display = 'block';
-
-        const woRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}`, { headers });
+        const [woRes, intRes] = await Promise.all([
+            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}`, { headers }),
+            fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${id}&order=date_received.asc`, { headers })
+        ]);
         allWorks = await woRes.json();
-
-renderTable(allWorks, true);
-
-renderMobileCards(allWorks);
-
-        const intRes = await fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${id}&order=date_received.asc`, { headers });
         const interims = await intRes.json();
-
-        buildInterimMatrix(c, interims, allWorks);
-
+        renderTable(allWorks, true);
+        buildInterimMatrix(c, interims, allWorks, c.vo_breakdown || {});
         generateDistrictTabs(allWorks);
         filterDistrict('ALL', document.querySelector('.district-tab'));
-
-    }catch(e){
-        console.error(e);
-    }
+    }catch(e){ console.error(e); }
 }
 
 function renderTable(data, showArea = true){
-
     currentTableData = data;
-
     const tbody = document.getElementById('workOrderTbody');
-
     let html = '';
     let currentArea = '';
-
+    const seqGroups = {};
     data.forEach(w => {
-
+        const seq = (w.sequence_no || '').trim();
+        if(seq !== ''){
+            if(!seqGroups[seq]) seqGroups[seq] = [];
+            seqGroups[seq].push(w);
+        }
+    });
+    const processedSeqs = new Set();
+    data.forEach(w => {
+        const seq = (w.sequence_no || '').trim();
         const area = (w.area_code || 'LAIN').toUpperCase();
-
         if(showArea && area !== currentArea){
-            html += `
-            <tr class="area-header">
-                <td colspan="10" style="padding:10px;">
-                    <i class="fa fa-layer-group"></i> ${area}
-                </td>
-            </tr>`;
+            html += `<tr class="area-header"><td colspan="10" style="padding:10px;"><i class="fa fa-layer-group"></i> ${area}</td></tr>`;
             currentArea = area;
         }
-
-        html += `
-        <tr>
-            <td>
-    <select 
-    onchange="updateStatus(${w.id}, this.value)"
-    ${(w.interim_no) ? 'disabled' : ''}
-    style="
-        padding:6px 10px;
-        border-radius:10px;
-        border:1px solid #ddd;
-        font-size:11px;
-        font-weight:700;
-        background:${w.status === 'Claimed' ? '#f1f1f1' : 'white'};
-    "
->
-        <option value="BLUEFORM" ${w.status === 'BLUEFORM' ? 'selected' : ''}>BLUEFORM</option>
-        <option value="APPROVED" ${w.status === 'APPROVED' ? 'selected' : ''}>APPROVED</option>
-        <option value="INDENT" ${w.status === 'INDENT' ? 'selected' : ''}>INDENT</option>
-        <option value="INDENT APPROVED" ${w.status === 'INDENT APPROVED' ? 'selected' : ''}>INDENT APPROVED</option>
-        <option value="CANCEL" ${w.status === 'CANCEL' ? 'selected' : ''}>CANCEL</option>
-        <option value="CLAIMED" ${(w.interim_no) ? 'selected' : ''}>CLAIMED</option>
-    </select>
-</td>
-
-            <td><strong>${w.sequence_no || '-'}</strong></td>
-            <td><strong>${w.work_id}</strong></td>
-
-            <td>
-                <div style="font-weight:500;">${w.description}</div>
-                <div style="font-size:11px;color:var(--ios-orange);">
-                    <i class="fa-solid fa-map-pin"></i> ${w.location || 'N/A'}
-                </div>
-            </td>
-
-            <td><strong>${w.interim_no ? 'INT-' + w.interim_no : '-'}</strong></td>
-
-            <td>
-                <strong>
-                    RM ${(w.amount_spent || 0).toLocaleString(undefined,{minimumFractionDigits:2})}
-                </strong>
-                ${buildSectionBreakdown(w)}
-            </td>
-
-            <td style="font-weight:bold;color:var(--ios-green);">
-                RM ${(w.status === 'Claimed' ? w.amount_spent : 0)
-                    .toLocaleString(undefined,{minimumFractionDigits:2})}
-            </td>
-
-            <td>${formatTarikhBM(w.qpb_date)}</td>
-
-            <td>
-    <button class="btn-action"
-        style="background:var(--ios-orange);padding:8px 14px;font-size:12px;"
-        onclick="openBlueform(${w.id})">
-        <i class="fa-solid fa-print"></i> Blueform
-    </button>
-</td>
-
-<td style="text-align:center;">
-    <input
-        type="checkbox"
-        class="bf-checkbox"
-        value="${w.id}"
-        style="width:18px;height:18px;cursor:pointer;"
-    >
-</td>
-        </tr>`;
+        if(seq !== '' && seqGroups[seq]){
+            if(processedSeqs.has(seq)) return;
+            processedSeqs.add(seq);
+            const group = seqGroups[seq];
+            const mainW = group[0];
+            const allWorkIds = group.map(g => g.work_id).join(', ');
+            const uniqueLocations = [...new Set(group.map(g => (g.location || '').trim()).filter(l => l !== ''))];
+            const combinedLocation = uniqueLocations.join(', ');
+            const allDesc = group.map(g => g.description).join(' + ');
+            const combinedAmt = group.reduce((sum, g) => sum + Number(g.amount_spent || 0), 0);
+            const combinedSec = {};
+            group.forEach(g => {
+                const s = g.section_category || {};
+                Object.keys(s).forEach(sec => {
+                    const amt = Number(s[sec]?.amt || 0);
+                    if(!combinedSec[sec]) combinedSec[sec] = 0;
+                    combinedSec[sec] += amt;
+                });
+                const add = Number(g.additional || 0);
+                if(add > 0){
+                    if(!combinedSec["PROVISIONAL SUM"]) combinedSec["PROVISIONAL SUM"] = 0;
+                    combinedSec["PROVISIONAL SUM"] += add;
+                }
+            });
+            let secHtml = '';
+            Object.keys(combinedSec).forEach(sec => {
+                const amt = combinedSec[sec];
+                if(amt <= 0) return;
+                secHtml += `<div style="display:flex;justify-content:space-between;font-size:11px;color:#666;"><span>${sec}</span><span>RM ${amt.toLocaleString(undefined,{minimumFractionDigits:2})}</span></div>`;
+            });
+            const allInterimNos = [...new Set(group.map(g => g.interim_no).filter(Boolean))];
+            const allClaimed = group.every(g => g.interim_no);
+            const groupStatus = allClaimed ? 'CLAIMED' : (mainW.status || 'BLUEFORM');
+            const allIdsStr = group.map(g => g.id).join(',');
+            const groupBadge = group.length > 1
+                ? `<span style="background:#007AFF20;color:#007AFF;border-radius:10px;padding:2px 7px;font-size:9px;font-weight:700;margin-left:6px;">${group.length} WO</span>`
+                : '';
+            html += `
+            <tr>
+                <td>
+                    <select onchange="updateStatusGroup('${allIdsStr}', this.value)" ${allClaimed ? 'disabled' : ''}
+                        style="width:100%;max-width:140px;padding:6px 8px;border-radius:10px;border:1px solid #ddd;font-size:11px;font-weight:700;background:${allClaimed ? '#f1f1f1' : 'white'};box-sizing:border-box;">
+                        <option value="BLUEFORM"        ${groupStatus === 'BLUEFORM'        ? 'selected' : ''}>BLUEFORM</option>
+                        <option value="APPROVED"        ${groupStatus === 'APPROVED'        ? 'selected' : ''}>APPROVED</option>
+                        <option value="INDENT"          ${groupStatus === 'INDENT'          ? 'selected' : ''}>INDENT</option>
+                        <option value="INDENT APPROVED" ${groupStatus === 'INDENT APPROVED' ? 'selected' : ''}>INDENT APPROVED</option>
+                        <option value="CANCEL"          ${groupStatus === 'CANCEL'          ? 'selected' : ''}>CANCEL</option>
+                        <option value="CLAIMED"         ${allClaimed                        ? 'selected' : ''}>CLAIMED</option>
+                    </select>
+                </td>
+                <td><strong>${seq}</strong>${groupBadge}</td>
+                <td><strong>${allWorkIds}</strong></td>
+                <td>
+                    <div style="font-weight:500;">${allDesc}</div>
+                    <div style="font-size:11px;color:var(--ios-orange);"><i class="fa-solid fa-map-pin"></i> ${combinedLocation || 'N/A'}</div>
+                </td>
+                <td><strong>${allInterimNos.length ? allInterimNos.map(n => 'INT-' + n).join(', ') : '-'}</strong></td>
+                <td><strong>RM ${combinedAmt.toLocaleString(undefined,{minimumFractionDigits:2})}</strong>${secHtml}</td>
+                <td style="font-weight:bold;color:var(--ios-green);">RM ${(allClaimed ? combinedAmt : 0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+                <td>${formatTarikhBM(mainW.qpb_date)}</td>
+                <td>
+                    <button class="btn-action" style="background:var(--ios-orange);padding:8px 14px;font-size:12px;" onclick="openBlueformGroup('${allIdsStr}')">
+                        <i class="fa-solid fa-print"></i> Blueform
+                    </button>
+                </td>
+                <td style="text-align:center;">
+                    <input type="checkbox" class="bf-checkbox" value="${allIdsStr}" style="width:18px;height:18px;cursor:pointer;">
+                </td>
+            </tr>`;
+        } else {
+            html += `
+            <tr>
+                <td>
+                    <select onchange="updateStatus(${w.id}, this.value)" ${w.interim_no ? 'disabled' : ''}
+                        style="width:100%;max-width:140px;padding:6px 8px;border-radius:10px;border:1px solid #ddd;font-size:11px;font-weight:700;background:${w.status === 'Claimed' ? '#f1f1f1' : 'white'};box-sizing:border-box;">
+                        <option value="BLUEFORM"        ${w.status === 'BLUEFORM'        ? 'selected' : ''}>BLUEFORM</option>
+                        <option value="APPROVED"        ${w.status === 'APPROVED'        ? 'selected' : ''}>APPROVED</option>
+                        <option value="INDENT"          ${w.status === 'INDENT'          ? 'selected' : ''}>INDENT</option>
+                        <option value="INDENT APPROVED" ${w.status === 'INDENT APPROVED' ? 'selected' : ''}>INDENT APPROVED</option>
+                        <option value="CANCEL"          ${w.status === 'CANCEL'          ? 'selected' : ''}>CANCEL</option>
+                        <option value="CLAIMED"         ${w.interim_no                   ? 'selected' : ''}>CLAIMED</option>
+                    </select>
+                </td>
+                <td><strong>${w.sequence_no || '-'}</strong></td>
+                <td><strong>${w.work_id}</strong></td>
+                <td>
+                    <div style="font-weight:500;">${w.description}</div>
+                    <div style="font-size:11px;color:var(--ios-orange);"><i class="fa-solid fa-map-pin"></i> ${w.location || 'N/A'}</div>
+                </td>
+                <td><strong>${w.interim_no ? 'INT-' + w.interim_no : '-'}</strong></td>
+                <td><strong>RM ${(w.amount_spent || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</strong>${buildSectionBreakdown(w)}</td>
+                <td style="font-weight:bold;color:var(--ios-green);">RM ${(w.status === 'Claimed' ? w.amount_spent : 0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+                <td>${formatTarikhBM(w.qpb_date)}</td>
+                <td>
+                    <button class="btn-action" style="background:var(--ios-orange);padding:8px 14px;font-size:12px;" onclick="openBlueform(${w.id})">
+                        <i class="fa-solid fa-print"></i> Blueform
+                    </button>
+                </td>
+                <td style="text-align:center;">
+                    <input type="checkbox" class="bf-checkbox" value="${w.id}" style="width:18px;height:18px;cursor:pointer;">
+                </td>
+            </tr>`;
+        }
     });
-
     tbody.innerHTML = html;
-
-    renderMobileCards(data);
+    if(window.innerWidth <= 768){ renderMobileCards(data); }
 }
 
 function renderMobileCards(data){
-    console.log("MOBILE:", data);
-
     const container = document.getElementById('mobileCardContainer');
     if(!container) return;
-
     let html = '';
-
     data.forEach(w => {
-
         html += `
         <div class="mobile-card">
-
             <div class="mobile-card-header">
-                <div class="mobile-title">
-    ${w.sequence_no ? w.sequence_no + ' — ' : ''}${w.work_id || '-'}
-</div>
-
-                <span class="tag ${(w.status || 'BLUEFORM').toUpperCase()}">
-                    ${w.status || 'BLUEFORM'}
-                </span>
+                <div class="mobile-title">${w.sequence_no ? w.sequence_no + ' — ' : ''}${w.work_id || '-'}</div>
+                <span class="tag ${(w.status || 'BLUEFORM').toLowerCase().replace(/\s+/g,'')}">${w.status || 'BLUEFORM'}</span>
             </div>
-
             <div class="mobile-sub">${w.description || '-'}</div>
-            <div class="mobile-sub">
-                <i class="fa fa-map-pin"></i> ${w.location || 'N/A'}
-            </div>
-
-            <div class="mobile-row">
-                <span>Interim</span>
-                <strong>${w.interim_no ? 'INT-' + w.interim_no : '-'}</strong>
-            </div>
-
-            <div class="mobile-row">
-                <span>Amaun</span>
-                <strong>
-                    RM ${(w.amount_spent || 0)
-                        .toLocaleString(undefined,{minimumFractionDigits:2})}
-                </strong>
-            </div>
-
-            <div class="mobile-row">
-                <span>Tarikh</span>
-                <strong>${formatTarikhBM(w.qpb_date)}</strong>
-            </div>
-
+            <div class="mobile-sub"><i class="fa fa-map-pin"></i> ${w.location || 'N/A'}</div>
+            <div class="mobile-row"><span>Interim</span><strong>${w.interim_no ? 'INT-' + w.interim_no : '-'}</strong></div>
+            <div class="mobile-row"><span>Amaun</span><strong>RM ${(w.amount_spent || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</strong></div>
+            <div class="mobile-row"><span>Tarikh</span><strong>${formatTarikhBM(w.qpb_date)}</strong></div>
             <div class="mobile-actions">
-                <button class="btn-action"
-                    style="background:var(--ios-orange);padding:6px 12px;font-size:11px;"
-                    onclick="openBlueform(${w.id})">
-                    Blueform
-                </button>
+                <button class="btn-action" style="background:var(--ios-orange);padding:6px 12px;font-size:11px;" onclick="openBlueform(${w.id})">Blueform</button>
             </div>
-
         </div>`;
     });
-
     container.innerHTML = html;
 }
 
-    function generateDistrictTabs(data){
-
-const container = document.getElementById("districtTabs");
-
-let districts = [...new Set(data.map(w => w.district || "LAIN"))];
-
-let html = `<div class="district-tab active" onclick="filterDistrict('ALL',this)">SEMUA</div>`;
-
-districts.forEach(d=>{
-html += `<div class="district-tab" onclick="filterDistrict('${d}',this)">${d}</div>`;
-});
-
-container.innerHTML = html;
-
+function generateDistrictTabs(data){
+    const container = document.getElementById("districtTabs");
+    let districts = [...new Set(data.map(w => w.district || "LAIN"))];
+    let html = `<div class="district-tab active" onclick="filterDistrict('ALL',this)">SEMUA</div>`;
+    districts.forEach(d=>{ html += `<div class="district-tab" onclick="filterDistrict('${d}',this)">${d}</div>`; });
+    container.innerHTML = html;
 }
 
-function filterDistrict(district,el){
-
-document.querySelectorAll('.district-tab').forEach(t=>t.classList.remove('active'));
-el.classList.add('active');
-
-if(district === "ALL"){
-
-currentView = "DATE";
-
-const sorted = [...allWorks].sort((a,b)=>{
-
-const d1 = new Date(a.qpb_date || "1900-01-01");
-const d2 = new Date(b.qpb_date || "1900-01-01");
-
-if(d1.getTime() !== d2.getTime()){
-return d1 - d2;
+function filterDistrict(district, el){
+    document.querySelectorAll('.district-tab').forEach(t=>t.classList.remove('active'));
+    el.classList.add('active');
+    if(district === "ALL"){
+        currentView = "DATE";
+        const sorted = [...allWorks].sort((a,b)=>{
+            const d1 = new Date(a.qpb_date || "1900-01-01");
+            const d2 = new Date(b.qpb_date || "1900-01-01");
+            if(d1.getTime() !== d2.getTime()) return d1 - d2;
+            const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
+            const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
+            return aSeq - bSeq;
+        });
+        renderTable(sorted, false);
+        return;
+    }
+    currentView = "AREA";
+    const filtered = allWorks.filter(w => (w.district || '') === district);
+    const sorted = sortWorkOrders(filtered, areaPriority || {});
+    renderTable(sorted, true);
 }
 
-const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
-const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
-
-return aSeq - bSeq;
-
-});
-
-renderTable(sorted,false);
-return;
-
+function getInitials(text){
+    const ignore = ['AND','OF','THE','&','DAN'];
+    return text.toUpperCase().replace(/[^A-Z\s]/g,'').split(/\s+/)
+        .filter(word => word.length > 0 && !ignore.includes(word))
+        .map(word => word[0]).join('.');
 }
 
-/* DISTRICT */
-currentView = "AREA";
-
-const filtered = allWorks.filter(w => (w.district || '') === district);
-
-const sorted = sortWorkOrders(filtered, areaPriority || {});
-
-renderTable(sorted,true);
-
-}
-    function getInitials(text){
-
-const ignore = ['AND','OF','THE','&','DAN'];
-
-return text
-    .toUpperCase()
-    .replace(/[^A-Z\s]/g,'')
-    .split(/\s+/)
-    .filter(word => word.length > 0 && !ignore.includes(word))
-    .map(word => word[0])
-    .join('.');
-
-}
-
-    function buildSectionBreakdown(work){
-
-const s = work.section_category || {};
-
-let html = '';
-
-Object.keys(s).forEach(sec=>{
-
-const amt = Number(s[sec]?.amt || 0);
-if(amt <= 0) return;
-
-html += `
-<div style="display:flex;justify-content:space-between;font-size:11px;color:#666;">
-<span>${sec}</span>
-<span>RM ${amt.toLocaleString(undefined,{minimumFractionDigits:2})}</span>
-</div>
-`;
-
-});
-
-const add = Number(work.additional || 0);
-
-if(add > 0){
-html += `
-<div style="display:flex;justify-content:space-between;font-size:11px;color:#666;">
-<span>PROVISIONAL SUM</span>
-<span>RM ${add.toLocaleString(undefined,{minimumFractionDigits:2})}</span>
-</div>
-`;
-}
-
-return html;
-
+function buildSectionBreakdown(work){
+    const s = work.section_category || {};
+    let html = '';
+    Object.keys(s).forEach(sec=>{
+        const amt = Number(s[sec]?.amt || 0);
+        if(amt <= 0) return;
+        html += `<div style="display:flex;justify-content:space-between;font-size:11px;color:#666;"><span>${sec}</span><span>RM ${amt.toLocaleString(undefined,{minimumFractionDigits:2})}</span></div>`;
+    });
+    const add = Number(work.additional || 0);
+    if(add > 0){
+        html += `<div style="display:flex;justify-content:space-between;font-size:11px;color:#666;"><span>PROVISIONAL SUM</span><span>RM ${add.toLocaleString(undefined,{minimumFractionDigits:2})}</span></div>`;
+    }
+    return html;
 }
 
 function formatTarikhBM(dateStr){
-
-if(!dateStr) return '';
-
-const bulan = [
-'JANUARI','FEBRUARI','MAC','APRIL','MEI','JUN',
-'JULAI','OGOS','SEPTEMBER','OKTOBER','NOVEMBER','DISEMBER'
-];
-
-const d = new Date(dateStr);
-const hari = String(d.getDate()).padStart(2,'0');
-const bulanText = bulan[d.getMonth()];
-const tahun = d.getFullYear();
-
-return `${hari} ${bulanText} ${tahun}`;
-
+    if(!dateStr) return '';
+    const bulan = ['JANUARI','FEBRUARI','MAC','APRIL','MEI','JUN','JULAI','OGOS','SEPTEMBER','OKTOBER','NOVEMBER','DISEMBER'];
+    const d = new Date(dateStr);
+    return `${String(d.getDate()).padStart(2,'0')} ${bulan[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-    // ============================
-    // BLUEFORM: EXTRACT DATA (boleh dipakai single & bulk)
-    // ============================
-    async function buildBlueformData(id) {
+// ============================
+// HELPER: Tapis VO aktif mengikut vo_date <= cutoffDate
+// ============================
+function getActiveVO(voBreakdown, cutoffDate){
+    const active = {};
+    Object.entries(voBreakdown).forEach(([voName, vo]) => {
+        const voDate = vo.vo_date ? new Date(vo.vo_date) : null;
+        if(voDate && voDate <= cutoffDate){
+            active[voName] = vo;
+        }
+    });
+    return active;
+}
 
-        const res = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}&select=*,contract(*,units(unit_name))`, { headers });
-        const result = await res.json();
-        const data = result[0];
+// ============================
+// BLUEFORM DATA — single WO
+// ============================
+async function buildBlueformData(id, sharedData = null) {
 
-        const c = data.contract;
-        const b = c.contract_sections_breakdown || {};
-        const s = data.section_category ?? {};
+    const res = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}&select=*,contract(*,units(unit_name))`, { headers });
+    const result = await res.json();
+    const data = result[0];
 
-        let totalSection = 0;
-        Object.values(s).forEach(sec => { totalSection += Number(sec?.amt || 0); });
-        let provisionalExtra = Number(data.additional || 0);
-        let totalWorkValue = totalSection + provisionalExtra;
+    const c = data.contract;
+    const b = c.contract_sections_breakdown || {};
+    const s = data.section_category ?? {};
 
-        // fetch interim & semua WO serentak
+    let totalSection = 0;
+    Object.values(s).forEach(sec => { totalSection += Number(sec?.amt || 0); });
+    let provisionalExtra = Number(data.additional || 0);
+    let totalWorkValue = totalSection + provisionalExtra;
+
+    let allInterims, allWO, localAreaPriority;
+    if(sharedData){
+        allInterims = sharedData.allInterims;
+        allWO = [...sharedData.allWO];
+        localAreaPriority = sharedData.localAreaPriority;
+    } else {
         const [interimRes, woRes, areaRes] = await Promise.all([
             fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=date_received.asc`, { headers }),
             fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}`, { headers }),
             fetch(`${SB_URL}/rest/v1/contract?id=eq.${c.id}&select=area_code`, { headers })
         ]);
-
-        const allInterims = await interimRes.json();
-        let allWO = await woRes.json();
+        allInterims = await interimRes.json();
+        allWO = await woRes.json();
         const areaRows = await areaRes.json();
-
-        const localAreaPriority = {};
-        (areaRows[0]?.area_code || '')
-            .split(',')
-            .map(a => a.trim().toUpperCase())
-            .filter(a => a.length > 0)
+        localAreaPriority = {};
+        (areaRows[0]?.area_code || '').split(',').map(a => a.trim().toUpperCase()).filter(a => a.length > 0)
             .forEach((a, i) => { localAreaPriority[a] = i + 1; });
+    }
 
-        let cutoffDate = new Date(data.qpb_date);
-        if(data.status === "Claimed"){
-            for(const int of allInterims){
-                const cat = int.claim_breakdown || {};
-                const found = Object.values(cat).some(sec => Number(sec?.work_order_id) === Number(data.id));
-                if(found){ cutoffDate = new Date(int.date_received); break; }
-            }
-        }
-
-        allWO.sort((a,b)=>{
-            const d1 = new Date(a.qpb_date);
-            const d2 = new Date(b.qpb_date);
-            if(d1 < d2) return -1;
-            if(d1 > d2) return 1;
-            const aRank = localAreaPriority[(a.area_code || '').toUpperCase()] ?? 999;
-            const bRank = localAreaPriority[(b.area_code || '').toUpperCase()] ?? 999;
-            if(aRank < bRank) return -1;
-            if(aRank > bRank) return 1;
-            const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
-            const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
-            return aSeq - bSeq;
-        });
-
-        let sectionUsed = {};
-        let totalSalvage = 0;
-        let totalPG = 0;
-        let totalTax = 0;
-        let timeline = [];
-
-        allInterims.forEach(int => {
-            const intDate = new Date(int.date_received);
-            if(intDate > cutoffDate) return;
-            const salvage = Number(int.salvage_value || 0);
-            const pg = Number(int.performance_guarantee_sum || 0);
-const tax = Number(int.tax || 0);
-            totalSalvage += salvage;
-            totalPG += pg;
-    totalTax += tax;
+    let cutoffDate = new Date(data.qpb_date);
+    if(data.status === "Claimed"){
+        for(const int of allInterims){
             const cat = int.claim_breakdown || {};
-            let amt = 0;
-            Object.values(cat).forEach(s=>{ amt += Number(s?.amt || s?.amount || s?.value || 0); });
-            timeline.push({ type:'INTERIM', date:int.date_received, amount:amt, salvage:salvage, pg:pg, tax:tax });
-            Object.keys(cat).forEach(sec => {
-                const val = Number(cat[sec]?.amt || cat[sec]?.amount || cat[sec]?.value || 0);
-                if(!sectionUsed[sec]) sectionUsed[sec] = 0;
-                sectionUsed[sec] += val;
-            });
-        });
+            const found = Object.values(cat).some(sec => Number(sec?.work_order_id) === Number(data.id));
+            if(found){ cutoffDate = new Date(int.date_received); break; }
+        }
+    }
 
-        allWO.filter(w => {
-            if(w.status === "Claimed") return false;
-            if(Number(w.id) === Number(data.id)) return false;
-            if(!w.qpb_date) return false;
-            const woDate = new Date(w.qpb_date);
-            if(woDate < cutoffDate) return true;
-            if(woDate > cutoffDate) return false;
-            const wArea = (w.area_code || '').toUpperCase();
-            const curArea = (data.area_code || '').toUpperCase();
-            const wRank = localAreaPriority[wArea] || 99;
-            const curRank = localAreaPriority[curArea] || 99;
-            if(wRank < curRank) return true;
-            if(wRank > curRank) return false;
-            const wSeq = parseInt((w.sequence_no || '').match(/\d+/)?.[0] || 0);
-            const curSeq = parseInt((data.sequence_no || '').match(/\d+/)?.[0] || 0);
-            return wSeq <= curSeq;
-        }).forEach(wo => {
-            timeline.push({
-                type:'WORKORDER',
-                date:wo.qpb_date,
-                seq:parseInt((wo.sequence_no || '').match(/\d+/)?.[0] || 0),
-                amount:Number(wo.amount_spent || 0),
-                salvage:0
-            });
-            const cat = wo.section_category || {};
-            Object.keys(cat).forEach(sec => {
-                const amt = Number(cat[sec]?.amt || 0);
-                if(!sectionUsed[sec]) sectionUsed[sec] = 0;
-                sectionUsed[sec] += amt;
-            });
-            const add = Number(wo.additional || 0);
-            if(add > 0){
-                if(!sectionUsed["PROVISIONAL SUM"]) sectionUsed["PROVISIONAL SUM"] = 0;
-                sectionUsed["PROVISIONAL SUM"] += add;
-            }
-        });
+    allWO.sort((a, b) => {
+        const d1 = new Date(a.qpb_date), d2 = new Date(b.qpb_date);
+        if(d1 < d2) return -1; if(d1 > d2) return 1;
+        const aR = localAreaPriority[(a.area_code||'').toUpperCase()]||99;
+        const bR = localAreaPriority[(b.area_code||'').toUpperCase()]||99;
+        if(aR < bR) return -1; if(aR > bR) return 1;
+        const aS = parseInt((a.sequence_no||'').match(/\d+/)?.[0]||0);
+        const bS = parseInt((b.sequence_no||'').match(/\d+/)?.[0]||0);
+        if(aS !== bS) return aS - bS;
+        // ✅ TIEBREAKER: sequence sama, ikut id (urutan masuk DB)
+        return Number(a.id) - Number(b.id);
+    });
 
-        const currentSections = data.section_category || {};
-        Object.keys(currentSections).forEach(sec => {
-            const amt = Number(currentSections[sec]?.amt || 0);
+    let sectionUsed = {};
+    let totalSalvage = 0, totalPG = 0, totalTax = 0;
+    let timeline = [];
+
+    allInterims.forEach(int => {
+        const intDate = new Date(int.date_received);
+        if(intDate > cutoffDate) return;
+        const salvage = Number(int.salvage_value || 0);
+        const pg = Number(int.performance_guarantee_sum || 0);
+        const tax = Number(int.tax || 0);
+        totalSalvage += salvage;
+        totalPG += pg;
+        totalTax += tax;
+        const cat = int.claim_breakdown || {};
+        let amt = 0;
+        Object.values(cat).forEach(s => { amt += Number(s?.amt || s?.amount || s?.value || 0); });
+        timeline.push({ type:'INTERIM', date:int.date_received, amount:amt, salvage, pg, tax });
+        Object.keys(cat).forEach(sec => {
+            const val = Number(cat[sec]?.amt || cat[sec]?.amount || cat[sec]?.value || 0);
+            if(!sectionUsed[sec]) sectionUsed[sec] = 0;
+            sectionUsed[sec] += val;
+        });
+    });
+
+    // ✅ FIX UTAMA: filter WO sebelum WO semasa
+    // Untuk sequence yang SAMA, hanya masukkan WO yang id-nya LEBIH KECIL (datang sebelum)
+    allWO.filter(w => {
+        if(w.status === "Claimed") return false;
+        if(Number(w.id) === Number(data.id)) return false; // skip diri sendiri (tambah manual bawah)
+        if(!w.qpb_date) return false;
+
+        const woDate = new Date(w.qpb_date);
+        const curDate = new Date(data.qpb_date);
+
+        if(woDate < curDate) return true;
+        if(woDate > curDate) return false;
+
+        // Tarikh sama — compare area
+        const wArea = (w.area_code||'').toUpperCase();
+        const curArea = (data.area_code||'').toUpperCase();
+        const wR = localAreaPriority[wArea] || 99;
+        const cR = localAreaPriority[curArea] || 99;
+        if(wR < cR) return true;
+        if(wR > cR) return false;
+
+        // Area sama — compare sequence number
+        const wSeq = parseInt((w.sequence_no||'').match(/\d+/)?.[0]||0);
+        const curSeq = parseInt((data.sequence_no||'').match(/\d+/)?.[0]||0);
+        if(wSeq < curSeq) return true;
+        if(wSeq > curSeq) return false;
+
+        // ✅ Sequence number sama — ikut id (kumulatif dalam kumpulan sequence sama)
+        // Masukkan WO yang id-nya lebih kecil sahaja
+        return Number(w.id) < Number(data.id);
+
+    }).forEach(wo => {
+        timeline.push({
+            type:'WORKORDER',
+            date: wo.qpb_date,
+            seq: parseInt((wo.sequence_no||'').match(/\d+/)?.[0]||0),
+            id: Number(wo.id),
+            amount: Number(wo.amount_spent || 0),
+            salvage: 0
+        });
+        const cat = wo.section_category || {};
+        Object.keys(cat).forEach(sec => {
+            const amt = Number(cat[sec]?.amt || 0);
             if(!sectionUsed[sec]) sectionUsed[sec] = 0;
             sectionUsed[sec] += amt;
         });
-        const currentAdd = Number(data.additional || 0);
-        if(currentAdd > 0){
+        const add = Number(wo.additional || 0);
+        if(add > 0){
             if(!sectionUsed["PROVISIONAL SUM"]) sectionUsed["PROVISIONAL SUM"] = 0;
-            sectionUsed["PROVISIONAL SUM"] += currentAdd;
+            sectionUsed["PROVISIONAL SUM"] += add;
         }
+    });
 
-        timeline.push({
-            type:'WORKORDER',
-            date:data.qpb_date,
-            seq:parseInt((data.sequence_no || '').match(/\d+/)?.[0] || 0),
-            amount: totalWorkValue,
-            salvage:0
-        });
-
-        timeline.sort((a,b)=>{
-            const d1 = new Date(a.date);
-            const d2 = new Date(b.date);
-            if(d1 < d2) return -1;
-            if(d1 > d2) return 1;
-            if(a.type !== b.type){ return a.type === 'INTERIM' ? -1 : 1; }
-            if(a.type === 'WORKORDER'){ return (a.seq || 0) - (b.seq || 0); }
-            return 0;
-        });
-
-        let bakiKontrak = Number(c.contract_sum || 0);
-        timeline.forEach(t => {
-            if(t.type === 'INTERIM'){
-                bakiKontrak -= t.amount;
-                bakiKontrak += (t.salvage || 0);
-                bakiKontrak += (t.pg || 0);
-bakiKontrak -= (t.tax || 0);
-            } else if(t.type === 'WORKORDER'){
-                bakiKontrak -= t.amount;
-            }
-        });
-
-        return { data, c, b, s, totalWorkValue, provisionalExtra, sectionUsed, totalSalvage, totalPG, totalTax, bakiKontrak };
+    // Tambah WO semasa
+    const currentSections = data.section_category || {};
+    Object.keys(currentSections).forEach(sec => {
+        const amt = Number(currentSections[sec]?.amt || 0);
+        if(!sectionUsed[sec]) sectionUsed[sec] = 0;
+        sectionUsed[sec] += amt;
+    });
+    const currentAdd = Number(data.additional || 0);
+    if(currentAdd > 0){
+        if(!sectionUsed["PROVISIONAL SUM"]) sectionUsed["PROVISIONAL SUM"] = 0;
+        sectionUsed["PROVISIONAL SUM"] += currentAdd;
     }
 
-    // ============================
-    // BLUEFORM: BUILD HTML STRING (boleh dipakai single & bulk)
-    // ============================
-    function buildBlueformHTML(payload) {
-        const { data, c, b, s, totalWorkValue, provisionalExtra, sectionUsed, totalSalvage, totalPG, totalTax, bakiKontrak } = payload;
+    timeline.push({
+        type:'WORKORDER',
+        date: data.qpb_date,
+        seq: parseInt((data.sequence_no||'').match(/\d+/)?.[0]||0),
+        id: Number(data.id),
+        amount: totalWorkValue,
+        salvage: 0
+    });
 
-        const seq = data.sequence_no || '';
-        const refPrefix = c.reference || 'RSAJ/M&E/IP/11-';
-        let formattedRef = seq.replace(/([A-Z]{2,4}\d+)$/i, ' - $1');
-        const unitName = (c.units?.unit_name || '').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+    timeline.sort((a, b) => {
+        const d1 = new Date(a.date), d2 = new Date(b.date);
+        if(d1 < d2) return -1; if(d1 > d2) return 1;
+        if(a.type !== b.type) return a.type === 'INTERIM' ? -1 : 1;
+        if(a.type === 'WORKORDER'){
+            if((a.seq||0) !== (b.seq||0)) return (a.seq||0) - (b.seq||0);
+            return (a.id||0) - (b.id||0); // ✅ tiebreaker by id
+        }
+        return 0;
+    });
 
-const tpl = Array.isArray(c.selected_sections) ? c.selected_sections : [];
+    const voBreakdown = c.vo_breakdown || {};
+    const cutoffForVO = new Date(data.qpb_date);
+    const activeVO = getActiveVO(voBreakdown, cutoffForVO);
 
-        let dynamicHtml = '';
-        let currentRow = 6;
+    let totalActiveVO = 0;
+    Object.values(activeVO).forEach(vo => { totalActiveVO += Number(vo.amt || 0); });
 
-        Object.keys(b).sort().forEach((key, idx) => {
-    const label = b[key]?.desc || key;
-    const active = tpl.length > 0 ? tpl.includes(key) : true;
-    if (!active) return;
-    const sumValue = b[key]?.amt || 0;
-    let workValue = Number(s[key]?.amt || 0);
+    let bakiKontrak = Number(c.contract_sum || 0) + totalActiveVO;
+    timeline.forEach(t => {
+        if(t.type === 'INTERIM'){
+            bakiKontrak -= t.amount;
+            bakiKontrak += (t.salvage || 0);
+            bakiKontrak += (t.pg || 0);
+            bakiKontrak -= (t.tax || 0);
+        } else if(t.type === 'WORKORDER'){
+            bakiKontrak -= t.amount;
+        }
+    });
 
-            dynamicHtml += `
+    return { data, c, b, s, totalWorkValue, provisionalExtra,
+             sectionUsed, totalSalvage, totalPG, totalTax,
+             bakiKontrak, voBreakdown, activeVO };
+}
+
+// ============================
+// BLUEFORM DATA — group (multiple IDs, sequence_no sama)
+// ============================
+async function buildBlueformDataGroup(ids, sharedData = null) {
+    const woResults = await Promise.all(
+        ids.map(id =>
+            fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}&select=*,contract(*,units(unit_name))`, { headers })
+                .then(r => r.json()).then(r => r[0])
+        )
+    );
+
+    const primaryWO = woResults[0];
+    const c = primaryWO.contract;
+    const b = c.contract_sections_breakdown || {};
+
+    const combinedSections = {};
+    let combinedProvisional = 0;
+    woResults.forEach(wo => {
+        const s = wo.section_category || {};
+        Object.keys(s).forEach(sec => {
+            const amt = Number(s[sec]?.amt || 0);
+            if(!combinedSections[sec]) combinedSections[sec] = { amt: 0 };
+            combinedSections[sec].amt += amt;
+        });
+        combinedProvisional += Number(wo.additional || 0);
+    });
+
+    let totalSection = 0;
+    Object.values(combinedSections).forEach(sec => { totalSection += Number(sec?.amt || 0); });
+    const totalWorkValue = totalSection + combinedProvisional;
+
+    const combinedWorkId = woResults.map(w => w.work_id).join(', ');
+    const uniqueLocations = [...new Set(woResults.map(w => (w.location || '').trim()).filter(l => l !== ''))];
+    const combinedLocation = uniqueLocations.join(', ');
+    const combinedDesc = woResults.map(w => w.description).join(' + ');
+
+    let allInterims, allWO, localAreaPriority;
+    if(sharedData){
+        allInterims = sharedData.allInterims;
+        allWO = [...sharedData.allWO];
+        localAreaPriority = sharedData.localAreaPriority;
+    } else {
+        const [interimRes, woRes, areaRes] = await Promise.all([
+            fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=date_received.asc`, { headers }),
+            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}`, { headers }),
+            fetch(`${SB_URL}/rest/v1/contract?id=eq.${c.id}&select=area_code`, { headers })
+        ]);
+        allInterims = await interimRes.json();
+        allWO = await woRes.json();
+        const areaRows = await areaRes.json();
+        localAreaPriority = {};
+        (areaRows[0]?.area_code || '').split(',').map(a => a.trim().toUpperCase()).filter(a => a.length > 0)
+            .forEach((a, i) => { localAreaPriority[a] = i + 1; });
+    }
+
+    const groupIds = ids.map(Number);
+    const cutoffDate = new Date(Math.max(...woResults.map(wo => new Date(wo.qpb_date))));
+
+    allWO.sort((a,b)=>{
+        const d1 = new Date(a.qpb_date), d2 = new Date(b.qpb_date);
+        if(d1 < d2) return -1; if(d1 > d2) return 1;
+        const aR = localAreaPriority[(a.area_code||'').toUpperCase()]||99;
+        const bR = localAreaPriority[(b.area_code||'').toUpperCase()]||99;
+        if(aR < bR) return -1; if(aR > bR) return 1;
+        const aS = parseInt((a.sequence_no||'').match(/\d+/)?.[0]||0);
+        const bS = parseInt((b.sequence_no||'').match(/\d+/)?.[0]||0);
+        return aS - bS;
+    });
+
+    let sectionUsed = {};
+    let totalSalvage = 0, totalPG = 0, totalTax = 0;
+
+    allInterims.forEach(int => {
+        const intDate = new Date(int.date_received);
+        if(intDate > cutoffDate) return;
+        totalSalvage += Number(int.salvage_value || 0);
+        totalPG += Number(int.performance_guarantee_sum || 0);
+        totalTax += Number(int.tax || 0);
+        const cat = int.claim_breakdown || {};
+        Object.keys(cat).forEach(sec => {
+            const val = Number(cat[sec]?.amt || cat[sec]?.amount || cat[sec]?.value || 0);
+            if(!sectionUsed[sec]) sectionUsed[sec] = 0;
+            sectionUsed[sec] += val;
+        });
+    });
+
+    allWO.filter(w => {
+        if(groupIds.includes(Number(w.id))) return false;
+        if(w.status === "Claimed") return false;
+        if(!w.qpb_date) return false;
+        const woDate = new Date(w.qpb_date);
+        if(woDate < cutoffDate) return true;
+        if(woDate > cutoffDate) return false;
+        const wArea = (w.area_code||'').toUpperCase();
+        const curArea = (primaryWO.area_code||'').toUpperCase();
+        const wR = localAreaPriority[wArea]||99;
+        const cR = localAreaPriority[curArea]||99;
+        if(wR < cR) return true; if(wR > cR) return false;
+        const wSeq = parseInt((w.sequence_no||'').match(/\d+/)?.[0]||0);
+        const cSeq = parseInt((primaryWO.sequence_no||'').match(/\d+/)?.[0]||0);
+        return wSeq <= cSeq;
+    }).forEach(wo => {
+        const cat = wo.section_category || {};
+        Object.keys(cat).forEach(sec => {
+            const amt = Number(cat[sec]?.amt || 0);
+            if(!sectionUsed[sec]) sectionUsed[sec] = 0;
+            sectionUsed[sec] += amt;
+        });
+        const add = Number(wo.additional || 0);
+        if(add > 0){
+            if(!sectionUsed["PROVISIONAL SUM"]) sectionUsed["PROVISIONAL SUM"] = 0;
+            sectionUsed["PROVISIONAL SUM"] += add;
+        }
+    });
+
+    woResults.forEach(wo => {
+        const cat = wo.section_category || {};
+        Object.keys(cat).forEach(sec => {
+            const amt = Number(cat[sec]?.amt || 0);
+            if(!sectionUsed[sec]) sectionUsed[sec] = 0;
+            sectionUsed[sec] += amt;
+        });
+        const add = Number(wo.additional || 0);
+        if(add > 0){
+            if(!sectionUsed["PROVISIONAL SUM"]) sectionUsed["PROVISIONAL SUM"] = 0;
+            sectionUsed["PROVISIONAL SUM"] += add;
+        }
+    });
+
+    const voBreakdown = c.vo_breakdown || {};
+    // ── BARU: hanya VO yang vo_date <= cutoffDate ──
+    const activeVO = getActiveVO(voBreakdown, cutoffDate);
+
+    let bakiKontrak = Number(c.contract_sum || 0);
+    allInterims.forEach(int => {
+        const intDate = new Date(int.date_received);
+        if(intDate > cutoffDate) return;
+        let amt = 0;
+        Object.values(int.claim_breakdown||{}).forEach(s => { amt += Number(s?.amt||s?.amount||s?.value||0); });
+        bakiKontrak -= amt;
+        bakiKontrak += Number(int.salvage_value||0);
+        bakiKontrak += Number(int.performance_guarantee_sum||0);
+        bakiKontrak -= Number(int.tax||0);
+    });
+
+    allWO.filter(w => {
+        if(groupIds.includes(Number(w.id))) return false;
+        if(w.status === "Claimed") return false;
+        if(!w.qpb_date) return false;
+        return new Date(w.qpb_date) <= cutoffDate;
+    }).forEach(w => { bakiKontrak -= Number(w.amount_spent||0); });
+
+    bakiKontrak -= totalWorkValue;
+
+    // ── BARU: tambah VO aktif sahaja ──
+    Object.values(activeVO).forEach(vo => { bakiKontrak += Number(vo.amt||0); });
+
+    const combinedData = {
+        ...primaryWO,
+        work_id: combinedWorkId,
+        location: combinedLocation,
+        description: combinedDesc,
+        section_category: combinedSections,
+        additional: combinedProvisional,
+        amount_spent: totalWorkValue,
+        contract: c
+    };
+
+    return {
+        data: combinedData, c, b,
+        s: combinedSections,
+        totalWorkValue,
+        provisionalExtra: combinedProvisional,
+        sectionUsed,
+        totalSalvage, totalPG, totalTax,
+        bakiKontrak,
+        voBreakdown, activeVO
+    };
+}
+
+// ============================
+// BLUEFORM: BUILD HTML STRING
+// ============================
+function buildBlueformHTML(payload) {
+    const { data, c, b, s, totalWorkValue, provisionalExtra,
+            sectionUsed, totalSalvage, totalPG, totalTax,
+            bakiKontrak, voBreakdown, activeVO } = payload;
+
+    // activeVO: VO yang sudah aktif pada cutoffDate
+    // Fallback ke voBreakdown kalau activeVO tiada (backward compat)
+    const effectiveVO = activeVO || voBreakdown;
+
+    const seq = data.sequence_no || '';
+    const refPrefix = c.reference || 'RSAJ/M&E/IP/11-';
+    let formattedRef = seq.replace(/([A-Z]{2,4}\d+)$/i, ' - $1');
+    const unitName = (c.units?.unit_name || '').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+    const tpl = Array.isArray(c.selected_sections) ? c.selected_sections : [];
+
+    let dynamicHtml = '';
+    let currentRow = 6;
+
+    Object.keys(b).sort().forEach((key, idx) => {
+        const label = b[key]?.desc || key;
+        const active = tpl.length > 0 ? tpl.includes(key) : true;
+        if(!active) return;
+        const sumValue = b[key]?.amt || 0;
+        let workValue = Number(s[key]?.amt || 0);
+
+        dynamicHtml += `
         <div class="grp-dyn-${idx}">
             <hr style="border:0.5px solid #000;margin:8px 0;">
             <div class="bf-row">
-    <div class="bf-label"><span class="bf-no">${currentRow++}</span><span>${label.toUpperCase().includes('SUM') ? label : label + ' Sum'}</span></div><div class="bf-colon">:</div><div class="bf-value">RM ${Number(sumValue).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+                <div class="bf-label"><span class="bf-no">${currentRow++}</span><span>${label.toUpperCase().includes('SUM') ? label : label + ' Sum'}</span></div>
+                <div class="bf-colon">:</div>
+                <div class="bf-value">RM ${Number(sumValue).toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+            </div>
             <div class="bf-row">
-    <div class="bf-label">
-        <span class="bf-no">${currentRow++}</span>
-        <span>Anggaran Kerja (${getInitials(label)})</span></div><div class="bf-colon">:</div><div class="bf-value">RM ${workValue.toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
-        </div>
-    `;
-        });
-
-        function formatLocation(loc){
-            if(!loc) return '';
-            let txt = loc.toUpperCase().trim();
-            txt = txt.replace(/\bKAMPUNG\b/g,'KG');
-            if(txt.includes('BPH') || txt.includes('RESERVOIR')){ return txt; }
-            if(!txt.startsWith('LRA')){ txt = 'LRA ' + txt; }
-            return txt;
-        }
-
-        const locationText = formatLocation(data.location);
-
-        const bakiSectionRows = Object.keys(b).map(sec => {
-            let label = (b[sec].desc || '').toUpperCase();
-            if(label.includes('GENERAL') || label.includes('PRELIMINARIES')){ label = 'G&P'; }
-            else if(label.includes('PREVENTIVE')){ label = 'PREVENTIVE MAINTENANCE'; }
-            else if(label.includes('PROACTIVE')){ label = 'PROACTIVE MAINTENANCE'; }
-            label = label.replace(/CHARGES/g,'').trim();
-            const contractAmt = Number(b[sec]?.amt || 0);
-            const usedAmt = Number(sectionUsed[sec] || 0);
-            const baki = contractAmt - usedAmt;
-            return `
-<div class="bf-row" style="font-size:9px;">
-<div class="bf-label" style="width:220px;">
-<span style="margin-left:25px;">${label}</span>
-</div>
-<div class="bf-colon">:</div>
-<div class="bf-value">
-RM ${baki.toLocaleString(undefined,{minimumFractionDigits:2})}
-</div>
-</div>`;
-        }).join('');
-
-        const contentHtml = `
-                <div class="bf-row"><div class="bf-label"><span class="bf-no">1</span><span>   No. Rujukan</span></div><div class="bf-colon">:</div><div class="bf-value">${refPrefix}${formattedRef}</div></div>
-                <div class="bf-row"><div class="bf-label"><span class="bf-no">2</span><span>   No. Work Order</span></div><div class="bf-colon">:</div><div class="bf-value">${data.work_id}</div></div>
-                <div class="bf-row"><div class="bf-label"><span class="bf-no">3</span><span>   No. Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value">${c.contract_code}</div></div>
-                <div class="bf-row"><div class="bf-label"><span class="bf-no">4</span><span>   Nama Kontraktor</span></div><div class="bf-colon">:</div><div class="bf-value">${c.contractor}</div></div>
-                <div class="bf-row"><div class="bf-label"><span class="bf-no">5</span><span>   Tempoh Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value">${formatTarikhBM(c.contract_start)} ~ ${formatTarikhBM(c.contract_end)}</div></div>
-                
-                ${dynamicHtml}
-
-<div class="bf-row">
-    <div class="bf-label">
-        <span class="bf-no">${currentRow++}</span>
-        <span>Anggaran Kerja (<i>Tambahan</i>)</span>
-    </div>
-    <div class="bf-colon">:</div>
-    <div class="bf-value">
-        RM ${provisionalExtra.toLocaleString(undefined,{minimumFractionDigits:2})}
-    </div>
-</div>
-                <hr style="border: 0.5px solid #000; margin: 8px 0;">
-                <div class="bf-row"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Jumlah Harga Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value">RM ${Number(c.contract_sum || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
-                
-                <div style="margin-top: 8px;">
-                    <div class="bf-row"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>BAKI</span></div><div class="bf-colon">:</div><div class="bf-value"></div></div>
-                    <div class="bf-baki-table">
-                    ${bakiSectionRows}
-
-<div class="bf-row" style="font-size:9px;">
-<div class="bf-label" style="width:220px;">
-<span style="margin-left:25px;">SALVAGE VALUE</span>
-</div>
-<div class="bf-colon">:</div>
-<div class="bf-value">
-RM ${totalSalvage.toLocaleString(undefined,{minimumFractionDigits:2})}
-</div>
-</div>
-
-<div class="bf-row" style="font-size:9px;">
-<div class="bf-label" style="width:220px;">
-<span style="margin-left:25px;">PERFORMANCE GUARANTEE</span>
-</div>
-<div class="bf-colon">:</div>
-<div class="bf-value">
-RM ${totalPG.toLocaleString(undefined,{minimumFractionDigits:2})}
-</div>
-</div>
-
-<div class="bf-row" style="font-size:9px;">
-<div class="bf-label" style="width:220px;">
-<span style="margin-left:25px;">TAX</span>
-</div>
-<div class="bf-colon">:</div>
-<div class="bf-value">
-RM ${totalTax.toLocaleString(undefined,{minimumFractionDigits:2})}
-</div>
-</div>
-
-</div></div>
-                <div class="bf-row" style="margin-top:8px;"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Baki Harga Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value" style="font-weight:bold;">RM ${bakiKontrak.toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
-                <hr style="border: 0.5px solid #000; margin: 8px 0;">
-                <div class="bf-row"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Tajuk Kerja</span></div><div class="bf-colon">:</div><div class="bf-value">${data.description.toUpperCase()} DI ${locationText} (RM ${totalWorkValue.toLocaleString(undefined,{minimumFractionDigits:2})})</div></div>
-            `;
-
-        return `
-        <div class="a4-container" style="
-            width: 210mm;
-            height: 297mm;
-            margin: 0;
-            background: white;
-            padding: 1.5cm 2cm 1.6cm 2cm;
-            position: relative;
-            font-size: 11px;
-            color: black;
-            line-height: 1.3;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            box-shadow: 0 4px 30px rgba(0,0,0,0.4);
-            page-break-after: always;
-            page-break-inside: avoid;
-            flex-shrink: 0;
-        ">
-            <img src="RSAJ.png" class="bf-logo" alt="RSAJ Logo" onerror="this.src='https://upload.wikimedia.org/wikipedia/en/thumb/3/3d/Ranhill_SAJ_logo.svg/1200px-Ranhill_SAJ_logo.svg.png'">
-            <div id="bf_title" style="text-align:center;font-weight:bold;margin-top:0.7cm;margin-bottom:12px;padding:0 50px;font-size:10px;">
-                PERMOHONAN KERJA-KERJA S.O.R / TAMBAHAN DALAM KONTRAK PENYELENGGARAAN
-            </div>
-            <div id="bf_content" style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;">
-                ${contentHtml}
-            </div>
-            <div class="bf-signature-grid">
-                <div>
-                    <strong>Dimohon Oleh:</strong>
-                    <div style="height:70px;"></div>
-                    <div class="bf-sign-line"></div>
-                    <small>${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}</small>
-                </div>
-                <div>
-                    <strong>Disemak Oleh:</strong>
-                    <div style="height:70px;"></div>
-                    <div class="bf-sign-line"></div>
-                    <small>Ketua Seksyen Selenggara</small>
-                </div>
-                <div>
-                    <strong>Disahkan Oleh:</strong>
-                    <div style="height:70px;"></div>
-                    <div class="bf-sign-line"></div>
-                    <small>Ketua Mekanikal & Elektrikal</small>
-                </div>
-                <div>
-                    <strong>Disokong Oleh:</strong>
-                    <div style="height:70px;"></div>
-                    <div class="bf-sign-line"></div>
-                    <small>Ketua Bahagian Operasi & Penyelenggaraan</small>
-                </div>
-            </div>
-            <div class="bf-footer-note">
-                * Sebutharga dan Work Order telah disemak sepenuhnya oleh Pihak Daerah
+                <div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Anggaran Kerja (${getInitials(label)})</span></div>
+                <div class="bf-colon">:</div>
+                <div class="bf-value">RM ${workValue.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
             </div>
         </div>`;
-    }
 
-    // ============================
-    // OPEN BLUEFORM SINGLE — guna preview page yang sama
-    // ============================
-    async function openBlueform(id) {
-        window.currentBFId = id;
-        console.log("OPEN BF:", id);
-        try {
-            const container = document.getElementById('bulkPagesContainer');
-            container.innerHTML = '';
-            document.getElementById('bulkPreviewCount').innerText = 'Memuatkan...';
-            document.getElementById('bulkPreviewPage').style.display = 'block';
-
-            const payload = await buildBlueformData(id);
-            container.innerHTML = buildBlueformHTML(payload);
-
-            document.getElementById('bulkPreviewCount').innerText = payload.data.work_id || '';
-        } catch (e) { 
-            console.error(e);
-            alert("Ralat memaparkan borang."); 
-        }
-    }
-
-    function toggleBfGroup(className, isVisible) {
-        const elements = document.getElementsByClassName(className);
-        for (let el of elements) isVisible ? el.classList.remove('hide-group') : el.classList.add('hide-group');
-    }
-
-function formatRM(v){
-return Number(v).toLocaleString(undefined,{
-minimumFractionDigits:2,
-maximumFractionDigits:2
-});
-}
-    function buildInterimMatrix(contract, interims, workorders){
-
-const sections = contract.contract_sections_breakdown || {};
-const interimCount = interims.length;
-const sectionNames = Object.keys(sections);
-
-/* HEADER */
-
-let head = `<tr>
-<th>ITEM</th>
-<th>DESCRIPTION</th>
-<th>AS PER CONTRACT</th>`;
-
-for(let i=1;i<=interimCount;i++){
-head += `<th>INTERIM ${i}</th>`;
-}
-
-head += `
-<th>TOTAL CLAIM</th>
-<th>CONTRACT BALANCE</th>
-<th>ON GOING WORKS</th>
-<th>ON GOING CONTRACT BALANCE</th>
-</tr>`;
-
-document.getElementById("interimHead").innerHTML = head;
-
-let body='';
-
-sectionNames.forEach((sec,index)=>{
-
-const letter=String.fromCharCode(65+index);
-const contractAmt=Number(sections[sec]?.amt||0);
-
-let row=`
-<tr>
-<td>${letter}</td>
-<td>${sections[sec]?.desc || sec}</td>
-<td style="text-align:right;">${formatRM(contractAmt)}</td>
-`;
-
-let totalClaim=0;
-
-/* interim columns */
-
-interims.forEach(int=>{
-
-const cat=int.claim_breakdown || {};
-
-let val = Number(cat[sec]?.amt || 0);
-
-totalClaim+=val;
-
-row+=`<td style="text-align:right;">${val?formatRM(val):'-'}</td>`;
-
-});
-
-/* contract balance */
-
-const contractBalance=contractAmt-totalClaim;
-
-/* pending work order */
-
-let ongoing=0;
-
-workorders
-.filter(w=>w.status!=='Claimed')
-.forEach(w=>{
-
-const cat=w.section_category||{};
-ongoing += Number(cat[sec]?.amt || 0);
-
-/* tambahan hanya jika tiada dalam section_category */
-if(sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]){
-ongoing += Number(w.additional || 0);
-}
-
-});
-
-/* after WO */
-
-const afterWO=contractBalance-ongoing;
-
-row+=`
-<td style="text-align:right;">${formatRM(totalClaim)}</td>
-<td style="text-align:right;">${formatRM(contractBalance)}</td>
-<td style="text-align:right;">${formatRM(ongoing)}</td>
-<td style="text-align:right;font-weight:bold;color:${afterWO<0?'red':'black'};">
-${formatRM(afterWO)}
-</td>
-`;
-
-row+=`</tr>`;
-
-body+=row;
-
-});
-
-        /* SALVAGE VALUE ROW */
-
-let salvageRow = `
-<tr>
-<td></td>
-<td>SALVAGE VALUE</td>
-<td style="text-align:right;">-</td>
-`;
-
-let salvageTotal = 0;
-
-interims.forEach(int=>{
-
-const val = Number(int.salvage_value || 0);
-salvageTotal += val;
-
-salvageRow += `<td style="text-align:right;">${val?formatRM(val):'-'}</td>`;
-
-});
-
-salvageRow += `
-<td style="text-align:right;">${formatRM(salvageTotal)}</td>
-<td colspan="3"></td>
-</tr>
-`;
-
-body += salvageRow;
-
-
-/* ==============================
-PERFORMANCE GUARANTEE ROW
-============================== */
-
-let pgRow = `
-<tr>
-<td></td>
-<td>PERFORMANCE GUARANTEE SUM</td>
-<td style="text-align:right;">-</td>
-`;
-
-let pgTotal = 0;
-
-interims.forEach(int=>{
-
-const val = Number(int.performance_guarantee_sum || 0);
-pgTotal += val;
-
-pgRow += `<td style="text-align:right;">${val?formatRM(val):'-'}</td>`;
-
-});
-
-pgRow += `
-<td style="text-align:right;">${formatRM(pgTotal)}</td>
-<td colspan="3"></td>
-</tr>
-`;
-
-body += pgRow;
-
-/* ==============================
-TAX ROW
-============================== */
-
-let taxRow = `
-<tr>
-<td></td>
-<td>TAX</td>
-<td style="text-align:right;">-</td>
-`;
-
-let taxTotal = 0;
-
-interims.forEach(int=>{
-
-    const val = Number(int.tax || 0);
-
-    taxTotal += val;
-
-    taxRow += `
-    <td style="text-align:right;">
-        ${val ? formatRM(val) : '-'}
-    </td>`;
-});
-
-taxRow += `
-<td style="text-align:right;">
-    ${formatRM(taxTotal)}
-</td>
-<td colspan="3"></td>
-</tr>
-`;
-
-body += taxRow;
-
-
-                /* TOTAL ONGOING CONTRACT BALANCE */
-
-let totalOngoingBalance = 0;
-
-sectionNames.forEach(sec=>{
-
-const contractAmt = Number(sections[sec]?.amt || 0);
-
-let claimed = 0;
-
-interims.forEach(int=>{
-claimed += Number(int.claim_breakdown?.[sec]?.amt || 0);
-});
-
-let ongoing = 0;
-
-workorders
-.filter(w=>w.status!=='Claimed')
-.forEach(w=>{
-
-const cat = w.section_category || {};
-ongoing += Number(cat[sec]?.amt || 0);
-
-if(sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]){
-ongoing += Number(w.additional || 0);
-}
-
-});
-
-totalOngoingBalance += contractAmt - claimed - ongoing;
-
-});
-
-/* tambah salvage + pg, tolak tax */
-
-totalOngoingBalance += salvageTotal;
-totalOngoingBalance += pgTotal;
-totalOngoingBalance -= taxTotal;
-
-/* TOTAL ROW */
-
-let totalRow=`<tr style="font-weight:bold;background:#f5f5f5;">
-<td colspan="2">TOTAL</td>`;
-
-let totalContract=0;
-
-sectionNames.forEach(sec=>{
-totalContract+=Number(sections[sec]?.amt||0);
-});
-
-let totalClaim = 0;
-
-interims.forEach(int=>{
-totalClaim += Number(int.net_amount || 0);
-});
-
-totalRow+=`<td style="text-align:right;">${formatRM(totalContract)}</td>`;
-
-let interimTotals=new Array(interimCount).fill(0);
-
-interims.forEach((int,i)=>{
-
-interimTotals[i] = Number(int.net_amount || 0);
-
-});
-
-interimTotals.forEach(v=>{
-totalRow+=`<td style="text-align:right;">${formatRM(v)}</td>`;
-});
-
-/* TOTAL CLAIM */
-totalRow += `<td style="text-align:right;">${formatRM(totalClaim)}</td>`;
-
-/* CONTRACT BALANCE kosong */
-totalRow += `<td></td>`;
-
-/* ONGOING WORK kosong */
-totalRow += `<td></td>`;
-
-/* ONGOING CONTRACT BALANCE */
-totalRow += `
-<td style="text-align:right;font-weight:bold;">
-${formatRM(totalOngoingBalance)}
-</td>
-</tr>`;
-
-body += totalRow;
-
-document.getElementById("interimBody").innerHTML=body;
-
-}
-
-function printBlueform() {
-
-    const bf = document.getElementById('blueformPage');
-
-    if (!bf.classList.contains('active')) {
-        alert("Blueform belum dibuka.");
-        return;
-    }
-
-    bf.style.display = 'block';
-    bf.offsetHeight;
-
-    setTimeout(() => {
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                window.print();
-            });
-        });
-    }, 200);
-}
-
-    function openSummary(){
-    const id = currentContractId;
-    if(!id){
-        alert("Tiada kontrak dipilih.");
-        return;
-    }
-    window.location.href = `contract_summary.html?id=${id}`;
-}
-    async function updateStatus(id, status){
-
-    try{
-
-        await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}`,{
-            method:'PATCH',
-            headers,
-            body: JSON.stringify({
-                status: status
-            })
+        // ── BARU: papar VO aktif sahaja ──
+        let voTotal = 0;
+        let voLines = '';
+        Object.entries(effectiveVO).forEach(([voName, vo]) => {
+            const voAmt = Number(vo.breakdown?.[key]?.amt || 0);
+            if(voAmt > 0){
+                voTotal += voAmt;
+                voLines += `
+                <div class="bf-row" style="font-size:9px;color:#c0392b;">
+                    <div class="bf-label"><span class="bf-no"></span><span>↳ ${voName}</span></div>
+                    <div class="bf-colon">:</div>
+                    <div class="bf-value">RM ${voAmt.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+                </div>`;
+            }
         });
 
-        /* update local data */
-        const row = allWorks.find(w => Number(w.id) === Number(id));
-
-        if(row){
-            row.status = status;
+        if(voTotal > 0){
+            dynamicHtml += `
+            <div class="bf-row" style="font-size:9.5px;font-weight:700;color:#c0392b;">
+                <div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Variation Order (${getInitials(label)})</span></div>
+                <div class="bf-colon">:</div>
+                <div class="bf-value">RM ${voTotal.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+            </div>
+            ${voLines}`;
         }
-
-        renderTable(currentTableData, currentView !== "DATE");
-        renderMobileCards(currentTableData);
-
-    }catch(e){
-
-        console.error(e);
-        alert("Gagal update status");
-
-    }
-
-}
-    function toggleAllBF(el){
-
-    document.querySelectorAll('.bf-checkbox').forEach(cb=>{
-        cb.checked = el.checked;
     });
 
-}
-
-    // ============================
-    // BULK BLUEFORM — Promise.all, render sekali gus
-    // ============================
-    async function bulkDownloadBlueform(){
-
-    const checked = [...document.querySelectorAll('.bf-checkbox:checked')];
-
-    if(checked.length === 0){
-        alert("Sila pilih Blueform.");
-        return;
+    function formatLocation(loc){
+        if(!loc) return '';
+        const parts = loc.split(',').map(part => {
+            let txt = part.trim().toUpperCase();
+            txt = txt.replace(/\bKAMPUNG\b/g,'KG');
+            if(txt.includes('BPH') || txt.includes('RESERVOIR')) return txt;
+            if(!txt.startsWith('LRA')) txt = 'LRA ' + txt;
+            return txt;
+        });
+        return parts.join(', ');
     }
 
+    const locationText = formatLocation(data.location);
+
+    // ── BARU: baki per section tambah VO aktif ──
+    const bakiSectionRows = Object.keys(b).map(sec => {
+        let label = (b[sec].desc || '').toUpperCase();
+        if(label.includes('GENERAL') || label.includes('PRELIMINARIES')) label = 'G&P';
+        else if(label.includes('PREVENTIVE')) label = 'PREVENTIVE MAINTENANCE';
+        else if(label.includes('PROACTIVE')) label = 'PROACTIVE MAINTENANCE';
+        label = label.replace(/CHARGES/g,'').trim();
+        const contractAmt = Number(b[sec]?.amt || 0);
+        let voForSec = 0;
+        Object.values(effectiveVO).forEach(vo => { voForSec += Number(vo.breakdown?.[sec]?.amt || 0); });
+        const usedAmt = Number(sectionUsed[sec] || 0);
+        const baki = (contractAmt + voForSec) - usedAmt;
+        return `
+        <div class="bf-row" style="font-size:9px;">
+            <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">${label}</span></div>
+            <div class="bf-colon">:</div>
+            <div class="bf-value">RM ${baki.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+        </div>`;
+    }).join('');
+
+    // ── BARU: Jumlah Harga Kontrak = contract_sum + VO aktif ──
+    let totalActiveVO = 0;
+    Object.values(effectiveVO).forEach(vo => { totalActiveVO += Number(vo.amt || 0); });
+    const effectiveContractSum = Number(c.contract_sum || 0) + totalActiveVO;
+
+    const contentHtml = `
+        <div class="bf-row"><div class="bf-label"><span class="bf-no">1</span><span>   No. Rujukan</span></div><div class="bf-colon">:</div><div class="bf-value">${refPrefix}${formattedRef}</div></div>
+        <div class="bf-row"><div class="bf-label"><span class="bf-no">2</span><span>   No. Work Order</span></div><div class="bf-colon">:</div><div class="bf-value">${data.work_id}</div></div>
+        <div class="bf-row"><div class="bf-label"><span class="bf-no">3</span><span>   No. Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value">${c.contract_code}</div></div>
+        <div class="bf-row"><div class="bf-label"><span class="bf-no">4</span><span>   Nama Kontraktor</span></div><div class="bf-colon">:</div><div class="bf-value">${c.contractor}</div></div>
+        <div class="bf-row"><div class="bf-label"><span class="bf-no">5</span><span>   Tempoh Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value">${formatTarikhBM(c.contract_start)} ~ ${formatTarikhBM(c.contract_end)}</div></div>
+
+        ${dynamicHtml}
+
+        <div class="bf-row">
+            <div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Anggaran Kerja (<i>Tambahan</i>)</span></div>
+            <div class="bf-colon">:</div>
+            <div class="bf-value">RM ${provisionalExtra.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+        </div>
+
+        <hr style="border:0.5px solid #000;margin:8px 0;">
+        <div class="bf-row">
+            <div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Jumlah Harga Kontrak</span></div>
+            <div class="bf-colon">:</div>
+            <div class="bf-value">RM ${effectiveContractSum.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+        </div>
+
+        <div style="margin-top:8px;">
+            <div class="bf-row"><div class="bf-label"><span class="bf-no">${currentRow++}</span><span>BAKI</span></div><div class="bf-colon">:</div><div class="bf-value"></div></div>
+            <div class="bf-baki-table">
+                ${bakiSectionRows}
+                <div class="bf-row" style="font-size:9px;">
+                    <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">SALVAGE VALUE</span></div>
+                    <div class="bf-colon">:</div>
+                    <div class="bf-value">RM ${totalSalvage.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+                </div>
+                <div class="bf-row" style="font-size:9px;">
+                    <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">PERFORMANCE GUARANTEE</span></div>
+                    <div class="bf-colon">:</div>
+                    <div class="bf-value">RM ${totalPG.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+                </div>
+                <div class="bf-row" style="font-size:9px;">
+                    <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">TAX</span></div>
+                    <div class="bf-colon">:</div>
+                    <div class="bf-value">RM ${totalTax.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bf-row" style="margin-top:8px;">
+            <div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Baki Harga Kontrak</span></div>
+            <div class="bf-colon">:</div>
+            <div class="bf-value" style="font-weight:bold;">RM ${bakiKontrak.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+        </div>
+        <hr style="border:0.5px solid #000;margin:8px 0;">
+        <div class="bf-row">
+            <div class="bf-label"><span class="bf-no">${currentRow++}</span><span>Tajuk Kerja</span></div>
+            <div class="bf-colon">:</div>
+            <div class="bf-value">${data.description.toUpperCase()} DI ${locationText} (RM ${totalWorkValue.toLocaleString(undefined,{minimumFractionDigits:2})})</div>
+        </div>
+    `;
+
+    return `
+    <div class="a4-container" style="
+        width:210mm; height:297mm; margin:0; background:white;
+        padding:1.5cm 2cm 1.6cm 2cm; position:relative;
+        font-size:11px; color:black; line-height:1.3;
+        box-sizing:border-box; display:flex; flex-direction:column;
+        overflow:hidden; box-shadow:0 4px 30px rgba(0,0,0,0.4);
+        page-break-after:always; page-break-inside:avoid; flex-shrink:0;">
+        <img src="RSAJ.png" class="bf-logo" alt="RSAJ Logo"
+            onerror="this.src='https://upload.wikimedia.org/wikipedia/en/thumb/3/3d/Ranhill_SAJ_logo.svg/1200px-Ranhill_SAJ_logo.svg.png'">
+        <div id="bf_title" style="text-align:center;font-weight:bold;margin-top:0.7cm;margin-bottom:12px;padding:0 50px;font-size:10px;">
+            PERMOHONAN KERJA-KERJA S.O.R / TAMBAHAN DALAM KONTRAK PENYELENGGARAAN
+        </div>
+        <div id="bf_content" style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;">
+            ${contentHtml}
+        </div>
+        <div class="bf-signature-grid">
+            <div>
+                <strong>Dimohon Oleh:</strong>
+                <div style="height:70px;"></div>
+                <div class="bf-sign-line"></div>
+                <small>${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}</small>
+            </div>
+            <div>
+                <strong>Disemak Oleh:</strong>
+                <div style="height:70px;"></div>
+                <div class="bf-sign-line"></div>
+                <small>Ketua Seksyen Selenggara</small>
+            </div>
+            <div>
+                <strong>Disahkan Oleh:</strong>
+                <div style="height:70px;"></div>
+                <div class="bf-sign-line"></div>
+                <small>Ketua Mekanikal & Elektrikal</small>
+            </div>
+            <div>
+                <strong>Disokong Oleh:</strong>
+                <div style="height:70px;"></div>
+                <div class="bf-sign-line"></div>
+                <small>Ketua Bahagian Operasi & Penyelenggaraan</small>
+            </div>
+        </div>
+        <div class="bf-footer-note">
+            * Sebutharga dan Work Order telah disemak sepenuhnya oleh Pihak Daerah
+        </div>
+    </div>`;
+}
+
+async function openBlueform(id) {
+    try {
+        const container = document.getElementById('bulkPagesContainer');
+        container.innerHTML = '';
+        document.getElementById('bulkPreviewCount').innerText = 'Memuatkan...';
+        document.getElementById('bulkPreviewPage').style.display = 'block';
+        const payload = await buildBlueformData(id);
+        container.innerHTML = buildBlueformHTML(payload);
+        document.getElementById('bulkPreviewCount').innerText = payload.data.work_id || '';
+    } catch(e) {
+        console.error(e);
+        alert("Ralat memaparkan borang.");
+    }
+}
+
+async function openBlueformGroup(idsStr) {
+    const ids = idsStr.split(',').map(id => id.trim());
     const container = document.getElementById('bulkPagesContainer');
     container.innerHTML = '';
-
-    document.getElementById('bulkPreviewCount').innerText =
-        `Memuatkan ${checked.length} blueform...`;
-
+    document.getElementById('bulkPreviewCount').innerText = 'Memuatkan...';
     document.getElementById('bulkPreviewPage').style.display = 'block';
+    try {
+        const payload = ids.length === 1
+            ? await buildBlueformData(ids[0])
+            : await buildBlueformDataGroup(ids);
+        container.innerHTML = buildBlueformHTML(payload);
+        document.getElementById('bulkPreviewCount').innerText =
+            ids.length > 1 ? `Gabungan ${ids.length} Work Order` : (payload.data.work_id || '');
+    } catch(e) {
+        console.error(e);
+        alert("Ralat memaparkan borang.");
+    }
+}
 
-    // Fetch semua serentak
-    const payloads = await Promise.all(
-        checked.map(cb => buildBlueformData(cb.value))
-    );
+function toggleBfGroup(className, isVisible){
+    const elements = document.getElementsByClassName(className);
+    for(let el of elements) isVisible ? el.classList.remove('hide-group') : el.classList.add('hide-group');
+}
 
-    // Render semua sekali gus
-    container.innerHTML = payloads.map(p => buildBlueformHTML(p)).join('');
+function formatRM(v){
+    return Number(v).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
+}
 
-    document.getElementById('bulkPreviewCount').innerText =
-        `${checked.length} Blueform — Sedia untuk Cetak`;
+// ============================
+// BUILD INTERIM MATRIX — TIDAK DIUBAH
+// ============================
+function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
+    const sections = contract.contract_sections_breakdown || {};
+    const interimCount = interims.length;
+    const sectionNames = Object.keys(sections);
+
+    const pendingWO = workorders.filter(w => w.status !== 'Claimed');
+    const ongoingBase = {};
+    const ongoingVO = {};
+
+    sectionNames.forEach(sec => {
+        ongoingBase[sec] = 0;
+        ongoingVO[sec] = 0;
+        pendingWO.forEach(w => {
+            const cat = w.section_category || {};
+            if(w.status !== 'Variation Order' && w.status !== 'VO'){
+                ongoingBase[sec] += Number(cat[sec]?.amt || 0);
+                if(sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]){
+                    ongoingBase[sec] += Number(w.additional || 0);
+                }
+            } else {
+                ongoingVO[sec] += Number(cat[sec]?.amt || 0);
+            }
+        });
+    });
+
+    let head = `<tr>
+    <th>ITEM</th>
+    <th>DESCRIPTION</th>
+    <th>AS PER CONTRACT</th>`;
+    for(let i = 1; i <= interimCount; i++) head += `<th>INTERIM ${i}</th>`;
+    head += `<th>TOTAL CLAIM</th><th>CONTRACT BALANCE</th><th>ON GOING WORKS</th><th>ON GOING CONTRACT BALANCE</th></tr>`;
+    document.getElementById("interimHead").innerHTML = head;
+
+    let body = '';
+    let grandTotalContract = 0;
+    let grandTotalInterims = new Array(interimCount).fill(0);
+    let grandTotalClaim = 0;
+    let grandTotalContractBalance = 0;
+    let grandTotalOngoing = 0;
+    let grandTotalOngoingBalance = 0;
+
+    sectionNames.forEach((sec, index) => {
+        const letter = String.fromCharCode(65 + index);
+        const secDesc = sections[sec]?.desc || sec;
+        const originalContractAmt = Number(sections[sec]?.amt || 0);
+
+        let rowBase = `<tr><td>${letter}</td><td>${secDesc}</td><td style="text-align:right;">${formatRM(originalContractAmt)}</td>`;
+        let totalClaimBase = 0;
+        let interimValsBase = [];
+
+        interims.forEach(int => {
+            const cat = int.claim_breakdown || {};
+            let val = cat[sec] ? Number(cat[sec].amt || 0) : 0;
+            totalClaimBase += val;
+            interimValsBase.push(val);
+            rowBase += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
+        });
+
+        const balanceBase = originalContractAmt - totalClaimBase;
+        const ongoingB = ongoingBase[sec];
+        const afterWOBase = balanceBase - ongoingB;
+
+        rowBase += `
+        <td style="text-align:right;">${formatRM(totalClaimBase)}</td>
+        <td style="text-align:right;">${formatRM(balanceBase)}</td>
+        <td style="text-align:right;">${formatRM(ongoingB)}</td>
+        <td style="text-align:right;font-weight:bold;color:${afterWOBase < 0 ? 'red' : 'black'};">${formatRM(afterWOBase)}</td>
+        </tr>`;
+        body += rowBase;
+
+        grandTotalContract += originalContractAmt;
+        grandTotalContractBalance += balanceBase;
+        grandTotalOngoing += ongoingB;
+        grandTotalOngoingBalance += afterWOBase;
+        interimValsBase.forEach((v, i) => { grandTotalInterims[i] += v; });
+
+        Object.entries(voBreakdown).forEach(([voName, voData]) => {
+            if(voData && voData.breakdown && voData.breakdown[sec]){
+                const voContractAmt = Number(voData.breakdown[sec].amt || 0);
+                let totalClaimVO = 0;
+                let interimValsVO = [];
+                interims.forEach(int => {
+                    const cat = int.claim_breakdown || {};
+                    let val = 0;
+                    if(cat[sec] && cat[sec].vo && cat[sec].vo[voName]){
+                        val = Number(cat[sec].vo[voName].amt || 0);
+                    } else if(cat[sec] && cat[sec].vo){
+                        Object.entries(cat[sec].vo).forEach(([key, item]) => {
+                            if(key === voName) val += Number(item.amt || 0);
+                        });
+                    }
+                    totalClaimVO += val;
+                    interimValsVO.push(val);
+                });
+
+                if(voContractAmt > 0 || totalClaimVO > 0){
+                    let rowVO = `<tr style="color:#c0392b;background:#fffcfc;">
+                    <td></td><td>↳ ${voName}</td>
+                    <td style="text-align:right;">${formatRM(voContractAmt)}</td>`;
+                    interimValsVO.forEach(val => {
+                        rowVO += `<td style="text-align:right;color:#c0392b;">${val ? formatRM(val) : '-'}</td>`;
+                    });
+                    const balanceVO = voContractAmt - totalClaimVO;
+                    const ongoingV = 0;
+                    const afterWOVO = balanceVO - ongoingV;
+                    rowVO += `
+                    <td style="text-align:right;font-weight:600;">${formatRM(totalClaimVO)}</td>
+                    <td style="text-align:right;">${formatRM(balanceVO)}</td>
+                    <td style="text-align:right;">${formatRM(ongoingV)}</td>
+                    <td style="text-align:right;font-weight:bold;color:${afterWOVO < 0 ? 'red' : '#c0392b'};">${formatRM(afterWOVO)}</td>
+                    </tr>`;
+                    body += rowVO;
+
+                    grandTotalContract += voContractAmt;
+                    grandTotalContractBalance += balanceVO;
+                    grandTotalOngoing += ongoingV;
+                    grandTotalOngoingBalance += afterWOVO;
+                    interimValsBase.forEach((v, i) => { grandTotalInterims[i] += interimValsVO[i]; });
+                }
+            }
+        });
+    });
+
+    let salvageTotal = 0;
+    let salvageRow = `<tr><td></td><td>SALVAGE VALUE</td><td style="text-align:right;">-</td>`;
+    interims.forEach((int, i) => {
+        const val = Number(int.salvage_value || 0);
+        salvageTotal += val;
+        grandTotalInterims[i] += val;
+        salvageRow += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
+    });
+    salvageRow += `<td style="text-align:right;">${formatRM(salvageTotal)}</td><td colspan="3"></td></tr>`;
+    body += salvageRow;
+
+    let pgTotal = 0;
+    let pgRow = `<tr><td></td><td>PERFORMANCE GUARANTEE SUM</td><td style="text-align:right;">-</td>`;
+    interims.forEach((int, i) => {
+        const val = Number(int.performance_guarantee_sum || 0);
+        pgTotal += val;
+        grandTotalInterims[i] += val;
+        pgRow += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
+    });
+    pgRow += `<td style="text-align:right;">${formatRM(pgTotal)}</td><td colspan="3"></td></tr>`;
+    body += pgRow;
+
+    let taxTotal = 0;
+    let taxRow = `<tr><td></td><td>TAX</td><td style="text-align:right;">-</td>`;
+    interims.forEach((int, i) => {
+        const val = Number(int.tax || 0);
+        taxTotal += val;
+        grandTotalInterims[i] -= val;
+        taxRow += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
+    });
+    taxRow += `<td style="text-align:right;">${formatRM(taxTotal)}</td><td colspan="3"></td></tr>`;
+    body += taxRow;
+
+    grandTotalOngoingBalance += salvageTotal + pgTotal - taxTotal;
+    grandTotalClaim = interims.reduce((acc, int) => acc + Number(int.net_amount || 0), 0);
+
+    let totalRow = `<tr style="font-weight:bold;background:#eef4fc;border-top:2px solid #b0c4de;">
+    <td colspan="2">TOTAL</td>
+    <td style="text-align:right;">${formatRM(grandTotalContract)}</td>`;
+    interims.forEach((int, i) => {
+        totalRow += `<td style="text-align:right;">${formatRM(Number(int.net_amount || 0))}</td>`;
+    });
+    totalRow += `
+    <td style="text-align:right;">${formatRM(grandTotalClaim)}</td>
+    <td style="text-align:right;">${formatRM(grandTotalContractBalance + salvageTotal + pgTotal - taxTotal)}</td>
+    <td style="text-align:right;">${formatRM(grandTotalOngoing)}</td>
+    <td style="text-align:right;font-weight:bold;">${formatRM(grandTotalOngoingBalance)}</td>
+    </tr>`;
+    body += totalRow;
+
+    document.getElementById("interimBody").innerHTML = body;
+}
+
+function openSummary(){
+    const id = currentContractId;
+    if(!id){ alert("Tiada kontrak dipilih."); return; }
+    window.location.href = `contract_summary.html?id=${id}`;
+}
+
+async function updateStatus(id, status){
+    try{
+        await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}`,{
+            method:'PATCH', headers,
+            body: JSON.stringify({ status: status })
+        });
+        const row = allWorks.find(w => Number(w.id) === Number(id));
+        if(row) row.status = status;
+        renderTable(currentTableData, currentView !== "DATE");
+    }catch(e){ console.error(e); alert("Gagal update status"); }
+}
+
+async function updateStatusGroup(idsStr, status){
+    const ids = idsStr.split(',').map(id => id.trim());
+    try{
+        await Promise.all(ids.map(id =>
+            fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}`,{
+                method:'PATCH', headers,
+                body: JSON.stringify({ status: status })
+            })
+        ));
+        ids.forEach(id => {
+            const row = allWorks.find(w => Number(w.id) === Number(id));
+            if(row) row.status = status;
+        });
+        renderTable(currentTableData, currentView !== "DATE");
+    }catch(e){ console.error(e); alert("Gagal update status group"); }
+}
+
+function toggleAllBF(el){
+    document.querySelectorAll('.bf-checkbox').forEach(cb => { cb.checked = el.checked; });
+}
+
+async function bulkDownloadBlueform(){
+    const checked = [...document.querySelectorAll('.bf-checkbox:checked')];
+    if(checked.length === 0){ alert("Sila pilih Blueform."); return; }
+    const container = document.getElementById('bulkPagesContainer');
+    container.innerHTML = '';
+    document.getElementById('bulkPreviewCount').innerText = `Memuatkan ${checked.length} blueform...`;
+    document.getElementById('bulkPreviewPage').style.display = 'block';
+    const contractId = currentContractId;
+    try {
+        const [interimRes, woRes, areaRes] = await Promise.all([
+            fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=date_received.asc`, { headers }),
+            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}`, { headers }),
+            fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}&select=area_code`, { headers })
+        ]);
+        const allInterims = await interimRes.json();
+        const allWO = await woRes.json();
+        const areaRows = await areaRes.json();
+        const localAreaPriority = {};
+        (areaRows[0]?.area_code || '').split(',').map(a => a.trim().toUpperCase()).filter(a => a.length > 0)
+            .forEach((a, i) => { localAreaPriority[a] = i + 1; });
+        const sharedData = { allInterims, allWO, localAreaPriority };
+        const payloads = await processInBatches(checked, 5, cb => {
+            const idsStr = cb.value;
+            const ids = idsStr.split(',').map(id => id.trim());
+            return ids.length === 1
+                ? buildBlueformData(ids[0], sharedData)
+                : buildBlueformDataGroup(ids, sharedData);
+        });
+        container.innerHTML = payloads.map(p => buildBlueformHTML(p)).join('');
+        document.getElementById('bulkPreviewCount').innerText = `${checked.length} Blueform — Sedia untuk Cetak`;
+    } catch(e) {
+        console.error(e);
+        alert("Ralat memuatkan bulk blueform.");
+        document.getElementById('bulkPreviewCount').innerText = 'Ralat memuatkan data.';
+    }
+}
+
+async function processInBatches(items, batchSize, fn){
+    const results = [];
+    for(let i = 0; i < items.length; i += batchSize){
+        const batch = items.slice(i, i + batchSize);
+        const batchResults = await Promise.all(batch.map(fn));
+        results.push(...batchResults);
+    }
+    return results;
 }
 
 function closeBulkPreview(){
