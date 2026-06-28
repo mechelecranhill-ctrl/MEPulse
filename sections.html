@@ -599,7 +599,18 @@ let items = [];
 let itemEls = [];
 let currentFloating = null;
 let activeSection = "";
+
+// ── contractClaimCache: stores per-contract accumulated values
+// Structure: { [contractId]: { interimUsed: { [secKeyUpper]: number }, woUsed: { [secKeyUpper]: number } } }
+// interimUsed — semua interim claims (semua section keys)
+// woUsed      — pending WO section_category (semua section keys) + additional field
+//               additional disimpan di key yang sama dengan pSum key contract tu
 let contractClaimCache = {};
+
+// ── contractPSumKeyCache: simpan pSum key (uppercase) bagi setiap contract
+// supaya kita boleh map "additional" WO ke key yang betul
+// Structure: { [contractId]: string }  e.g. { "123": "SECTION G" }
+let contractPSumKeyCache = {};
 
 let currentLists = {
     ongoing: [],
@@ -620,41 +631,59 @@ function closeDetail() {
     detailPanel.classList.remove("visible");
 }
 
-/* ── FUNGSI FORMAT MATA WANG (RM) ── */
+/* ── FORMAT MATA WANG ── */
 function formatRM(value) {
     return "RM " + Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-/* ── FUNGSI CARIAN KUNCI PROVISIONAL SUM SECARA DINAMIK ── */
+/* ── CARI KEY PROVISIONAL SUM DALAM contract_sections_breakdown ──
+   Sama seperti findProvisionalSumKey dalam buildInterimMatrix:
+   cari key atau desc yang mengandungi "PROVISIONAL SUM"
+*/
 function findProvisionalSumKey(breakdown) {
     if (!breakdown) return null;
     return Object.keys(breakdown).find(k => {
         const item = breakdown[k];
         const description = typeof item === 'object' ? (item.desc || '') : '';
-        return k.toUpperCase().includes("PROVISIONAL SUM") || description.toUpperCase().includes("PROVISIONAL SUM");
+        return k.toUpperCase().trim().includes("PROVISIONAL SUM")
+            || description.toUpperCase().trim().includes("PROVISIONAL SUM");
     });
 }
 
-/* ── PENGIRAAN BAKI SECARA DINAMIK (TELAH DIKEMAS KINI) ── */
+/* ── PENGIRAAN BAKI PROVISIONAL SUM
+   Logik ini mirror TEPAT dengan buildInterimMatrix:
+
+   buildInterimMatrix mengira untuk section pSum:
+     contractAmt   = sections[sec].amt
+     totalClaim    = jumlah claim_breakdown[sec].amt dari semua interim
+     ongoingWO     = jumlah section_category[sec].amt dari pending WO
+                     + jumlah additional dari pending WO (jika sec === pSumKey)
+     balance       = contractAmt - totalClaim - ongoingWO
+
+   Kita replicate logik yang sama di sini menggunakan cache yang
+   dibina semasa loadSections().
+── */
 function getProvisionalSumBalance(c) {
     const breakdown = c.contract_sections_breakdown || {};
     const cache = contractClaimCache[c.id] || { interimUsed: {}, woUsed: {} };
-    
+
     const pSumKey = findProvisionalSumKey(breakdown);
     if (!pSumKey) return { budget: 0, used: 0, balance: 0 };
 
-    const targetKeyUpper = pSumKey.toUpperCase().trim();
+    const keyUpper = pSumKey.toUpperCase().trim();
     const pSumValue = breakdown[pSumKey] || 0;
-    
-    // Mengekstrak nilai amaun bajet dari objek atau nombor terus
-    const budget = Number(typeof pSumValue === 'object' ? (pSumValue.amt || pSumValue.amount || 0) : pSumValue) || 0;
+    const budget = Number(
+        typeof pSumValue === 'object' ? (pSumValue.amt || pSumValue.amount || 0) : pSumValue
+    ) || 0;
 
-    // Menghitung jumlah penggunaan komitmen
-    const totalInterimClaim = Number(cache.interimUsed[targetKeyUpper] || 0);
-    const totalPendingWO = Number(cache.woUsed[targetKeyUpper] || 0);
-    const totalAdditional = Number(cache.woUsed["ADDITIONAL_PSUM"] || 0);
-    
-    const used = totalInterimClaim + totalPendingWO + totalAdditional;
+    // interimUsed[keyUpper] — tuntutan interim untuk section pSum
+    const totalInterimClaim = Number(cache.interimUsed[keyUpper] || 0);
+
+    // woUsed[keyUpper] — pending WO section_category untuk section pSum
+    //                  + additional WO (sudah di-accumulate ke keyUpper semasa load)
+    const totalOngoingWO = Number(cache.woUsed[keyUpper] || 0);
+
+    const used = totalInterimClaim + totalOngoingWO;
     const balance = budget - used;
 
     return { budget, used, balance };
@@ -759,7 +788,17 @@ openBtn.addEventListener("click", (e) => {
     window.location.href = `dashboard-contract.html?section=${activeSection.id}`;
 });
 
-/* ── LOAD DATA ── */
+/* ── LOAD DATA ──
+   Fetch:
+     1. me_sections + units + contract (termasuk vo_breakdown untuk kegunaan masa depan)
+     2. interims — untuk kira interimUsed per section
+     3. work_orders — untuk kira woUsed per section (pending sahaja)
+
+   Cache dibina sama seperti buildInterimMatrix dalam dashboard:
+     - interimUsed[secKeyUpper] += claim_breakdown[sec].amt
+     - woUsed[secKeyUpper]      += section_category[sec].amt  (pending WO)
+     - woUsed[pSumKeyUpper]     += additional                 (pending WO, ikut pSum key contract)
+── */
 async function loadSections(){
     try {
         const [secRes, interimRes, woRes] = await Promise.all([
@@ -773,35 +812,72 @@ async function loadSections(){
         const allWOs = await woRes.json();
 
         contractClaimCache = {};
+        contractPSumKeyCache = {};
 
-        // 1. Ambil tuntutan daripada Interim
-        allInterims.forEach(im => {
-            if (!im.contract_id || !im.claim_breakdown) return;
-            if (!contractClaimCache[im.contract_id]) contractClaimCache[im.contract_id] = { interimUsed: {}, woUsed: {} };
-            
-            Object.entries(im.claim_breakdown).forEach(([s, val]) => {
-                const amt = Number(typeof val === 'object' ? (val.amt || val.amount || 0) : val) || 0;
-                const keyUpper = s.toUpperCase().trim();
-                contractClaimCache[im.contract_id].interimUsed[keyUpper] = (contractClaimCache[im.contract_id].interimUsed[keyUpper] || 0) + amt;
+        // ── Bina pSumKey cache daripada contract data ──
+        sections.forEach(sec => {
+            (sec.units || []).forEach(u => {
+                (u.contract || []).forEach(c => {
+                    if (!c.id || !c.contract_sections_breakdown) return;
+                    const pKey = findProvisionalSumKey(c.contract_sections_breakdown);
+                    if (pKey) {
+                        contractPSumKeyCache[c.id] = pKey.toUpperCase().trim();
+                    }
+                });
             });
         });
 
-        // 2. Ambil tuntutan daripada Work Order KECUALI yang berstatus Claimed
-        allWOs.forEach(wo => {
-            if (!wo.contract_id || !wo.section_category) return;
-            if (!contractClaimCache[wo.contract_id]) contractClaimCache[wo.contract_id] = { interimUsed: {}, woUsed: {} };
-            
-            if (wo.status && wo.status.toUpperCase() === "CLAIMED") return;
-
-            Object.entries(wo.section_category).forEach(([s, val]) => {
+        // ── 1. Accumulate interim claims ──
+        allInterims.forEach(im => {
+            if (!im.contract_id || !im.claim_breakdown) return;
+            if (!contractClaimCache[im.contract_id]) {
+                contractClaimCache[im.contract_id] = { interimUsed: {}, woUsed: {} };
+            }
+            Object.entries(im.claim_breakdown).forEach(([s, val]) => {
                 const amt = Number(typeof val === 'object' ? (val.amt || val.amount || 0) : val) || 0;
                 const keyUpper = s.toUpperCase().trim();
-                contractClaimCache[wo.contract_id].woUsed[keyUpper] = (contractClaimCache[wo.contract_id].woUsed[keyUpper] || 0) + amt;
+                contractClaimCache[im.contract_id].interimUsed[keyUpper] =
+                    (contractClaimCache[im.contract_id].interimUsed[keyUpper] || 0) + amt;
             });
-            
+        });
+
+        // ── 2. Accumulate pending WO — sama seperti buildInterimMatrix ──
+        //    pending = status !== 'CLAIMED' dan tiada interim_no
+        //    (buildInterimMatrix guna: workorders.filter(w => w.status !== 'Claimed'))
+        allWOs.forEach(wo => {
+            if (!wo.contract_id) return;
+
+            // Skip jika sudah di-claim (sama seperti buildInterimMatrix)
+            if (wo.status && wo.status.toUpperCase() === "CLAIMED") return;
+            // Skip juga jika ada interim_no (sudah dalam interim)
+            if (wo.interim_no) return;
+
+            if (!contractClaimCache[wo.contract_id]) {
+                contractClaimCache[wo.contract_id] = { interimUsed: {}, woUsed: {} };
+            }
+
+            // section_category — accumulate setiap section
+            if (wo.section_category) {
+                Object.entries(wo.section_category).forEach(([s, val]) => {
+                    const amt = Number(typeof val === 'object' ? (val.amt || val.amount || 0) : val) || 0;
+                    if (amt <= 0) return;
+                    const keyUpper = s.toUpperCase().trim();
+                    contractClaimCache[wo.contract_id].woUsed[keyUpper] =
+                        (contractClaimCache[wo.contract_id].woUsed[keyUpper] || 0) + amt;
+                });
+            }
+
+            // additional — accumulate ke pSum key contract (sama seperti buildInterimMatrix
+            //   yang accumulate ke ongoingBase[sec] apabila sec === pSumKey dan tiada
+            //   section_category["PROVISIONAL SUM"])
             const add = Number(wo.additional || 0);
             if (add > 0) {
-                contractClaimCache[wo.contract_id].woUsed["ADDITIONAL_PSUM"] = (contractClaimCache[wo.contract_id].woUsed["ADDITIONAL_PSUM"] || 0) + add;
+                // Guna pSumKey contract untuk mapping — tally dengan buildInterimMatrix
+                const pKey = contractPSumKeyCache[wo.contract_id];
+                if (pKey) {
+                    contractClaimCache[wo.contract_id].woUsed[pKey] =
+                        (contractClaimCache[wo.contract_id].woUsed[pKey] || 0) + add;
+                }
             }
         });
 
@@ -819,28 +895,35 @@ async function loadSections(){
     }
 }
 
-/* ── SEMAK FINANCIAL DEFICIT RISK ── */
+/* ── SEMAK FINANCIAL DEFICIT RISK ──
+   Kontrak berisiko jika penggunaan semasa (used) melebihi
+   perancangan penggunaan pro-rata hingga hari ini.
+── */
 function isFinancialDeficitRisk(c) {
     if (!c.contract_start || !c.contract_end || !c.contract_sections_breakdown) return false;
 
     const hariIni = new Date();
     const start = new Date(c.contract_start);
     const end = new Date(c.contract_end);
-    
-    if (end < hariIni) return false; 
 
-    const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
-    let monthsElapsed = (hariIni.getFullYear() - start.getFullYear()) * 12 + (hariIni.getMonth() - start.getMonth()) + 1;
+    // Kontrak yang sudah tamat tidak dikira sebagai risiko aktif
+    if (end < hariIni) return false;
+
+    const totalMonths = Math.max(1,
+        (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth())
+    );
+    let monthsElapsed = (hariIni.getFullYear() - start.getFullYear()) * 12
+        + (hariIni.getMonth() - start.getMonth()) + 1;
     monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
 
     const breakdown = c.contract_sections_breakdown || {};
-
     const pSumKey = findProvisionalSumKey(breakdown);
-    if (!pSumKey) return false; 
+    if (!pSumKey) return false;
 
     const pSumValue = breakdown[pSumKey] || 0;
-    const budget = Number(typeof pSumValue === 'object' ? (pSumValue.amt || pSumValue.amount || 0) : pSumValue) || 0;
-    
+    const budget = Number(
+        typeof pSumValue === 'object' ? (pSumValue.amt || pSumValue.amount || 0) : pSumValue
+    ) || 0;
     if (budget === 0) return false;
 
     const plannedTotalToDate = (budget / totalMonths) * monthsElapsed;
