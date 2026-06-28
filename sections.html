@@ -653,29 +653,7 @@ function openDetail(type) {
             title: "Financial Deficit Risk (Provisional Sum)",
             color: "#ff6b6b",
             render: (c) => {
-                const sections = c.contract_sections_breakdown || {};
-                const cache = contractClaimCache[c.id] || { interimUsed: {}, woUsed: {} };
-
-                let provBudget = 0;
-                let provUsed = 0;
-
-                // Kira bajet asal provisional sum didaftarkan
-                Object.entries(sections).forEach(([key, val]) => {
-                    if (key.toUpperCase().includes("PROVISIONAL")) {
-                        provBudget += ((typeof val === 'object' ? val.amt : val) || 0);
-                        provUsed += (cache.interimUsed[key] || 0);
-                    }
-                });
-
-                // Tambah penggunaan dari WO pending
-                Object.entries(cache.woUsed).forEach(([key, usedAmt]) => {
-                    if (key.toUpperCase().includes("PROVISIONAL")) {
-                        provUsed += usedAmt;
-                    }
-                });
-
-                const bal = provBudget - provUsed;
-
+                const bal = getRemainingBalance(c);
                 return {
                     code: c.contract_code || c.id,
                     sub: "Prov. Bal: RM " + bal.toLocaleString(undefined, { maximumFractionDigits: 0 }),
@@ -727,14 +705,14 @@ function getRemainingBalance(c) {
 
     Object.entries(sections).forEach(([key, val]) => {
         if (key.toUpperCase().includes("PROVISIONAL")) {
-            provBudget += ((typeof val === 'object' ? val.amt : val) || 0);
-            provUsed += (cache.interimUsed[key] || 0);
+            provBudget += Number(typeof val === 'object' ? (val.amt || val.amount || 0) : val) || 0;
+            provUsed += Number(cache.interimUsed[key] || 0);
         }
     });
 
     Object.entries(cache.woUsed).forEach(([key, usedAmt]) => {
         if (key.toUpperCase().includes("PROVISIONAL")) {
-            provUsed += usedAmt;
+            provUsed += Number(usedAmt || 0);
         }
     });
 
@@ -771,7 +749,7 @@ async function loadSections(){
         const [secRes, interimRes, woRes] = await Promise.all([
             fetch(`${SB_URL}/rest/v1/me_sections?select=*,units(*,contract(id,contract_code,contract_name,contract_start,contract_end,contract_sum,contract_sections_breakdown,vo_breakdown))`, { headers }),
             fetch(`${SB_URL}/rest/v1/interims?select=contract_id,claim_breakdown`, { headers }),
-            fetch(`${SB_URL}/rest/v1/work_orders?select=contract_id,interim_no,section_category,additional`, { headers })
+            fetch(`${SB_URL}/rest/v1/work_orders?select=contract_id,interim_no,section_category,additional,status`, { headers })
         ]);
 
         const sections = await secRes.json();
@@ -780,20 +758,26 @@ async function loadSections(){
 
         contractClaimCache = {};
 
+        // 1. Ambil tuntutan daripada Interim (Menolak nilai asal)
         allInterims.forEach(im => {
             if (!im.contract_id || !im.claim_breakdown) return;
             if (!contractClaimCache[im.contract_id]) contractClaimCache[im.contract_id] = { interimUsed: {}, woUsed: {} };
             Object.entries(im.claim_breakdown).forEach(([s, val]) => {
-                const amt = (typeof val === 'object' ? val.amt : val) || 0;
+                const amt = Number(typeof val === 'object' ? (val.amt || val.amount || 0) : val) || 0;
                 contractClaimCache[im.contract_id].interimUsed[s] = (contractClaimCache[im.contract_id].interimUsed[s] || 0) + amt;
             });
         });
 
+        // 2. Ambil tuntutan daripada Work Order (Tolak juga KECUALI yang berstatus Claimed)
         allWOs.forEach(wo => {
-            if (!wo.contract_id || !wo.section_category || wo.interim_no) return;
+            if (!wo.contract_id || !wo.section_category) return;
             if (!contractClaimCache[wo.contract_id]) contractClaimCache[wo.contract_id] = { interimUsed: {}, woUsed: {} };
+            
+            // KECUALI yang berstatus 'Claimed'
+            if (wo.status && wo.status.toUpperCase() === "CLAIMED") return;
+
             Object.entries(wo.section_category).forEach(([s, val]) => {
-                const amt = (typeof val === 'object' ? val.amt : val) || 0;
+                const amt = Number(typeof val === 'object' ? (val.amt || val.amount || 0) : val) || 0;
                 contractClaimCache[wo.contract_id].woUsed[s] = (contractClaimCache[wo.contract_id].woUsed[s] || 0) + amt;
             });
             const add = Number(wo.additional || 0);
@@ -820,10 +804,6 @@ async function loadSections(){
 /* ── SEMAK FINANCIAL DEFICIT RISK (PROVISIONAL SUM SAHAJA) ── */
 function isFinancialDeficitRisk(c) {
     if (!c.contract_start || !c.contract_end) return false;
-    const hariIni = new Date();
-    const end = new Date(c.contract_end);
-
-    if (end < hariIni) return false;
 
     const sections = c.contract_sections_breakdown || {};
     const cache = contractClaimCache[c.id] || { interimUsed: {}, woUsed: {} };
@@ -835,31 +815,43 @@ function isFinancialDeficitRisk(c) {
     // 1. Dapatkan bajet asal provisional sum dari breakdown kontrak asal
     Object.entries(sections).forEach(([key, val]) => {
         if (key.toUpperCase().includes("PROVISIONAL")) {
-            const contractAmt = (typeof val === 'object' ? val.amt : val) || 0;
+            const contractAmt = Number(typeof val === 'object' ? (val.amt || val.amount || 0) : val) || 0;
             totalProvisionalBudget += contractAmt;
-            totalProvisionalUsed += (cache.interimUsed[key] || 0);
+            totalProvisionalUsed += Number(cache.interimUsed[key] || 0);
         }
     });
 
-    // 2. Semak penggunaan daripada fail tracking WO pending
+    // 2. Tambah penggunaan daripada tracking WO yang belum Claimed
     Object.entries(cache.woUsed).forEach(([key, usedAmt]) => {
         if (key.toUpperCase().includes("PROVISIONAL")) {
-            totalProvisionalUsed += usedAmt;
+            const pendingAmt = Number(usedAmt || 0);
+            totalProvisionalUsed += pendingAmt;
             
             // SYARAT 1: Jika tiada bajet diperuntukkan langsung (RM 0) tapi ada penggunaan WO, cetus risiko (burst)
-            const baseBudget = sections[key] ? ((typeof sections[key] === 'object' ? sections[key].amt : sections[key]) || 0) : 0;
-            if (baseBudget === 0 && usedAmt > 0) {
+            let baseBudget = 0;
+            if (sections[key]) {
+                baseBudget = typeof sections[key] === 'object' 
+                    ? Number(sections[key].amt || sections[key].amount || 0)
+                    : Number(sections[key] || 0);
+            }
+            if (baseBudget === 0 && pendingAmt > 0) {
                 triggersRisk = true; 
             }
         }
     });
 
+    // Jika melepasi Syarat 1, terus set sebagai risiko deficit
     if (triggersRisk) return true;
 
-    // SYARAT 2: Jika penggunaan provisional melebihi peruntukan bajet provisional asal
+    // SYARAT 2: Jika penggunaan provisional (Interim + WO Baru) melebihi peruntukan bajet asal (BURST!)
     if (totalProvisionalBudget > 0 && totalProvisionalUsed > totalProvisionalBudget) {
         return true;
     }
+
+    // Semakan tarikh biasa hanya terpakai jika kontrak masih sihat/belum bocor
+    const hariIni = new Date();
+    const end = new Date(c.contract_end);
+    if (end < hariIni) return false;
 
     return false;
 }
@@ -1005,7 +997,7 @@ function update(){
             </span>
         </div>
         <div class="status-row" onclick="openDetail('risk')">
-            <span>Financial Deficit Risk (S.O.R)</span>
+            <span>Financial Deficit Risk</span>
             <span class="status-badge" style="background:rgba(255,59,48,0.15);color:#ff6b6b;border:1px solid rgba(255,59,48,0.3);">
                 ${currentLists.risk.length}
             </span>
