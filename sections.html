@@ -731,13 +731,15 @@ async function loadSections(){
 
         contractClaimCache = {};
 
-        // 1. Ambil tuntutan daripada Interim
+        // 1. Ambil tuntutan daripada Interim (Simpan mengikut Kunci Asal seperti "SECTION G")
         allInterims.forEach(im => {
             if (!im.contract_id || !im.claim_breakdown) return;
             if (!contractClaimCache[im.contract_id]) contractClaimCache[im.contract_id] = { interimUsed: {}, woUsed: {} };
+            
             Object.entries(im.claim_breakdown).forEach(([s, val]) => {
                 const amt = Number(typeof val === 'object' ? (val.amt || val.amount || 0) : val) || 0;
-                contractClaimCache[im.contract_id].interimUsed[s] = (contractClaimCache[im.contract_id].interimUsed[s] || 0) + amt;
+                const keyUpper = s.toUpperCase().trim();
+                contractClaimCache[im.contract_id].interimUsed[keyUpper] = (contractClaimCache[im.contract_id].interimUsed[keyUpper] || 0) + amt;
             });
         });
 
@@ -750,12 +752,14 @@ async function loadSections(){
 
             Object.entries(wo.section_category).forEach(([s, val]) => {
                 const amt = Number(typeof val === 'object' ? (val.amt || val.amount || 0) : val) || 0;
-                contractClaimCache[wo.contract_id].woUsed[s] = (contractClaimCache[wo.contract_id].woUsed[s] || 0) + amt;
+                const keyUpper = s.toUpperCase().trim();
+                contractClaimCache[wo.contract_id].woUsed[keyUpper] = (contractClaimCache[wo.contract_id].woUsed[keyUpper] || 0) + amt;
             });
+            
+            // Tambahan jika ada field 'additional' murni untuk Provisional Sum
             const add = Number(wo.additional || 0);
             if (add > 0) {
-                contractClaimCache[wo.contract_id].woUsed["PROVISIONAL SUM"] =
-                    (contractClaimCache[wo.contract_id].woUsed["PROVISIONAL SUM"] || 0) + add;
+                contractClaimCache[wo.contract_id].woUsed["ADDITIONAL_PSUM"] = (contractClaimCache[wo.contract_id].woUsed["ADDITIONAL_PSUM"] || 0) + add;
             }
         });
 
@@ -773,49 +777,49 @@ async function loadSections(){
     }
 }
 
-/* ── SEMAK FINANCIAL DEFICIT RISK (TERHAD KEPADA PROVISIONAL SUM SAHAJA) ── */
+/* ── SEMAK FINANCIAL DEFICIT RISK (DIBETULKAN PADANAN KUNCI SECARA DINAMIK) ── */
 function isFinancialDeficitRisk(c) {
     if (!c.contract_start || !c.contract_end || !c.contract_sections_breakdown) return false;
 
-    // 1. Semakan Tempoh Kontrak Aktif
     const hariIni = new Date();
     const start = new Date(c.contract_start);
     const end = new Date(c.contract_end);
     
-    if (end < hariIni) return false; // Kontrak dah tamat tempoh, tiada risiko aktif
+    if (end < hariIni) return false; 
 
-    // 2. Kira 'Months Elapsed' & 'Total Months'
     const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
     let monthsElapsed = (hariIni.getFullYear() - start.getFullYear()) * 12 + (hariIni.getMonth() - start.getMonth()) + 1;
     monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
 
-    const sections = c.contract_sections_breakdown || {};
+    const breakdown = c.contract_sections_breakdown || {};
     const cache = contractClaimCache[c.id] || { interimUsed: {}, woUsed: {} };
 
-    // 3. Ambil nilai PROVISIONAL SUM daripada pecahan kontrak asal
-    const pSumValue = sections["PROVISIONAL SUM"] || 0;
-    const budget = Number(typeof pSumValue === 'object' ? (pSumValue.amt || pSumValue.amount || 0) : pSumValue) || 0;
-    
-    if (budget === 0) return false; // Tiada bajet peruntukan luar jangka ditubuhkan
-
-    // 4. Kira had pro-rata berjadual bulanan bagi Provisional Sum
-    const plannedTotalToDate = (budget / totalMonths) * monthsElapsed;
-
-    // 5. Kira jumlah perbelanjaan semasa (Interim + Pending WO) bagi Provisional Sum
-    const totalInterimClaim = Number(cache.interimUsed["PROVISIONAL SUM"] || 0);
-    const totalPendingWO = Number(cache.woUsed["PROVISIONAL SUM"] || 0);
-    const used = totalInterimClaim + totalPendingWO;
-
-    // Carian item 'luar jangka' atau item tak berdaftar dalam struktur pecahan yang masuk dalam tuntutan WO
-    let unmappedWOTotal = 0;
-    Object.keys(cache.woUsed).forEach(key => {
-        if (sections[key] === undefined) {
-            unmappedWOTotal += Number(cache.woUsed[key] || 0);
-        }
+    // CARIAN DINAMIK: Cari nama KEY (cth: "SECTION G") yang mengandungi nilai "PROVISIONAL SUM" di dalam properti .desc
+    const pSumKey = Object.keys(breakdown).find(k => {
+        const item = breakdown[k];
+        const description = typeof item === 'object' ? (item.desc || '') : '';
+        return k.toUpperCase().includes("PROVISIONAL SUM") || description.toUpperCase().includes("PROVISIONAL SUM");
     });
 
-    // Risiko dicetuskan jika jumlah penggunaan Provisional Sum melebihi bajet berjadual semasa
-    return (used + unmappedWOTotal) > plannedTotalToDate;
+    if (!pSumKey) return false; // Kontrak tiada peruntukan Provisional Sum
+
+    const targetKeyUpper = pSumKey.toUpperCase().trim();
+    const pSumValue = breakdown[pSumKey] || 0;
+    const budget = Number(typeof pSumValue === 'object' ? (pSumValue.amt || pSumValue.amount || 0) : pSumValue) || 0;
+    
+    if (budget === 0) return false;
+
+    // Had bajet berjadual sehingga bulan semasa
+    const plannedTotalToDate = (budget / totalMonths) * monthsElapsed;
+
+    // Ambil data tuntutan daripada cache menggunakan Key Padanan Sebenar yang ditemui (cth: "SECTION G")
+    const totalInterimClaim = Number(cache.interimUsed[targetKeyUpper] || 0);
+    const totalPendingWO = Number(cache.woUsed[targetKeyUpper] || 0);
+    const totalAdditional = Number(cache.woUsed["ADDITIONAL_PSUM"] || 0);
+    
+    const used = totalInterimClaim + totalPendingWO + totalAdditional;
+
+    return used > plannedTotalToDate;
 }
 
 /* ── CREATE WHEEL ── */
