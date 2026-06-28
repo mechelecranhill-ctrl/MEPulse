@@ -46,12 +46,6 @@ font-family:Inter,system-ui;
   inherits: false;
 }
 
-• {
-box-sizing: border-box;
--webkit-tap-highlight-color: transparent;
-font-family: Inter, system-ui;
-}
-
 html, body {
 height: 100dvh;
 width: 100%;
@@ -59,6 +53,7 @@ margin: 0;
 padding: 0;
 overflow: hidden;
 background: var(--bg-color);
+-webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -220,7 +215,7 @@ animation:fadeInRight .45s ease forwards;
     position: absolute;
     inset: 0;
     border-radius: 24px;
-    background: rgba(10, 20, 40, 0.75);
+    background: rgba(10, 20, 40, 0.85);
     backdrop-filter: blur(24px);
     padding: 20px;
     display: flex;
@@ -286,7 +281,7 @@ animation:fadeInRight .45s ease forwards;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 9px 12px;
+    padding: 10px 12px;
     border-radius: 11px;
     background: rgba(255,255,255,0.07);
     border: 1px solid rgba(255,255,255,0.09);
@@ -302,26 +297,24 @@ animation:fadeInRight .45s ease forwards;
 }
 
 .detail-item-sub {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 500;
-    opacity: 0.55;
+    opacity: 0.75;
     text-align: right;
     flex: 1;
+    word-break: break-all;
 }
 
 .detail-item-sub.warn {
     color: #fde047;
-    opacity: 1;
 }
 
 .detail-item-sub.danger {
     color: #ff6b6b;
-    opacity: 1;
 }
 
 .detail-item-sub.safe {
     color: #4ade80;
-    opacity: 1;
 }
 
 .section-helm{
@@ -620,6 +613,43 @@ function closeDetail() {
     detailPanel.classList.remove("visible");
 }
 
+/* ── FUNGSI FORMAT MATA WANG (RM) ── */
+function formatRM(value) {
+    return "RM " + Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/* ── FUNGSI CARIAN KUNCI PROVISIONAL SUM SECARA DINAMIK ── */
+function findProvisionalSumKey(breakdown) {
+    if (!breakdown) return null;
+    return Object.keys(breakdown).find(k => {
+        const item = breakdown[k];
+        const description = typeof item === 'object' ? (item.desc || '') : '';
+        return k.toUpperCase().includes("PROVISIONAL SUM") || description.toUpperCase().includes("PROVISIONAL SUM");
+    });
+}
+
+/* ── HILANGAN PENGIRAAN BAKI SECARA DINAMIK UNTUK DIPAPARKAN ── */
+function getProvisionalSumBalance(c) {
+    const breakdown = c.contract_sections_breakdown || {};
+    const cache = contractClaimCache[c.id] || { interimUsed: {}, woUsed: {} };
+    
+    const pSumKey = findProvisionalSumKey(breakdown);
+    if (!pSumKey) return { budget: 0, used: 0, balance: 0 };
+
+    const targetKeyUpper = pSumKey.toUpperCase().trim();
+    const pSumValue = breakdown[pSumKey] || 0;
+    const budget = Number(typeof pSumValue === 'object' ? (pSumValue.amt || pSumValue.amount || 0) : pSumValue) || 0;
+
+    const totalInterimClaim = Number(cache.interimUsed[targetKeyUpper] || 0);
+    const totalPendingWO = Number(cache.woUsed[targetKeyUpper] || 0);
+    const totalAdditional = Number(cache.woUsed["ADDITIONAL_PSUM"] || 0);
+    
+    const used = totalInterimClaim + totalPendingWO + totalAdditional;
+    const balance = budget - used;
+
+    return { budget, used, balance };
+}
+
 function openDetail(type) {
     const configs = {
         ongoing: {
@@ -652,11 +682,14 @@ function openDetail(type) {
         risk: {
             title: "Provisional Sum Deficit Risk",
             color: "#ff6b6b",
-            render: (c) => ({
-                code: c.contract_code || c.id,
-                sub: "P.Sum Actual > Planned to date",
-                subClass: "danger"
-            })
+            render: (c) => {
+                const financial = getProvisionalSumBalance(c);
+                return {
+                    code: c.contract_code || c.id,
+                    sub: `Bal: ${formatRM(financial.balance)}`,
+                    subClass: "danger"
+                };
+            }
         }
     };
 
@@ -794,14 +827,8 @@ function isFinancialDeficitRisk(c) {
     const breakdown = c.contract_sections_breakdown || {};
     const cache = contractClaimCache[c.id] || { interimUsed: {}, woUsed: {} };
 
-    // CARIAN DINAMIK: Cari nama KEY (cth: "SECTION G") yang mengandungi nilai "PROVISIONAL SUM" di dalam properti .desc
-    const pSumKey = Object.keys(breakdown).find(k => {
-        const item = breakdown[k];
-        const description = typeof item === 'object' ? (item.desc || '') : '';
-        return k.toUpperCase().includes("PROVISIONAL SUM") || description.toUpperCase().includes("PROVISIONAL SUM");
-    });
-
-    if (!pSumKey) return false; // Kontrak tiada peruntukan Provisional Sum
+    const pSumKey = findProvisionalSumKey(breakdown);
+    if (!pSumKey) return false; 
 
     const targetKeyUpper = pSumKey.toUpperCase().trim();
     const pSumValue = breakdown[pSumKey] || 0;
@@ -812,7 +839,6 @@ function isFinancialDeficitRisk(c) {
     // Had bajet berjadual sehingga bulan semasa
     const plannedTotalToDate = (budget / totalMonths) * monthsElapsed;
 
-    // Ambil data tuntutan daripada cache menggunakan Key Padanan Sebenar yang ditemui (cth: "SECTION G")
     const totalInterimClaim = Number(cache.interimUsed[targetKeyUpper] || 0);
     const totalPendingWO = Number(cache.woUsed[targetKeyUpper] || 0);
     const totalAdditional = Number(cache.woUsed["ADDITIONAL_PSUM"] || 0);
