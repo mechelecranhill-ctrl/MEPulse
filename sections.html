@@ -30,6 +30,13 @@ font-family:Inter,system-ui;
 --input-bg: rgba(255, 255, 255, 0.4);
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-primary: #f5f5f7;
+    --text-secondary: rgba(255,255,255,0.6);
+  }
+}
+
 @property --gradient-1 {
   syntax: '<color>';
   initial-value: #0b3d91;
@@ -628,7 +635,7 @@ function findProvisionalSumKey(breakdown) {
     });
 }
 
-/* ── HILANGAN PENGIRAAN BAKI SECARA DINAMIK UNTUK DIPAPARKAN ── */
+/* ── PENGIRAAN BAKI SECARA DINAMIK (TELAH DIKEMAS KINI) ── */
 function getProvisionalSumBalance(c) {
     const breakdown = c.contract_sections_breakdown || {};
     const cache = contractClaimCache[c.id] || { interimUsed: {}, woUsed: {} };
@@ -638,8 +645,11 @@ function getProvisionalSumBalance(c) {
 
     const targetKeyUpper = pSumKey.toUpperCase().trim();
     const pSumValue = breakdown[pSumKey] || 0;
+    
+    // Mengekstrak nilai amaun bajet dari objek atau nombor terus
     const budget = Number(typeof pSumValue === 'object' ? (pSumValue.amt || pSumValue.amount || 0) : pSumValue) || 0;
 
+    // Menghitung jumlah penggunaan komitmen
     const totalInterimClaim = Number(cache.interimUsed[targetKeyUpper] || 0);
     const totalPendingWO = Number(cache.woUsed[targetKeyUpper] || 0);
     const totalAdditional = Number(cache.woUsed["ADDITIONAL_PSUM"] || 0);
@@ -764,7 +774,7 @@ async function loadSections(){
 
         contractClaimCache = {};
 
-        // 1. Ambil tuntutan daripada Interim (Simpan mengikut Kunci Asal seperti "SECTION G")
+        // 1. Ambil tuntutan daripada Interim
         allInterims.forEach(im => {
             if (!im.contract_id || !im.claim_breakdown) return;
             if (!contractClaimCache[im.contract_id]) contractClaimCache[im.contract_id] = { interimUsed: {}, woUsed: {} };
@@ -789,7 +799,6 @@ async function loadSections(){
                 contractClaimCache[wo.contract_id].woUsed[keyUpper] = (contractClaimCache[wo.contract_id].woUsed[keyUpper] || 0) + amt;
             });
             
-            // Tambahan jika ada field 'additional' murni untuk Provisional Sum
             const add = Number(wo.additional || 0);
             if (add > 0) {
                 contractClaimCache[wo.contract_id].woUsed["ADDITIONAL_PSUM"] = (contractClaimCache[wo.contract_id].woUsed["ADDITIONAL_PSUM"] || 0) + add;
@@ -810,7 +819,7 @@ async function loadSections(){
     }
 }
 
-/* ── SEMAK FINANCIAL DEFICIT RISK (DIBETULKAN PADANAN KUNCI SECARA DINAMIK) ── */
+/* ── SEMAK FINANCIAL DEFICIT RISK ── */
 function isFinancialDeficitRisk(c) {
     if (!c.contract_start || !c.contract_end || !c.contract_sections_breakdown) return false;
 
@@ -825,27 +834,19 @@ function isFinancialDeficitRisk(c) {
     monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
 
     const breakdown = c.contract_sections_breakdown || {};
-    const cache = contractClaimCache[c.id] || { interimUsed: {}, woUsed: {} };
 
     const pSumKey = findProvisionalSumKey(breakdown);
     if (!pSumKey) return false; 
 
-    const targetKeyUpper = pSumKey.toUpperCase().trim();
     const pSumValue = breakdown[pSumKey] || 0;
     const budget = Number(typeof pSumValue === 'object' ? (pSumValue.amt || pSumValue.amount || 0) : pSumValue) || 0;
     
     if (budget === 0) return false;
 
-    // Had bajet berjadual sehingga bulan semasa
     const plannedTotalToDate = (budget / totalMonths) * monthsElapsed;
+    const financial = getProvisionalSumBalance(c);
 
-    const totalInterimClaim = Number(cache.interimUsed[targetKeyUpper] || 0);
-    const totalPendingWO = Number(cache.woUsed[targetKeyUpper] || 0);
-    const totalAdditional = Number(cache.woUsed["ADDITIONAL_PSUM"] || 0);
-    
-    const used = totalInterimClaim + totalPendingWO + totalAdditional;
-
-    return used > plannedTotalToDate;
+    return financial.used > plannedTotalToDate;
 }
 
 /* ── CREATE WHEEL ── */
