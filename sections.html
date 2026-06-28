@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -183,7 +183,7 @@ animation:fadeInRight .45s ease forwards;
 .info-card p{ opacity:.7; line-height:1.6; }
 
 .unit-card{
-padding:10px 14px;
+padding:12px 14px;
 margin-bottom:8px;
 border-radius:12px;
 background:rgba(255,255,255,.08);
@@ -504,7 +504,6 @@ function getHelmSrc(name){
 function getSectionColor(name) {
     const n = name.toUpperCase();
     if (n.includes("SELENGGARA")) {
-        // Tema Hitam Premium
         return {
             base: "#121212",
             color1: "#121212",
@@ -513,7 +512,6 @@ function getSectionColor(name) {
         };
     }
     if (n.includes("PEMATUHAN")) {
-        // Tema Hijau Emerald
         return {
             base: "#064e3b",
             color1: "#064e3b",
@@ -522,7 +520,6 @@ function getSectionColor(name) {
         };
     }
     if (n.includes("ASET")) {
-        // Tema Jingga / Oren
         return {
             base: "#7c2d12",
             color1: "#6c2a0d",
@@ -531,7 +528,6 @@ function getSectionColor(name) {
         };
     }
     if (n.includes("PROJEK")) {
-        // Menggunakan Nilai Default Asal (M&E Biru)
         return {
             base: "#0b3d91",
             color1: "#0b3d91",
@@ -539,7 +535,6 @@ function getSectionColor(name) {
             color3: "#00b4d8"
         };
     }
-    // Nilai fallback
     return {
         base: "#0b3d91",
         color1: "#0b3d91",
@@ -559,26 +554,23 @@ openBtn.addEventListener("click", (e) => {
 window.location.href = targetUrl;
 });
 
-/* ── LOAD DATA ── */
+/* ── LOAD DATA (MENGGUNAKAN RELATION 'contract') ── */
 async function loadSections(){
     try{
-        const [secRes, unitRes] = await Promise.all([
-            fetch(`${SB_URL}/rest/v1/me_sections?select=*`, { headers }), 
-            fetch(`${SB_URL}/rest/v1/units?select=*`, { headers })
-        ]);
-        const sections = await secRes.json();
-        const units = await unitRes.json();
+        // Menggunakan select 'contract(*)' berbanding 'contracts(*)' mengikut struktur asal table anda
+        const response = await fetch(`${SB_URL}/rest/v1/me_sections?select=*,units(*,contract(*))`, { headers });
+        const sections = await response.json();
 
         items = sections.map(sec => ({
             id: sec.id,
             title: sec.section_name,
-            units: units.filter(u => u.section_id === sec.id)
+            units: sec.units || []
         }));
 
         stepAngle = 360 / items.length;
         createWheel();
     }catch(err){
-        console.error(err);
+        console.error("Gagal mendapatkan maklumat seksyen & kontrak:", err);
     }
 }
 
@@ -677,10 +669,10 @@ function update(){
 
     const item = items[index];
     
-activeSection = {
-    id: item.id,
-    name: item.title
-};
+    activeSection = {
+        id: item.id,
+        name: item.title
+    };
 
     const colors = getSectionColor(item.title);
     document.body.style.setProperty('--bg-color', colors.base);
@@ -691,8 +683,53 @@ activeSection = {
     title.innerText = item.title;
     cardTitle.innerText = item.title;
 
-    cardDesc.innerHTML = `<div style="margin-bottom:10px">${item.units.length} Unit</div>` + 
-        item.units.map(u => `<div class="unit-card">${u.unit_name}</div>`).join("");
+    const totalUnits = item.units.length;
+    let htmlContent = `<div style="margin-bottom:12px; font-size: 14px; opacity:0.8; font-weight:600;">${totalUnits} Unit</div>`;
+
+    htmlContent += item.units.map(u => {
+        // Membaca data objek array 'contract' bersesuaian dengan nama singular table anda
+        const contractsList = u.contract || [];
+        
+        const hariIni = new Date();
+        const enamBulanLagi = new Date();
+        enamBulanLagi.setMonth(hariIni.getMonth() + 6);
+
+        let aktif = 0;
+        let kurang6Bulan = 0;
+        let tamatTempoh = 0;
+
+        contractsList.forEach(c => {
+            if(!c.contract_end) return;
+            const tarikhTamat = new Date(c.contract_end);
+
+            if (tarikhTamat < hariIni) {
+                tamatTempoh++; 
+            } else if (tarikhTamat >= hariIni && tarikhTamat <= enamBulanLagi) {
+                kurang6Bulan++; 
+            } else {
+                aktif++; 
+            }
+        });
+
+        return `
+            <div class="unit-card" style="display: flex; flex-direction: column; gap: 6px;">
+                <div style="font-weight: 600; font-size: 14px; letter-spacing: 0.2px;">${u.unit_name}</div>
+                <div style="display: flex; gap: 6px; font-size: 11px; font-weight: 500;">
+                    <span style="background: rgba(34,197,94,0.15); color: #4ade80; padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(34,197,94,0.3);">
+                        Aktif: ${aktif}
+                    </span>
+                    <span style="background: rgba(234,179,8,0.15); color: #fde047; padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(234,179,8,0.3);">
+                        &lt; 6 Bln: ${kurang6Bulan}
+                    </span>
+                    <span style="background: rgba(239,68,68,0.15); color: #fca5a5; padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(239,68,68,0.3);">
+                        Tamat: ${tamatTempoh}
+                    </span>
+                </div>
+            </div>
+        `;
+    }).join("");
+
+    cardDesc.innerHTML = htmlContent;
 
     if(!isMobile){
         card.classList.remove("show");
