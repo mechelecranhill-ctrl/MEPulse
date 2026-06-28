@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -696,7 +696,7 @@ function formatDate(dateStr) {
     return d.toLocaleDateString("ms-MY", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-/* ── KIRA BALANCE TINGGAL — ikut formula usage schedule ── */
+/* ── KIRA BALANCE TINGGAL ── */
 function getRemainingBalance(c) {
     const sections = c.contract_sections_breakdown || {};
     const voBreakdown = c.vo_breakdown || {};
@@ -707,16 +707,16 @@ function getRemainingBalance(c) {
 
     Object.entries(sections).forEach(([key, val]) => {
         const contractAmt = (typeof val === 'object' ? val.amt : val) || 0;
-
-        // Tambah VO untuk section ini
         let voForSec = 0;
         Object.values(voBreakdown).forEach(vo => {
             voForSec += Number(vo.breakdown?.[key]?.amt || 0);
         });
-
         totalBudget += contractAmt + voForSec;
         totalUsed += (cache.interimUsed[key] || 0) + (cache.woUsed[key] || 0);
     });
+
+    // Tambah provisional sum dalam budget & used
+    totalUsed += (cache.woUsed["PROVISIONAL SUM"] || 0);
 
     return totalBudget - totalUsed;
 }
@@ -749,10 +749,10 @@ openBtn.addEventListener("click", (e) => {
 async function loadSections(){
     try {
         const [secRes, interimRes, woRes] = await Promise.all([
-            // Explicit include vo_breakdown supaya getRemainingBalance boleh kira VO
             fetch(`${SB_URL}/rest/v1/me_sections?select=*,units(*,contract(id,contract_code,contract_name,contract_start,contract_end,contract_sum,contract_sections_breakdown,vo_breakdown))`, { headers }),
             fetch(`${SB_URL}/rest/v1/interims?select=contract_id,claim_breakdown`, { headers }),
-            fetch(`${SB_URL}/rest/v1/work_orders?select=contract_id,interim_no,section_category`, { headers })
+            // ── BARU: tambah field additional ──
+            fetch(`${SB_URL}/rest/v1/work_orders?select=contract_id,interim_no,section_category,additional`, { headers })
         ]);
 
         const sections = await secRes.json();
@@ -778,6 +778,12 @@ async function loadSections(){
                 const amt = (typeof val === 'object' ? val.amt : val) || 0;
                 contractClaimCache[wo.contract_id].woUsed[s] = (contractClaimCache[wo.contract_id].woUsed[s] || 0) + amt;
             });
+            // ── BARU: tambah provisional sum sama seperti dashboard ──
+            const add = Number(wo.additional || 0);
+            if (add > 0) {
+                contractClaimCache[wo.contract_id].woUsed["PROVISIONAL SUM"] =
+                    (contractClaimCache[wo.contract_id].woUsed["PROVISIONAL SUM"] || 0) + add;
+            }
         });
 
         items = sections.map(sec => ({
@@ -801,7 +807,6 @@ function isFinancialDeficitRisk(c) {
     const start = new Date(c.contract_start);
     const end = new Date(c.contract_end);
 
-    // Skip kontrak yang dah tamat
     if (end < hariIni) return false;
 
     const totalMonths = Math.max(1,
@@ -821,8 +826,6 @@ function isFinancialDeficitRisk(c) {
 
     for (const [key, val] of Object.entries(sections)) {
         const contractAmt = (typeof val === 'object' ? val.amt : val) || 0;
-
-        // Tambah VO untuk section ini
         let voForSec = 0;
         Object.values(voBreakdown).forEach(vo => {
             voForSec += Number(vo.breakdown?.[key]?.amt || 0);
@@ -834,14 +837,15 @@ function isFinancialDeficitRisk(c) {
         const used = (cache.interimUsed[key] || 0) + (cache.woUsed[key] || 0);
         const plannedToDate = (budget / totalMonths) * monthsElapsed;
 
-        // Kondisi 1: Mana-mana section actual > planned to date
         if (used > plannedToDate) return true;
 
         totalBudget += budget;
         totalUsed += used;
     }
 
-    // Kondisi 2: Masa < 50% tapi bajet dah guna > 70%
+    // Tambah provisional sum dalam jumlah used untuk kondisi 2
+    totalUsed += (cache.woUsed["PROVISIONAL SUM"] || 0);
+
     if (timeRatio < 0.5 && totalBudget > 0 && (totalUsed / totalBudget) > 0.7) return true;
 
     return false;
