@@ -30,7 +30,6 @@ font-family:Inter,system-ui;
 --input-bg: rgba(255, 255, 255, 0.4);
 }
 
-/* ── DAFTAR PROPERTY UNTUK ANIMASI GRADIENT ── */
 @property --gradient-1 {
   syntax: '<color>';
   initial-value: #0b3d91;
@@ -225,7 +224,6 @@ drop-shadow(0 0 10px rgba(255,255,255,.6))
 drop-shadow(0 0 20px rgba(56,189,248,.4));
 }
 
-/* ── OPEN BUTTON ── */
 #openBtn{
 display:block;
 width:100%;
@@ -249,7 +247,6 @@ background:rgba(56,189,248,0.5);
 transform:scale(0.97);
 }
 
-/* ── FLOATING HELM ── */
 .floating-helm{
 position:fixed;
 object-fit:contain;
@@ -292,7 +289,6 @@ drop-shadow(0 0 20px rgba(56,189,248,.5));
     transform: scale(0.92);
 }
 
-/* ── MOBILE ── */
 @media (max-width:768px){
 .panel{ display:none; }
 
@@ -476,10 +472,12 @@ let itemEls = [];
 let currentFloating = null;
 let activeSection = "";
 
+// Cache claim data per contract_id: { interimUsed: {sectionKey: amt}, woUsed: {sectionKey: amt} }
+let contractClaimCache = {};
+
 prevBtn.addEventListener("click", () => { prev(); });
 nextBtn.addEventListener("click", () => { next(); });
 
-/* ── HELM SRC ── */
 function getHelmSrc(name){
     const n = name.toUpperCase();
     if(n.includes("SELENGGARA")) return "MaintHelm.png";
@@ -489,7 +487,6 @@ function getHelmSrc(name){
     return null;
 }
 
-/* ── BACKGROUND COLOR MATCHING ── */
 function getSectionColor(name) {
     const n = name.toUpperCase();
     if (n.includes("SELENGGARA")) {
@@ -507,7 +504,6 @@ function getSectionColor(name) {
     return { base: "#0b3d91", color1: "#0b3d91", color2: "#0077b6", color3: "#00b4d8" };
 }
 
-/* ── BUTTON REDIRECT ── */
 openBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     if(!activeSection) {
@@ -520,9 +516,45 @@ openBtn.addEventListener("click", (e) => {
 
 /* ── LOAD DATA ── */
 async function loadSections(){
-    try{
-        const response = await fetch(`${SB_URL}/rest/v1/me_sections?select=*,units(*,contract(*))`, { headers });
-        const sections = await response.json();
+    try {
+        // Fetch sections + contracts serentak dengan interims + work_orders
+        const [secRes, interimRes, woRes] = await Promise.all([
+            fetch(`${SB_URL}/rest/v1/me_sections?select=*,units(*,contract(*))`, { headers }),
+            fetch(`${SB_URL}/rest/v1/interims?select=contract_id,claim_breakdown`, { headers }),
+            fetch(`${SB_URL}/rest/v1/work_orders?select=contract_id,interim_no,section_category`, { headers })
+        ]);
+
+        const sections = await secRes.json();
+        const allInterims = await interimRes.json();
+        const allWOs = await woRes.json();
+
+        // Bina cache: aggregate used amount per contract_id per section key
+        contractClaimCache = {};
+
+        allInterims.forEach(im => {
+            if (!im.contract_id || !im.claim_breakdown) return;
+            if (!contractClaimCache[im.contract_id]) {
+                contractClaimCache[im.contract_id] = { interimUsed: {}, woUsed: {} };
+            }
+            Object.keys(im.claim_breakdown).forEach(s => {
+                const amt = im.claim_breakdown[s].amt || 0;
+                contractClaimCache[im.contract_id].interimUsed[s] =
+                    (contractClaimCache[im.contract_id].interimUsed[s] || 0) + amt;
+            });
+        });
+
+        allWOs.forEach(wo => {
+            // Hanya WO yang belum submit interim (interim_no kosong/null)
+            if (!wo.contract_id || !wo.section_category || wo.interim_no) return;
+            if (!contractClaimCache[wo.contract_id]) {
+                contractClaimCache[wo.contract_id] = { interimUsed: {}, woUsed: {} };
+            }
+            Object.keys(wo.section_category).forEach(s => {
+                const amt = wo.section_category[s].amt || 0;
+                contractClaimCache[wo.contract_id].woUsed[s] =
+                    (contractClaimCache[wo.contract_id].woUsed[s] || 0) + amt;
+            });
+        });
 
         items = sections.map(sec => ({
             id: sec.id,
@@ -532,9 +564,68 @@ async function loadSections(){
 
         stepAngle = 360 / items.length;
         createWheel();
-    }catch(err){
-        console.error("Failed to fetch section & contract data:", err);
+
+    } catch(err) {
+        console.error("Failed to fetch data:", err);
     }
+}
+
+/* ── HELPER: Semak sama ada kontrak ada Financial Deficit Risk ── */
+function isFinancialDeficitRisk(c) {
+    if (!c.contract_start || !c.contract_end) return false;
+
+    const hariIni = new Date();
+    const start = new Date(c.contract_start);
+    const end = new Date(c.contract_end);
+
+    // Kontrak sudah tamat — skip
+    if (end < hariIni) return false;
+
+    const totalMonths = Math.max(1,
+        (end.getFullYear() - start.getFullYear()) * 12 +
+        (end.getMonth() - start.getMonth())
+    );
+
+    let monthsElapsed = (hariIni.getFullYear() - start.getFullYear()) * 12 +
+        (hariIni.getMonth() - start.getMonth()) + 1;
+    monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
+
+    const timeRatio = monthsElapsed / totalMonths; // 0.0 – 1.0
+
+    const sections = c.contract_sections_breakdown || {};
+    const cache = contractClaimCache[c.id] || { interimUsed: {}, woUsed: {} };
+
+    // ── KONDISI 1: Provisional Sum burst ──
+    // Cari section yang keynya ada "provisional sum" (case-insensitive)
+    const provSumKeys = Object.keys(sections).filter(k =>
+        k.toLowerCase().includes("provisional sum")
+    );
+
+    for (const key of provSumKeys) {
+        const budget = sections[key].amt || 0;
+        if (budget <= 0) continue;
+
+        const used = (cache.interimUsed[key] || 0) + (cache.woUsed[key] || 0);
+        const plannedToDate = (budget / totalMonths) * monthsElapsed;
+
+        if (used > plannedToDate) return true;
+    }
+
+    // ── KONDISI 2: Masa berlalu < 50% tapi bajet keseluruhan dah guna > 70% ──
+    if (timeRatio < 0.5) {
+        let totalBudget = 0;
+        let totalUsed = 0;
+
+        Object.keys(sections).forEach(key => {
+            const budget = sections[key].amt || 0;
+            totalBudget += budget;
+            totalUsed += (cache.interimUsed[key] || 0) + (cache.woUsed[key] || 0);
+        });
+
+        if (totalBudget > 0 && (totalUsed / totalBudget) > 0.7) return true;
+    }
+
+    return false;
 }
 
 /* ── CREATE WHEEL ── */
@@ -658,14 +749,16 @@ function update(){
     item.units.forEach(u => {
         const contractsList = u.contract || [];
         contractsList.forEach(c => {
-            if (c.p_sum_exceeded === true || c.status === "prov_sum_overrun") {
-                totalP_SumReview++;
-                return; 
-            }
-
-            if(!c.contract_end) return;
+            if (!c.contract_end) return;
             const tarikhTamat = new Date(c.contract_end);
 
+            // Semak Financial Deficit Risk dulu — kontrak boleh masuk kategori ini
+            // walaupun ongoing, tapi kita flag ia secara berasingan (tidak exclude dari ongoing)
+            if (isFinancialDeficitRisk(c)) {
+                totalP_SumReview++;
+            }
+
+            // Kategorikan status kontrak seperti biasa
             if (tarikhTamat < hariIni) {
                 totalAvailableCPC++;
             } else if (tarikhTamat >= hariIni && tarikhTamat <= enamBulanLagi) {
@@ -700,7 +793,7 @@ function update(){
 
         <div class="status-row">
             <span>Financial Deficit Risk</span>
-            <span class="status-badge" style="background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3);">
+            <span class="status-badge" style="background: rgba(255,59,48,0.15); color: #ff6b6b; border: 1px solid rgba(255,59,48,0.3);">
                 ${totalP_SumReview}
             </span>
         </div>
