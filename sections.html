@@ -702,23 +702,24 @@ function getRemainingBalance(c) {
     const voBreakdown = c.vo_breakdown || {};
     const cache = contractClaimCache[c.id] || { interimUsed: {}, woUsed: {} };
 
-    let totalBudget = 0;
-    let totalUsed = 0;
+    let total = 0;
 
+    // Kira per section: (contract + VO) - claimed - ongoing WO
     Object.entries(sections).forEach(([key, val]) => {
         const contractAmt = (typeof val === 'object' ? val.amt : val) || 0;
         let voForSec = 0;
         Object.values(voBreakdown).forEach(vo => {
             voForSec += Number(vo.breakdown?.[key]?.amt || 0);
         });
-        totalBudget += contractAmt + voForSec;
-        totalUsed += (cache.interimUsed[key] || 0) + (cache.woUsed[key] || 0);
+        const claimed = cache.interimUsed[key] || 0;
+        const ongoing = cache.woUsed[key] || 0;
+        total += (contractAmt + voForSec) - claimed - ongoing;
     });
 
-    // Tambah provisional sum dalam budget & used
-    totalUsed += (cache.woUsed["PROVISIONAL SUM"] || 0);
+    // Provisional sum — tolak ongoing WO sahaja, tiada contract budget untuk dia
+    total -= (cache.woUsed["PROVISIONAL SUM"] || 0);
 
-    return totalBudget - totalUsed;
+    return total;
 }
 
 function getHelmSrc(name){
@@ -751,7 +752,6 @@ async function loadSections(){
         const [secRes, interimRes, woRes] = await Promise.all([
             fetch(`${SB_URL}/rest/v1/me_sections?select=*,units(*,contract(id,contract_code,contract_name,contract_start,contract_end,contract_sum,contract_sections_breakdown,vo_breakdown))`, { headers }),
             fetch(`${SB_URL}/rest/v1/interims?select=contract_id,claim_breakdown`, { headers }),
-            // ── BARU: tambah field additional ──
             fetch(`${SB_URL}/rest/v1/work_orders?select=contract_id,interim_no,section_category,additional`, { headers })
         ]);
 
@@ -778,7 +778,7 @@ async function loadSections(){
                 const amt = (typeof val === 'object' ? val.amt : val) || 0;
                 contractClaimCache[wo.contract_id].woUsed[s] = (contractClaimCache[wo.contract_id].woUsed[s] || 0) + amt;
             });
-            // ── BARU: tambah provisional sum sama seperti dashboard ──
+            // Provisional sum dari field additional
             const add = Number(wo.additional || 0);
             if (add > 0) {
                 contractClaimCache[wo.contract_id].woUsed["PROVISIONAL SUM"] =
