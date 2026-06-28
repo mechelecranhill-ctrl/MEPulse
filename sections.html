@@ -129,7 +129,7 @@ backdrop-filter:none;
 transition:0.3s;
 opacity:0.4;
 transform:scale(0.9);
-pointer-events: none; 
+pointer-events: none;
 cursor: default;
 }
 
@@ -193,6 +193,12 @@ animation:fadeInRight .45s ease forwards;
     font-size: 13.5px;
     font-weight: 500;
     gap: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.status-row:active {
+    background: rgba(255,255,255,.12);
 }
 
 .status-row span:first-child {
@@ -207,6 +213,110 @@ animation:fadeInRight .45s ease forwards;
     border-radius: 8px;
     white-space: nowrap;
     flex-shrink: 0;
+}
+
+/* ── DETAIL PANEL ── */
+.detail-panel {
+    position: absolute;
+    inset: 0;
+    border-radius: 24px;
+    background: rgba(10, 20, 40, 0.75);
+    backdrop-filter: blur(24px);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 20;
+    overflow: hidden;
+}
+
+.detail-panel.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.detail-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+}
+
+.detail-panel-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    opacity: 0.6;
+    text-transform: uppercase;
+}
+
+.detail-back-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.detail-back-btn:active {
+    background: rgba(255,255,255,0.2);
+}
+
+.detail-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-right: 2px;
+}
+
+.detail-list::-webkit-scrollbar { width: 3px; }
+.detail-list::-webkit-scrollbar-track { background: transparent; }
+.detail-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+
+.detail-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 12px;
+    border-radius: 11px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.09);
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.detail-item-code {
+    font-size: 12px;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+}
+
+.detail-item-sub {
+    font-size: 10px;
+    font-weight: 500;
+    opacity: 0.55;
+    text-align: right;
+    flex: 1;
+}
+
+.detail-item-sub.warn {
+    color: #fde047;
+    opacity: 1;
+}
+
+.detail-item-sub.danger {
+    color: #ff6b6b;
+    opacity: 1;
 }
 
 .section-helm{
@@ -299,7 +409,7 @@ right:20px;
 top:auto;
 bottom:20px;
 height: auto;
-max-height: 50vh;
+max-height: 55vh;
 display: flex;
 flex-direction: column;
 padding: 20px;
@@ -342,9 +452,7 @@ opacity:0 !important;
 }
 
 @media (min-width:769px){
-    .panel{
-        display:none;
-    }
+    .panel{ display:none; }
 
     .info-card{
         position: fixed !important;
@@ -431,10 +539,22 @@ opacity:0 !important;
     <button id="prevBtn"><i class="fa fa-chevron-left"></i></button>
     <button id="nextBtn"><i class="fa fa-chevron-right"></i></button>
 </div>
+
 <div class="info-card" id="infoCard">
-<h2 id="cardTitle"></h2>
-<div id="cardDesc"></div>
-<button id="openBtn">Open Dashboard</button>
+    <h2 id="cardTitle"></h2>
+    <div id="cardDesc"></div>
+    <button id="openBtn">Open Dashboard</button>
+
+    <!-- Detail overlay panel -->
+    <div class="detail-panel" id="detailPanel">
+        <div class="detail-panel-header">
+            <span class="detail-panel-title" id="detailPanelTitle"></span>
+            <button class="detail-back-btn" id="detailBackBtn">
+                <i class="fa fa-chevron-left"></i> Back
+            </button>
+        </div>
+        <div class="detail-list" id="detailList"></div>
+    </div>
 </div>
 
 <script>
@@ -459,6 +579,10 @@ const cardDesc = document.getElementById("cardDesc");
 const openBtn = document.getElementById("openBtn");
 const prevBtn = document.getElementById("prevBtn");
 const nextBtn = document.getElementById("nextBtn");
+const detailPanel = document.getElementById("detailPanel");
+const detailPanelTitle = document.getElementById("detailPanelTitle");
+const detailList = document.getElementById("detailList");
+const detailBackBtn = document.getElementById("detailBackBtn");
 
 const isMobile = window.innerWidth <= 768;
 const radius = isMobile ? 180 : 240;
@@ -471,12 +595,118 @@ let items = [];
 let itemEls = [];
 let currentFloating = null;
 let activeSection = "";
-
-// Cache claim data per contract_id: { interimUsed: {sectionKey: amt}, woUsed: {sectionKey: amt} }
 let contractClaimCache = {};
+
+// Simpan senarai kontrak per kategori untuk semasa section aktif
+let currentLists = {
+    ongoing: [],
+    renewal: [],
+    cpc: [],
+    risk: []
+};
 
 prevBtn.addEventListener("click", () => { prev(); });
 nextBtn.addEventListener("click", () => { next(); });
+
+detailBackBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeDetail();
+});
+
+function closeDetail() {
+    detailPanel.classList.remove("visible");
+}
+
+function openDetail(type) {
+    const configs = {
+        ongoing: {
+            title: "Ongoing Contracts",
+            color: "#4ade80",
+            render: (c) => ({
+                code: c.contract_code || c.id,
+                sub: c.contract_name || "",
+                subClass: ""
+            })
+        },
+        renewal: {
+            title: "Renewals Within 6 Months",
+            color: "#fde047",
+            render: (c) => ({
+                code: c.contract_code || c.id,
+                sub: c.contract_end ? "Ends: " + formatDate(c.contract_end) : "",
+                subClass: "warn"
+            })
+        },
+        cpc: {
+            title: "Available for Closing",
+            color: "#c084fc",
+            render: (c) => ({
+                code: c.contract_code || c.id,
+                sub: c.contract_end ? "Ended: " + formatDate(c.contract_end) : "",
+                subClass: ""
+            })
+        },
+        risk: {
+            title: "Financial Deficit Risk",
+            color: "#ff6b6b",
+            render: (c) => {
+                const bal = getRemainingBalance(c);
+                return {
+                    code: c.contract_code || c.id,
+                    sub: "Balance: RM " + bal.toLocaleString(undefined, { maximumFractionDigits: 0 }),
+                    subClass: bal < 0 ? "danger" : "warn"
+                };
+            }
+        }
+    };
+
+    const cfg = configs[type];
+    if (!cfg) return;
+
+    const list = currentLists[type];
+
+    detailPanelTitle.textContent = cfg.title;
+    detailPanelTitle.style.color = cfg.color;
+
+    if (list.length === 0) {
+        detailList.innerHTML = `<div style="opacity:0.4; font-size:13px; text-align:center; margin-top:20px;">No contracts</div>`;
+    } else {
+        detailList.innerHTML = list.map(c => {
+            const rendered = cfg.render(c);
+            return `
+                <div class="detail-item">
+                    <span class="detail-item-code">${rendered.code}</span>
+                    <span class="detail-item-sub ${rendered.subClass}">${rendered.sub}</span>
+                </div>
+            `;
+        }).join("");
+    }
+
+    detailPanel.classList.add("visible");
+}
+
+/* ── FORMAT DATE ── */
+function formatDate(dateStr) {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("ms-MY", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+/* ── KIRA BALANCE TINGGAL untuk risk contracts ── */
+function getRemainingBalance(c) {
+    const sections = c.contract_sections_breakdown || {};
+    const cache = contractClaimCache[c.id] || { interimUsed: {}, woUsed: {} };
+
+    let totalBudget = 0;
+    let totalUsed = 0;
+
+    Object.entries(sections).forEach(([key, val]) => {
+        const budget = (typeof val === 'object' ? val.amt : val) || 0;
+        totalBudget += budget;
+        totalUsed += (cache.interimUsed[key] || 0) + (cache.woUsed[key] || 0);
+    });
+
+    return totalBudget - totalUsed;
+}
 
 function getHelmSrc(name){
     const n = name.toUpperCase();
@@ -489,29 +719,17 @@ function getHelmSrc(name){
 
 function getSectionColor(name) {
     const n = name.toUpperCase();
-    if (n.includes("SELENGGARA")) {
-        return { base: "#121212", color1: "#121212", color2: "#1c1c1e", color3: "#2c2c2e" };
-    }
-    if (n.includes("PEMATUHAN")) {
-        return { base: "#064e3b", color1: "#064e3b", color2: "#0f5132", color3: "#115e59" };
-    }
-    if (n.includes("ASET")) {
-        return { base: "#7c2d12", color1: "#6c2a0d", color2: "#9a3412", color3: "#b45309" };
-    }
-    if (n.includes("PROJEK")) {
-        return { base: "#0b3d91", color1: "#0b3d91", color2: "#0077b6", color3: "#00b4d8" };
-    }
+    if (n.includes("SELENGGARA")) return { base: "#121212", color1: "#121212", color2: "#1c1c1e", color3: "#2c2c2e" };
+    if (n.includes("PEMATUHAN")) return { base: "#064e3b", color1: "#064e3b", color2: "#0f5132", color3: "#115e59" };
+    if (n.includes("ASET")) return { base: "#7c2d12", color1: "#6c2a0d", color2: "#9a3412", color3: "#b45309" };
+    if (n.includes("PROJEK")) return { base: "#0b3d91", color1: "#0b3d91", color2: "#0077b6", color3: "#00b4d8" };
     return { base: "#0b3d91", color1: "#0b3d91", color2: "#0077b6", color3: "#00b4d8" };
 }
 
 openBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    if(!activeSection) {
-        alert("Please select a section first.");
-        return;
-    }
-    const targetUrl = `dashboard-contract.html?section=${activeSection.id}`;
-    window.location.href = targetUrl;
+    if(!activeSection) { alert("Please select a section first."); return; }
+    window.location.href = `dashboard-contract.html?section=${activeSection.id}`;
 });
 
 /* ── LOAD DATA ── */
@@ -527,31 +745,23 @@ async function loadSections(){
         const allInterims = await interimRes.json();
         const allWOs = await woRes.json();
 
-        // Bina interimMap per contract_id
         contractClaimCache = {};
 
         allInterims.forEach(im => {
             if (!im.contract_id || !im.claim_breakdown) return;
-            if (!contractClaimCache[im.contract_id]) {
-                contractClaimCache[im.contract_id] = { interimUsed: {}, woUsed: {} };
-            }
+            if (!contractClaimCache[im.contract_id]) contractClaimCache[im.contract_id] = { interimUsed: {}, woUsed: {} };
             Object.entries(im.claim_breakdown).forEach(([s, val]) => {
                 const amt = (typeof val === 'object' ? val.amt : val) || 0;
-                contractClaimCache[im.contract_id].interimUsed[s] =
-                    (contractClaimCache[im.contract_id].interimUsed[s] || 0) + amt;
+                contractClaimCache[im.contract_id].interimUsed[s] = (contractClaimCache[im.contract_id].interimUsed[s] || 0) + amt;
             });
         });
 
-        // Bina woMap per contract_id — hanya WO pending (tiada interim_no)
         allWOs.forEach(wo => {
             if (!wo.contract_id || !wo.section_category || wo.interim_no) return;
-            if (!contractClaimCache[wo.contract_id]) {
-                contractClaimCache[wo.contract_id] = { interimUsed: {}, woUsed: {} };
-            }
+            if (!contractClaimCache[wo.contract_id]) contractClaimCache[wo.contract_id] = { interimUsed: {}, woUsed: {} };
             Object.entries(wo.section_category).forEach(([s, val]) => {
                 const amt = (typeof val === 'object' ? val.amt : val) || 0;
-                contractClaimCache[wo.contract_id].woUsed[s] =
-                    (contractClaimCache[wo.contract_id].woUsed[s] || 0) + amt;
+                contractClaimCache[wo.contract_id].woUsed[s] = (contractClaimCache[wo.contract_id].woUsed[s] || 0) + amt;
             });
         });
 
@@ -569,71 +779,50 @@ async function loadSections(){
     }
 }
 
-/* ── HELPER: Semak Financial Deficit Risk ── */
+/* ── SEMAK FINANCIAL DEFICIT RISK ── */
 function isFinancialDeficitRisk(c) {
     if (!c.contract_start || !c.contract_end) return false;
-
     const hariIni = new Date();
     const start = new Date(c.contract_start);
     const end = new Date(c.contract_end);
-
-    // Skip kontrak yang dah tamat
     if (end < hariIni) return false;
 
     const totalMonths = Math.max(1,
-        (end.getFullYear() - start.getFullYear()) * 12 +
-        (end.getMonth() - start.getMonth())
+        (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth())
     );
-
-    let monthsElapsed = (hariIni.getFullYear() - start.getFullYear()) * 12 +
-        (hariIni.getMonth() - start.getMonth()) + 1;
+    let monthsElapsed = (hariIni.getFullYear() - start.getFullYear()) * 12 + (hariIni.getMonth() - start.getMonth()) + 1;
     monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
 
     const timeRatio = monthsElapsed / totalMonths;
-
     const sections = c.contract_sections_breakdown || {};
     const cache = contractClaimCache[c.id] || { interimUsed: {}, woUsed: {} };
 
     let totalBudget = 0;
     let totalUsed = 0;
 
-    // ── KONDISI 1: Mana-mana section ada actual > planned to date ──
     for (const [key, val] of Object.entries(sections)) {
         const budget = (typeof val === 'object' ? val.amt : val) || 0;
         if (budget <= 0) continue;
-
         const used = (cache.interimUsed[key] || 0) + (cache.woUsed[key] || 0);
         const plannedToDate = (budget / totalMonths) * monthsElapsed;
-
-        // Kondisi 1: Burst mana-mana section (actual > planned)
         if (used > plannedToDate) return true;
-
-        // Kumpul untuk kondisi 2
         totalBudget += budget;
         totalUsed += used;
     }
 
-    // ── KONDISI 2: Masa < 50% tapi bajet dah guna > 70% ──
-    if (timeRatio < 0.5 && totalBudget > 0 && (totalUsed / totalBudget) > 0.7) {
-        return true;
-    }
-
+    if (timeRatio < 0.5 && totalBudget > 0 && (totalUsed / totalBudget) > 0.7) return true;
     return false;
 }
 
 /* ── CREATE WHEEL ── */
 function createWheel(){
     wheel.innerHTML = "";
-
     items.forEach(item => {
         const el = document.createElement("div");
         el.className = "item";
         const src = getHelmSrc(item.title);
-        if(src){
-            el.innerHTML = `<img src="${src}" class="section-helm">`;
-        } else {
-            el.innerText = item.title;
-        }
+        if(src) el.innerHTML = `<img src="${src}" class="section-helm">`;
+        else el.innerText = item.title;
         wheel.appendChild(el);
     });
 
@@ -641,25 +830,22 @@ function createWheel(){
 
     itemEls.forEach((el, i) => {
         el.addEventListener("click", (e) => {
+            closeDetail();
             if(!isMobile) {
                 let diff = i - index;
                 if (diff > items.length / 2) diff -= items.length;
                 if (diff < -items.length / 2) diff += items.length;
                 baseAngle -= diff * stepAngle;
                 index = i;
-                update();
-                render();
+                update(); render();
                 return;
             }
-
             index = i;
-            update();
-            render();
+            update(); render();
             dismissFloating();
 
             const img = el.querySelector(".section-helm");
             document.body.classList.add("hide-wheel");
-
             if(img){
                 const r = img.getBoundingClientRect();
                 const fl = document.createElement("img");
@@ -670,10 +856,8 @@ function createWheel(){
                 fl.style.left = r.left + "px";
                 fl.style.width = r.width + "px";
                 fl.style.height = r.height + "px";
-
                 document.body.appendChild(fl);
                 currentFloating = fl;
-
                 requestAnimationFrame(() => {
                     requestAnimationFrame(() => {
                         fl.style.transition = "";
@@ -702,7 +886,7 @@ function positionItems(){
         const theta = (i / items.length) * Math.PI * 2;
         const x = Math.cos(theta) * radius;
         const y = Math.sin(theta) * radius;
-        el.style.left = `calc(50% + ${x}px - 60px)`; 
+        el.style.left = `calc(50% + ${x}px - 60px)`;
         el.style.top = `calc(50% + ${y}px - 60px)`;
     });
 }
@@ -710,16 +894,14 @@ function positionItems(){
 /* ── UPDATE DATA CARD ── */
 function update(){
     if(itemEls.length === 0) return;
-    
+
+    closeDetail();
+
     itemEls.forEach(e => e.classList.remove("active"));
     itemEls[index].classList.add("active");
 
     const item = items[index];
-    
-    activeSection = {
-        id: item.id,
-        name: item.title
-    };
+    activeSection = { id: item.id, name: item.title };
 
     const colors = getSectionColor(item.title);
     document.body.style.setProperty('--bg-color', colors.base);
@@ -730,64 +912,53 @@ function update(){
     title.innerText = item.title;
     cardTitle.innerText = item.title;
 
-    let totalOngoing = 0;
-    let totalImpendingExpiry = 0;
-    let totalAvailableCPC = 0;
-    let totalP_SumReview = 0;
+    // Reset lists
+    currentLists = { ongoing: [], renewal: [], cpc: [], risk: [] };
 
     const hariIni = new Date();
     const enamBulanLagi = new Date();
     enamBulanLagi.setMonth(hariIni.getMonth() + 6);
 
     item.units.forEach(u => {
-        const contractsList = u.contract || [];
-        contractsList.forEach(c => {
+        (u.contract || []).forEach(c => {
             if (!c.contract_end) return;
             const tarikhTamat = new Date(c.contract_end);
 
-            // Semak Financial Deficit Risk dulu — kontrak boleh masuk kategori ini
-            // walaupun ongoing, tapi kita flag ia secara berasingan (tidak exclude dari ongoing)
-            if (isFinancialDeficitRisk(c)) {
-                totalP_SumReview++;
-            }
+            if (isFinancialDeficitRisk(c)) currentLists.risk.push(c);
 
-            // Kategorikan status kontrak seperti biasa
             if (tarikhTamat < hariIni) {
-                totalAvailableCPC++;
-            } else if (tarikhTamat >= hariIni && tarikhTamat <= enamBulanLagi) {
-                totalImpendingExpiry++;
+                currentLists.cpc.push(c);
+            } else if (tarikhTamat <= enamBulanLagi) {
+                currentLists.renewal.push(c);
             } else {
-                totalOngoing++;
+                currentLists.ongoing.push(c);
             }
         });
     });
 
     cardDesc.innerHTML = `
-        <div class="status-row">
+        <div class="status-row" onclick="openDetail('ongoing')">
             <span>Ongoing Contracts</span>
-            <span class="status-badge" style="background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3);">
-                ${totalOngoing}
+            <span class="status-badge" style="background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3);">
+                ${currentLists.ongoing.length}
             </span>
         </div>
-        
-        <div class="status-row">
+        <div class="status-row" onclick="openDetail('renewal')">
             <span>Contracts Renewals (Within 6M)</span>
-            <span class="status-badge" style="background: rgba(234,179,8,0.15); color: #fde047; border: 1px solid rgba(234,179,8,0.3);">
-                ${totalImpendingExpiry}
+            <span class="status-badge" style="background:rgba(234,179,8,0.15);color:#fde047;border:1px solid rgba(234,179,8,0.3);">
+                ${currentLists.renewal.length}
             </span>
         </div>
-        
-        <div class="status-row">
+        <div class="status-row" onclick="openDetail('cpc')">
             <span>Available for Closing</span>
-            <span class="status-badge" style="background: rgba(147,51,234,0.15); color: #c084fc; border: 1px solid rgba(147,51,234,0.3);">
-                ${totalAvailableCPC}
+            <span class="status-badge" style="background:rgba(147,51,234,0.15);color:#c084fc;border:1px solid rgba(147,51,234,0.3);">
+                ${currentLists.cpc.length}
             </span>
         </div>
-
-        <div class="status-row">
+        <div class="status-row" onclick="openDetail('risk')">
             <span>Financial Deficit Risk</span>
-            <span class="status-badge" style="background: rgba(255,59,48,0.15); color: #ff6b6b; border: 1px solid rgba(255,59,48,0.3);">
-                ${totalP_SumReview}
+            <span class="status-badge" style="background:rgba(255,59,48,0.15);color:#ff6b6b;border:1px solid rgba(255,59,48,0.3);">
+                ${currentLists.risk.length}
             </span>
         </div>
     `;
@@ -801,21 +972,17 @@ function update(){
     }
 }
 
-/* ── RENDER WHEEL ROTATION ── */
+/* ── RENDER ── */
 function render(){
     if(itemEls.length === 0) return;
-    
-    wheel.style.transform = `translateY(-50%) rotate(${baseAngle}deg)`; 
-    itemEls.forEach(el => { 
-        el.style.transform = `rotate(${-baseAngle}deg) scale(0.9)`; 
-    }); 
+    wheel.style.transform = `translateY(-50%) rotate(${baseAngle}deg)`;
+    itemEls.forEach(el => { el.style.transform = `rotate(${-baseAngle}deg) scale(0.9)`; });
     itemEls[index].style.transform = `rotate(${-baseAngle}deg) scale(1.25)`;
 }
 
-function next(){ index=(index+1)%items.length; baseAngle-=stepAngle; update(); render(); }
-function prev(){ index=(index-1+items.length)%items.length; baseAngle+=stepAngle; update(); render(); }
+function next(){ index=(index+1)%items.length; baseAngle-=stepAngle; closeDetail(); update(); render(); }
+function prev(){ index=(index-1+items.length)%items.length; baseAngle+=stepAngle; closeDetail(); update(); render(); }
 
-/* ── SCROLL WHEEL ── */
 let buffer = 0;
 window.addEventListener("wheel", e => {
     if(lock) return;
@@ -826,7 +993,6 @@ window.addEventListener("wheel", e => {
     setTimeout(() => lock=false, 120);
 }, { passive:true });
 
-/* ── SWIPE MOBILE ── */
 let startX = 0;
 const isCardOpen = () => card.classList.contains("show-mobile");
 
@@ -842,19 +1008,20 @@ window.addEventListener("touchend", e => {
     if(diff > 0) next(); else prev();
 }, { passive:true });
 
-/* ── DISMISS ON CLICK OUTSIDE ── */
 document.addEventListener("click", e => {
     if(!isMobile) return;
     if(!card.contains(e.target) && !e.target.closest(".item") && e.target.id !== "openBtn"){
         card.classList.remove("show-mobile");
         document.body.classList.remove("hide-wheel");
         dismissFloating();
+        closeDetail();
     }
 });
 
 window.addEventListener("keydown", (e) => {
-    if(e.key === "ArrowLeft" || e.key === "ArrowUp"){ prev(); }
-    if(e.key === "ArrowRight" || e.key === "ArrowDown"){ next(); }
+    if(e.key === "Escape") closeDetail();
+    if(e.key === "ArrowLeft" || e.key === "ArrowUp") prev();
+    if(e.key === "ArrowRight" || e.key === "ArrowDown") next();
 });
 </script>
 </body>
