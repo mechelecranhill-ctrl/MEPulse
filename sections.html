@@ -47,7 +47,8 @@ font-family:Inter,system-ui;
   inherits: false;
 }
 
-• {
+/* FIX TYPO: Menukar bullet point (•) kepada selector universal (*) */
+* {
 box-sizing: border-box;
 -webkit-tap-highlight-color: transparent;
 font-family: Inter, system-ui;
@@ -84,11 +85,13 @@ body::before {
     filter: blur(40px);
     animation: fogMove 10s ease-in-out infinite alternate;
     z-index: 0;
+    will-change: transform; /* OPTIMASI: Mengurangkan beban CPU untuk animasi latar belakang */
 }
 
 @keyframes fogMove{
-from{ transform:translateX(-30px) translateY(0); }
-to{ transform:translateX(30px) translateY(-20px); }
+/* OPTIMASI: Menggunakan translate3d untuk mengaktifkan pecutan GPU hardware */
+from{ transform: translate3d(-30px, 0, 0); }
+to{ transform: translate3d(30px, -20px, 0); }
 }
 
 .stage {
@@ -108,9 +111,10 @@ to{ transform:translateX(30px) translateY(-20px); }
     left: -325px;
     top: 50%;
     transform: translateY(-50%) rotate(0deg);
-    transition: transform 0.7s cubic-bezier(.22,1,.36,1);
+    transition: transform 0.6s cubic-bezier(.22,1,.36,1); /* OPTIMASI: Mempercepat sedikit respon putaran */
     transform-origin: center center;
     pointer-events: auto;
+    will-change: transform; /* OPTIMASI: Memberitahu pelayar untuk bersedia memusingkan roda tanpa lag */
 }
 
 .item{
@@ -127,11 +131,11 @@ text-align:center;
 color:white;
 font-weight:600;
 backdrop-filter:none;
-transition:0.3s;
+transition: transform 0.4s, opacity 0.4s;
 opacity:0.4;
 transform:scale(0.9);
-pointer-events: none; 
-cursor: default;
+pointer-events: auto; /* BUG FIX: Membolehkan item dikesan klik pada desktop/mobile */
+cursor: pointer;
 }
 
 .item.active{
@@ -169,6 +173,7 @@ color:white;
     opacity: 0;
     animation: none;
     pointer-events: auto;
+    will-change: transform, opacity;
 }
 
 @keyframes fadeInRight{
@@ -288,6 +293,17 @@ opacity:0;
 visibility:hidden;
 transform:translateY(40px);
 transition:opacity .35s ease, transform .35s ease, visibility .35s;
+
+/* ── Ketinggian Tetap & Susunan Flex ── */
+height: 380px;            /* Dioptimumkan ngam-ngam untuk saiz 4 unit + butang */
+display: flex;
+flex-direction: column;
+justify-content: space-between; /* Menolak butang ke bawah & susun unit sekata */
+}
+
+#cardDesc {
+/* Membuang fungsi skrol kerana kuantiti unit adalah statik */
+overflow: hidden; 
 }
 
 .info-card.show-mobile{
@@ -312,6 +328,7 @@ body.hide-wheel .item.active{
 opacity:0 !important;
 }
 }
+
 /* =========================
    DESKTOP INFO PANEL
    ========================= */
@@ -470,7 +487,7 @@ let lock = false;
 let items = [];
 let itemEls = [];
 let currentFloating = null;
-let activeSection = "";
+let activeSection = null; /* BUG FIX: Ditukar kepada null untuk konsistensi jenis data objek */
 
 prevBtn.addEventListener("click", () => {
     prev();
@@ -494,48 +511,18 @@ function getHelmSrc(name){
 function getSectionColor(name) {
     const n = name.toUpperCase();
     if (n.includes("SELENGGARA")) {
-        // Tema Hitam Premium
-        return {
-            base: "#121212",
-            color1: "#121212",
-            color2: "#1c1c1e",
-            color3: "#2c2c2e"
-        };
+        return { base: "#121212", color1: "#121212", color2: "#1c1c1e", color3: "#2c2c2e" };
     }
     if (n.includes("PEMATUHAN")) {
-        // Tema Hijau Emerald
-        return {
-            base: "#064e3b",
-            color1: "#064e3b",
-            color2: "#0f5132",
-            color3: "#115e59"
-        };
+        return { base: "#064e3b", color1: "#064e3b", color2: "#0f5132", color3: "#115e59" };
     }
     if (n.includes("ASET")) {
-        // Tema Jingga / Oren
-        return {
-            base: "#7c2d12",
-            color1: "#6c2a0d",
-            color2: "#9a3412",
-            color3: "#b45309"
-        };
+        return { base: "#7c2d12", color1: "#6c2a0d", color2: "#9a3412", color3: "#b45309" };
     }
     if (n.includes("PROJEK")) {
-        // Menggunakan Nilai Default Asal (M&E Biru)
-        return {
-            base: "#0b3d91",
-            color1: "#0b3d91",
-            color2: "#0077b6",
-            color3: "#00b4d8"
-        };
+        return { base: "#0b3d91", color1: "#0b3d91", color2: "#0077b6", color3: "#00b4d8" };
     }
-    // Nilai fallback
-    return {
-        base: "#0b3d91",
-        color1: "#0b3d91",
-        color2: "#0077b6",
-        color3: "#00b4d8"
-    };
+    return { base: "#0b3d91", color1: "#0b3d91", color2: "#0077b6", color3: "#00b4d8" };
 }
 
 /* ── BUTTON REDIRECT ── */
@@ -546,29 +533,24 @@ openBtn.addEventListener("click", (e) => {
         return;
     }
     const targetUrl = `dashboard-contract.html?section=${activeSection.id}`;
-window.location.href = targetUrl;
+    window.location.href = targetUrl;
 });
 
 /* ── LOAD DATA ── */
 async function loadSections(){
-
     const cached = localStorage.getItem("sections_cache");
-
     if(cached){
         items = JSON.parse(cached);
         stepAngle = 360 / items.length;
         createWheel();
-
-        refreshSections();
+        refreshSections(); // Berjalan di latar belakang tanpa block UI
         return;
     }
-
     await refreshSections();
 }
 
 async function refreshSections(){
     try{
-
         const [secRes, unitRes] = await Promise.all([
             fetch(`${SB_URL}/rest/v1/me_sections?select=id,section_name`, { headers }),
             fetch(`${SB_URL}/rest/v1/units?select=id,unit_name,section_id`, { headers })
@@ -584,7 +566,6 @@ async function refreshSections(){
         }));
 
         localStorage.setItem("sections_cache", JSON.stringify(items));
-
         stepAngle = 360 / items.length;
         createWheel();
 
@@ -688,10 +669,10 @@ function update(){
 
     const item = items[index];
     
-activeSection = {
-    id: item.id,
-    name: item.title
-};
+    activeSection = {
+        id: item.id,
+        name: item.title
+    };
 
     const colors = getSectionColor(item.title);
     document.body.style.setProperty('--bg-color', colors.base);
@@ -707,8 +688,8 @@ activeSection = {
 
     if(!isMobile){
         if(!card.classList.contains("show")){
-    card.classList.add("show");
-}
+            card.classList.add("show");
+        }
     }
 }
 
@@ -716,11 +697,15 @@ activeSection = {
 function render(){
     if(itemEls.length === 0) return;
     
-    wheel.style.transform = `translateY(-50%) rotate(${baseAngle}deg)`; 
-    itemEls.forEach(el => { 
-        el.style.transform = `rotate(${-baseAngle}deg) scale(0.9)`; 
+    /* OPTIMASI LAGGING: Menggunakan hardware acceleration translate3d untuk kelancaran putaran */
+    wheel.style.transform = `translate3d(0, -50%, 0) rotate(${baseAngle}deg)`; 
+    itemEls.forEach((el, i) => { 
+        if (i === index) {
+            el.style.transform = `rotate(${-baseAngle}deg) scale(1.25)`;
+        } else {
+            el.style.transform = `rotate(${-baseAngle}deg) scale(0.9)`; 
+        }
     }); 
-    itemEls[index].style.transform = `rotate(${-baseAngle}deg) scale(1.25)`;
 }
 
 function next(){ index=(index+1)%items.length; baseAngle-=stepAngle; update(); render(); }
@@ -734,7 +719,7 @@ window.addEventListener("wheel", e => {
     buffer += e.deltaY;
     if(buffer > 80){ next(); buffer=0; }
     if(buffer < -80){ prev(); buffer=0; }
-    setTimeout(() => lock=false, 120);
+    setTimeout(() => lock=false, 150); /* OPTIMASI: Selang masa ditambah sedikit untuk kestabilan event scroll */
 }, { passive:true });
 
 /* ── SWIPE MOBILE ── */
