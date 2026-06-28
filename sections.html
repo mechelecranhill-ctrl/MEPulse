@@ -551,29 +551,11 @@ window.location.href = targetUrl;
 
 /* ── LOAD DATA ── */
 async function loadSections(){
-
-    const cached = localStorage.getItem("sections_cache");
-
-    if(cached){
-        items = JSON.parse(cached);
-        stepAngle = 360 / items.length;
-        createWheel();
-
-        refreshSections();
-        return;
-    }
-
-    await refreshSections();
-}
-
-async function refreshSections(){
     try{
-
         const [secRes, unitRes] = await Promise.all([
-            fetch(`${SB_URL}/rest/v1/me_sections?select=id,section_name`, { headers }),
-            fetch(`${SB_URL}/rest/v1/units?select=id,unit_name,section_id`, { headers })
+            fetch(`${SB_URL}/rest/v1/me_sections?select=*`, { headers }), 
+            fetch(`${SB_URL}/rest/v1/units?select=*`, { headers })
         ]);
-
         const sections = await secRes.json();
         const units = await unitRes.json();
 
@@ -583,11 +565,8 @@ async function refreshSections(){
             units: units.filter(u => u.section_id === sec.id)
         }));
 
-        localStorage.setItem("sections_cache", JSON.stringify(items));
-
         stepAngle = 360 / items.length;
         createWheel();
-
     }catch(err){
         console.error(err);
     }
@@ -706,9 +685,9 @@ activeSection = {
         item.units.map(u => `<div class="unit-card">${u.unit_name}</div>`).join("");
 
     if(!isMobile){
-        if(!card.classList.contains("show")){
-    card.classList.add("show");
-}
+        card.classList.remove("show");
+        void card.offsetWidth;
+        card.classList.add("show");
     }
 }
 
