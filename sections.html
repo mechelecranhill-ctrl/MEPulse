@@ -650,16 +650,13 @@ function openDetail(type) {
             })
         },
         risk: {
-            title: "Financial Deficit Risk (Provisional Sum)",
+            title: "Provisional Sum Deficit Risk",
             color: "#ff6b6b",
-            render: (c) => {
-                const bal = getRemainingBalance(c);
-                return {
-                    code: c.contract_code || c.id,
-                    sub: "Prov. Bal: RM " + bal.toLocaleString(undefined, { maximumFractionDigits: 0 }),
-                    subClass: bal < 0 ? "danger" : "warn"
-                };
-            }
+            render: (c) => ({
+                code: c.contract_code || c.id,
+                sub: "P.Sum Actual > Planned to date",
+                subClass: "danger"
+            })
         }
     };
 
@@ -693,30 +690,6 @@ function openDetail(type) {
 function formatDate(dateStr) {
     const d = new Date(dateStr);
     return d.toLocaleDateString("ms-MY", { day: "2-digit", month: "short", year: "numeric" });
-}
-
-/* ── KIRA BALANCE TINGGAL (PROVISIONAL SUM SAHAJA) ── */
-function getRemainingBalance(c) {
-    const sections = c.contract_sections_breakdown || {};
-    const cache = contractClaimCache[c.id] || { interimUsed: {}, woUsed: {} };
-
-    let provBudget = 0;
-    let provUsed = 0;
-
-    Object.entries(sections).forEach(([key, val]) => {
-        if (key.toUpperCase().includes("PROVISIONAL")) {
-            provBudget += Number(typeof val === 'object' ? (val.amt || val.amount || 0) : val) || 0;
-            provUsed += Number(cache.interimUsed[key] || 0);
-        }
-    });
-
-    Object.entries(cache.woUsed).forEach(([key, usedAmt]) => {
-        if (key.toUpperCase().includes("PROVISIONAL")) {
-            provUsed += Number(usedAmt || 0);
-        }
-    });
-
-    return provBudget - provUsed;
 }
 
 function getHelmSrc(name){
@@ -758,7 +731,7 @@ async function loadSections(){
 
         contractClaimCache = {};
 
-        // 1. Ambil tuntutan daripada Interim (Menolak nilai asal)
+        // 1. Ambil tuntutan daripada Interim
         allInterims.forEach(im => {
             if (!im.contract_id || !im.claim_breakdown) return;
             if (!contractClaimCache[im.contract_id]) contractClaimCache[im.contract_id] = { interimUsed: {}, woUsed: {} };
@@ -768,12 +741,11 @@ async function loadSections(){
             });
         });
 
-        // 2. Ambil tuntutan daripada Work Order (Tolak juga KECUALI yang berstatus Claimed)
+        // 2. Ambil tuntutan daripada Work Order KECUALI yang berstatus Claimed
         allWOs.forEach(wo => {
             if (!wo.contract_id || !wo.section_category) return;
             if (!contractClaimCache[wo.contract_id]) contractClaimCache[wo.contract_id] = { interimUsed: {}, woUsed: {} };
             
-            // KECUALI yang berstatus 'Claimed'
             if (wo.status && wo.status.toUpperCase() === "CLAIMED") return;
 
             Object.entries(wo.section_category).forEach(([s, val]) => {
@@ -801,59 +773,49 @@ async function loadSections(){
     }
 }
 
-/* ── SEMAK FINANCIAL DEFICIT RISK (PROVISIONAL SUM SAHAJA) ── */
+/* ── SEMAK FINANCIAL DEFICIT RISK (TERHAD KEPADA PROVISIONAL SUM SAHAJA) ── */
 function isFinancialDeficitRisk(c) {
-    if (!c.contract_start || !c.contract_end) return false;
+    if (!c.contract_start || !c.contract_end || !c.contract_sections_breakdown) return false;
+
+    // 1. Semakan Tempoh Kontrak Aktif
+    const hariIni = new Date();
+    const start = new Date(c.contract_start);
+    const end = new Date(c.contract_end);
+    
+    if (end < hariIni) return false; // Kontrak dah tamat tempoh, tiada risiko aktif
+
+    // 2. Kira 'Months Elapsed' & 'Total Months'
+    const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
+    let monthsElapsed = (hariIni.getFullYear() - start.getFullYear()) * 12 + (hariIni.getMonth() - start.getMonth()) + 1;
+    monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
 
     const sections = c.contract_sections_breakdown || {};
     const cache = contractClaimCache[c.id] || { interimUsed: {}, woUsed: {} };
 
-    let totalProvisionalBudget = 0;
-    let totalProvisionalUsed = 0;
-    let triggersRisk = false;
+    // 3. Ambil nilai PROVISIONAL SUM daripada pecahan kontrak asal
+    const pSumValue = sections["PROVISIONAL SUM"] || 0;
+    const budget = Number(typeof pSumValue === 'object' ? (pSumValue.amt || pSumValue.amount || 0) : pSumValue) || 0;
+    
+    if (budget === 0) return false; // Tiada bajet peruntukan luar jangka ditubuhkan
 
-    // 1. Dapatkan bajet asal provisional sum dari breakdown kontrak asal
-    Object.entries(sections).forEach(([key, val]) => {
-        if (key.toUpperCase().includes("PROVISIONAL")) {
-            const contractAmt = Number(typeof val === 'object' ? (val.amt || val.amount || 0) : val) || 0;
-            totalProvisionalBudget += contractAmt;
-            totalProvisionalUsed += Number(cache.interimUsed[key] || 0);
+    // 4. Kira had pro-rata berjadual bulanan bagi Provisional Sum
+    const plannedTotalToDate = (budget / totalMonths) * monthsElapsed;
+
+    // 5. Kira jumlah perbelanjaan semasa (Interim + Pending WO) bagi Provisional Sum
+    const totalInterimClaim = Number(cache.interimUsed["PROVISIONAL SUM"] || 0);
+    const totalPendingWO = Number(cache.woUsed["PROVISIONAL SUM"] || 0);
+    const used = totalInterimClaim + totalPendingWO;
+
+    // Carian item 'luar jangka' atau item tak berdaftar dalam struktur pecahan yang masuk dalam tuntutan WO
+    let unmappedWOTotal = 0;
+    Object.keys(cache.woUsed).forEach(key => {
+        if (sections[key] === undefined) {
+            unmappedWOTotal += Number(cache.woUsed[key] || 0);
         }
     });
 
-    // 2. Tambah penggunaan daripada tracking WO yang belum Claimed
-    Object.entries(cache.woUsed).forEach(([key, usedAmt]) => {
-        if (key.toUpperCase().includes("PROVISIONAL")) {
-            const pendingAmt = Number(usedAmt || 0);
-            totalProvisionalUsed += pendingAmt;
-            
-            // SYARAT 1: Jika tiada bajet diperuntukkan langsung (RM 0) tapi ada penggunaan WO, cetus risiko (burst)
-            let baseBudget = 0;
-            if (sections[key]) {
-                baseBudget = typeof sections[key] === 'object' 
-                    ? Number(sections[key].amt || sections[key].amount || 0)
-                    : Number(sections[key] || 0);
-            }
-            if (baseBudget === 0 && pendingAmt > 0) {
-                triggersRisk = true; 
-            }
-        }
-    });
-
-    // Jika melepasi Syarat 1, terus set sebagai risiko deficit
-    if (triggersRisk) return true;
-
-    // SYARAT 2: Jika penggunaan provisional (Interim + WO Baru) melebihi peruntukan bajet asal (BURST!)
-    if (totalProvisionalBudget > 0 && totalProvisionalUsed > totalProvisionalBudget) {
-        return true;
-    }
-
-    // Semakan tarikh biasa hanya terpakai jika kontrak masih sihat/belum bocor
-    const hariIni = new Date();
-    const end = new Date(c.contract_end);
-    if (end < hariIni) return false;
-
-    return false;
+    // Risiko dicetuskan jika jumlah penggunaan Provisional Sum melebihi bajet berjadual semasa
+    return (used + unmappedWOTotal) > plannedTotalToDate;
 }
 
 /* ── CREATE WHEEL ── */
