@@ -1402,6 +1402,37 @@ function getActiveVO(voBreakdown, cutoffDate){
 // ============================
 // BLUEFORM DATA — single WO
 // ============================
+// ============================================================
+// HELPER: susun WO ikut kronologi penuh
+// qpb_date → created_at → district priority → sequence_no
+// ============================================================
+function sortWOChronological(woArray, districtPriority) {
+    return [...woArray].sort((a, b) => {
+        // 1. qpb_date
+        const d1 = new Date(a.qpb_date || "1900-01-01");
+        const d2 = new Date(b.qpb_date || "1900-01-01");
+        if (d1.getTime() !== d2.getTime()) return d1 - d2;
+
+        // 2. created_at
+        const t1 = new Date(a.created_at || "1900-01-01");
+        const t2 = new Date(b.created_at || "1900-01-01");
+        if (t1.getTime() !== t2.getTime()) return t1 - t2;
+
+        // 3. district priority (ikut susunan dalam contract.area_code / districtPriority)
+        const aDistrict = (a.district || '').toUpperCase().trim();
+        const bDistrict = (b.district || '').toUpperCase().trim();
+        const aRank = districtPriority[aDistrict] ?? 999;
+        const bRank = districtPriority[bDistrict] ?? 999;
+        if (aRank !== bRank) return aRank - bRank;
+
+        // 4. sequence_no
+        return (a.sequence_no || '').localeCompare(b.sequence_no || '');
+    });
+}
+
+// ============================================================
+// BLUEFORM DATA — single WO
+// ============================================================
 async function buildBlueformData(id, sharedData = null) {
 
     const res = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}&select=*,contract(*,units(unit_name))`, { headers });
@@ -1417,11 +1448,11 @@ async function buildBlueformData(id, sharedData = null) {
     let provisionalExtra = Number(data.additional || 0);
     let totalWorkValue = totalSection + provisionalExtra;
 
-    let allInterims, allWO, localAreaPriority;
-    if(sharedData){
+    let allInterims, allWO, localDistrictPriority;
+    if (sharedData) {
         allInterims = sharedData.allInterims;
-        allWO = [...sharedData.allWO];
-        localAreaPriority = sharedData.localAreaPriority;
+        allWO = sharedData.allWO;
+        localDistrictPriority = sharedData.localDistrictPriority;
     } else {
         const [interimRes, woRes, areaRes] = await Promise.all([
             fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=date_received.asc`, { headers }),
@@ -1431,137 +1462,159 @@ async function buildBlueformData(id, sharedData = null) {
         allInterims = await interimRes.json();
         allWO = await woRes.json();
         const areaRows = await areaRes.json();
-        localAreaPriority = {};
-        (areaRows[0]?.area_code || '').split(',').map(a => a.trim().toUpperCase()).filter(a => a.length > 0)
-            .forEach((a, i) => { localAreaPriority[a] = i + 1; });
+
+        // district priority dari area_code dalam contract (cth: "SEGAMAT,MUAR,BATU PAHAT,KLUANG,MERSING")
+        localDistrictPriority = {};
+        (areaRows[0]?.area_code || '').split(',')
+            .map(a => a.trim().toUpperCase())
+            .filter(a => a.length > 0)
+            .forEach((a, i) => { localDistrictPriority[a] = i + 1; });
     }
 
-    let cutoffDate = new Date(data.qpb_date);
-    if(data.status === "Claimed"){
-        for(const int of allInterims){
-            const cat = int.claim_breakdown || {};
-            const found = Object.values(cat).some(sec => Number(sec?.work_order_id) === Number(data.id));
-            if(found){ cutoffDate = new Date(int.date_received); break; }
-        }
-    }
+    // Susun semua WO ikut kronologi penuh
+    const sortedAllWO = sortWOChronological(allWO, localDistrictPriority);
 
-    // SUSUN DATA KONTRAK TERDAHULU (QUEUE) IKUT QPB_DATE -> CREATED_AT -> SEQUENCE_NO
-    allWO.sort((a, b) => {
-        const d1 = new Date(a.qpb_date || "1900-01-01");
-        const d2 = new Date(b.qpb_date || "1900-01-01");
-        if (d1.getTime() !== d2.getTime()) return d1 - d2;
+    // Tentukan cutoff — tarikh WO semasa
+    const cutoffDate = new Date(data.qpb_date);
 
-        const t1 = new Date(a.created_at || "1900-01-01");
-        const t2 = new Date(b.created_at || "1900-01-01");
-        if (t1.getTime() !== t2.getTime()) return t1 - t2;
-
-        return (a.sequence_no || '').localeCompare(b.sequence_no || '');
-    });
+    // ── KIRA sectionUsed ──────────────────────────────────────
+    // PERATURAN:
+    // 1. Interim claims yang date_received <= cutoffDate → tolak terus
+    // 2. Work orders yang:
+    //    - BUKAN dalam kumpulan semasa (id != data.id)
+    //    - BUKAN sudah Claimed (ada interim_no) ← ini yang selalu tersilap
+    //    - Datang SEBELUM WO semasa dalam susunan kronologi
+    //    → tolak dari baki
+    // 3. WO semasa sendiri → tolak
+    //
+    // WO yang sudah Claimed TIDAK perlu ditolak semula kerana
+    // nilai mereka sudah ditolak melalui interim claim (langkah 1).
+    // ─────────────────────────────────────────────────────────
 
     let sectionUsed = {};
     let totalSalvage = 0, totalPG = 0, totalTax = 0;
-    let timeline = [];
 
+    // LANGKAH 1: Interim claims
     allInterims.forEach(int => {
         const intDate = new Date(int.date_received);
-        if(intDate > cutoffDate) return;
-        const salvage = Number(int.salvage_value || 0);
-        const pg = Number(int.performance_guarantee_sum || 0);
-        const tax = Number(int.tax || 0);
-        totalSalvage += salvage;
-        totalPG += pg;
-        totalTax += tax;
+        if (intDate > cutoffDate) return; // Hanya ambil interim sebelum/sama cutoff
+
+        totalSalvage += Number(int.salvage_value || 0);
+        totalPG += Number(int.performance_guarantee_sum || 0);
+        totalTax += Number(int.tax || 0);
+
         const cat = int.claim_breakdown || {};
-        let amt = 0;
-        Object.values(cat).forEach(s => { amt += Number(s?.amt || s?.amount || s?.value || 0); });
-        timeline.push({ type:'INTERIM', date:int.date_received, amount:amt, salvage, pg, tax });
         Object.keys(cat).forEach(sec => {
             const val = Number(cat[sec]?.amt || cat[sec]?.amount || cat[sec]?.value || 0);
-            if(!sectionUsed[sec]) sectionUsed[sec] = 0;
+            if (!sectionUsed[sec]) sectionUsed[sec] = 0;
             sectionUsed[sec] += val;
         });
     });
 
-    const currentWOIndex = allWO.findIndex(w => Number(w.id) === Number(data.id));
-
-    allWO.forEach((wo, index) => {
-        if (wo.status === "Claimed") return;
-        if (Number(wo.id) === Number(data.id)) return;
-
-        if (index < currentWOIndex) {
-            timeline.push({
-                type: 'WORKORDER',
-                date: wo.qpb_date,
-                amount: Number(wo.amount_spent || 0)
-            });
-            const cat = wo.section_category || {};
-            Object.keys(cat).forEach(sec => {
-                const amt = Number(cat[sec]?.amt || 0);
-                if(!sectionUsed[sec]) sectionUsed[sec] = 0;
-                sectionUsed[sec] += amt;
-            });
-            const add = Number(wo.additional || 0);
-            if(add > 0){
-                if(!sectionUsed["PROVISIONAL SUM"]) sectionUsed["PROVISIONAL SUM"] = 0;
-                sectionUsed["PROVISIONAL SUM"] += add;
-            }
+    // Kumpulkan work_order_ids yang sudah di-claim oleh interim (date_received <= cutoffDate)
+    // Supaya kita TIDAK tolak mereka lagi sebagai "pending WO"
+    const claimedByInterimIds = new Set();
+    allInterims.forEach(int => {
+        const intDate = new Date(int.date_received);
+        if (intDate > cutoffDate) return;
+        const cat = int.claim_breakdown || {};
+        Object.values(cat).forEach(sec => {
+            if (sec?.work_order_id) claimedByInterimIds.add(Number(sec.work_order_id));
+        });
+        // Sokongan format lama — jika interim menyimpan array wo_ids
+        if (Array.isArray(int.work_order_ids)) {
+            int.work_order_ids.forEach(wid => claimedByInterimIds.add(Number(wid)));
         }
     });
 
+    // Indeks WO semasa dalam susunan kronologi
+    const currentWOIndex = sortedAllWO.findIndex(w => Number(w.id) === Number(data.id));
+
+    // LANGKAH 2: WO pending (belum claimed) yang datang SEBELUM WO semasa
+    sortedAllWO.forEach((wo, index) => {
+        const woId = Number(wo.id);
+
+        if (woId === Number(data.id)) return;           // skip WO semasa
+        if (claimedByInterimIds.has(woId)) return;      // skip — dah dalam interim
+        if (wo.interim_no) return;                       // skip — dah claimed (ada interim_no)
+        if (wo.status === 'CANCEL') return;              // skip — dibatalkan
+        if (index >= currentWOIndex) return;             // skip — datang selepas WO semasa
+
+        const cat = wo.section_category || {};
+        Object.keys(cat).forEach(sec => {
+            const amt = Number(cat[sec]?.amt || 0);
+            if (!sectionUsed[sec]) sectionUsed[sec] = 0;
+            sectionUsed[sec] += amt;
+        });
+        const add = Number(wo.additional || 0);
+        if (add > 0) {
+            if (!sectionUsed["PROVISIONAL SUM"]) sectionUsed["PROVISIONAL SUM"] = 0;
+            sectionUsed["PROVISIONAL SUM"] += add;
+        }
+    });
+
+    // LANGKAH 3: WO semasa sendiri
     const currentSections = data.section_category || {};
     Object.keys(currentSections).forEach(sec => {
         const amt = Number(currentSections[sec]?.amt || 0);
-        if(!sectionUsed[sec]) sectionUsed[sec] = 0;
+        if (!sectionUsed[sec]) sectionUsed[sec] = 0;
         sectionUsed[sec] += amt;
     });
     const currentAdd = Number(data.additional || 0);
-    if(currentAdd > 0){
-        if(!sectionUsed["PROVISIONAL SUM"]) sectionUsed["PROVISIONAL SUM"] = 0;
+    if (currentAdd > 0) {
+        if (!sectionUsed["PROVISIONAL SUM"]) sectionUsed["PROVISIONAL SUM"] = 0;
         sectionUsed["PROVISIONAL SUM"] += currentAdd;
     }
 
-    timeline.push({
-        type: 'WORKORDER',
-        date: data.qpb_date,
-        amount: totalWorkValue
-    });
-
-    timeline.sort((a, b) => {
-        const d1 = new Date(a.date || "1900-01-01");
-        const d2 = new Date(b.date || "1900-01-01");
-        if(d1.getTime() !== d2.getTime()) return d1 - d2;
-        if(a.type !== b.type) return a.type === 'INTERIM' ? -1 : 1;
-        return 0;
-    });
-
+    // Kira VO aktif pada tarikh WO semasa
     const voBreakdown = c.vo_breakdown || {};
-    const cutoffForVO = new Date(data.qpb_date);
-    const activeVO = getActiveVO(voBreakdown, cutoffForVO);
-
+    const activeVO = getActiveVO(voBreakdown, cutoffDate);
     let totalActiveVO = 0;
     Object.values(activeVO).forEach(vo => { totalActiveVO += Number(vo.amt || 0); });
 
+    // Kira baki kontrak
     let bakiKontrak = Number(c.contract_sum || 0) + totalActiveVO;
-    timeline.forEach(t => {
-        if(t.type === 'INTERIM'){
-            bakiKontrak -= t.amount;
-            bakiKontrak += (t.salvage || 0);
-            bakiKontrak += (t.pg || 0);
-            bakiKontrak -= (t.tax || 0);
-        } else if(t.type === 'WORKORDER'){
-            bakiKontrak -= t.amount;
-        }
+
+    // Tolak semua interim (dalam cutoff)
+    allInterims.forEach(int => {
+        const intDate = new Date(int.date_received);
+        if (intDate > cutoffDate) return;
+        let amt = 0;
+        Object.values(int.claim_breakdown || {}).forEach(s => {
+            amt += Number(s?.amt || s?.amount || s?.value || 0);
+        });
+        bakiKontrak -= amt;
+        bakiKontrak += Number(int.salvage_value || 0);
+        bakiKontrak += Number(int.performance_guarantee_sum || 0);
+        bakiKontrak -= Number(int.tax || 0);
     });
 
-    return { data, c, b, s, totalWorkValue, provisionalExtra,
-             sectionUsed, totalSalvage, totalPG, totalTax,
-             bakiKontrak, voBreakdown, activeVO };
+    // Tolak WO pending sebelum dan termasuk WO semasa
+    sortedAllWO.forEach((wo, index) => {
+        const woId = Number(wo.id);
+        if (claimedByInterimIds.has(woId)) return; // dah dikira dalam interim
+        if (wo.interim_no) return;                  // dah claimed
+        if (wo.status === 'CANCEL') return;
+        if (index > currentWOIndex) return;         // selepas WO semasa
+
+        bakiKontrak -= Number(wo.amount_spent || 0);
+    });
+
+    return {
+        data, c, b, s,
+        totalWorkValue, provisionalExtra,
+        sectionUsed,
+        totalSalvage, totalPG, totalTax,
+        bakiKontrak,
+        voBreakdown, activeVO
+    };
 }
 
-// ============================
+// ============================================================
 // BLUEFORM DATA — group (multiple IDs, sequence_no sama)
-// ============================
+// ============================================================
 async function buildBlueformDataGroup(ids, sharedData = null) {
+
     const woResults = await Promise.all(
         ids.map(id =>
             fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}&select=*,contract(*,units(unit_name))`, { headers })
@@ -1573,13 +1626,14 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
     const c = primaryWO.contract;
     const b = c.contract_sections_breakdown || {};
 
+    // Gabungkan sections dari semua WO dalam group
     const combinedSections = {};
     let combinedProvisional = 0;
     woResults.forEach(wo => {
         const s = wo.section_category || {};
         Object.keys(s).forEach(sec => {
             const amt = Number(s[sec]?.amt || 0);
-            if(!combinedSections[sec]) combinedSections[sec] = { amt: 0 };
+            if (!combinedSections[sec]) combinedSections[sec] = { amt: 0 };
             combinedSections[sec].amt += amt;
         });
         combinedProvisional += Number(wo.additional || 0);
@@ -1594,11 +1648,11 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
     const combinedLocation = uniqueLocations.join(', ');
     const combinedDesc = woResults.map(w => w.description).join(' + ');
 
-    let allInterims, allWO, localAreaPriority;
-    if(sharedData){
+    let allInterims, allWO, localDistrictPriority;
+    if (sharedData) {
         allInterims = sharedData.allInterims;
-        allWO = [...sharedData.allWO];
-        localAreaPriority = sharedData.localAreaPriority;
+        allWO = sharedData.allWO;
+        localDistrictPriority = sharedData.localDistrictPriority;
     } else {
         const [interimRes, woRes, areaRes] = await Promise.all([
             fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=date_received.asc`, { headers }),
@@ -1608,106 +1662,132 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
         allInterims = await interimRes.json();
         allWO = await woRes.json();
         const areaRows = await areaRes.json();
-        localAreaPriority = {};
-        (areaRows[0]?.area_code || '').split(',').map(a => a.trim().toUpperCase()).filter(a => a.length > 0)
-            .forEach((a, i) => { localAreaPriority[a] = i + 1; });
+        localDistrictPriority = {};
+        (areaRows[0]?.area_code || '').split(',')
+            .map(a => a.trim().toUpperCase())
+            .filter(a => a.length > 0)
+            .forEach((a, i) => { localDistrictPriority[a] = i + 1; });
     }
 
-    const groupIds = ids.map(Number);
+    const groupIds = new Set(ids.map(Number));
+
+    // Susun semua WO ikut kronologi penuh
+    const sortedAllWO = sortWOChronological(allWO, localDistrictPriority);
+
+    // Cutoff = tarikh WO terkemudian dalam group
     const cutoffDate = new Date(Math.max(...woResults.map(wo => new Date(wo.qpb_date))));
 
-    // SUSUN DATA KUMPULAN TERDAHULU (QUEUE) IKUT QPB_DATE -> CREATED_AT -> SEQUENCE_NO
-    allWO.sort((a, b) => {
-        const d1 = new Date(a.qpb_date || "1900-01-01");
-        const d2 = new Date(b.qpb_date || "1900-01-01");
-        if (d1.getTime() !== d2.getTime()) return d1 - d2;
-
-        const t1 = new Date(a.created_at || "1900-01-01");
-        const t2 = new Date(b.created_at || "1900-01-01");
-        if (t1.getTime() !== t2.getTime()) return t1 - t2;
-
-        return (a.sequence_no || '').localeCompare(b.sequence_no || '');
+    // Interim claims dalam cutoff
+    const claimedByInterimIds = new Set();
+    allInterims.forEach(int => {
+        const intDate = new Date(int.date_received);
+        if (intDate > cutoffDate) return;
+        const cat = int.claim_breakdown || {};
+        Object.values(cat).forEach(sec => {
+            if (sec?.work_order_id) claimedByInterimIds.add(Number(sec.work_order_id));
+        });
+        if (Array.isArray(int.work_order_ids)) {
+            int.work_order_ids.forEach(wid => claimedByInterimIds.add(Number(wid)));
+        }
     });
 
     let sectionUsed = {};
     let totalSalvage = 0, totalPG = 0, totalTax = 0;
-    let groupTimeline = [];
 
+    // LANGKAH 1: Interim claims dalam cutoff
     allInterims.forEach(int => {
         const intDate = new Date(int.date_received);
-        if(intDate > cutoffDate) return;
-        let amt = 0;
-        Object.values(int.claim_breakdown||{}).forEach(s => { amt += Number(s?.amt||s?.amount||s?.value||0); });
-        
-        groupTimeline.push({ 
-            type: 'INTERIM', 
-            date: int.date_received, 
-            amount: amt, 
-            salvage: Number(int.salvage_value||0), 
-            pg: Number(int.performance_guarantee_sum||0), 
-            tax: Number(int.tax||0) 
-        });
+        if (intDate > cutoffDate) return;
 
-        Object.keys(int.claim_breakdown || {}).forEach(sec => {
-            const val = Number(int.claim_breakdown[sec]?.amt || 0);
-            if(!sectionUsed[sec]) sectionUsed[sec] = 0;
+        totalSalvage += Number(int.salvage_value || 0);
+        totalPG += Number(int.performance_guarantee_sum || 0);
+        totalTax += Number(int.tax || 0);
+
+        const cat = int.claim_breakdown || {};
+        Object.keys(cat).forEach(sec => {
+            const val = Number(cat[sec]?.amt || cat[sec]?.amount || cat[sec]?.value || 0);
+            if (!sectionUsed[sec]) sectionUsed[sec] = 0;
             sectionUsed[sec] += val;
         });
     });
 
-    const firstGroupIndex = allWO.findIndex(w => groupIds.includes(Number(w.id)));
+    // Indeks WO pertama dalam group (yang paling awal dalam susunan kronologi)
+    const firstGroupIndex = sortedAllWO.findIndex(w => groupIds.has(Number(w.id)));
 
-    allWO.forEach((wo, index) => {
-        if (groupIds.includes(Number(wo.id))) return;
-        if (wo.status === "Claimed") return;
+    // LANGKAH 2: WO pending sebelum group
+    sortedAllWO.forEach((wo, index) => {
+        const woId = Number(wo.id);
 
-        if (index < firstGroupIndex) {
-            groupTimeline.push({ type: 'WORKORDER', date: wo.qpb_date, amount: Number(wo.amount_spent || 0) });
-            
-            const cat = wo.section_category || {};
-            Object.keys(cat).forEach(sec => {
-                const amt = Number(cat[sec]?.amt || 0);
-                if(!sectionUsed[sec]) sectionUsed[sec] = 0;
-                sectionUsed[sec] += amt;
-            });
-            const add = Number(wo.additional || 0);
-            if(add > 0){
-                if(!sectionUsed["PROVISIONAL SUM"]) sectionUsed["PROVISIONAL SUM"] = 0;
-                sectionUsed["PROVISIONAL SUM"] += add;
-            }
-        }
-    });
+        if (groupIds.has(woId)) return;            // skip — ini dalam group
+        if (claimedByInterimIds.has(woId)) return; // skip — dah dalam interim
+        if (wo.interim_no) return;                  // skip — dah claimed
+        if (wo.status === 'CANCEL') return;
+        if (index >= firstGroupIndex) return;       // skip — datang sama/selepas group
 
-    woResults.forEach(wo => {
         const cat = wo.section_category || {};
         Object.keys(cat).forEach(sec => {
             const amt = Number(cat[sec]?.amt || 0);
-            if(!sectionUsed[sec]) sectionUsed[sec] = 0;
+            if (!sectionUsed[sec]) sectionUsed[sec] = 0;
             sectionUsed[sec] += amt;
         });
         const add = Number(wo.additional || 0);
-        if(add > 0){
-            if(!sectionUsed["PROVISIONAL SUM"]) sectionUsed["PROVISIONAL SUM"] = 0;
+        if (add > 0) {
+            if (!sectionUsed["PROVISIONAL SUM"]) sectionUsed["PROVISIONAL SUM"] = 0;
             sectionUsed["PROVISIONAL SUM"] += add;
         }
     });
 
+    // LANGKAH 3: WO dalam group sendiri
+    woResults.forEach(wo => {
+        const cat = wo.section_category || {};
+        Object.keys(cat).forEach(sec => {
+            const amt = Number(cat[sec]?.amt || 0);
+            if (!sectionUsed[sec]) sectionUsed[sec] = 0;
+            sectionUsed[sec] += amt;
+        });
+        const add = Number(wo.additional || 0);
+        if (add > 0) {
+            if (!sectionUsed["PROVISIONAL SUM"]) sectionUsed["PROVISIONAL SUM"] = 0;
+            sectionUsed["PROVISIONAL SUM"] += add;
+        }
+    });
+
+    // VO aktif
     const voBreakdown = c.vo_breakdown || {};
     const activeVO = getActiveVO(voBreakdown, cutoffDate);
+    let totalActiveVO = 0;
+    Object.values(activeVO).forEach(vo => { totalActiveVO += Number(vo.amt || 0); });
 
-    groupTimeline.push({ type: 'WORKORDER', date: cutoffDate, amount: totalWorkValue });
-    groupTimeline.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+    // Kira baki kontrak
+    let bakiKontrak = Number(c.contract_sum || 0) + totalActiveVO;
 
-    let bakiKontrak = Number(c.contract_sum || 0) + Object.values(activeVO).reduce((sum, vo) => sum + Number(vo.amt || 0), 0);
-    groupTimeline.forEach(t => {
-        if(t.type === 'INTERIM'){
-            bakiKontrak -= t.amount;
-            bakiKontrak += (t.salvage || 0);
-            bakiKontrak += (t.pg || 0);
-            bakiKontrak -= (t.tax || 0);
-        } else if(t.type === 'WORKORDER'){
-            bakiKontrak -= t.amount;
-        }
+    // Tolak interim
+    allInterims.forEach(int => {
+        const intDate = new Date(int.date_received);
+        if (intDate > cutoffDate) return;
+        let amt = 0;
+        Object.values(int.claim_breakdown || {}).forEach(s => {
+            amt += Number(s?.amt || s?.amount || s?.value || 0);
+        });
+        bakiKontrak -= amt;
+        bakiKontrak += Number(int.salvage_value || 0);
+        bakiKontrak += Number(int.performance_guarantee_sum || 0);
+        bakiKontrak -= Number(int.tax || 0);
+    });
+
+    // Tolak WO pending sebelum dan termasuk group
+    sortedAllWO.forEach((wo, index) => {
+        const woId = Number(wo.id);
+        if (claimedByInterimIds.has(woId)) return;
+        if (wo.interim_no) return;
+        if (wo.status === 'CANCEL') return;
+
+        // Ambil WO sebelum group DAN WO dalam group sendiri
+        const isInGroup = groupIds.has(woId);
+        const isBeforeGroup = index < firstGroupIndex;
+        if (!isInGroup && !isBeforeGroup) return;
+
+        bakiKontrak -= Number(wo.amount_spent || 0);
     });
 
     const combinedData = {
@@ -1733,6 +1813,54 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
     };
 }
 
+// ============================================================
+// UPDATE: bulkDownloadBlueform — hantar localDistrictPriority
+// ============================================================
+async function bulkDownloadBlueform() {
+    const checked = [...document.querySelectorAll('.bf-checkbox:checked')];
+    if (checked.length === 0) { alert("Sila pilih Blueform."); return; }
+
+    const container = document.getElementById('bulkPagesContainer');
+    container.innerHTML = '';
+    document.getElementById('bulkPreviewCount').innerText = `Memuatkan ${checked.length} blueform...`;
+    document.getElementById('bulkPreviewPage').style.display = 'block';
+
+    const contractId = currentContractId;
+    try {
+        const [interimRes, woRes, areaRes] = await Promise.all([
+            fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=date_received.asc`, { headers }),
+            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}`, { headers }),
+            fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}&select=area_code`, { headers })
+        ]);
+        const allInterims = await interimRes.json();
+        const allWO = await woRes.json();
+        const areaRows = await areaRes.json();
+
+        const localDistrictPriority = {};
+        (areaRows[0]?.area_code || '').split(',')
+            .map(a => a.trim().toUpperCase())
+            .filter(a => a.length > 0)
+            .forEach((a, i) => { localDistrictPriority[a] = i + 1; });
+
+        // Nama field ditukar: localAreaPriority → localDistrictPriority
+        const sharedData = { allInterims, allWO, localDistrictPriority };
+
+        const payloads = await processInBatches(checked, 5, cb => {
+            const idsStr = cb.value;
+            const ids = idsStr.split(',').map(id => id.trim());
+            return ids.length === 1
+                ? buildBlueformData(ids[0], sharedData)
+                : buildBlueformDataGroup(ids, sharedData);
+        });
+
+        container.innerHTML = payloads.map(p => buildBlueformHTML(p)).join('');
+        document.getElementById('bulkPreviewCount').innerText = `${checked.length} Blueform — Sedia untuk Cetak`;
+    } catch (e) {
+        console.error(e);
+        alert("Ralat memuatkan bulk blueform.");
+        document.getElementById('bulkPreviewCount').innerText = 'Ralat memuatkan data.';
+    }
+}
 // ============================
 // BLUEFORM: BUILD HTML STRING
 // ============================
