@@ -636,7 +636,7 @@ function findProvisionalSumKey(breakdown) {
     });
 }
 
-/* ── FIX #1 + #3: getProvisionalSumBalance — tambah VO ke budget ── */
+/* ── KEMASKINI PENUH: getProvisionalSumBalance SEBIJI IKUT buildInterimMatrix ── */
 function getProvisionalSumBalance(c) {
     const breakdown = c.contract_sections_breakdown || {};
     const cache = contractClaimCache[c.id] || { interimUsed: {}, woUsed: {} };
@@ -651,11 +651,12 @@ function getProvisionalSumBalance(c) {
         typeof pSumValue === 'object' ? (pSumValue.amt || pSumValue.amount || 0) : pSumValue
     ) || 0;
 
-    // FIX #1: Tambah VO ke budget — ikut buildInterimMatrix yang
-    // accumulate voContractAmt ke grandTotalContract
+    // Tambah VO ke budget — sebiji ikut logik pengiraan voBreakdown dalam buildInterimMatrix
     let voAmt = 0;
     Object.values(voBreakdown).forEach(vo => {
-        voAmt += Number(vo.breakdown?.[pSumKey]?.amt || 0);
+        if (vo && vo.breakdown && vo.breakdown[pSumKey]) {
+            voAmt += Number(vo.breakdown[pSumKey].amt || 0);
+        }
     });
     const budget = baseAmt + voAmt;
 
@@ -807,25 +808,25 @@ async function loadSections(){
             });
         });
 
-        // ── 2. Accumulate pending WO ──
-        // FIX #2: Buang semakan `wo.interim_no` — ikut buildInterimMatrix yang
-        //         hanya skip status 'Claimed', tidak semak interim_no
-        // FIX #3: Semak hasPSumInCat sebelum accumulate `additional` —
-        //         ikut buildInterimMatrix: `if(sec === pSumKey && !cat["PROVISIONAL SUM"])`
+        // ── 2. Accumulate pending WO (Kemas kini penapisan mengikut buildInterimMatrix) ──
         allWOs.forEach(wo => {
             if (!wo.contract_id) return;
 
-            // Skip jika sudah di-claim — ikut buildInterimMatrix
-            if (wo.status && wo.status.toUpperCase() === "CLAIMED") return;
+            const statusUpper = wo.status ? wo.status.toUpperCase().trim() : "";
 
-            // FIX #2: BUANG baris ini — buildInterimMatrix tidak semak interim_no
-            // if (wo.interim_no) return;
+            // Skip jika sudah di-claim (Sebiji ikut buildInterimMatrix)
+            if (statusUpper === "CLAIMED") return;
+
+            // Skip jika status adalah VO kerana VO ditapis berasingan masuk terus ke kiraan Budget
+            if (statusUpper === "VARIATION ORDER" || statusUpper === "VO") return;
 
             if (!contractClaimCache[wo.contract_id]) {
                 contractClaimCache[wo.contract_id] = { interimUsed: {}, woUsed: {} };
             }
 
-            // section_category — accumulate setiap section
+            const pSumKeyRaw = contractPSumKeyCache[wo.contract_id];
+
+            // Pecahan section_category — accumulate ke seksyen berkaitan
             if (wo.section_category) {
                 Object.entries(wo.section_category).forEach(([s, val]) => {
                     const amt = Number(typeof val === 'object' ? (val.amt || val.amount || 0) : val) || 0;
@@ -836,19 +837,18 @@ async function loadSections(){
                 });
             }
 
-            // FIX #3: additional — hanya accumulate jika section_category
-            //         tiada key "PROVISIONAL SUM" — ikut buildInterimMatrix:
-            //         `if(sec === pSumKey && !cat["PROVISIONAL SUM"])`
+            // Serapan automatic 'additional' jika tiada breakdown khusus "PROVISIONAL SUM"
             const secCat = wo.section_category || {};
             const hasPSumInCat = Object.keys(secCat).some(
-                k => k.toUpperCase().trim() === "PROVISIONAL SUM"
+                k => k.toUpperCase().trim() === (pSumKeyRaw ? pSumKeyRaw.toUpperCase().trim() : "PROVISIONAL SUM")
             );
+            
             const add = Number(wo.additional || 0);
             if (add > 0 && !hasPSumInCat) {
-                const pKey = contractPSumKeyCache[wo.contract_id];
-                if (pKey) {
-                    contractClaimCache[wo.contract_id].woUsed[pKey] =
-                        (contractClaimCache[wo.contract_id].woUsed[pKey] || 0) + add;
+                if (pSumKeyRaw) {
+                    const pKeyUpper = pSumKeyRaw.toUpperCase().trim();
+                    contractClaimCache[wo.contract_id].woUsed[pKeyUpper] =
+                        (contractClaimCache[wo.contract_id].woUsed[pKeyUpper] || 0) + add;
                 }
             }
         });
