@@ -1431,6 +1431,31 @@ function sortWOChronological(woArray, districtPriority) {
 }
 
 // ============================================================
+// BUILD INTERIM DATE LOOKUP (interim_no -> date_received)
+// ============================================================
+function buildInterimDateMap(allInterims){
+    const map = new Map();
+    (allInterims || []).forEach(int => {
+        if (int && int.interim_no !== undefined && int.interim_no !== null) {
+            map.set(String(int.interim_no), new Date(int.date_received || "1900-01-01"));
+        }
+    });
+    return map;
+}
+
+// Tentukan sama ada sebuah WO sudah "settled" PADA cutoffDate tertentu.
+// WO dianggap settled hanya jika ia mempunyai interim_no DAN interim
+// berkenaan punya date_received <= cutoffDate. Jika interim_no tiada,
+// atau date_received interim itu > cutoffDate (claim belum wujud lagi
+// pada masa cutoff), WO tetap dikira PENDING dan kena ditolak ke baki.
+function isWOSettledAtCutoff(wo, interimDateMap, cutoffDate){
+    if (!wo.interim_no) return false;
+    const claimDate = interimDateMap.get(String(wo.interim_no));
+    if (!claimDate) return false; // tak jumpa rekod interim -> anggap belum settled
+    return claimDate.getTime() <= cutoffDate.getTime();
+}
+
+// ============================================================
 // BLUEFORM DATA — single WO
 // ============================================================
 async function buildBlueformData(id, sharedData = null) {
@@ -1477,18 +1502,26 @@ async function buildBlueformData(id, sharedData = null) {
     // Tentukan cutoff — tarikh WO semasa
     const cutoffDate = new Date(data.qpb_date);
 
+    // Peta interim_no -> date_received, untuk tentukan settle status sebenar WO lain
+    const interimDateMap = buildInterimDateMap(allInterims);
+
     // ── KIRA sectionUsed ──────────────────────────────────────
-    // PERATURAN:
+    // PERATURAN (DIKEMASKINI):
     // 1. Interim claims yang date_received <= cutoffDate → tolak terus
     // 2. Work orders yang:
     //    - BUKAN dalam kumpulan semasa (id != data.id)
-    //    - BUKAN sudah Claimed (ada interim_no) ← ini yang selalu tersilap
+    //    - BUKAN settled pada cutoffDate ini (lihat isWOSettledAtCutoff —
+    //      iaitu TIDAK cukup sekadar ada interim_no; interim berkaitan
+    //      mesti date_received <= cutoffDate WO semasa)
     //    - Datang SEBELUM WO semasa dalam susunan kronologi
     //    → tolak dari baki
     // 3. WO semasa sendiri → tolak
     //
-    // WO yang sudah Claimed TIDAK perlu ditolak semula kerana
-    // nilai mereka sudah ditolak melalui interim claim (langkah 1).
+    // NOTA PENTING: WO yang ada interim_no TAPI interim tersebut
+    // date_received-nya SELEPAS cutoffDate WO semasa, ATAU yang
+    // claim_breakdown interim itu tidak merekodkan work_order_id-nya,
+    // TETAP dianggap pending pada cutoff ini dan WAJIB ditolak di sini —
+    // supaya nilainya tidak "hilang" terus dari pengiraan baki.
     // ─────────────────────────────────────────────────────────
 
     let sectionUsed = {};
@@ -1511,8 +1544,8 @@ async function buildBlueformData(id, sharedData = null) {
         });
     });
 
-    // Kumpulkan work_order_ids yang sudah di-claim oleh interim (date_received <= cutoffDate)
-    // Supaya kita TIDAK tolak mereka lagi sebagai "pending WO"
+    // Kumpulkan work_order_ids yang sudah di-claim DALAM claim_breakdown
+    // (dipakai sekadar untuk elak double-count — BUKAN untuk keputusan skip)
     const claimedByInterimIds = new Set();
     allInterims.forEach(int => {
         const intDate = new Date(int.date_received);
@@ -1530,15 +1563,24 @@ async function buildBlueformData(id, sharedData = null) {
     // Indeks WO semasa dalam susunan kronologi
     const currentWOIndex = sortedAllWO.findIndex(w => Number(w.id) === Number(data.id));
 
-    // LANGKAH 2: WO pending (belum claimed) yang datang SEBELUM WO semasa
+    // LANGKAH 2: WO pending (belum settled PADA cutoffDate ini) yang datang SEBELUM WO semasa
     sortedAllWO.forEach((wo, index) => {
         const woId = Number(wo.id);
 
         if (woId === Number(data.id)) return;           // skip WO semasa
-        if (claimedByInterimIds.has(woId)) return;      // skip — dah dalam interim
-        if (wo.interim_no) return;                       // skip — dah claimed (ada interim_no)
         if (wo.status === 'CANCEL') return;              // skip — dibatalkan
         if (index >= currentWOIndex) return;             // skip — datang selepas WO semasa
+
+        // Settle status kini ditentukan berasaskan TARIKH interim sebenar,
+        // bukan sekadar kewujudan wo.interim_no.
+        const settled = isWOSettledAtCutoff(wo, interimDateMap, cutoffDate);
+        if (settled && claimedByInterimIds.has(woId)) return; // sudah betul² dikira dalam Langkah 1, elak double-count
+        if (settled && !claimedByInterimIds.has(woId)) {
+            // Settled dari segi tarikh, tapi claim_breakdown tak rekod work_order_id-nya.
+            // Tolak di sini sebagai fallback supaya nilainya tidak hilang dari baki.
+        }
+        // Jika tidak settled (interim_no tiada, atau date_received > cutoffDate) —
+        // WO ini masih pending pada cutoff ini, kena tolak.
 
         const cat = wo.section_category || {};
         Object.keys(cat).forEach(sec => {
@@ -1590,12 +1632,17 @@ async function buildBlueformData(id, sharedData = null) {
     });
 
     // Tolak WO pending sebelum dan termasuk WO semasa
+    // (guna logik settle berasaskan tarikh yang sama seperti Langkah 2)
     sortedAllWO.forEach((wo, index) => {
         const woId = Number(wo.id);
-        if (claimedByInterimIds.has(woId)) return; // dah dikira dalam interim
-        if (wo.interim_no) return;                  // dah claimed
         if (wo.status === 'CANCEL') return;
         if (index > currentWOIndex) return;         // selepas WO semasa
+
+        if (woId !== Number(data.id)) {
+            const settled = isWOSettledAtCutoff(wo, interimDateMap, cutoffDate);
+            if (settled && claimedByInterimIds.has(woId)) return; // dah dikira dalam interim, elak double-count
+            // selain itu (belum settled, ATAU settled tapi tak capture dalam claim_breakdown) — tolak.
+        }
 
         bakiKontrak -= Number(wo.amount_spent || 0);
     });
@@ -1677,6 +1724,9 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
     // Cutoff = tarikh WO terkemudian dalam group
     const cutoffDate = new Date(Math.max(...woResults.map(wo => new Date(wo.qpb_date))));
 
+    // Peta interim_no -> date_received
+    const interimDateMap = buildInterimDateMap(allInterims);
+
     // Interim claims dalam cutoff
     const claimedByInterimIds = new Set();
     allInterims.forEach(int => {
@@ -1714,15 +1764,17 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
     // Indeks WO pertama dalam group (yang paling awal dalam susunan kronologi)
     const firstGroupIndex = sortedAllWO.findIndex(w => groupIds.has(Number(w.id)));
 
-    // LANGKAH 2: WO pending sebelum group
+    // LANGKAH 2: WO pending (belum settled PADA cutoffDate ini) sebelum group
     sortedAllWO.forEach((wo, index) => {
         const woId = Number(wo.id);
 
         if (groupIds.has(woId)) return;            // skip — ini dalam group
-        if (claimedByInterimIds.has(woId)) return; // skip — dah dalam interim
-        if (wo.interim_no) return;                  // skip — dah claimed
         if (wo.status === 'CANCEL') return;
         if (index >= firstGroupIndex) return;       // skip — datang sama/selepas group
+
+        const settled = isWOSettledAtCutoff(wo, interimDateMap, cutoffDate);
+        if (settled && claimedByInterimIds.has(woId)) return; // sudah dikira dalam Langkah 1, elak double-count
+        // selain itu — belum settled (atau settled tapi tak capture dalam claim_breakdown) — tolak.
 
         const cat = wo.section_category || {};
         Object.keys(cat).forEach(sec => {
@@ -1776,16 +1828,20 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
     });
 
     // Tolak WO pending sebelum dan termasuk group
+    // (guna logik settle berasaskan tarikh yang sama seperti Langkah 2)
     sortedAllWO.forEach((wo, index) => {
         const woId = Number(wo.id);
-        if (claimedByInterimIds.has(woId)) return;
-        if (wo.interim_no) return;
         if (wo.status === 'CANCEL') return;
 
         // Ambil WO sebelum group DAN WO dalam group sendiri
         const isInGroup = groupIds.has(woId);
         const isBeforeGroup = index < firstGroupIndex;
         if (!isInGroup && !isBeforeGroup) return;
+
+        if (!isInGroup) {
+            const settled = isWOSettledAtCutoff(wo, interimDateMap, cutoffDate);
+            if (settled && claimedByInterimIds.has(woId)) return; // dah dikira dalam interim, elak double-count
+        }
 
         bakiKontrak -= Number(wo.amount_spent || 0);
     });
