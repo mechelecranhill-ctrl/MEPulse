@@ -1052,9 +1052,12 @@ document.getElementById('tableSearch').addEventListener('keyup', debounce(functi
                 const d1 = new Date(a.qpb_date || "1900-01-01");
                 const d2 = new Date(b.qpb_date || "1900-01-01");
                 if(d1.getTime() !== d2.getTime()) return d1 - d2;
-                const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
-                const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
-                return aSeq - bSeq;
+                
+                const t1 = new Date(a.created_at || "1900-01-01");
+                const t2 = new Date(b.created_at || "1900-01-01");
+                if(t1.getTime() !== t2.getTime()) return t1 - t2;
+
+                return (a.sequence_no || '').localeCompare(b.sequence_no || '');
             });
             renderTable(sorted,false);
         } else {
@@ -1072,9 +1075,12 @@ document.getElementById('tableSearch').addEventListener('keyup', debounce(functi
             const d1 = new Date(a.qpb_date || "1900-01-01");
             const d2 = new Date(b.qpb_date || "1900-01-01");
             if(d1.getTime() !== d2.getTime()) return d1 - d2;
-            const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
-            const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
-            return aSeq - bSeq;
+            
+            const t1 = new Date(a.created_at || "1900-01-01");
+            const t2 = new Date(b.created_at || "1900-01-01");
+            if(t1.getTime() !== t2.getTime()) return t1 - t2;
+
+            return (a.sequence_no || '').localeCompare(b.sequence_no || '');
         });
         renderTable(filteredWorks,false);
     } else {
@@ -1129,9 +1135,16 @@ function sortWorkOrders(data, areaPriority){
         const aRank = areaPriority[aArea] ?? 999;
         const bRank = areaPriority[bArea] ?? 999;
         if(aRank !== bRank) return aRank - bRank;
-        const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
-        const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
-        return aSeq - bSeq;
+        
+        const d1 = new Date(a.qpb_date || "1900-01-01");
+        const d2 = new Date(b.qpb_date || "1900-01-01");
+        if(d1.getTime() !== d2.getTime()) return d1 - d2;
+
+        const t1 = new Date(a.created_at || "1900-01-01");
+        const t2 = new Date(b.created_at || "1900-01-01");
+        if(t1.getTime() !== t2.getTime()) return t1 - t2;
+
+        return (a.sequence_no || '').localeCompare(b.sequence_no || '');
     });
 }
 
@@ -1330,9 +1343,12 @@ function filterDistrict(district, el){
             const d1 = new Date(a.qpb_date || "1900-01-01");
             const d2 = new Date(b.qpb_date || "1900-01-01");
             if(d1.getTime() !== d2.getTime()) return d1 - d2;
-            const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
-            const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
-            return aSeq - bSeq;
+            
+            const t1 = new Date(a.created_at || "1900-01-01");
+            const t2 = new Date(b.created_at || "1900-01-01");
+            if(t1.getTime() !== t2.getTime()) return t1 - t2;
+
+            return (a.sequence_no || '').localeCompare(b.sequence_no || '');
         });
         renderTable(sorted, false);
         return;
@@ -1372,9 +1388,6 @@ function formatTarikhBM(dateStr){
     return `${String(d.getDate()).padStart(2,'0')} ${bulan[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-// ============================
-// HELPER: Tapis VO aktif mengikut vo_date <= cutoffDate
-// ============================
 function getActiveVO(voBreakdown, cutoffDate){
     const active = {};
     Object.entries(voBreakdown).forEach(([voName, vo]) => {
@@ -1432,7 +1445,7 @@ async function buildBlueformData(id, sharedData = null) {
         }
     }
 
-    // Susun semua mengikut qpb_date -> created_at -> district priority
+    // SUSUN DATA KONTRAK TERDAHULU (QUEUE) IKUT QPB_DATE -> CREATED_AT -> SEQUENCE_NO
     allWO.sort((a, b) => {
         const d1 = new Date(a.qpb_date || "1900-01-01");
         const d2 = new Date(b.qpb_date || "1900-01-01");
@@ -1442,15 +1455,7 @@ async function buildBlueformData(id, sharedData = null) {
         const t2 = new Date(b.created_at || "1900-01-01");
         if (t1.getTime() !== t2.getTime()) return t1 - t2;
 
-        const aArea = (a.area_code || '').toUpperCase().trim();
-        const bArea = (b.area_code || '').toUpperCase().trim();
-        const aRank = localAreaPriority[aArea] ?? 999;
-        const bRank = localAreaPriority[bArea] ?? 999;
-        if (aRank !== bRank) return aRank - bRank;
-
-        const aSeq = parseInt((a.sequence_no || '').match(/\d+/)?.[0] || 0);
-        const bSeq = parseInt((b.sequence_no || '').match(/\d+/)?.[0] || 0);
-        return aSeq - bSeq;
+        return (a.sequence_no || '').localeCompare(b.sequence_no || '');
     });
 
     let sectionUsed = {};
@@ -1477,14 +1482,12 @@ async function buildBlueformData(id, sharedData = null) {
         });
     });
 
-    // Ambil index WO semasa dalam array yang dah di-sort
     const currentWOIndex = allWO.findIndex(w => Number(w.id) === Number(data.id));
 
     allWO.forEach((wo, index) => {
         if (wo.status === "Claimed") return;
         if (Number(wo.id) === Number(data.id)) return;
 
-        // Hanya kumpul data WO terdahulu yang berada sebelum WO semasa dalam barisan susunan (queue)
         if (index < currentWOIndex) {
             timeline.push({
                 type: 'WORKORDER',
@@ -1505,7 +1508,6 @@ async function buildBlueformData(id, sharedData = null) {
         }
     });
 
-    // Tambah pecahan semasa borang ini
     const currentSections = data.section_category || {};
     Object.keys(currentSections).forEach(sec => {
         const amt = Number(currentSections[sec]?.amt || 0);
@@ -1614,7 +1616,7 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
     const groupIds = ids.map(Number);
     const cutoffDate = new Date(Math.max(...woResults.map(wo => new Date(wo.qpb_date))));
 
-    // Susun mengikut kriteria yang sama untuk kumpulan
+    // SUSUN DATA KUMPULAN TERDAHULU (QUEUE) IKUT QPB_DATE -> CREATED_AT -> SEQUENCE_NO
     allWO.sort((a, b) => {
         const d1 = new Date(a.qpb_date || "1900-01-01");
         const d2 = new Date(b.qpb_date || "1900-01-01");
@@ -1624,13 +1626,7 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
         const t2 = new Date(b.created_at || "1900-01-01");
         if (t1.getTime() !== t2.getTime()) return t1 - t2;
 
-        const aArea = (a.area_code || '').toUpperCase().trim();
-        const bArea = (b.area_code || '').toUpperCase().trim();
-        const aRank = localAreaPriority[aArea] ?? 999;
-        const bRank = localAreaPriority[bArea] ?? 999;
-        if (aRank !== bRank) return aRank - bRank;
-
-        return Number(a.id) - Number(b.id);
+        return (a.sequence_no || '').localeCompare(b.sequence_no || '');
     });
 
     let sectionUsed = {};
@@ -1659,14 +1655,12 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
         });
     });
 
-    // Cari kedudukan indeks pertama ahli kumpulan group ini dalam senarai allWO yang disusun
     const firstGroupIndex = allWO.findIndex(w => groupIds.includes(Number(w.id)));
 
     allWO.forEach((wo, index) => {
         if (groupIds.includes(Number(wo.id))) return;
         if (wo.status === "Claimed") return;
 
-        // Hanya kumpul data WO terdahulu yang berada sebelum kumpulan ini
         if (index < firstGroupIndex) {
             groupTimeline.push({ type: 'WORKORDER', date: wo.qpb_date, amount: Number(wo.amount_spent || 0) });
             
@@ -1992,7 +1986,7 @@ function formatRM(v){
 }
 
 // ============================
-// BUILD INTERIM MATRIX — TIDAK DIUBAH
+// BUILD INTERIM MATRIX
 // ============================
 function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
     const sections = contract.contract_sections_breakdown || {};
