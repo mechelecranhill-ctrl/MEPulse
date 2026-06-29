@@ -2331,43 +2331,6 @@ function toggleAllBF(el){
     document.querySelectorAll('.bf-checkbox').forEach(cb => { cb.checked = el.checked; });
 }
 
-async function bulkDownloadBlueform(){
-    const checked = [...document.querySelectorAll('.bf-checkbox:checked')];
-    if(checked.length === 0){ alert("Sila pilih Blueform."); return; }
-    const container = document.getElementById('bulkPagesContainer');
-    container.innerHTML = '';
-    document.getElementById('bulkPreviewCount').innerText = `Memuatkan ${checked.length} blueform...`;
-    document.getElementById('bulkPreviewPage').style.display = 'block';
-    const contractId = currentContractId;
-    try {
-        const [interimRes, woRes, areaRes] = await Promise.all([
-            fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=date_received.asc`, { headers }),
-            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}`, { headers }),
-            fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}&select=area_code`, { headers })
-        ]);
-        const allInterims = await interimRes.json();
-        const allWO = await woRes.json();
-        const areaRows = await areaRes.json();
-        const localAreaPriority = {};
-        (areaRows[0]?.area_code || '').split(',').map(a => a.trim().toUpperCase()).filter(a => a.length > 0)
-            .forEach((a, i) => { localAreaPriority[a] = i + 1; });
-        const sharedData = { allInterims, allWO, localAreaPriority };
-        const payloads = await processInBatches(checked, 5, cb => {
-            const idsStr = cb.value;
-            const ids = idsStr.split(',').map(id => id.trim());
-            return ids.length === 1
-                ? buildBlueformData(ids[0], sharedData)
-                : buildBlueformDataGroup(ids, sharedData);
-        });
-        container.innerHTML = payloads.map(p => buildBlueformHTML(p)).join('');
-        document.getElementById('bulkPreviewCount').innerText = `${checked.length} Blueform — Sedia untuk Cetak`;
-    } catch(e) {
-        console.error(e);
-        alert("Ralat memuatkan bulk blueform.");
-        document.getElementById('bulkPreviewCount').innerText = 'Ralat memuatkan data.';
-    }
-}
-
 async function processInBatches(items, batchSize, fn){
     const results = [];
     for(let i = 0; i < items.length; i += batchSize){
