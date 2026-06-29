@@ -1182,22 +1182,28 @@ function renderTable(data, showArea = true){
     data.forEach(w => {
         const seq = (w.sequence_no || '').trim();
         if(seq !== ''){
-            if(!seqGroups[seq]) seqGroups[seq] = [];
-            seqGroups[seq].push(w);
+            // Key gabungan district + sequence_no — supaya sequence_no yang
+            // sama dari DISTRICT BERLAINAN tidak digabung sesama sendiri.
+            const district = (w.district || '').trim().toUpperCase();
+            const groupKey = district + '||' + seq;
+            if(!seqGroups[groupKey]) seqGroups[groupKey] = [];
+            seqGroups[groupKey].push(w);
         }
     });
     const processedSeqs = new Set();
     data.forEach(w => {
         const seq = (w.sequence_no || '').trim();
+        const district = (w.district || '').trim().toUpperCase();
+        const groupKey = district + '||' + seq;
         const area = (w.area_code || 'LAIN').toUpperCase();
         if(showArea && area !== currentArea){
             html += `<tr class="area-header"><td colspan="10" style="padding:10px;"><i class="fa fa-layer-group"></i> ${area}</td></tr>`;
             currentArea = area;
         }
-        if(seq !== '' && seqGroups[seq]){
-            if(processedSeqs.has(seq)) return;
-            processedSeqs.add(seq);
-            const group = seqGroups[seq];
+        if(seq !== '' && seqGroups[groupKey]){
+            if(processedSeqs.has(groupKey)) return;
+            processedSeqs.add(groupKey);
+            const group = seqGroups[groupKey];
             const mainW = group[0];
             const allWorkIds = group.map(g => g.work_id).join(', ');
             const uniqueLocations = [...new Set(group.map(g => (g.location || '').trim()).filter(l => l !== ''))];
