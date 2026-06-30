@@ -21,7 +21,7 @@ class AppSidebar extends HTMLElement {
                     <div class="profile-role" id="profRole">${staffRole.toUpperCase()}</div>
                 </div>
                 
-                <a href="sections.html" class="menu-link">Home</a>>
+                <a href="sections.html" class="menu-link">Home</a>
                 <div class="menu-group">
                     <a href="#" class="menu-parent" id="dashboardBtn">
                         Dashboard ▼
