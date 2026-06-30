@@ -11,7 +11,6 @@ const channel = new BroadcastChannel("auth_channel");
    STATE
 ========================= */
 let warningShown = false;
-// BUG FIX: Ambil status expired dari localStorage sekiranya pengguna refresh semasa modal keluar
 let sessionExpired = localStorage.getItem("sessionExpired") === "true";
 
 let countdown = 10;
@@ -39,8 +38,7 @@ async function checkSession() {
         return false;
     }
 
-    // BUG FIX: Jika memang sudah dikesan expired sebelum refresh, terus sekat & tunjuk modal
-    if (sessionExpired) {
+    if (sessionExpired || localStorage.getItem("sessionExpired") === "true") {
         showExpiredModal();
         return false;
     }
@@ -53,33 +51,36 @@ async function checkSession() {
         return false;
     }
 
-    // Sambung aktiviti baru JIKA sesi benar-benar masih sah
     updateActivity();
     return true;
 }
 
 /* =========================
-   ACTIVITY TRACKING
+   ACTIVITY TRACKING (OPTIMIZED WITH THROTTLING)
 ========================= */
+let activityTimeout = null;
 function updateActivity() {
-    if (sessionExpired) return;
-    localStorage.setItem("lastActivity", Date.now());
-    warningShown = false;
+    if (sessionExpired || localStorage.getItem("sessionExpired") === "true") return;
+    
+    // Throttling: Jangan tulis ke localStorage setiap milisaat untuk jimat bateri telefon/PWA
+    if (!activityTimeout) {
+        localStorage.setItem("lastActivity", Date.now());
+        activityTimeout = setTimeout(() => { activityTimeout = null; }, 1000);
+    }
 }
 
-/* Mouse / keyboard activity */
+/* Mouse / keyboard activity with Performance Optimization */
 ["mousemove", "mousedown", "keydown", "touchstart"].forEach(event => {
     document.addEventListener(event, () => {
         lastMouseTime = Date.now();
         updateActivity();
-    }, true);
+    }, { passive: true }); // Menggunakan passive true supaya tatalan skrin telefon pintar tidak sangkut (Smooth Scrolling)
 });
 
 /* =========================
    SCROLL TRACKING (READING MODE)
 ========================= */
 let scrollTimer = null;
-
 window.addEventListener("scroll", () => {
     lastScrollTime = Date.now();
     updateActivity();
@@ -91,11 +92,16 @@ window.addEventListener("scroll", () => {
 }, { passive: true });
 
 /* =========================
-   PWA RESUME FIX
+   PWA & MULTI-TAB RESUME FIX
 ========================= */
 function checkIdleOnResume() {
     if (localStorage.getItem("loggedIn") !== "true") return;
-    if (sessionExpired) return;
+    
+    // Semak state terkini terus dari storage (takut tab lain dah set expired)
+    if (localStorage.getItem("sessionExpired") === "true") {
+        showExpiredModal();
+        return;
+    }
 
     const last = Number(localStorage.getItem("lastActivity")) || 0;
     const idle = Date.now() - last;
@@ -103,7 +109,10 @@ function checkIdleOnResume() {
     if (idle >= SESSION_TIMEOUT) {
         showExpiredModal();
     } else {
-        updateActivity();
+        // Jika tab lain baru sahaja aktif, tutup warning modal jika sedang terbuka di tab ini
+        if (idle < (SESSION_TIMEOUT - WARNING_TIME) && warningShown) {
+            closeWarningModalLocal();
+        }
     }
 }
 
@@ -113,6 +122,16 @@ document.addEventListener("visibilitychange", () => {
 
 window.addEventListener("focus", checkIdleOnResume);
 window.addEventListener("pageshow", checkIdleOnResume);
+
+// BUG FIX MULTI-TAB: Jika pengguna sambung aktiviti di Tab A, Tab B yang terbiar akan tahu secara automatik
+window.addEventListener("storage", (e) => {
+    if (e.key === "lastActivity") {
+        checkIdleOnResume();
+    }
+    if (e.key === "sessionExpired" && e.newValue === "true") {
+        showExpiredModal();
+    }
+});
 
 /* =========================
    USER STATE
@@ -139,26 +158,24 @@ function getUserState() {
 ========================= */
 function showExpiredModal() {
     sessionExpired = true;
-    localStorage.setItem("sessionExpired", "true"); // BUG FIX: Kunci status expired dalam storage
+    localStorage.setItem("sessionExpired", "true"); 
 
-    // Singkirkan modal amaran jika ada
-    const existingWarning = document.getElementById("sessionWarningModal");
-    if (existingWarning) existingWarning.remove();
+    // Tutup amaran amaran lama
+    closeWarningModalLocal();
 
     if (document.getElementById("sessionExpiredModal")) return;
 
     const modal = document.createElement("div");
     modal.id = "sessionExpiredModal";
-
     modal.innerHTML = `
-    <div style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;justify-content:center;align-items:center;z-index:999999;">
-        <div style="width:320px;background:white;border-radius:18px;padding:22px;text-align:center;font-family:system-ui;">
-            <h3 style="color:#1d1d1f;">Session Expired</h3>
-            <p style="margin:12px 0;color:#666;font-size:14px;">
-                Your session has expired due to inactivity.
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;justify-content:center;align-items:center;z-index:999999;backdrop-filter:blur(3px);">
+        <div style="width:320px;background:white;border-radius:18px;padding:22px;text-align:center;font-family:system-ui;box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+            <h3 style="color:#1d1d1f;margin-top:0;">Session Expired</h3>
+            <p style="margin:12px 0 24px 0;color:#666;font-size:14px;line-height:1.4;">
+                Your session has expired due to inactivity. Please log in again.
             </p>
             <button id="loginAgainBtn"
-                style="width:100%;padding:12px;border:none;border-radius:12px;background:#007AFF;color:white;font-weight:700;cursor:pointer;">
+                style="width:100%;padding:12px;border:none;border-radius:12px;background:#007AFF;color:white;font-weight:700;cursor:pointer;font-size:15px;">
                 Login Again
             </button>
         </div>
@@ -175,7 +192,7 @@ function showExpiredModal() {
    WARNING MODAL
 ========================= */
 function showWarning() {
-    if (warningShown || sessionExpired) return;
+    if (warningShown || sessionExpired || localStorage.getItem("sessionExpired") === "true") return;
     warningShown = true;
     countdown = 10;
 
@@ -184,17 +201,16 @@ function showWarning() {
 
     const modal = document.createElement("div");
     modal.id = "sessionWarningModal";
-
     modal.innerHTML = `
-    <div style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;justify-content:center;align-items:center;z-index:999999;">
-        <div style="width:320px;background:white;border-radius:18px;padding:20px;text-align:center;font-family:system-ui;">
-            <h3 style="color:#1d1d1f;">Session Expiring</h3>
-            <p style="margin:6px 0;color:#666;font-size:14px;">You are inactive</p>
-            <p style="font-weight:700;color:#007AFF;margin-bottom:12px;">
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;justify-content:center;align-items:center;z-index:999999;backdrop-filter:blur(3px);">
+        <div style="width:320px;background:white;border-radius:18px;padding:20px;text-align:center;font-family:system-ui;box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+            <h3 style="color:#1d1d1f;margin-top:0;">Session Expiring</h3>
+            <p style="margin:6px 0;color:#666;font-size:14px;">You have been inactive for a while.</p>
+            <p style="font-weight:700;color:#FF3B30;margin-bottom:18px;font-size:16px;">
                 Auto logout in <span id="cd">10</span>s
             </p>
             <button id="extendBtn"
-                style="width:100%;padding:12px;background:#34C759;color:white;border:none;font-weight:700;border-radius:12px;cursor:pointer;">
+                style="width:100%;padding:12px;background:#34C759;color:white;border:none;font-weight:700;border-radius:12px;cursor:pointer;font-size:15px;">
                 Extend Session
             </button>
         </div>
@@ -216,11 +232,26 @@ function showWarning() {
     }, 1000);
 
     modal.querySelector("#extendBtn").onclick = () => {
-        clearInterval(countdownInterval);
-        modal.remove();
-        warningShown = false;
-        updateActivity();
+        // Hubungi tab-tab lain untuk tutup warning modal secara serentak
+        channel.postMessage({ type: "EXTEND_SESSION" });
+        extendSessionLocal();
     };
+}
+
+// Fungsi pembantu untuk tutup/lanjutkan sesi secara lokal pada tab semasa
+function extendSessionLocal() {
+    if (countdownInterval) clearInterval(countdownInterval);
+    const modal = document.getElementById("sessionWarningModal");
+    if (modal) modal.remove();
+    warningShown = false;
+    updateActivity();
+}
+
+function closeWarningModalLocal() {
+    if (countdownInterval) clearInterval(countdownInterval);
+    const modal = document.getElementById("sessionWarningModal");
+    if (modal) modal.remove();
+    warningShown = false;
 }
 
 /* =========================
@@ -229,7 +260,7 @@ function showWarning() {
 function clearAuthStates() {
     localStorage.removeItem("loggedIn");
     localStorage.removeItem("lastActivity");
-    localStorage.removeItem("sessionExpired"); // Reset balik state key ini
+    localStorage.removeItem("sessionExpired");
 }
 
 /* =========================
@@ -245,9 +276,16 @@ function forceLogout(broadcast = true) {
     window.location.replace("login.html");
 }
 
+/* =========================
+   BROADCAST CHANNEL LISTENERS
+========================= */
 channel.onmessage = (e) => {
     if (e.data.type === "LOGOUT") {
         forceLogout(false);
+    }
+    // BUG FIX: Jika pengguna klik 'Extend' di tab sebelah, tab ini pun akan bersihkan modal amaran
+    if (e.data.type === "EXTEND_SESSION") {
+        extendSessionLocal();
     }
 };
 
@@ -255,21 +293,21 @@ channel.onmessage = (e) => {
    MAIN ENGINE LOOP
 ========================= */
 setInterval(() => {
-    if (sessionExpired || localStorage.getItem("loggedIn") !== "true") return;
+    if (sessionExpired || localStorage.getItem("sessionExpired") === "true" || localStorage.getItem("loggedIn") !== "true") return;
 
     const state = getUserState();
     const idle = state.idleTime;
 
-    // warning before timeout
-    if (!state.isReading &&
-        idle > SESSION_TIMEOUT - WARNING_TIME &&
-        !warningShown) {
+    // Warning sebelum timeout
+    if (!state.isReading && idle > (SESSION_TIMEOUT - WARNING_TIME) && !warningShown) {
         showWarning();
     }
 
-    // expired
-    if (!state.isReading &&
-        idle > SESSION_TIMEOUT) {
+    // Expired
+    if (!state.isReading && idle > SESSION_TIMEOUT) {
         showExpiredModal();
     }
 }, CHECK_INTERVAL);
+
+// Jalankan semakan keselamatan sebaik fail ini dimuat turun
+checkSession();
