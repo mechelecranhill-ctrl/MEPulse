@@ -1,55 +1,56 @@
-class AppSidebar extends HTMLElement { 
+class AppSidebar extends HTMLElement {
     connectedCallback() {
         const staffName = localStorage.getItem("staff_name") || "USER";
         const staffRole = localStorage.getItem("role") || "STAFF";
-        const staffAvatar = localStorage.getItem("staff_avatar") || ""; 
+        const staffAvatar = localStorage.getItem("staff_avatar") || "";
 
-        const avatarHtml = staffAvatar 
-            ? `<img src="${staffAvatar}" alt="Profile">` 
+        const avatarHtml = staffAvatar
+            ? `<img src="${staffAvatar}" alt="Profile">`
             : `<i class="fa-solid fa-user-circle"></i>`;
 
         this.innerHTML = `
             <div class="overlay" id="overlay"></div>
 
             <div class="sidebar" id="sidebar">
-                
+
                 <div class="sidebar-profile">
                     <div class="profile-img-wrapper">
                         ${avatarHtml}
                     </div>
-                    <div class="profile-name" id="profName">${staffName.toUpperCase()}</div>
-                    <div class="profile-role" id="profRole">${staffRole.toUpperCase()}</div>
+                    <div class="profile-name">${staffName.toUpperCase()}</div>
+                    <div class="profile-role">${staffRole.toUpperCase()}</div>
                 </div>
-                
-                <a href="sections.html" class="menu-link">Home</a>
+
+                <a href="sections.html" class="menu-link" data-page="home">Home</a>
+
                 <div class="menu-group">
                     <a href="#" class="menu-parent" id="dashboardBtn">
                         Dashboard ▼
                     </a>
-                    
+
                     <div class="submenu" id="dashboardMenu">
-    <a href="#" data-section="Seksyen Selenggara" class="menu-link">
-        Seksyen Selenggara
-    </a>
+                        <a href="#" data-section="Seksyen Selenggara" class="menu-link">
+                            Seksyen Selenggara
+                        </a>
 
-    <a href="#" data-section="Seksyen Pematuhan Peraturan" class="menu-link">
-        Seksyen Pematuhan Peraturan
-    </a>
+                        <a href="#" data-section="Seksyen Pematuhan Peraturan" class="menu-link">
+                            Seksyen Pematuhan Peraturan
+                        </a>
 
-    <a href="#" data-section="Seksyen Pengurusan Aset & Kewangan" class="menu-link">
-        Seksyen Pengurusan Aset & Kewangan 
-    </a>
+                        <a href="#" data-section="Seksyen Pengurusan Aset & Kewangan" class="menu-link">
+                            Seksyen Pengurusan Aset & Kewangan
+                        </a>
 
-    <a href="#" data-section="Seksyen Projek & Perkhidmatan Teknikal" class="menu-link">
-        Seksyen Projek & Perkhidmatan Teknikal
-    </a>
-</div>
+                        <a href="#" data-section="Seksyen Projek & Perkhidmatan Teknikal" class="menu-link">
+                            Seksyen Projek & Perkhidmatan Teknikal
+                        </a>
+                    </div>
                 </div>
 
-<a href="contract-closing.html" class="menu-link">
-    Contract Closing
-</a>
-                
+                <a href="contract-closing.html" class="menu-link" data-page="contract">
+                    Contract Closing
+                </a>
+
                 <a href="#" id="logoutBtn" class="menu-link">Logout</a>
             </div>
 
@@ -77,11 +78,13 @@ class AppSidebar extends HTMLElement {
                         <button class="confirm-btn" id="confirmLogout">Logout</button>
                     </div>
                 </div>
-            </div>`;
+            </div>
+        `;
 
         this.cacheDOM();
         this.bindEvents();
         this.loadDashboardLinks();
+        this.setActiveMenu(); // ⭐ IMPORTANT
     }
 
     cacheDOM() {
@@ -89,11 +92,14 @@ class AppSidebar extends HTMLElement {
         this.overlay = this.querySelector("#overlay");
         this.btn = this.querySelector("#hamburger");
         this.checkbox = this.querySelector("#menuToggle");
-        this.logoutBtn = this.querySelector("#logoutBtn");
 
+        this.logoutBtn = this.querySelector("#logoutBtn");
         this.logoutModal = this.querySelector("#logoutModal");
         this.cancelLogout = this.querySelector("#cancelLogout");
         this.confirmLogout = this.querySelector("#confirmLogout");
+
+        this.menuLinks = this.querySelectorAll(".menu-link");
+        this.subLinks = this.querySelectorAll("#dashboardMenu a[data-section]");
     }
 
     bindEvents() {
@@ -118,33 +124,73 @@ class AppSidebar extends HTMLElement {
                 this.logoutModal.classList.remove("active");
             }
         });
-        
+
         document.addEventListener("keydown", (e) => {
             if (e.key === "Escape") this.close();
         });
     }
 
     async loadDashboardLinks() {
-        const links = this.querySelectorAll("#dashboardMenu a[data-section]");
-        if (!links.length) return;
-
-        // Scoped locally — TIDAK declare di top-level fail
         const sbUrl = "https://ywmsvowroxzhrjwrhsru.supabase.co";
-        const sbKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
+        const sbKey = "YOUR_SUPABASE_KEY";
 
         try {
-            const res = await fetch(`${sbUrl}/rest/v1/me_sections?select=id,section_name`, {
-                headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
-            });
+            const res = await fetch(
+                `${sbUrl}/rest/v1/me_sections?select=id,section_name`,
+                {
+                    headers: {
+                        apikey: sbKey,
+                        Authorization: `Bearer ${sbKey}`
+                    }
+                }
+            );
+
             const sections = await res.json();
 
-            links.forEach(a => {
+            this.subLinks.forEach(a => {
                 const name = a.dataset.section;
                 const sec = sections.find(s => s.section_name === name);
-                if (sec) a.href = `dashboard-contract.html?section=${sec.id}`;
+
+                if (sec) {
+                    a.href = `dashboard-contract.html?section=${sec.id}`;
+                    a.dataset.sectionId = sec.id;
+                }
             });
+
+            this.setActiveMenu(); // re-check after load
         } catch (e) {
             console.error("Error loading dashboard links:", e);
+        }
+    }
+
+    setActiveMenu() {
+        const url = new URL(window.location.href);
+
+        const currentSection = url.searchParams.get("section");
+        const path = window.location.pathname.split("/").pop();
+
+        // reset all
+        this.menuLinks.forEach(el => el.classList.remove("active"));
+        this.subLinks.forEach(el => el.classList.remove("active"));
+
+        // ⭐ HOME / CONTRACT highlight
+        this.menuLinks.forEach(link => {
+            if (link.getAttribute("href") === path) {
+                link.classList.add("active");
+            }
+        });
+
+        // ⭐ SUBMENU highlight by section ID
+        if (currentSection) {
+            this.subLinks.forEach(link => {
+                if (link.dataset.sectionId === currentSection) {
+                    link.classList.add("active");
+
+                    // open submenu automatically
+                    const submenu = this.querySelector("#dashboardMenu");
+                    if (submenu) submenu.classList.add("open");
+                }
+            });
         }
     }
 
@@ -164,11 +210,6 @@ class AppSidebar extends HTMLElement {
         localStorage.clear();
         sessionStorage.clear();
         window.location.replace("login.html");
-    }
-
-    goDashboard() {
-        const section = localStorage.getItem("current_section") || "GENERAL";
-        window.location.href = `dashboard-contract.html?section=${encodeURIComponent(section)}`;
     }
 }
 
