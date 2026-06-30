@@ -225,48 +225,46 @@
             vertical-align: middle;
             transition: all 0.2s ease;
         }
+        
         .tag{
-    padding:5px 10px;
-    border-radius:20px;
-    font-size:10px;
-    font-weight:700;
-    color:white;
-    display:inline-block;
-}
+            padding:5px 10px;
+            border-radius:20px;
+            font-size:10px;
+            font-weight:700;
+            color:white; 
+            display:inline-block;
+        }
 
-/* BLUEFORM */
-.tag.blueform{
-    background:#007AFF20;
-    color:#007AFF;
-}
+        .tag.blueform{
+            background:#007AFF20;
+            color:#007AFF;
+        }
 
-/* APPROVED */
-.tag.approved{
-    background:#34C75920;
-    color:#34C759;
-}
+        .tag.approved{
+            background:#34C75920; 
+            color:#34C759;
+        }
 
-/* INDENT */
-.tag.indent{
-    background:#00000020;
-    color:#000;
-}
-        /* INDENT APPROVED */
-.tag.indentapproved{
-    background:#00000020;
-    color:#000;
-}
+        .tag.indent{
+            background:#00000020;
+            color:#000;
+        }
+      
+        .tag.indentapproved{
+            background:#00000020;
+            color:#000;
+        }
 
-/* CANCEL */
-.tag.cancel{
-    background:#FF3B3020;
-    color:#FF3B30;
-}
+        .tag.cancel{
+            background:#FF3B3020;
+            color:#FF3B30;
+        }
 
-.tag.claimed{
-    background:#34C75920;
-    color:#34C759;
-}
+        .tag.claimed{
+            background:#34C75920;
+            color:#34C759;
+        }
+        
         .bf-baki-table{
             margin-left:35px;
             margin-top:4px;
@@ -418,25 +416,25 @@
             display: none !important; 
         }
 
-@media (max-width:768px){
+        @media (max-width:768px){
 
-    body{
-        flex-direction: column;
-        overflow-x: hidden;
-        overflow-y: auto;
-    }
+            body{
+                flex-direction: column;
+                overflow-x: hidden;  
+                overflow-y: auto; 
+            }
+    
+            .sidebar{
+                width: 100%;
+                height: auto;
+                border-right: none; 
+            }
 
-    .sidebar{
-        width: 100%;
-        height: auto;
-        border-right: none;
-    }
-
-    .main-panel{
-        width: 100%;
-        padding: 10px;
-        overflow-x: auto;
-    }
+            .main-panel{
+                width: 100%;
+                padding: 10px; 
+                overflow-x: auto;
+            }
 
     .glass-card{
         width: 100%;
@@ -555,7 +553,6 @@
         visibility: hidden;
     }
 
-    /* ── BULK PREVIEW PRINT (dikongsi untuk single & bulk) ── */
     #bulkPreviewPage, #bulkPreviewPage * {
         visibility: visible;
     }
@@ -703,9 +700,6 @@
     margin-top:10px;
     text-align:right;
 }
-/* =========================================
-   CONTRACT FINANCIAL TABLE (MODERN COMPACT)
-========================================= */
 
 #interimTable{
     width:100%;
@@ -1405,13 +1399,6 @@ function getActiveVO(voBreakdown, cutoffDate){
     return active;
 }
 
-// ============================
-// BLUEFORM DATA — single WO
-// ============================
-// ============================================================
-// HELPER: susun WO ikut kronologi penuh
-// qpb_date → created_at → district priority → sequence_no
-// ============================================================
 function sortWOChronological(woArray, districtPriority) {
     return [...woArray].sort((a, b) => {
         // 1. qpb_date
@@ -1436,9 +1423,6 @@ function sortWOChronological(woArray, districtPriority) {
     });
 }
 
-// ============================================================
-// BUILD INTERIM DATE LOOKUP (interim_no -> date_received)
-// ============================================================
 function buildInterimDateMap(allInterims){
     const map = new Map();
     (allInterims || []).forEach(int => {
@@ -1449,29 +1433,6 @@ function buildInterimDateMap(allInterims){
     return map;
 }
 
-// ============================================================
-// Tentukan sama ada sebuah WO masih PENDING (belum settle) PADA
-// cutoffDate tertentu.
-//
-// PRINSIP (PENTING):
-// - Jumlah claim SEBENAR bagi WO yang sudah di-attach ke satu interim
-//   HANYA wujud dalam claim_breakdown interim itu (by section) — dan
-//   jumlah ini boleh berbeza daripada jumlah asal WO (section_category).
-//   Oleh itu kita TIDAK BOLEH tolak jumlah asal WO secara individu lagi
-//   apabila WO itu sudah settled — itu akan jadi double-count.
-// - Kerana claim_breakdown tidak semestinya merekod work_order_id bagi
-//   setiap section (jadi kita tak boleh kenal pasti "share" tepat WO
-//   dalam interim itu secara individu), kita TIDAK cuba memadankan WO
-//   kepada baris claim_breakdown. Sebaliknya:
-//     • Jumlah interim (by section) ditolak SEKALI sahaja di Langkah 1,
-//       merangkumi semua WO yang sudah di-attach kepadanya — tak kira
-//       work_order_id direkod atau tidak.
-//     • Di Langkah 2, kita HANYA tolak WO yang MASIH PENDING — iaitu WO
-//       yang tiada interim_no, ATAU interim yang di-attach kepadanya
-//       belum wujud pada cutoffDate ini (date_received > cutoffDate).
-//   Ini mengelakkan double-count tanpa perlu tahu "share" WO dalam
-//   interim secara individu.
-// ============================================================
 function isWOPendingAtCutoff(wo, interimDateMap, cutoffDate){
     if (!wo.interim_no) return true; // tiada interim langsung -> pending
     const claimDate = interimDateMap.get(String(wo.interim_no));
@@ -1479,9 +1440,6 @@ function isWOPendingAtCutoff(wo, interimDateMap, cutoffDate){
     return claimDate.getTime() > cutoffDate.getTime(); // claim belum wujud pada cutoff ini -> pending
 }
 
-// ============================================================
-// BLUEFORM DATA — single WO
-// ============================================================
 async function buildBlueformData(id, sharedData = null) {
 
     const res = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}&select=*,contract(*,units(unit_name))`, { headers });
@@ -1512,7 +1470,6 @@ async function buildBlueformData(id, sharedData = null) {
         allWO = await woRes.json();
         const areaRows = await areaRes.json();
 
-        // district priority dari area_code dalam contract (cth: "SEGAMAT,MUAR,BATU PAHAT,KLUANG,MERSING")
         localDistrictPriority = {};
         (areaRows[0]?.area_code || '').split(',')
             .map(a => a.trim().toUpperCase())
@@ -1520,42 +1477,18 @@ async function buildBlueformData(id, sharedData = null) {
             .forEach((a, i) => { localDistrictPriority[a] = i + 1; });
     }
 
-    // Susun semua WO ikut kronologi penuh
     const sortedAllWO = sortWOChronological(allWO, localDistrictPriority);
 
-    // Tentukan cutoff — tarikh WO semasa
     const cutoffDate = new Date(data.qpb_date);
 
-    // Peta interim_no -> date_received, untuk tentukan status pending sebenar WO lain
     const interimDateMap = buildInterimDateMap(allInterims);
-
-    // ── KIRA sectionUsed ──────────────────────────────────────
-    // PERATURAN (DIKEMASKINI — elak double-count):
-    // 1. Interim claims yang date_received <= cutoffDate → tolak jumlah
-    //    SEBENAR (by section) dari claim_breakdown. Ini merangkumi SEMUA
-    //    WO yang sudah di-attach kepada interim tersebut, walaupun
-    //    work_order_id tiada dalam breakdown — kita tak cuba pecahkan
-    //    balik "share" individu WO, kita ambil terus jumlah interim.
-    // 2. Work orders yang MASIH PENDING pada cutoffDate ini (lihat
-    //    isWOPendingAtCutoff — iaitu tiada interim_no, ATAU interim yang
-    //    di-attach belum wujud lagi pada cutoffDate ini), dan datang
-    //    SEBELUM WO semasa dalam susunan kronologi → tolak jumlah ASAL
-    //    WO tersebut.
-    // 3. WO semasa sendiri → tolak.
-    //
-    // WO yang SUDAH ada interim_no DENGAN interim date_received <=
-    // cutoffDate dianggap SUDAH settle melalui Langkah 1 — dan TIDAK
-    // ditolak lagi secara individu di Langkah 2, supaya tidak double-count
-    // (jumlah claim interim boleh berbeza daripada jumlah asal WO).
-    // ─────────────────────────────────────────────────────────
 
     let sectionUsed = {};
     let totalSalvage = 0, totalPG = 0, totalTax = 0;
 
-    // LANGKAH 1: Interim claims (jumlah sebenar yang dituntut, by section)
     allInterims.forEach(int => {
         const intDate = new Date(int.date_received);
-        if (intDate > cutoffDate) return; // Hanya ambil interim sebelum/sama cutoff
+        if (intDate > cutoffDate) return;
 
         totalSalvage += Number(int.salvage_value || 0);
         totalPG += Number(int.performance_guarantee_sum || 0);
@@ -1569,19 +1502,15 @@ async function buildBlueformData(id, sharedData = null) {
         });
     });
 
-    // Indeks WO semasa dalam susunan kronologi
     const currentWOIndex = sortedAllWO.findIndex(w => Number(w.id) === Number(data.id));
 
-    // LANGKAH 2: WO yang MASIH PENDING pada cutoffDate ini, datang SEBELUM WO semasa
     sortedAllWO.forEach((wo, index) => {
         const woId = Number(wo.id);
 
-        if (woId === Number(data.id)) return;           // skip WO semasa
-        if (wo.status === 'CANCEL') return;              // skip — dibatalkan
-        if (index >= currentWOIndex) return;             // skip — datang selepas WO semasa
+        if (woId === Number(data.id)) return;         
+        if (wo.status === 'CANCEL') return;             
+        if (index >= currentWOIndex) return;            
 
-        // WO yang sudah settle (ada interim_no dengan date_received <= cutoffDate)
-        // SUDAH ditolak melalui jumlah interim di Langkah 1 — jangan tolak lagi.
         if (!isWOPendingAtCutoff(wo, interimDateMap, cutoffDate)) return;
 
         const cat = wo.section_category || {};
@@ -1597,7 +1526,6 @@ async function buildBlueformData(id, sharedData = null) {
         }
     });
 
-    // LANGKAH 3: WO semasa sendiri
     const currentSections = data.section_category || {};
     Object.keys(currentSections).forEach(sec => {
         const amt = Number(currentSections[sec]?.amt || 0);
@@ -1610,16 +1538,13 @@ async function buildBlueformData(id, sharedData = null) {
         sectionUsed["PROVISIONAL SUM"] += currentAdd;
     }
 
-    // Kira VO aktif pada tarikh WO semasa
     const voBreakdown = c.vo_breakdown || {};
     const activeVO = getActiveVO(voBreakdown, cutoffDate);
     let totalActiveVO = 0;
     Object.values(activeVO).forEach(vo => { totalActiveVO += Number(vo.amt || 0); });
 
-    // Kira baki kontrak
     let bakiKontrak = Number(c.contract_sum || 0) + totalActiveVO;
 
-    // Tolak semua interim (dalam cutoff)
     allInterims.forEach(int => {
         const intDate = new Date(int.date_received);
         if (intDate > cutoffDate) return;
@@ -1633,17 +1558,13 @@ async function buildBlueformData(id, sharedData = null) {
         bakiKontrak -= Number(int.tax || 0);
     });
 
-    // Tolak WO pending sebelum dan termasuk WO semasa
-    // (guna logik pending yang sama seperti Langkah 2 — WO yang sudah
-    // settle melalui interim TIDAK ditolak lagi di sini, sebab dah
-    // dikira melalui jumlah interim sebenar di atas)
     sortedAllWO.forEach((wo, index) => {
         const woId = Number(wo.id);
         if (wo.status === 'CANCEL') return;
-        if (index > currentWOIndex) return;         // selepas WO semasa
+        if (index > currentWOIndex) return;        
 
         if (woId !== Number(data.id)) {
-            if (!isWOPendingAtCutoff(wo, interimDateMap, cutoffDate)) return; // dah settle via interim, elak double-count
+            if (!isWOPendingAtCutoff(wo, interimDateMap, cutoffDate)) return; 
         }
 
         bakiKontrak -= Number(wo.amount_spent || 0);
@@ -1659,9 +1580,6 @@ async function buildBlueformData(id, sharedData = null) {
     };
 }
 
-// ============================================================
-// BLUEFORM DATA — group (multiple IDs, sequence_no sama)
-// ============================================================
 async function buildBlueformDataGroup(ids, sharedData = null) {
 
     const woResults = await Promise.all(
@@ -1675,7 +1593,6 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
     const c = primaryWO.contract;
     const b = c.contract_sections_breakdown || {};
 
-    // Gabungkan sections dari semua WO dalam group
     const combinedSections = {};
     let combinedProvisional = 0;
     woResults.forEach(wo => {
@@ -1720,19 +1637,15 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
 
     const groupIds = new Set(ids.map(Number));
 
-    // Susun semua WO ikut kronologi penuh
     const sortedAllWO = sortWOChronological(allWO, localDistrictPriority);
 
-    // Cutoff = tarikh WO terkemudian dalam group
     const cutoffDate = new Date(Math.max(...woResults.map(wo => new Date(wo.qpb_date))));
 
-    // Peta interim_no -> date_received
     const interimDateMap = buildInterimDateMap(allInterims);
 
     let sectionUsed = {};
     let totalSalvage = 0, totalPG = 0, totalTax = 0;
 
-    // LANGKAH 1: Interim claims dalam cutoff (jumlah sebenar yang dituntut, by section)
     allInterims.forEach(int => {
         const intDate = new Date(int.date_received);
         if (intDate > cutoffDate) return;
@@ -1749,19 +1662,15 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
         });
     });
 
-    // Indeks WO pertama dalam group (yang paling awal dalam susunan kronologi)
     const firstGroupIndex = sortedAllWO.findIndex(w => groupIds.has(Number(w.id)));
 
-    // LANGKAH 2: WO yang MASIH PENDING pada cutoffDate ini, sebelum group
     sortedAllWO.forEach((wo, index) => {
         const woId = Number(wo.id);
 
-        if (groupIds.has(woId)) return;            // skip — ini dalam group
+        if (groupIds.has(woId)) return;            
         if (wo.status === 'CANCEL') return;
-        if (index >= firstGroupIndex) return;       // skip — datang sama/selepas group
+        if (index >= firstGroupIndex) return;      
 
-        // WO yang sudah settle melalui interim (date_received <= cutoffDate)
-        // sudah ditolak di Langkah 1 — jangan tolak lagi di sini.
         if (!isWOPendingAtCutoff(wo, interimDateMap, cutoffDate)) return;
 
         const cat = wo.section_category || {};
@@ -1777,7 +1686,6 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
         }
     });
 
-    // LANGKAH 3: WO dalam group sendiri
     woResults.forEach(wo => {
         const cat = wo.section_category || {};
         Object.keys(cat).forEach(sec => {
@@ -1792,16 +1700,13 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
         }
     });
 
-    // VO aktif
     const voBreakdown = c.vo_breakdown || {};
     const activeVO = getActiveVO(voBreakdown, cutoffDate);
     let totalActiveVO = 0;
     Object.values(activeVO).forEach(vo => { totalActiveVO += Number(vo.amt || 0); });
 
-    // Kira baki kontrak
     let bakiKontrak = Number(c.contract_sum || 0) + totalActiveVO;
 
-    // Tolak interim
     allInterims.forEach(int => {
         const intDate = new Date(int.date_received);
         if (intDate > cutoffDate) return;
@@ -1815,20 +1720,16 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
         bakiKontrak -= Number(int.tax || 0);
     });
 
-    // Tolak WO pending sebelum dan termasuk group
-    // (guna logik pending yang sama seperti Langkah 2 — WO yang sudah
-    // settle melalui interim TIDAK ditolak lagi di sini)
     sortedAllWO.forEach((wo, index) => {
         const woId = Number(wo.id);
         if (wo.status === 'CANCEL') return;
 
-        // Ambil WO sebelum group DAN WO dalam group sendiri
         const isInGroup = groupIds.has(woId);
         const isBeforeGroup = index < firstGroupIndex;
         if (!isInGroup && !isBeforeGroup) return;
 
         if (!isInGroup) {
-            if (!isWOPendingAtCutoff(wo, interimDateMap, cutoffDate)) return; // dah settle via interim, elak double-count
+            if (!isWOPendingAtCutoff(wo, interimDateMap, cutoffDate)) return;
         }
 
         bakiKontrak -= Number(wo.amount_spent || 0);
@@ -1857,9 +1758,6 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
     };
 }
 
-// ============================================================
-// UPDATE: bulkDownloadBlueform — hantar localDistrictPriority
-// ============================================================
 async function bulkDownloadBlueform() {
     const checked = [...document.querySelectorAll('.bf-checkbox:checked')];
     if (checked.length === 0) { alert("Sila pilih Blueform."); return; }
@@ -1886,7 +1784,6 @@ async function bulkDownloadBlueform() {
             .filter(a => a.length > 0)
             .forEach((a, i) => { localDistrictPriority[a] = i + 1; });
 
-        // Nama field ditukar: localAreaPriority → localDistrictPriority
         const sharedData = { allInterims, allWO, localDistrictPriority };
 
         const payloads = await processInBatches(checked, 5, cb => {
@@ -1905,9 +1802,7 @@ async function bulkDownloadBlueform() {
         document.getElementById('bulkPreviewCount').innerText = 'Ralat memuatkan data.';
     }
 }
-// ============================
-// BLUEFORM: BUILD HTML STRING
-// ============================
+
 function buildBlueformHTML(payload) {
     const { data, c, b, s, totalWorkValue, provisionalExtra,
             sectionUsed, totalSalvage, totalPG, totalTax,
@@ -2157,9 +2052,6 @@ function formatRM(v){
     return Number(v).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
 }
 
-// ============================
-// BUILD INTERIM MATRIX
-// ============================
 function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
     const sections = contract.contract_sections_breakdown || {};
     const interimCount = interims.length;
