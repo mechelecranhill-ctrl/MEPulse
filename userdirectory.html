@@ -417,54 +417,63 @@ function renderStaff(){
 
 }
 
-async function addStaff(existing = null){
+let editingStaff = null;
 
-    const name = prompt(
-        "STAFF NAME",
-        existing?.name || ''
-    );
-    if(name === null) return;
+function addStaff(existing=null){
 
-    const position = prompt(
-        "POSITION",
-        existing?.position || ''
-    );
-    if(position === null) return;
+    editingStaff = existing;
 
-    const employee_id = prompt(
-        "EMPLOYEE ID",
-        existing?.employee_id || ''
-    );
-    if(employee_id === null) return;
+    document.getElementById("modalTitle").innerText =
+        existing ? "Edit Staff" : "New Staff";
 
-    const phone_no = prompt(
-        "PHONE NO",
-        existing?.phone_no || ''
-    );
-    if(phone_no === null) return;
+    document.getElementById("fName").value =
+        existing?.name || "";
 
-    const email = prompt(
-        "EMAIL",
-        existing?.email || ''
-    );
-    if(email === null) return;
+    document.getElementById("fPosition").value =
+        existing?.position || "";
+
+    document.getElementById("fEmployee").value =
+        existing?.employee_id || "";
+
+    document.getElementById("fPhone").value =
+        existing?.phone_no || "";
+
+    document.getElementById("fEmail").value =
+        existing?.email || "";
+
+    document.getElementById("staffModal").style.display="flex";
+}
+
+function closeModal(){
+    document.getElementById("staffModal").style.display="none";
+}
+
+function editStaff(id){
+
+    const staff = staffData.find(s=>s.id===id);
+
+    if(staff){
+        addStaff(staff);
+    }
+}
+    async function saveStaff(){
+
+    const body = {
+        name:document.getElementById("fName").value,
+        position:document.getElementById("fPosition").value,
+        employee_id:document.getElementById("fEmployee").value,
+        phone_no:document.getElementById("fPhone").value,
+        email:document.getElementById("fEmail").value
+    };
 
     try{
 
-        const body = {
-            name,
-            position,
-            employee_id,
-            phone_no,
-            email
-        };
-
-        if(existing){
+        if(editingStaff){
 
             await fetch(
-                `${SB_URL}/rest/v1/staff?id=eq.${existing.id}`,
+                `${SB_URL}/rest/v1/staff?id=eq.${editingStaff.id}`,
                 {
-                    method:'PATCH',
+                    method:"PATCH",
                     headers,
                     body:JSON.stringify(body)
                 }
@@ -475,7 +484,7 @@ async function addStaff(existing = null){
             await fetch(
                 `${SB_URL}/rest/v1/staff`,
                 {
-                    method:'POST',
+                    method:"POST",
                     headers,
                     body:JSON.stringify(body)
                 }
@@ -483,6 +492,7 @@ async function addStaff(existing = null){
 
         }
 
+        closeModal();
         loadStaff();
 
     }catch(err){
@@ -491,15 +501,6 @@ async function addStaff(existing = null){
 
     }
 
-}
-
-function editStaff(id){
-
-    const staff = staffData.find(s=>s.id===id);
-
-    if(staff){
-        addStaff(staff);
-    }
 }
 
 async function deleteStaff(id, name){
@@ -533,5 +534,49 @@ window.onload = loadStaff;
 
 </script>
 
+        <div id="staffModal" style="display:none;
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.45);
+justify-content:center;
+align-items:center;
+z-index:9999;">
+
+<div style="
+background:#fff;
+width:420px;
+max-width:95%;
+border-radius:20px;
+padding:20px;">
+
+<h3 id="modalTitle">Staff</h3>
+
+<input id="fName" class="search-box" placeholder="Staff Name">
+
+<input id="fPosition" class="search-box" placeholder="Position">
+
+<input id="fEmployee" class="search-box" placeholder="Employee ID">
+
+<input id="fPhone" class="search-box" placeholder="Phone No">
+
+<input id="fEmail" class="search-box" placeholder="Email">
+
+<div style="display:flex;justify-content:flex-end;gap:10px">
+
+<button onclick="closeModal()"
+style="padding:10px 18px;border:none;border-radius:10px;">
+Cancel
+</button>
+
+<button onclick="saveStaff()"
+style="padding:10px 18px;border:none;border-radius:10px;background:#007AFF;color:#fff;">
+Save
+</button>
+
+</div>
+
+</div>
+</div>
+    
 </body>
 </html>
