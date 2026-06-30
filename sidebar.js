@@ -28,19 +28,22 @@ class AppSidebar extends HTMLElement {
                     </a>
                     
                     <div class="submenu" id="dashboardMenu">
-                        <a href="#" data-section="Seksyen Selenggara class="menu-link">
-                            Seksyen Selenggara
-                        </a>
-                        <a href="#" data-section="Seksyen Pematuhan Peraturan class="menu-link">
-                            Seksyen Pematuhan Peraturan
-                        </a>
-                        <a href="#" data-section="Seksyen Pengurusan Aset & Kewangan class="menu-link">
-                            Seksyen Pengurusan Aset & Kewangan 
-                        </a>
-                        <a href="#" data-section="Seksyen Projek & Perkhidmatan Teknikal class="menu-link">
-                            Seksyen Projek & Perkhidmatan Teknikal
-                        </a>
-                    </div>
+    <a href="#" data-section="Seksyen Selenggara" class="menu-link">
+        Seksyen Selenggara
+    </a>
+
+    <a href="#" data-section="Seksyen Pematuhan Peraturan" class="menu-link">
+        Seksyen Pematuhan Peraturan
+    </a>
+
+    <a href="#" data-section="Seksyen Pengurusan Aset & Kewangan" class="menu-link">
+        Seksyen Pengurusan Aset & Kewangan 
+    </a>
+
+    <a href="#" data-section="Seksyen Projek & Perkhidmatan Teknikal" class="menu-link">
+        Seksyen Projek & Perkhidmatan Teknikal
+    </a>
+</div>
                 </div>
 
 <a href="contract-closing.html" class="menu-link">
