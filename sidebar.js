@@ -1,4 +1,4 @@
-class AppSidebar extends HTMLElement { 
+class AppSidebar extends HTMLElement {
     connectedCallback() {
         const staffName = localStorage.getItem("staff_name") || "USER";
         const staffRole = localStorage.getItem("role") || "STAFF";
@@ -21,7 +21,7 @@ class AppSidebar extends HTMLElement {
                     <div class="profile-role">${staffRole.toUpperCase()}</div>
                 </div>
 
-                <a href="sections.html" class="menu-link" data-page="home">Home</a>
+                <a href="sections.html" class="menu-link">Home</a>
 
                 <div class="menu-group">
                     <a href="#" class="menu-parent" id="dashboardBtn">
@@ -29,32 +29,19 @@ class AppSidebar extends HTMLElement {
                     </a>
 
                     <div class="submenu" id="dashboardMenu">
-                        <a href="#" data-section="Seksyen Selenggara" class="menu-link">
-                            Seksyen Selenggara
-                        </a>
-
-                        <a href="#" data-section="Seksyen Pematuhan Peraturan" class="menu-link">
-                            Seksyen Pematuhan Peraturan
-                        </a>
-
-                        <a href="#" data-section="Seksyen Pengurusan Aset & Kewangan" class="menu-link">
-                            Seksyen Pengurusan Aset & Kewangan
-                        </a>
-
-                        <a href="#" data-section="Seksyen Projek & Perkhidmatan Teknikal" class="menu-link">
-                            Seksyen Projek & Perkhidmatan Teknikal
-                        </a>
+                        <a href="#" data-section="Seksyen Selenggara" class="menu-link">Seksyen Selenggara</a>
+                        <a href="#" data-section="Seksyen Pematuhan Peraturan" class="menu-link">Seksyen Pematuhan Peraturan</a>
+                        <a href="#" data-section="Seksyen Pengurusan Aset & Kewangan" class="menu-link">Seksyen Pengurusan Aset & Kewangan</a>
+                        <a href="#" data-section="Seksyen Projek & Perkhidmatan Teknikal" class="menu-link">Seksyen Projek & Perkhidmatan Teknikal</a>
                     </div>
                 </div>
 
-                <a href="contract-closing.html" class="menu-link" data-page="contract">
-                    Contract Closing
-                </a>
+                <a href="contract-closing.html" class="menu-link">Contract Closing</a>
 
                 <a href="#" id="logoutBtn" class="menu-link">Logout</a>
             </div>
 
-            <button class="hamburger" id="hamburger" aria-label="Menu">
+            <button class="hamburger" id="hamburger">
                 <input type="checkbox" id="menuToggle">
                 <svg viewBox="0 0 32 32">
                     <path class="line line-top-bottom"
@@ -72,11 +59,9 @@ class AppSidebar extends HTMLElement {
             <div class="logout-modal" id="logoutModal">
                 <div class="logout-box">
                     <h3>Logout</h3>
-                    <p>Are you sure you want to logout?</p>
-                    <div class="logout-actions">
-                        <button class="cancel-btn" id="cancelLogout">Cancel</button>
-                        <button class="confirm-btn" id="confirmLogout">Logout</button>
-                    </div>
+                    <p>Are you sure?</p>
+                    <button id="cancelLogout">Cancel</button>
+                    <button id="confirmLogout">Logout</button>
                 </div>
             </div>
         `;
@@ -84,7 +69,7 @@ class AppSidebar extends HTMLElement {
         this.cacheDOM();
         this.bindEvents();
         this.loadDashboardLinks();
-        this.setActiveMenu(); // ⭐ IMPORTANT
+        this.setActiveMenu();
     }
 
     cacheDOM() {
@@ -95,8 +80,6 @@ class AppSidebar extends HTMLElement {
 
         this.logoutBtn = this.querySelector("#logoutBtn");
         this.logoutModal = this.querySelector("#logoutModal");
-        this.cancelLogout = this.querySelector("#cancelLogout");
-        this.confirmLogout = this.querySelector("#confirmLogout");
 
         this.menuLinks = this.querySelectorAll(".menu-link");
         this.subLinks = this.querySelectorAll("#dashboardMenu a[data-section]");
@@ -106,23 +89,28 @@ class AppSidebar extends HTMLElement {
         this.btn.addEventListener("click", () => this.toggle());
         this.overlay.addEventListener("click", () => this.close());
 
+        // logout
         this.logoutBtn.addEventListener("click", (e) => {
             e.preventDefault();
             this.logoutModal.classList.add("active");
         });
 
-        this.cancelLogout.addEventListener("click", () => {
+        this.querySelector("#cancelLogout").onclick = () =>
             this.logoutModal.classList.remove("active");
-        });
 
-        this.confirmLogout.addEventListener("click", () => {
-            this.logout();
-        });
+        this.querySelector("#confirmLogout").onclick = () => this.logout();
 
-        this.logoutModal.addEventListener("click", (e) => {
-            if (e.target === this.logoutModal) {
-                this.logoutModal.classList.remove("active");
-            }
+        // 🔥 IMPORTANT: submenu click fix
+        this.subLinks.forEach(link => {
+            link.addEventListener("click", (e) => {
+                e.preventDefault();
+
+                const sectionId = link.dataset.sectionId;
+                if (sectionId) {
+                    window.location.href =
+                        `dashboard-contract.html?section=${sectionId}`;
+                }
+            });
         });
 
         document.addEventListener("keydown", (e) => {
@@ -148,50 +136,42 @@ class AppSidebar extends HTMLElement {
             const sections = await res.json();
 
             this.subLinks.forEach(a => {
-                const name = a.dataset.section;
-                const sec = sections.find(s => s.section_name === name);
+                const match = sections.find(
+                    s => s.section_name === a.dataset.section
+                );
 
-                if (sec) {
-                    a.href = `dashboard-contract.html?section=${sec.id}`;
-                    a.dataset.sectionId = sec.id;
+                if (match) {
+                    a.dataset.sectionId = match.id;
                 }
             });
 
-            this.setActiveMenu(); // re-check after load
         } catch (e) {
-            console.error("Error loading dashboard links:", e);
+            console.error(e);
         }
     }
 
     setActiveMenu() {
         const url = new URL(window.location.href);
-
         const currentSection = url.searchParams.get("section");
+
+        this.subLinks.forEach(link => {
+            link.classList.remove("active");
+
+            if (link.dataset.sectionId === currentSection) {
+                link.classList.add("active");
+
+                const submenu = this.querySelector("#dashboardMenu");
+                submenu?.classList.add("open");
+            }
+        });
+
         const path = window.location.pathname.split("/").pop();
 
-        // reset all
-        this.menuLinks.forEach(el => el.classList.remove("active"));
-        this.subLinks.forEach(el => el.classList.remove("active"));
-
-        // ⭐ HOME / CONTRACT highlight
         this.menuLinks.forEach(link => {
             if (link.getAttribute("href") === path) {
                 link.classList.add("active");
             }
         });
-
-        // ⭐ SUBMENU highlight by section ID
-        if (currentSection) {
-            this.subLinks.forEach(link => {
-                if (link.dataset.sectionId === currentSection) {
-                    link.classList.add("active");
-
-                    // open submenu automatically
-                    const submenu = this.querySelector("#dashboardMenu");
-                    if (submenu) submenu.classList.add("open");
-                }
-            });
-        }
     }
 
     toggle() {
@@ -209,7 +189,7 @@ class AppSidebar extends HTMLElement {
     logout() {
         localStorage.clear();
         sessionStorage.clear();
-        window.location.replace("login.html");
+        window.location.href = "login.html";
     }
 }
 
