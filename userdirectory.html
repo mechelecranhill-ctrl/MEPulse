@@ -259,7 +259,7 @@ async function loadStaff(){
     try{
 
         const res = await fetch(
-            `${SB_URL}/rest/v1/staff?select=id,nama,jawatan,employee_id,password,phone_no,email`,
+            `${SB_URL}/rest/v1/staff?select=id,name,position,employee_id,password,phone_no,email`,
             { headers }
         );
 
@@ -295,20 +295,20 @@ function renderStaff(){
     filtered = filtered.filter(s => {
 
         return (
-            s.nama?.toLowerCase().includes(keyword) ||
-            s.jawatan?.toLowerCase().includes(keyword)
+            s.name?.toLowerCase().includes(keyword) ||
+            s.position?.toLowerCase().includes(keyword)
         );
 
     });
 
     filtered.sort((a,b)=>{
 
-        const ra = hierarki[a.jawatan?.toUpperCase()] || 99;
-        const rb = hierarki[b.jawatan?.toUpperCase()] || 99;
+        const ra = hierarki[a.position?.toUpperCase()] || 99;
+        const rb = hierarki[b.position?.toUpperCase()] || 99;
 
         if(ra !== rb) return ra-rb;
 
-        return a.nama.localeCompare(b.nama);
+        return a.name.localeCompare(b.name);
 
     });
 
@@ -316,35 +316,35 @@ function renderStaff(){
 
     filtered.forEach(s=>{
 
-        const jawatan = s.jawatan?.toUpperCase() || 'LAIN-LAIN';
+        const position = s.position?.toUpperCase() || 'LAIN-LAIN';
 
-        if(!grouped[jawatan]){
-            grouped[jawatan] = [];
+        if(!grouped[position]){
+            grouped[position] = [];
         }
 
-        grouped[jawatan].push(s);
+        grouped[position].push(s);
 
     });
 
     let html = '';
 
-    Object.keys(grouped).forEach(jawatan=>{
+    Object.keys(grouped).forEach(position=>{
 
         html += `
 
         <div class="tree-group">
 
             <div class="tree-title">
-                ${jawatan}
+                ${position}
             </div>
 
             <div class="tree-wrapper">
 
         `;
 
-        grouped[jawatan].forEach(s=>{
+        grouped[position].forEach(s=>{
 
-            const initials = s.nama
+            const initials = s.name
                 .split(' ')
                 .map(x=>x[0])
                 .join('')
@@ -361,9 +361,9 @@ function renderStaff(){
                     </div>
 
                     <div class="staff-info">
-    <h4>${s.nama.toUpperCase()}</h4>
+    <h4>${s.name.toUpperCase()}</h4>
 
-    <p><strong>${s.jawatan}</strong></p>
+    <p><strong>${s.position}</strong></p>
 
     <p>
         <i class="fa fa-id-badge"></i>
@@ -401,7 +401,7 @@ function renderStaff(){
                     </button>
 
                     <button class="icon-btn delete-btn"
-                            onclick="deleteStaff(${s.id}, '${s.nama}')">
+                            onclick="deleteStaff(${s.id}, '${s.name}')">
 
                         <i class="fa fa-trash"></i>
 
@@ -425,19 +425,19 @@ function renderStaff(){
 
 async function addStaff(existing = null){
 
-    const nama = prompt(
-        "NAMA STAFF",
-        existing?.nama || ''
+    const name = prompt(
+        "STAFF NAME",
+        existing?.name || ''
     );
 
-    if(!nama) return;
+    if(!name) return;
 
-    const jawatan = prompt(
-        "JAWATAN",
-        existing?.jawatan || ''
+    const position = prompt(
+        "POSITION",
+        existing?.position || ''
     );
 
-    if(!jawatan) return;
+    if(!position) return;
 
     try{
 
@@ -449,8 +449,8 @@ async function addStaff(existing = null){
                     method:'PATCH',
                     headers,
                     body:JSON.stringify({
-                        nama,
-                        jawatan
+                        name,
+                        position
                     })
                 }
             );
@@ -463,8 +463,8 @@ async function addStaff(existing = null){
                     method:'POST',
                     headers,
                     body:JSON.stringify({
-                        nama,
-                        jawatan
+                        name,
+                        position
                     })
                 }
             );
@@ -488,10 +488,10 @@ function editStaff(id){
     }
 }
 
-async function deleteStaff(id, nama){
+async function deleteStaff(id, name){
 
     const ok = confirm(
-        `PADAM ${nama.toUpperCase()} ?`
+        `PADAM ${name.toUpperCase()} ?`
     );
 
     if(!ok) return;
