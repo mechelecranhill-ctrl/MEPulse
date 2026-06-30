@@ -519,6 +519,58 @@ opacity:0 !important;
         animation:fadeInRightDesktop .45s ease forwards !important;
     }
 }
+  /* ===============================
+   Large Monitor Scaling
+   (2K / 4K / Ultrawide)
+=================================*/
+@media (min-width: 1800px){
+
+    .wheel{
+        width: 820px;
+        height: 820px;
+        left:-410px;
+    }
+
+    .item{
+        width:160px;
+        height:160px;
+    }
+
+    .section-helm{
+        width:210px;
+        height:210px;
+    }
+
+    .item.active{
+        transform:scale(1.35);
+    }
+
+    .info-card{
+        width:calc(50vw - 60px) !important;
+        max-width:900px;
+        padding:38px !important;
+    }
+
+    .info-card h2{
+        font-size:38px;
+    }
+
+    .status-row{
+        padding:18px 22px;
+        font-size:18px;
+    }
+
+    .status-badge{
+        font-size:16px;
+        padding:6px 14px;
+    }
+
+    #openBtn{
+        font-size:18px;
+        padding:16px 0;
+    }
+
+}
 </style>
 
 <link rel="stylesheet" href="style.css">
@@ -589,7 +641,17 @@ const detailList = document.getElementById("detailList");
 const detailBackBtn = document.getElementById("detailBackBtn");
 
 const isMobile = window.innerWidth <= 768;
-const radius = isMobile ? 180 : 240;
+
+let radius;
+
+if (isMobile) {
+    radius = 180;
+} else {
+    radius = Math.min(
+        Math.max(window.innerWidth * 0.16, 240),
+        340
+    );
+}
 
 let index = 0;
 let baseAngle = 0;
@@ -968,8 +1030,11 @@ function positionItems(){
         const theta = (i / items.length) * Math.PI * 2;
         const x = Math.cos(theta) * radius;
         const y = Math.sin(theta) * radius;
-        el.style.left = `calc(50% + ${x}px - 60px)`;
-        el.style.top = `calc(50% + ${y}px - 60px)`;
+
+        const size = el.offsetWidth;
+
+        el.style.left = `calc(50% + ${x}px - ${size/2}px)`;
+        el.style.top = `calc(50% + ${y}px - ${size/2}px)`;
     });
 }
 
@@ -1058,7 +1123,10 @@ function render(){
     if(itemEls.length === 0) return;
     wheel.style.transform = `translateY(-50%) rotate(${baseAngle}deg)`;
     itemEls.forEach(el => { el.style.transform = `rotate(${-baseAngle}deg) scale(0.9)`; });
-    itemEls[index].style.transform = `rotate(${-baseAngle}deg) scale(1.25)`;
+    const activeScale = window.innerWidth >= 1800 ? 1.35 : 1.25;
+
+itemEls[index].style.transform =
+    `rotate(${-baseAngle}deg) scale(${activeScale})`;
 }
 
 function next(){ index=(index+1)%items.length; baseAngle-=stepAngle; closeDetail(); update(); render(); }
