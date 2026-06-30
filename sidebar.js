@@ -21,7 +21,7 @@ class AppSidebar extends HTMLElement {
                     <div class="profile-role" id="profRole">${staffRole.toUpperCase()}</div>
                 </div>
                 
-                <a href="sections.html">Home</a>
+                <a href="sections.html" class="menu-link">Home</a>>
                 <div class="menu-group">
                     <a href="#" class="menu-parent" id="dashboardBtn">
                         Dashboard ▼
@@ -50,7 +50,7 @@ class AppSidebar extends HTMLElement {
     Contract Closing
 </a>
                 
-                <a href="#" id="logoutBtn">Logout</a>
+                <a href="#" id="logoutBtn" class="menu-link">Logout</a>
             </div>
 
             <button class="hamburger" id="hamburger" aria-label="Menu">
