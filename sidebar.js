@@ -119,16 +119,14 @@ class AppSidebar extends HTMLElement {
     }
 
     async loadDashboardLinks() {
-        const sbUrl = "https://ywmsvowroxzhrjwrhsru.supabase.co";
-        const sbKey = "YOUR_SUPABASE_KEY";
-
+        
         try {
             const res = await fetch(
-                `${sbUrl}/rest/v1/me_sections?select=id,section_name`,
+                `${SB_URL}/rest/v1/me_sections?select=id,section_name`,
                 {
                     headers: {
-                        apikey: sbKey,
-                        Authorization: `Bearer ${sbKey}`
+                        apikey: SB_KEY,
+                        Authorization: `Bearer ${SB_KEY}`
                     }
                 }
             );
