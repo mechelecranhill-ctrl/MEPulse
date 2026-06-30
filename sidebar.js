@@ -56,7 +56,7 @@ class AppSidebar extends HTMLElement {
                 </svg>
             </button>
 
-                        <div class="logout-modal" id="logoutModal">
+            <div class="logout-modal" id="logoutModal">
                 <div class="logout-box">
                     <h3>Logout</h3>
                     <p>Are you sure you want to logout?</p>
@@ -65,7 +65,7 @@ class AppSidebar extends HTMLElement {
                         <button class="confirm-btn" id="confirmLogout">Logout</button>
                     </div>
                 </div>
-            </div>`;
+            </div>
         `;
 
         this.cacheDOM();
