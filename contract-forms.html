@@ -1301,6 +1301,19 @@ document.getElementById('workOrderForm').addEventListener('submit', async (e) =>
 
         let sequenceToUse = currentWorkSequenceNo;
 
+    const originalDistrict =
+    document.getElementById("w_dist")
+    .dataset.originalDistrict || "";
+
+if (
+    originalDistrict &&
+    originalDistrict.trim().toUpperCase() !==
+    districtSelected.trim().toUpperCase()
+) {
+    currentWorkSequenceNo = null;
+    sequenceToUse = null;
+}
+
 // jika edit dan district berubah, paksa generate sequence baru
 if(
     currentWorkSequenceNo &&
@@ -1328,17 +1341,53 @@ if(
 
 if(!sequenceToUse){
 
-    // generate sequence baru seperti sedia ada
+    const seqRes = await fetch(
+`${SB_URL}/rest/v1/work_orders?select=sequence_no`,
+    {headers}
+    );
+
+    const seqData = await seqRes.json();
+
+    let max = 0;
+
+    seqData.forEach(r=>{
+
+        if(!r.sequence_no) return;
+
+        if(!r.sequence_no.startsWith(areaCode)) return;
+
+        const num = parseInt(
+            r.sequence_no.replace(areaCode,'')
+        );
+
+        if(num>max) max=num;
+
+    });
+
+    sequenceToUse =
+        areaCode +
+        String(max+1).padStart(3,'0');
+
+    currentWorkSequenceNo =
+        sequenceToUse;
 
 }
 
         const sharedFields = {
-            contract_id: contractId,
-            sequence_no: sequenceToUse,
-            qpb_date: document.getElementById('w_qpb_date').value,
-            district: districtSelected,
-            description: document.getElementById('w_desc').value
-        };
+
+    contract_id: contractId,
+
+    sequence_no: sequenceToUse,
+
+    qpb_date:
+        document.getElementById("w_qpb_date").value,
+
+    district: districtSelected,
+
+    description:
+        document.getElementById("w_desc").value
+
+};
 
         const perWorkIdPayload = {};
 
@@ -1391,21 +1440,33 @@ if(!sequenceToUse){
             const checkRes = await fetch(
 `${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}`,
 { headers });
-
+            
             const existing = await checkRes.json();
 
-            if(existing.length > 0){
+            const districtChanged =
+    document.getElementById("w_dist").dataset.originalDistrict !== districtSelected;
 
-                await fetch(
-                `${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`,
-                {
-                    method: 'PATCH',
-                    headers: headers,
-                    body: JSON.stringify(payload)
-                });
+if(existing.length > 0){
 
-            }else{
+    await fetch(
+    `${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`,
+    {
+        method: 'PATCH',
+        headers: headers,
+        body: JSON.stringify({
 
+            ...payload,
+
+            sequence_no: districtChanged
+                ? sequenceToUse
+                : payload.sequence_no,
+
+            district: districtSelected
+
+        })
+    });
+
+}else{
                 await fetch(
                 `${SB_URL}/rest/v1/work_orders`,
                 {
@@ -1572,6 +1633,9 @@ dSel.innerHTML += `<option value="${district}">${district}</option>`;
 currentContractSections = (opt && opt.dataset.b) ? JSON.parse(opt.dataset.b) : {};
 
 renderWorkIdCards();
+
+        document.getElementById("w_dist")
+    .dataset.originalDistrict = "";
 
 }
 
@@ -1841,73 +1905,174 @@ oninput="formatCurrencyInput(this); calcTotalWork()">
 
 function renderWorkIdCards(){
 
-    const container = document.getElementById('w_id_cards_container');
+    const container = document.getElementById("w_id_cards_container");
     if(!container) return;
 
-    const preservedData = { ...workIdCardDataMap };
-
-    document.querySelectorAll('.w-id-card').forEach(card=>{
+    // ==========================
+    // Simpan data semasa
+    // ==========================
+    document.querySelectorAll(".w-id-card").forEach(card=>{
 
         const workId = card.dataset.workId;
         if(!workId) return;
 
-        const locationInput = card.querySelector('.w_card_location');
-        const location = locationInput ? locationInput.value : '';
+        if(!workIdCardDataMap[workId]){
+            workIdCardDataMap[workId]={};
+        }
 
-        const sectionData = {};
+        workIdCardDataMap[workId].location =
+            card.querySelector(".w_card_location")?.value || "";
 
-        card.querySelectorAll('.w_sec_amt').forEach(i=>{
-            const sec = i.dataset.sec;
-            if(!sectionData[sec]) sectionData[sec] = {};
-            sectionData[sec].amt = parseFloat(i.dataset.rawValue || 0);
+        if(!workIdCardDataMap[workId].section_category){
+            workIdCardDataMap[workId].section_category={};
+        }
+
+        card.querySelectorAll(".w_sec_amt").forEach(input=>{
+
+            const sec=input.dataset.sec;
+
+            if(!workIdCardDataMap[workId].section_category[sec]){
+                workIdCardDataMap[workId].section_category[sec]={};
+            }
+
+            workIdCardDataMap[workId]
+                .section_category[sec]
+                .amt=parseFloat(input.dataset.rawValue||0);
+
         });
 
-        card.querySelectorAll('.w_sec_extra').forEach(i=>{
-            const sec = i.dataset.sec;
-            if(!sectionData[sec]) sectionData[sec] = {};
-            sectionData[sec].extra = parseFloat(i.dataset.rawValue || 0);
-        });
+        card.querySelectorAll(".w_sec_extra").forEach(input=>{
 
-        preservedData[workId] = { location, section_category: sectionData };
+            const sec=input.dataset.sec;
+
+            if(!workIdCardDataMap[workId].section_category[sec]){
+                workIdCardDataMap[workId].section_category[sec]={};
+            }
+
+            workIdCardDataMap[workId]
+                .section_category[sec]
+                .extra=parseFloat(input.dataset.rawValue||0);
+
+        });
 
     });
 
-    const currentIds = getCurrentWorkIdsFromRows();
+    const currentIds=getCurrentWorkIdsFromRows();
 
-    container.innerHTML = '';
+    container.innerHTML="";
 
     currentIds.forEach(workId=>{
 
-        const existing = preservedData[workId] || {};
-        const location = existing.location || '';
-        const sectionData = existing.section_category || {};
+        const saved=
+            workIdCardDataMap[workId] || {};
 
-        const card = document.createElement('div');
-        card.className = 'w-id-card';
-        card.dataset.workId = workId;
+        const location=
+            saved.location || "";
 
-        card.innerHTML = `
+        const breakdown=
+            saved.section_category || {};
+
+        const card=document.createElement("div");
+
+        card.className="w-id-card";
+        card.dataset.workId=workId;
+
+        let html=`
             <span class="w-id-card-label">${workId}</span>
+
             <label>Location</label>
-            <input type="text"
-                   class="w_card_location"
-                   placeholder="Location (Example: JEMENTAH)"
-                   value="${escapeAttr(location)}">
+
+            <input
+                type="text"
+                class="w_card_location"
+                value="${escapeAttr(location)}"
+                placeholder="Location">
+
             <label>Cost Breakdown</label>
+
             <div class="funding-grid">
-                ${buildSectionFieldsHtml(workId, sectionData)}
+        `;
+
+        Object.keys(currentContractSections)
+        .sort()
+        .forEach(sec=>{
+
+            const desc=
+                currentContractSections[sec].desc || "";
+
+            const data=
+                breakdown[sec] || {};
+
+            const amt=
+                Number(data.amt || 0);
+
+            const extra=
+                Number(data.extra || 0);
+
+            const provisional=
+                desc.toUpperCase().includes("PROVISIONAL");
+
+            html+=`
+
+<div class="funding-item">
+
+<label>${sec}</label>
+
+<span class="sec-desc">${desc}</span>
+
+<input
+type="text"
+class="w_sec_amt"
+data-sec="${escapeAttr(sec)}"
+data-work-id="${escapeAttr(workId)}"
+data-raw-value="${amt}"
+value="${amt.toLocaleString('en-MY',{
+minimumFractionDigits:2,
+maximumFractionDigits:2
+})}"
+oninput="
+formatCurrencyInput(this);
+calcTotalWork();
+">
+
+${provisional?`
+
+<input
+type="text"
+class="w_sec_extra"
+data-sec="${escapeAttr(sec)}"
+data-work-id="${escapeAttr(workId)}"
+data-raw-value="${extra}"
+value="${extra.toLocaleString('en-MY',{
+minimumFractionDigits:2,
+maximumFractionDigits:2
+})}"
+oninput="
+formatCurrencyInput(this);
+calcTotalWork();
+">
+
+`:``}
+
+</div>
+
+`;
+
+        });
+
+        html+=`
             </div>
         `;
+
+        card.innerHTML=html;
 
         container.appendChild(card);
 
     });
 
-    workIdCardDataMap = preservedData;
-
     calcTotalWork();
-}
 
+}
 /* ============================================================
    INTERIM
    ============================================================ */
@@ -2576,109 +2741,161 @@ return total;
 function autoDetectWork(){
 
     const currentIds = getCurrentWorkIdsFromRows();
-    const idsKey = currentIds.join('|');
+    const idsKey = currentIds.join("|");
 
     if(idsKey === lastWorkIdNum) return;
+
     lastWorkIdNum = idsKey;
 
     clearTimeout(detectTimer);
-    detectTimer = setTimeout(async ()=>{
 
-const contractId = document.getElementById('w_contract_id').value;
-const idsToCheck = getCurrentWorkIdsFromRows();
+    detectTimer = setTimeout(async()=>{
 
-if(!contractId || idsToCheck.length === 0) return;
+        const contractId =
+            document.getElementById("w_contract_id").value;
 
-try{
+        if(!contractId) return;
 
-const orFilter = idsToCheck
-    .map(id => `work_id.eq.${encodeURIComponent(id)}`)
-    .join(',');
+        const ids = getCurrentWorkIdsFromRows();
 
-const res = await fetch(
-`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&or=(${orFilter})&select=*`,
-{ headers }
-);
+        if(ids.length===0){
 
-const matches = await res.json();
+            currentWorkSequenceNo = null;
+            originalLoadedWorkIds = [];
 
-if(!Array.isArray(matches) || matches.length === 0){
+            return;
+        }
 
-    currentWorkSequenceNo = null;
-    originalLoadedWorkIds = [];
+        try{
 
-    return;
-}
+            const filter = ids
+                .map(id=>`work_id.eq.${encodeURIComponent(id)}`)
+                .join(",");
 
-const sharedSeq = matches[0].sequence_no;
+            const res = await fetch(
 
-const groupRes = await fetch(
-`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&sequence_no=eq.${encodeURIComponent(sharedSeq || '')}&select=*`,
-{ headers }
-);
+`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&or=(${filter})&select=*`,
 
-const group = await groupRes.json();
+            {headers});
 
-if(group.length === 0) return;
+            const matches = await res.json();
 
-currentWorkSequenceNo = sharedSeq;
-originalLoadedWorkIds = group.map(w => w.work_id);
+            if(!Array.isArray(matches) || matches.length===0){
 
-document.getElementById('w_id_rows_container').innerHTML = '';
-workIdRowCounter = 0;
+                currentWorkSequenceNo = null;
+                originalLoadedWorkIds = [];
 
-group.forEach(w=>{
-    const parts = (w.work_id || '').split(' ');
-    const prefix = parts[0] || 'C';
-    const num = parts[1] || '';
-    addWorkIdRow(prefix, num);
-});
+                return;
+            }
 
-workIdCardDataMap = {};
-group.forEach(w=>{
-    workIdCardDataMap[w.work_id] = {
-        location: w.location || '',
-        section_category: w.section_category || {}
-    };
-});
+            const sequenceNo = matches[0].sequence_no;
 
-const w = group[0];
+            currentWorkSequenceNo = sequenceNo;
 
-document.getElementById('w_qpb_date').value = w.qpb_date || '';
-document.getElementById('w_desc').value = w.description || '';
+            const groupRes = await fetch(
 
-setTimeout(()=>{
+`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&sequence_no=eq.${encodeURIComponent(sequenceNo)}&select=*`,
 
-    const dist = document.getElementById("w_dist");
+            {headers});
 
-    dist.value = w.district || "";
+            const group = await groupRes.json();
 
-    dist.dataset.originalDistrict =
-        w.district || "";
+            if(!Array.isArray(group) || group.length===0){
+                return;
+            }
 
-},100);
+            originalLoadedWorkIds =
+                group.map(x=>x.work_id);
 
-renderWorkIdCards();
+            // ===========================
+            // Simpan data sedia ada
+            // ===========================
 
-// render sekali lagi selepas district siap dipilih
-setTimeout(()=>{
+            group.forEach(w=>{
 
-    renderWorkIdCards();
-    calcTotalWork();
+                workIdCardDataMap[w.work_id]={
 
-},150);
+                    location:
+                        w.location || "",
 
-lastWorkIdNum = getCurrentWorkIdsFromRows().join('|');
+                    section_category:
+                        structuredClone(
+                            w.section_category || {}
+                        )
 
-console.log("Existing Work Order group loaded:", sharedSeq);
+                };
 
-}catch(e){
+            });
 
-console.error("Auto detect error:", e);
+            // ===========================
+            // Bina semula Work ID rows
+            // ===========================
 
-}
+            const rowContainer =
+                document.getElementById("w_id_rows_container");
 
-},500);
+            rowContainer.innerHTML="";
+
+            workIdRowCounter=0;
+
+            group.forEach(w=>{
+
+                const split =
+                    (w.work_id || "").split(" ");
+
+                addWorkIdRow(
+
+                    split[0] || "C",
+
+                    split[1] || ""
+
+                );
+
+            });
+
+            // ===========================
+            // Shared fields
+            // ===========================
+
+            document.getElementById("w_qpb_date").value =
+                group[0].qpb_date || "";
+
+            document.getElementById("w_desc").value =
+                group[0].description || "";
+
+            const district =
+                document.getElementById("w_dist");
+
+            // hanya isi jika user belum pilih
+            if(!district.value){
+
+                district.value =
+                    group[0].district || "";
+
+            }
+
+            district.dataset.originalDistrict =
+                group[0].district || "";
+
+            renderWorkIdCards();
+
+            calcTotalWork();
+
+            lastWorkIdNum =
+                getCurrentWorkIdsFromRows().join("|");
+
+            console.log(
+                "Existing Work Order Loaded:",
+                sequenceNo
+            );
+
+        }catch(err){
+
+            console.error(err);
+
+        }
+
+    },400);
 
 }
     let interimDetectTimer = null;
