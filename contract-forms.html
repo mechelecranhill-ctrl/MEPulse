@@ -1301,25 +1301,36 @@ document.getElementById('workOrderForm').addEventListener('submit', async (e) =>
 
         let sequenceToUse = currentWorkSequenceNo;
 
-        if(!sequenceToUse){
+// jika edit dan district berubah, paksa generate sequence baru
+if(
+    currentWorkSequenceNo &&
+    originalLoadedWorkIds.length > 0
+){
 
-            const seqRes = await fetch(
-`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&district=eq.${encodeURIComponent(districtSelected)}&select=sequence_no`,
-{ headers });
+    const firstCard =
+        document.querySelector("#w_id_cards_container .w-id-card");
 
-            const existingWorks = await seqRes.json();
+    if(firstCard){
 
-            let maxSeq = 0;
+        const loadedDistrict =
+            document.getElementById("w_dist").dataset.originalDistrict || "";
 
-            existingWorks.forEach(w=>{
-                const num = parseInt((w.sequence_no || '').replace(/\D/g,'')) || 0;
-                if(num > maxSeq) maxSeq = num;
-            });
-
-            const nextNum = (maxSeq + 1).toString().padStart(3,'0');
-
-            sequenceToUse = `${areaCode}${nextNum}`;
+        if(
+            loadedDistrict &&
+            loadedDistrict !== districtSelected
+        ){
+            sequenceToUse = null;
         }
+
+    }
+
+}
+
+if(!sequenceToUse){
+
+    // generate sequence baru seperti sedia ada
+
+}
 
         const sharedFields = {
             contract_id: contractId,
@@ -2637,12 +2648,25 @@ document.getElementById('w_qpb_date').value = w.qpb_date || '';
 document.getElementById('w_desc').value = w.description || '';
 
 setTimeout(()=>{
-document.getElementById('w_dist').value = w.district || '';
+
+    const dist = document.getElementById("w_dist");
+
+    dist.value = w.district || "";
+
+    dist.dataset.originalDistrict =
+        w.district || "";
+
 },100);
 
 renderWorkIdCards();
 
-calcTotalWork();
+// render sekali lagi selepas district siap dipilih
+setTimeout(()=>{
+
+    renderWorkIdCards();
+    calcTotalWork();
+
+},150);
 
 lastWorkIdNum = getCurrentWorkIdsFromRows().join('|');
 
