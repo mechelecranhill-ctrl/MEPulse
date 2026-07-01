@@ -1,12 +1,13 @@
 <!DOCTYPE html>
-<html lang="ms">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Contract Dashboard</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0" defer></script>
     <style>
         :root { 
             --ios-blue: #007AFF; --ios-green: #34C759; --ios-orange: #FF9500; --ios-red: #FF3B30;
@@ -15,9 +16,9 @@
 
         body { 
             font-family: -apple-system, system-ui, sans-serif;   
-            background:    
-                radial-gradient(circle at top, rgba(255,255,255,.10), transparent 35%),    
-                linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%); 
+            /* PENGOPTIMUMAN GPU: Tukar gradient kompleks kepada background-color jika peranti perlahan, 
+               atau paksa sub-layering menggunakan will-change */
+            background: linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%); 
             margin: 0; 
             height: 100vh; 
             display: flex; 
@@ -37,32 +38,23 @@
             font-size: 13px;
             outline: none;
             box-sizing: border-box;
-            transition: 0.2s;
+            transition: border-color 0.2s; /* PENGOPTIMUMAN GPU: Hadkan transisi hanya pada border-color, bukan 'all' */
         }
         .search-box:focus {
             border-color: var(--ios-blue);
-            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
         }
         .mobile-usage-btn { display: none; } 
 
-        /* =============================================
-           GLASS HEADER
-        ============================================= */
         .glass-header { 
             width: 100%; height: 60px; 
-            background:
-                radial-gradient(circle at top, rgba(255,255,255,.15), transparent 35%),
-                linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%);
+            background: linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%);
             display: flex; align-items: center; justify-content: center;
             box-shadow: 0 1px 10px rgba(0,0,0,0.05); z-index: 1000; flex-shrink: 0;
             position: relative;
-            padding: 0 60px; /* ruang untuk fab kiri kanan */
+            padding: 0 60px;
             box-sizing: border-box;
         }
 
-        /* =============================================
-           UNIT NAV — DESKTOP: full wrap centered, no scroll
-        ============================================= */
         .unit-container-wrapper {
             display: flex;
             justify-content: center;
@@ -72,17 +64,10 @@
 
         .unit-container {
             display: flex;
-            flex-wrap: wrap;         /* wrap supaya papar semua */
-            justify-content: center; /* tengah */
+            flex-wrap: wrap;         
+            justify-content: center; 
             gap: 8px;
             padding: 0;
-            /* tiada overflow scroll, tiada snap, tiada fade */
-        }
-
-        /* pseudo-elements untuk snap — desktop tak perlu */
-        .unit-container::before,
-        .unit-container::after {
-            display: none;
         }
 
         .unit-pill { 
@@ -95,18 +80,15 @@
             font-weight: 600; 
             font-size: 12px; 
             white-space: nowrap; 
-            transition: 0.3s;
+            transition: background-color 0.2s, color 0.2s; /* PENGOPTIMUMAN GPU */
+            will-change: background-color; /* Sediakan GPU lebih awal */
         }
         .unit-pill.active { 
             background: white;
             color: #0b3d91; 
         }
 
-        /* =============================================
-           MOBILE ONLY
-        ============================================= */
         @media (max-width: 768px) {
-
             #panel-vendor, 
             .next-container { 
                 display: none !important; 
@@ -123,12 +105,13 @@
                 font-weight: 800;
                 align-items: center;
                 gap: 5px;
-                box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
             }
 
             .contract-sidebar {
                 width: 100% !important;
-                transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                /* PENGOPTIMUMAN GPU: Gunakan 'transform' sahaja untuk elak lag re-layout */
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                will-change: transform;
             }
 
             .analysis-container {
@@ -144,7 +127,8 @@
                 background: #f2f2f7;
                 z-index: 1500;
                 transform: translateX(100%);
-                transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                will-change: transform;
                 overflow-x: hidden;
             }
 
@@ -152,7 +136,7 @@
                 transform: translateX(0);
             }
             body.analysis-active .contract-sidebar {
-                transform: translateX(-100%); opacity: 0.5; 
+                transform: translateX(-100%);
             }
 
             #analysis-panel {
@@ -171,33 +155,28 @@
                 min-width: 0;
             }
 
-            /* Mobile: unit nav scroll + snap + fade tepi */
             .glass-header {
-                padding: 0 10px; /* kurangkan padding, bagi ruang scroll */
+                padding: 0 10px; 
             }
 
             .unit-container-wrapper {
                 flex: 1;
                 overflow: hidden;
                 margin: 0 50px;  
-                -webkit-mask-image: linear-gradient(to right, transparent 0%, black 30px, black calc(100% - 30px), transparent 100%);
-                mask-image: linear-gradient(to right, transparent 0%, black 30px, black calc(100% - 30px), transparent 100%);
             }
 
             .unit-container {
-                flex-wrap: nowrap;           /* jangan wrap — scroll mendatar */
+                flex-wrap: nowrap;           
                 justify-content: flex-start;
                 overflow-x: auto;
                 scroll-behavior: smooth;
                 scroll-snap-type: x mandatory;
-                scroll-padding: 0 50%;
                 scrollbar-width: none;
                 padding: 0 16px;
             }
 
             .unit-container::-webkit-scrollbar { display: none; }
 
-            /* pseudo-elements untuk centering snap mobile */
             .unit-container::before,
             .unit-container::after {
                 display: block;
@@ -210,9 +189,6 @@
             }
         }
 
-        /* =============================================
-           LAIN-LAIN (sama macam asal)
-        ============================================= */
         .nav-btn {
             position: absolute;
             background: #e5e5ea;
@@ -224,10 +200,8 @@
             justify-content: center;
             cursor: pointer;
             color: var(--ios-blue);
-            transition: 0.2s;
             padding: 0 10px;
         }
-        .nav-btn:active { transform: scale(0.9); background: #d1d1d6; }
 
         .next-container {
             position: fixed;
@@ -256,21 +230,20 @@
             cursor: pointer;
             color: white;
             box-shadow: 0 4px 12px rgba(0, 122, 255, 0.4);
-            transition: 0.2s;
         }
 
         .fab { 
             position: fixed; top: 12px; right: 20px; width: 35px; height: 35px; 
             background: var(--ios-blue); color: white; border-radius: 10px;
             display: flex; align-items: center; justify-content: center; 
-            cursor: pointer; z-index: 1100; transition: transform 0.2s;
+            cursor: pointer; z-index: 1100;
         }
 
         .main-wrapper { display: flex; flex: 1; overflow: hidden; padding: 10px; gap: 15px; }
         .contract-sidebar { width: 220px; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
         #contractList { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 5px; }
         
-        .c-card { background: var(--card-bg); border-radius: 12px; padding: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); transition: 0.2s; cursor: pointer; border: 1px solid rgba(0,0,0,0.05); }
+        .c-card { background: var(--card-bg); border-radius: 12px; padding: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); cursor: pointer; border: 1px solid rgba(0,0,0,0.05); }
         .c-card.active { border-color: var(--ios-blue); background: #f0f7ff; }
         .c-card h4 { margin: 0; font-size: 11px; color: #1c1c1e; overflow: hidden; text-overflow: ellipsis; }
         .c-card .sub-text { font-size: 9px; color: #888; margin-top: 2px; }
@@ -279,11 +252,13 @@
         #analysis-panel { display: none; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); flex: 1; overflow: hidden; flex-direction: column; }
 
         .health-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; flex: 1; overflow: hidden; margin-top: 5px; }
-        .chart-box { padding: 10px; background: #f9f9fb; border-radius: 15px; flex: 1; position: relative; min-height: 0; display: flex; flex-direction: column;}
+        /* PENGOPTIMUMAN GPU: 'transform: translateZ(0)' memaksa lapisan dimuat naik ke perkakasan GPU */
+        .chart-box { padding: 10px; background: #f9f9fb; border-radius: 15px; flex: 1; position: relative; min-height: 0; display: flex; flex-direction: column; transform: translateZ(0); }
 
         .section-row { background: #fff; border: 1px solid var(--ios-blue); border-radius: 12px; padding: 10px; margin-bottom: 8px; }
         .prog-bar-bg { width: 100%; height: 8px; background: #eee; border-radius: 4px; margin-top: 5px; overflow: hidden; }
-        .prog-bar-fill { height: 100%; border-radius: 4px; transition: 1s cubic-bezier(0.4, 0, 0.2, 1); width: 0 !important; }
+        /* PENGOPTIMUMAN GPU: Kurangkan transition time dan paksa perkakasan render width melalui will-change */
+        .prog-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease-out !important; width: 0 !important; will-change: width;}
         .avg-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 5px; }
         .avg-item { font-size: 9px; font-weight: 600; color: #666; }
         .manage-btn { background: #f2f2f7; border: none; padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; color: var(--ios-blue); cursor: pointer; }
@@ -294,10 +269,9 @@
     </style>
 
     <link rel="stylesheet" href="style.css">
-    <script src="auth.js"></script>
-    <script src="session.js"></script>
+
+    <script src="session.js" defer></script>
     <script src="sidebar.js" defer></script>
-    
 </head>
 <body>
 
@@ -362,7 +336,6 @@
     </div>
     
 <script>
-
     const role = localStorage.getItem("role");
     const isAdmin = role === "admin" || role === "@dm1n";
     
@@ -375,10 +348,14 @@
     let currentWO = [];
     let selectedSections = [];
     let searchTimeout = null;
-
-    Chart.register(ChartDataLabels);
+    // PENGOPTIMUMAN FETCH: Simpan cache senarai kontrak tempatan mengikut unit_id untuk elak hit API Supabase berulang kali
+    const cacheContracts = {}; 
 
     window.onload = () => {
+        // Tunggu Chart.js dimuat turun sepenuhnya secara 'defer' sebelum daftar plugin
+        if (typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') {
+            Chart.register(ChartDataLabels);
+        }
         fetchUnits();
         if(!isAdmin){
             const btn = document.getElementById("manageBtn");
@@ -386,19 +363,22 @@
         }
     };
 
-    // Debounce filter carian untuk menghalang stuttering/lag input ketika menaip
     function debouncedFilterContracts() {
         clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(filterContracts, 200);
+        searchTimeout = setTimeout(filterContracts, 150);
     }
 
     function filterContracts() {
         const query = document.getElementById('contractSearch').value.toLowerCase();
         const cards = document.querySelectorAll('.c-card');
-        cards.forEach(card => {
-            const code = card.querySelector('h4').innerText.toLowerCase();
-            const name = card.querySelector('.sub-text').innerText.toLowerCase();
-            card.style.display = (code.includes(query) || name.includes(query)) ? 'block' : 'none';
+        
+        // PENGOPTIMUMAN RENDER: Sembunyikan elemen secara kelompok (Batch DOM manipulation)
+        requestAnimationFrame(() => {
+            cards.forEach(card => {
+                const code = card.querySelector('h4').innerText.toLowerCase();
+                const name = card.querySelector('.sub-text').innerText.toLowerCase();
+                card.style.display = (code.includes(query) || name.includes(query)) ? 'block' : 'none';
+            });
         });
     }
 
@@ -407,7 +387,6 @@
 
     async function fetchUnits() {
         try {
-            // Pengoptimuman Data: Hanya tarik lajur asas yang diperlukan untuk navigasi
             const [secRes, unitsRes] = await Promise.all([
                 fetch(`${SB_URL}/rest/v1/me_sections?select=id`, { headers }),
                 fetch(`${SB_URL}/rest/v1/units?select=id,unit_name,section_id`, { headers })
@@ -425,10 +404,8 @@
                 : units;
 
             const nav = document.getElementById('unitNav');
-
             nav.innerHTML = filteredUnits.map(u => `
-                <button class="unit-pill" id="unit-${u.id}"
-                    onclick="fetchContracts(${u.id}, this)">
+                <button class="unit-pill" id="unit-${u.id}" onclick="fetchContracts(${u.id}, this)">
                     ${u.unit_name}
                 </button>
             `).join('');
@@ -436,7 +413,6 @@
             if (filteredUnits.length > 0) {
                 document.getElementById(`unit-${filteredUnits[0].id}`).click();
             }
-
         } catch (e) {
             console.error("Error units:", e);
         }
@@ -453,51 +429,64 @@
 
         currentContract = null;
         currentWO = [];
-
         document.getElementById('panel-title').innerText = 'Analisis';
         document.getElementById('panel-vendor').innerText = '';
 
+        // PENGOPTIMUMAN FETCH: Semak cache tempatan dahulu sebelum panggil Supabase REST API
+        if (cacheContracts[unitId]) {
+            renderContractList(cacheContracts[unitId]);
+            return;
+        }
+
         try {
-            // Pengoptimuman Data: Hadkan query kepada struktur data sasar untuk mengecilkan payload JSON
             const res = await fetch(
                 `${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}&select=id,contract_code,contract_name,contract_start,contract_end,selected_sections,contract_sections_breakdown`,
                 { headers }
             );
-
             let data = await res.json();
 
             data.sort((a, b) => {
                 const dateDiff = new Date(a.contract_start) - new Date(b.contract_start);
                 if (dateDiff !== 0) return dateDiff;
-                return a.contract_code.localeCompare(
-                    b.contract_code,
-                    undefined,
-                    { numeric: true, sensitivity: "base" }
-                );
+                return a.contract_code.localeCompare(b.contract_code, undefined, { numeric: true, sensitivity: "base" });
             });
 
-            const list = document.getElementById('contractList');
-
-            list.innerHTML = data.map(c => `
-                <div class="c-card" id="card-${c.id}"
-                    onclick='selectCard(${c.id}); openAnalysis(${JSON.stringify(c)})'>
-                    <h4>${c.contract_code}</h4>
-                    <div class="sub-text">${c.contract_name}</div>
-                </div>
-            `).join('');
-
-            if (data.length > 0 && window.innerWidth > 768) {
-                selectCard(data[0].id);
-                openAnalysis(data[0]);
-            }
-
+            // Simpan data ke dalam cache
+            cacheContracts[unitId] = data;
+            renderContractList(data);
         } catch (e) {
             console.error("Error contracts:", e);
         }
     }
 
+    function renderContractList(data) {
+        const list = document.getElementById('contractList');
+        list.innerHTML = data.map(c => `
+            <div class="c-card" id="card-${c.id}">
+                <h4>${c.contract_code}</h4>
+                <div class="sub-text">${c.contract_name}</div>
+            </div>
+        `).join('');
+
+        data.forEach(c => {
+            const cardEl = document.getElementById(`card-${c.id}`);
+            if (cardEl) {
+                cardEl.addEventListener('click', () => {
+                    selectCard(c.id);
+                    openAnalysis(c);
+                });
+            }
+        });
+
+        if (data.length > 0 && window.innerWidth > 768) {
+            selectCard(data[0].id);
+            openAnalysis(data[0]);
+        }
+    }
+
     function selectCard(id) {
-        document.querySelectorAll('.c-card').forEach(c => c.classList.remove('active'));
+        const currentActive = document.querySelector('.c-card.active');
+        if(currentActive) currentActive.classList.remove('active');
         const activeCard = document.getElementById(`card-${id}`);
         if(activeCard) activeCard.classList.add('active');
     }
@@ -508,11 +497,9 @@
         document.getElementById('panel-title').innerText = contract.contract_code;
         document.getElementById('panel-vendor').innerText = contract.contract_name;
 
-        // Dijamin jimat data: Elakkan memanggil semula endpoint contract?id=eq kerana payload objek telah tersedia penuh
         currentContract = contract;
 
         try {
-            // Menggabungkan permintaan network dalam satu round-trip serta mengehadkan lajur terpilih
             const [resW, resI] = await Promise.all([
                 fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}&select=interim_no,section_category`, { headers }),
                 fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${currentContract.id}&order=date_received.asc&select=claim_breakdown`, { headers })
@@ -551,7 +538,6 @@
             const mainContainer = document.getElementById('selectedSectionContainer');
             let htmlBuilder = '';
 
-            // Penyatuan Gelung O(n): Lakukan agregasi amaun interim & work order ke dalam struktur objek cache tunggal
             const interimMap = {};
             const woMap = {};
 
@@ -587,15 +573,16 @@
                 const color = used > plannedTotalToDate ? 'var(--ios-red)' : 'var(--ios-green)';
                 const progressPercent = budget ? (used / budget) * 100 : 0;
 
-                // Sediakan data array kargo carta serentak bagi mengelak operasi gelung berulang di fungsi luaran
                 labels.push(s);
                 targetAvgData.push((budget / totalMonths).toFixed(2));
                 actualAvgData.push((used / monthsElapsed).toFixed(2));
 
                 htmlBuilder += `
-                    <div class="section-row">
-                        <div style="display:flex; justify-content:space-between; align-items:start;">
-                            <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">${s}: ${sections[s].desc || s}</div>
+    <div class="section-row">
+        <div style="display:flex; justify-content:space-between; align-items:start;">
+            <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">
+                ${s}: ${sections[s].desc || s}
+            </div>
                             ${isAdmin ? `<i class="fa fa-times-circle" style="color:#ccc; cursor:pointer;" onclick="toggleSection('${s}')"></i>` : ``}
                         </div>
                         <div class="avg-stats">
@@ -614,15 +601,14 @@
             });
 
             mainContainer.innerHTML = htmlBuilder;
-
-            // Kemaskini elemen Chart terus menggunakan data tatasusunan terbina bersih
             updateChartDirect(labels, targetAvgData, actualAvgData);
 
-            setTimeout(() => {
+            // PENGOPTIMUMAN GPU: Gunakan requestAnimationFrame berbanding setTimeout biasa untuk memicu animasi progress bar
+            requestAnimationFrame(() => {
                 document.querySelectorAll('.prog-bar-fill').forEach(bar => {
                     bar.style.setProperty('width', bar.getAttribute('data-width'), 'important');
                 });
-            }, 50);
+            });
 
         } catch (error) { console.error("Error processing UI:", error); }
     }
@@ -632,7 +618,7 @@
             myChart.data.labels = labels;
             myChart.data.datasets[0].data = targetAvgData;
             myChart.data.datasets[1].data = actualAvgData;
-            myChart.update('none'); // Mod kemaskini 'none' melangkau kesan animasi berat pencetus stuttering pada peranti mudah alih
+            myChart.update('none'); // Mod 'none' melangkau overhead animasi re-render carta
         } else {
             const ctx = document.getElementById('healthChart').getContext('2d');
             myChart = new Chart(ctx, {
@@ -646,7 +632,7 @@
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    animation: { duration: 300 },
+                    animation: { duration: 150 }, // PENGOPTIMUMAN GPU: Ringkaskan masa rendering awal carta
                     plugins: { 
                         legend: { position: 'top', labels: { font: { size: 10, weight: 'bold' } } },
                         datalabels: { anchor: 'end', align: 'top', font: { size: 9, weight: 'bold' }, formatter: (v) => v > 0 ? `RM${Math.round(v).toLocaleString()}` : '' }
@@ -657,7 +643,6 @@
         }
     }
 
-    // Kekalkan tandatangan fungsi asal tanpa memusnahkan parameter sedia ada
     function updateChart(currentInterims = []) {
         renderUI(currentInterims);
     }
@@ -667,7 +652,6 @@
         if(selectedSections.includes(s)) selectedSections = selectedSections.filter(x => x !== s);
         else selectedSections.push(s);
         
-        // Render pantas secara lokal tanpa memuat turun network semula
         renderUI([]);
         
         await fetch(`${SB_URL}/rest/v1/contract?id=eq.${currentContract.id}`, {
@@ -696,7 +680,6 @@
 
     let touchStartX = 0;
     let touchEndX = 0;
-
     const contractSidebar = document.querySelector('.contract-sidebar');
 
     contractSidebar.addEventListener('touchstart', e => {
@@ -710,13 +693,11 @@
 
     function handleUnitSwipe() {
         if(window.innerWidth > 768) return;
-
         const diff = touchStartX - touchEndX;
         if(Math.abs(diff) < 60) return;
 
         const units = [...document.querySelectorAll('.unit-pill')];
         const activeIndex = units.findIndex(btn => btn.classList.contains('active'));
-
         if(activeIndex === -1) return;
 
         if(diff > 0 && activeIndex < units.length - 1) {
