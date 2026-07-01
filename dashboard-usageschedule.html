@@ -1313,25 +1313,101 @@ function renderMobileCards(data){
     const container = document.getElementById('mobileCardContainer');
     if(!container) return;
     let html = '';
+    
+    // 1. Buat grouping yang sama seperti di desktop table (District + Sequence No)
+    const seqGroups = {};
     data.forEach(w => {
-        html += `
-        <div class="mobile-card">
-            <div class="mobile-card-header">
-                <div class="mobile-title">${w.sequence_no ? w.sequence_no + ' — ' : ''}${w.work_id || '-'}</div>
-                <span class="tag ${(w.status || 'BLUEFORM').toLowerCase().replace(/\s+/g,'')}">${w.status || 'BLUEFORM'}</span>
-            </div>
-            <div class="mobile-sub">${w.description || '-'}</div>
-            <div class="mobile-sub"><i class="fa fa-map-pin"></i> ${w.location || 'N/A'}</div>
-            <div class="mobile-row"><span>Interim</span><strong>${w.interim_no ? 'INT-' + w.interim_no : '-'}</strong></div>
-            <div class="mobile-row"><span>Amaun</span><strong>RM ${(w.amount_spent || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</strong></div>
-            <div class="mobile-row"><span>Tarikh</span><strong>${formatTarikhBM(w.qpb_date)}</strong></div>
-            <div class="mobile-actions">
-                <button class="btn-action" style="background:var(--ios-orange);padding:6px 12px;font-size:11px;" onclick="openBlueform(${w.id})">Blueform</button>
-            </div>
-        </div>`;
+        const seq = (w.sequence_no || '').trim();
+        if(seq !== ''){
+            const district = (w.district || '').trim().toUpperCase();
+            const groupKey = district + '||' + seq;
+            if(!seqGroups[groupKey]) seqGroups[groupKey] = [];
+            seqGroups[groupKey].push(w);
+        }
+    });
+
+    const processedSeqs = new Set();
+
+    // 2. Loop data untuk jana mobile card
+    data.forEach(w => {
+        const seq = (w.sequence_no || '').trim();
+        const district = (w.district || '').trim().toUpperCase();
+        const groupKey = district + '||' + seq;
+
+        if(seq !== '' && seqGroups[groupKey]){
+            // Jika group ini sudah diproses, skip
+            if(processedSeqs.has(groupKey)) return;
+            processedSeqs.add(groupKey);
+
+            const group = seqGroups[groupKey];
+            const mainW = group[0];
+            const allWorkIds = group.map(g => g.work_id).join(', ');
+            
+            // Gabungkan lokasi & keterangan unik
+            const uniqueLocations = [...new Set(group.map(g => (g.location || '').trim()).filter(l => l !== ''))];
+            const combinedLocation = uniqueLocations.join(', ');
+            
+            const uniqueDescriptions = [
+                ...new Map(group.map(g => [(g.description || '').trim().toLowerCase(), g.description]).filter(([k, v]) => k !== '')).values()
+            ];
+            const allDesc = uniqueDescriptions.join(', ');
+
+            // Kira total amaun kerja
+            const combinedAmt = group.reduce((sum, g) => sum + Number(g.amount_spent || 0), 0);
+            const allInterimNos = [...new Set(group.map(g => g.interim_no).filter(Boolean))];
+            
+            const allClaimed = group.every(g => g.interim_no);
+            const groupStatus = allClaimed ? 'CLAIMED' : (mainW.status || 'BLUEFORM');
+            const allIdsStr = group.map(g => g.id).join(',');
+
+            const groupBadge = group.length > 1 
+                ? `<span style="background:#007AFF20;color:#007AFF;border-radius:6px;padding:2px 6px;font-size:10px;font-weight:700;margin-left:6px;">${group.length} WO</span>`
+                : '';
+
+            html += `
+            <div class="mobile-card">
+                <div class="mobile-card-header">
+                    <div class="mobile-title">
+                        <strong>${seq}</strong> ${groupBadge}
+                    </div>
+                    <span class="tag ${groupStatus.toLowerCase().replace(/\s+/g,'')}">${groupStatus}</span>
+                </div>
+                <div class="mobile-sub" style="font-weight:600; color:#334155;">ID: ${allWorkIds}</div>
+                <div class="mobile-sub">${allDesc}</div>
+                <div class="mobile-sub" style="color:var(--ios-orange);"><i class="fa fa-map-pin"></i> ${combinedLocation || 'N/A'}</div>
+                <div class="mobile-row"><span>Interim</span><strong>${allInterimNos.length ? allInterimNos.map(n => 'INT-' + n).join(', ') : '-'}</strong></div>
+                <div class="mobile-row"><span>Amaun</span><strong>RM ${combinedAmt.toLocaleString(undefined,{minimumFractionDigits:2})}</strong></div>
+                <div class="mobile-row"><span>Tarikh</span><strong>${formatTarikhBM(mainW.qpb_date)}</strong></div>
+                <div class="mobile-actions">
+                    <button class="btn-action" style="background:var(--ios-orange);padding:6px 12px;font-size:11px;" onclick="openBlueformGroup('${allIdsStr}')">
+                        <i class="fa-solid fa-print"></i> Blueform
+                    </button>
+                </div>
+            </div>`;
+        } else {
+            // Jika tiada sequence_no (Work Order tunggal/bukan group)
+            html += `
+            <div class="mobile-card">
+                <div class="mobile-card-header">
+                    <div class="mobile-title">${w.work_id || '-'}</div>
+                    <span class="tag ${(w.status || 'BLUEFORM').toLowerCase().replace(/\s+/g,'')}">${w.status || 'BLUEFORM'}</span>
+                </div>
+                <div class="mobile-sub">${w.description || '-'}</div>
+                <div class="mobile-sub" style="color:var(--ios-orange);"><i class="fa fa-map-pin"></i> ${w.location || 'N/A'}</div>
+                <div class="mobile-row"><span>Interim</span><strong>${w.interim_no ? 'INT-' + w.interim_no : '-'}</strong></div>
+                <div class="mobile-row"><span>Amaun</span><strong>RM ${(w.amount_spent || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</strong></div>
+                <div class="mobile-row"><span>Tarikh</span><strong>${formatTarikhBM(w.qpb_date)}</strong></div>
+                <div class="mobile-actions">
+                    <button class="btn-action" style="background:var(--ios-orange);padding:6px 12px;font-size:11px;" onclick="openBlueform(${w.id})">
+                        <i class="fa-solid fa-print"></i> Blueform
+                    </button>
+                </div>
+            </div>`;
+        }
     });
     container.innerHTML = html;
 }
+
 
 function generateDistrictTabs(data){
     const container = document.getElementById("districtTabs");
