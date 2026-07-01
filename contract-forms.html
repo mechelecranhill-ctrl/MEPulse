@@ -3248,47 +3248,102 @@ calculateContractSum();
 
 }
 
-async function updateWorkOrderSequenceNumbers(contractId, districtText, areaText) {
-    const districts = districtText.split(',').map(x => x.trim().toUpperCase());
-    const areas = areaText.split(',').map(x => x.trim().toUpperCase());
+async function updateWorkOrderSequenceNumbers(
+    contractId,
+    districtText,
+    areaText
+){
 
-    const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&select=id,sequence_no,district`, { headers });
+    const districts =
+        districtText.split(",").map(x=>x.trim().toUpperCase());
+
+    const areas =
+        areaText.split(",").map(x=>x.trim().toUpperCase());
+
+    const res = await fetch(
+
+`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&select=*`,
+
+    {headers});
+
     const works = await res.json();
 
-    let bulkUpdatePayload = [];
+    const bulk = [];
 
-    districts.forEach((district, index) => {
-        const areaCode = areas[index] || 'WO';
+    districts.forEach((district,index)=>{
 
-        const districtWorks = works
-            .filter(w => (w.district || '').trim().toUpperCase() === district)
-            .sort((a, b) => {
-                const aNum = parseInt((a.sequence_no || '').replace(/\D/g, '')) || 0;
-                const bNum = parseInt((b.sequence_no || '').replace(/\D/g, '')) || 0;
-                return aNum - bNum;
-            });
+        const areaCode =
+            areas[index] || "WO";
 
-        districtWorks.forEach((work, i) => {
-            const newSeq = areaCode + String(i + 1).padStart(3, '0');
-            bulkUpdatePayload.push({
-                id: work.id,
-                sequence_no: newSeq
-            });
+        // ambil semua sequence unik
+        const sequences = [
+            ...new Set(
+                works
+                .filter(w=>
+                    (w.district||"")
+                    .trim()
+                    .toUpperCase()===district
+                )
+                .map(w=>w.sequence_no)
+            )
+        ];
+
+        sequences.sort((a,b)=>{
+
+            const na =
+                parseInt(
+                    (a||"").replace(/\D/g,"")
+                )||0;
+
+            const nb =
+                parseInt(
+                    (b||"").replace(/\D/g,"")
+                )||0;
+
+            return na-nb;
+
         });
+
+        sequences.forEach((oldSeq,i)=>{
+
+            const newSeq =
+                areaCode +
+                String(i+1).padStart(3,"0");
+
+            works
+            .filter(w=>w.sequence_no===oldSeq)
+            .forEach(w=>{
+
+                bulk.push({
+
+                    id:w.id,
+
+                    sequence_no:newSeq,
+
+                    district:district
+
+                });
+
+            });
+
+        });
+
     });
 
-    if (bulkUpdatePayload.length > 0) {
-        await fetch(`${SB_URL}/rest/v1/work_orders`, {
-            method: 'POST', 
-            headers: {
-                ...headers,
-                'Prefer': 'resolution=merge-duplicates'
-            },
-            body: JSON.stringify(bulkUpdatePayload)
-        });
-    }
-}
+    if(!bulk.length) return;
 
+    await fetch(
+`${SB_URL}/rest/v1/work_orders`,
+{
+method:"POST",
+headers:{
+...headers,
+Prefer:"resolution=merge-duplicates"
+},
+body:JSON.stringify(bulk)
+});
+
+}
     function centerActiveForm(btn) {
         if(window.innerWidth <= 768) {
             btn.scrollIntoView({ 
