@@ -1524,15 +1524,16 @@ async function buildBlueformData(id, sharedData = null) {
     const interimDateMap = buildInterimDateMap(allInterims);
 
     let sectionUsed = {};
-    let totalSalvage = 0, totalPG = 0, totalTax = 0;
+let totalSalvage = 0, totalPG = 0, totalTax = 0, totalPenalty = 0; // Tambah variable penalty
 
-    allInterims.forEach(int => {
-        const intDate = new Date(int.date_received);
-        if (intDate > cutoffDate) return;
+allInterims.forEach(int => {
+    const intDate = new Date(int.date_received);
+    if (intDate > cutoffDate) return;
 
-        totalSalvage += Number(int.salvage_value || 0);
-        totalPG += Number(int.performance_guarantee_sum || 0);
-        totalTax += Number(int.tax || 0);
+    totalSalvage += Number(int.salvage_value || 0);
+    totalPG += Number(int.performance_guarantee_sum || 0);
+    totalTax += Number(int.tax || 0);
+    totalPenalty += Number(int.penalty || 0); // Ambil data penalty dari interim
 
         const cat = int.claim_breakdown || {};
         Object.keys(cat).forEach(sec => {
@@ -1593,9 +1594,11 @@ async function buildBlueformData(id, sharedData = null) {
             amt += Number(s?.amt || s?.amount || s?.value || 0);
         });
         bakiKontrak -= amt;
-        bakiKontrak += Number(int.salvage_value || 0);
-        bakiKontrak += Number(int.performance_guarantee_sum || 0);
-        bakiKontrak -= Number(int.tax || 0);
+bakiKontrak += Number(int.salvage_value || 0);
+bakiKontrak += Number(int.performance_guarantee_sum || 0);
+bakiKontrak -= Number(int.tax || 0);
+bakiKontrak -= Number(int.penalty || 0); // Tolak denda untuk dapatkan baki bersih
+
     });
 
     sortedAllWO.forEach((wo, index) => {
@@ -1611,13 +1614,14 @@ async function buildBlueformData(id, sharedData = null) {
     });
 
     return {
-        data, c, b, s,
-        totalWorkValue, provisionalExtra,
-        sectionUsed,
-        totalSalvage, totalPG, totalTax,
-        bakiKontrak,
-        voBreakdown, activeVO
-    };
+    data, c, b, s,
+    totalWorkValue, provisionalExtra,
+    sectionUsed,
+    totalSalvage, totalPG, totalTax, totalPenalty,
+    bakiKontrak,
+    voBreakdown, activeVO
+};
+
 }
 
 async function buildBlueformDataGroup(ids, sharedData = null) {
@@ -1701,6 +1705,7 @@ const combinedDesc = uniqueDescriptions.join(', ');
         totalSalvage += Number(int.salvage_value || 0);
         totalPG += Number(int.performance_guarantee_sum || 0);
         totalTax += Number(int.tax || 0);
+totalPenalty += Number(int.penalty || 0);
 
         const cat = int.claim_breakdown || {};
         Object.keys(cat).forEach(sec => {
@@ -1766,6 +1771,7 @@ const combinedDesc = uniqueDescriptions.join(', ');
         bakiKontrak += Number(int.salvage_value || 0);
         bakiKontrak += Number(int.performance_guarantee_sum || 0);
         bakiKontrak -= Number(int.tax || 0);
+bakiKontrak -= Number(int.penalty || 0);
     });
 
     sortedAllWO.forEach((wo, index) => {
@@ -1800,7 +1806,7 @@ const combinedDesc = uniqueDescriptions.join(', ');
         totalWorkValue,
         provisionalExtra: combinedProvisional,
         sectionUsed,
-        totalSalvage, totalPG, totalTax,
+        totalSalvage, totalPG, totalTax,totalPenalty,
         bakiKontrak,
         voBreakdown, activeVO
     };
@@ -1853,8 +1859,9 @@ async function bulkDownloadBlueform() {
 
 function buildBlueformHTML(payload) {
     const { data, c, b, s, totalWorkValue, provisionalExtra,
-            sectionUsed, totalSalvage, totalPG, totalTax,
+            sectionUsed, totalSalvage, totalPG, totalTax, totalPenalty,
             bakiKontrak, voBreakdown, activeVO } = payload;
+
 
     const effectiveVO = activeVO || voBreakdown;
 
@@ -1989,10 +1996,16 @@ function buildBlueformHTML(payload) {
                     <div class="bf-value">RM ${totalPG.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
                 </div>
                 <div class="bf-row" style="font-size:9px;">
-                    <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">TAX</span></div>
-                    <div class="bf-colon">:</div>
-                    <div class="bf-value">RM ${totalTax.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
-                </div>
+    <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">TAX</span></div>
+    <div class="bf-colon">:</div>
+    <div class="bf-value">RM ${totalTax.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+</div>
+<div class="bf-row" style="font-size:9px;">
+    <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">PENALTY</span></div>
+    <div class="bf-colon">:</div>
+    <div class="bf-value" style="color: #dc2626;">RM ${totalPenalty.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+</div>
+
             </div>
         </div>
 
@@ -2256,7 +2269,19 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
     taxRow += `<td style="text-align:right;">${formatRM(taxTotal)}</td><td colspan="3"></td></tr>`;
     body += taxRow;
 
-    grandTotalOngoingBalance += salvageTotal + pgTotal - taxTotal;
+    let penaltyTotal = 0;
+    let penaltyRow = `<tr><td></td><td>PENALTY</td><td style="text-align:right;">-</td>`;
+    interims.forEach((int, i) => {
+        const val = Number(int.penalty || 0); // Ambil nilai dari field database
+        penaltyTotal += val;
+        grandTotalInterims[i] -= val; // Mengurangkan jumlah bersih bayaran interim
+        penaltyRow += `<td style="text-align:right;color:#dc2626;">${val ? formatRM(val) : '-'}</td>`;
+    });
+    penaltyRow += `<td style="text-align:right;color:#dc2626;">${formatRM(penaltyTotal)}</td><td colspan="3"></td></tr>`;
+    body += penaltyRow;
+
+        // Sertakan sekali - penaltyTotal dalam formula imbangan baki kontrak
+    grandTotalOngoingBalance += salvageTotal + pgTotal - taxTotal - penaltyTotal; 
     grandTotalClaim = interims.reduce((acc, int) => acc + Number(int.net_amount || 0), 0);
 
     let totalRow = `<tr style="font-weight:bold;background:#eef4fc;border-top:2px solid #b0c4de;">
@@ -2267,7 +2292,7 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
     });
     totalRow += `
     <td style="text-align:right;">${formatRM(grandTotalClaim)}</td>
-    <td style="text-align:right;">${formatRM(grandTotalContractBalance + salvageTotal + pgTotal - taxTotal)}</td>
+    <td style="text-align:right;">${formatRM(grandTotalContractBalance + salvageTotal + pgTotal - taxTotal - penaltyTotal)}</td>
     <td style="text-align:right;">${formatRM(grandTotalOngoing)}</td>
     <td style="text-align:right;font-weight:bold;">${formatRM(grandTotalOngoingBalance)}</td>
     </tr>`;
