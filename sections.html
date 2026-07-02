@@ -825,27 +825,51 @@ function openDetail(type) {
                 subClass: ""
             })
         },
-                risk: {
+                        risk: {
             title: "Financial Deficit Risk (S.O.R)",
             color: "#ff6b6b",
             render: (c) => {
                 const financial = getProvisionalSumBalance(c);
-                // Bina teks duration jika tarikh mula dan tamat wujud
-                const duration = (c.contract_start && c.contract_end) 
-                    ? `${formatDate(c.contract_start)} - ${formatDate(c.contract_end)}` 
-                    : "No Date";
                 
+                let remainingText = "Tamat Tempoh";
+                if (c.contract_end) {
+                    const hariIni = new Date();
+                    const tarikhTamat = new Date(c.contract_end);
+                    
+                    if (tarikhTamat > hariIni) {
+                        let diffY = tarikhTamat.getFullYear() - hariIni.getFullYear();
+                        let diffM = tarikhTamat.getMonth() - hariIni.getMonth();
+                        
+                        // Laraskan bulan jika hari belum sampai tarikh matang bulanan
+                        if (tarikhTamat.getDate() < hariIni.getDate()) {
+                            diffM--;
+                        }
+                        if (diffM < 0) {
+                            diffM += 12;
+                            diffY--;
+                        }
+                        
+                        let parts = [];
+                        if (diffY > 0) parts.push(`${diffY} Year`);
+                        if (diffM > 0 || parts.length === 0) parts.push(`${diffM} Month`);
+                        
+                        remainingText = "Baki: " + parts.join(" ");
+                    }
+                }
+
                 return {
                     code: c.contract_code || c.id,
-                    // Gabungkan duration di atas baki balance guna tag HTML break <br> atau susun kemas
                     sub: `
-                        <div style="font-size: 10px; opacity: 0.6; margin-bottom: 2px;">${duration}</div>
+                        <div style="font-size: 11px; color: #fde047; font-weight: 600; margin-bottom: 2px;">
+                            <i class="fa-regular fa-clock" style="font-size: 10px; margin-right: 3px;"></i>${remainingText}
+                        </div>
                         <div class="danger" style="font-weight: 600;">Bal: ${formatRM(financial.balance)}</div>
                     `,
-                    subClass: "" // Kosongkan subClass sebab gaya tulisan dah diuruskan di atas
+                    subClass: ""
                 };
             }
         }
+
 
     };
 
