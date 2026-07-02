@@ -613,18 +613,12 @@
         } catch (error) { console.error("Error processing UI:", error); }
     }
 
-            function updateChartDirect(labels, targetAvgData, actualAvgData) {
-        // Kekalkan labels asal (tiada lagi pemotongan perkataan "SECTION")
-        const isMobile = window.innerWidth <= 768;
-
+    function updateChartDirect(labels, targetAvgData, actualAvgData) {
         if (myChart) {
             myChart.data.labels = labels;
             myChart.data.datasets[0].data = targetAvgData;
             myChart.data.datasets[1].data = actualAvgData;
-            // Kemaskini orientation ticks paksi-X secara dinamik jika saiz skrin berubah
-            myChart.options.scales.x.ticks.maxRotation = isMobile ? 45 : 0;
-            myChart.options.scales.x.ticks.minRotation = isMobile ? 45 : 0;
-            myChart.update('none'); 
+            myChart.update('none'); // Mod 'none' melangkau overhead animasi re-render carta
         } else {
             const ctx = document.getElementById('healthChart').getContext('2d');
             myChart = new Chart(ctx, {
@@ -637,71 +631,17 @@
                     ]
                 },
                 options: {
-                    responsive: true, 
-                    maintainAspectRatio: false,
-                    animation: { duration: 150 },
-                    // --- TAMBAH PADDING LAYOUT UTK ELAK TEKS BAWAH TERPOTONG ---
-                    layout: {
-                        padding: {
-                            bottom: isMobile ? 10 : 25, // Beri ruang ekstra di bawah carta untuk label panjang
-                            top: 5,
-                            left: 5,
-                            right: 5
-                        }
-                    },
+                    responsive: true, maintainAspectRatio: false,
+                    animation: { duration: 150 }, // PENGOPTIMUMAN GPU: Ringkaskan masa rendering awal carta
                     plugins: { 
                         legend: { position: 'top', labels: { font: { size: 10, weight: 'bold' } } },
-                        datalabels: { 
-                            font: { size: 9, weight: 'bold' },
-                            anchor: (context) => {
-                                const index = context.dataIndex;
-                                const isPlanned = context.datasetIndex === 0;
-                                const pVal = Number(context.chart.data.datasets[0].data[index] || 0);
-                                const aVal = Number(context.chart.data.datasets[1].data[index] || 0);
-
-                                if (Math.abs(pVal - aVal) < (Math.max(pVal, aVal) * 0.15)) {
-                                    return isPlanned ? 'start' : 'end';
-                                }
-                                return 'end';
-                            },
-                            align: (context) => {
-                                const index = context.dataIndex;
-                                const isPlanned = context.datasetIndex === 0;
-                                const pVal = Number(context.chart.data.datasets[0].data[index] || 0);
-                                const aVal = Number(context.chart.data.datasets[1].data[index] || 0);
-
-                                if (Math.abs(pVal - aVal) < (Math.max(pVal, aVal) * 0.15)) {
-                                    return isPlanned ? 'bottom' : 'top';
-                                }
-                                return 'top';
-                            },
-                            formatter: (v) => v > 0 ? `RM${Math.round(v).toLocaleString()}` : '' 
-                        }
+                        datalabels: { anchor: 'end', align: 'top', font: { size: 9, weight: 'bold' }, formatter: (v) => v > 0 ? `RM${Math.round(v).toLocaleString()}` : '' }
                     },
-                    scales: { 
-                        y: { 
-                            beginAtZero: true,
-                            grace: '15%' 
-                        }, 
-                        x: { 
-                            // --- TETAPAN PAKSI-X SUPAYA TEKS AMAN & TIDAK HILANG ---
-                            grid: {
-                                display: false // Tutup grid menegak supaya chart nampak lebih 'clean'
-                            },
-                            ticks: { 
-                                font: { size: 10, weight: 'bold' }, 
-                                autoSkip: false, // Wajib false supaya Chart.js tak sorok mana-mana nama section
-                                maxRotation: isMobile ? 45 : 0, // Senget 45 darjah di mobile, mendatar lurus di desktop
-                                minRotation: isMobile ? 45 : 0,
-                                padding: 8 // Jarak antara bar graf dengan teks label di bawahnya
-                            } 
-                        } 
-                    }
+                    scales: { y: { beginAtZero: true }, x: { ticks: { font: { size: 10, weight: 'bold' }, maxRotation: 45, minRotation: 45 } } }
                 }
             });
         }
     }
-
 
     function updateChart(currentInterims = []) {
         renderUI(currentInterims);
