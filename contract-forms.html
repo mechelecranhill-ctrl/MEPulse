@@ -766,14 +766,24 @@ color: #0b3d91;
 <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">
 
     <div>
-    <label>Tax Amount (RM)</label>
-    <input type="text"
-       id="i_tax_amount"
-       data-raw-value="0"
-       value="0.00"
-       placeholder="0.00"
-       oninput="formatCurrencyInput(this); calcInterimManualTotal()">
-</div>
+        <label>Tax Amount (RM)</label>
+        <input type="text"
+           id="i_tax_amount"
+           data-raw-value="0"
+           value="0.00"
+           placeholder="0.00"
+           oninput="formatCurrencyInput(this); calcInterimManualTotal()">
+    </div>
+
+    <div>
+        <label>Penalty / Deduction (RM)</label>
+        <input type="text"
+           id="i_penalty"
+           data-raw-value="0"
+           value="0.00"
+           placeholder="0.00"
+           oninput="formatCurrencyInput(this); calcInterimManualTotal()">
+    </div>
 
 </div>
 
@@ -1756,10 +1766,6 @@ return `${prefix} ${match[2]}${suffix}`;
 
 }
 
-/* ============================================================
-   WORK ORDER — Multiple Work ID rows
-   ============================================================ */
-
 function addWorkIdRow(prefix = 'C', num = ''){
 
     const container = document.getElementById('w_id_rows_container');
@@ -1852,10 +1858,6 @@ function normalizeWorkIdWithPrefix(prefix, raw){
 
     return `${usedPrefix} ${match[2]}${suffix}`;
 }
-
-/* ============================================================
-   WORK ORDER — Per-Work-ID cards
-   ============================================================ */
 
 function buildSectionFieldsHtml(workId, sectionData){
 
@@ -2170,7 +2172,8 @@ document.getElementById('i_no').value = '';
 }
 
 document.getElementById('i_date_received').value = '';
-['i_salvage','i_pg_sum','i_tax_amount'].forEach(id=>{
+['i_salvage','i_pg_sum','i_tax_amount','i_penalty'].forEach(id=>{
+
     const el = document.getElementById(id);
     el.value = '0.00';
     el.dataset.rawValue = '0';
@@ -2232,23 +2235,18 @@ function addWorkOrdersToList() {
     let total = 0;
 
     document.querySelectorAll('.i_sec_claim_val').forEach(input => {
-    total += parseFloat(input.dataset.rawValue || 0);
-});
+        total += parseFloat(input.dataset.rawValue || 0);
+    });
 
-    const salvage = parseFloat(
-    document.getElementById('i_salvage').dataset.rawValue || 0
-);
+    const salvage = parseFloat(document.getElementById('i_salvage').dataset.rawValue || 0);
+    const pg = parseFloat(document.getElementById('i_pg_sum').dataset.rawValue || 0);
+    const taxAmount = parseFloat(document.getElementById('i_tax_amount').dataset.rawValue || 0);
+    const penalty = parseFloat(document.getElementById('i_penalty').dataset.rawValue || 0);
 
-const pg = parseFloat(
-    document.getElementById('i_pg_sum').dataset.rawValue || 0
-);
+    // Formula Bersih: Claims - Salvage - PG + Tax - Penalty
+    const net = total - salvage - pg + taxAmount - penalty;
 
-const taxAmount = parseFloat(
-    document.getElementById('i_tax_amount').dataset.rawValue || 0
-);
-
-const net = total - salvage - pg + taxAmount;
-       document.getElementById('i_total_display').innerHTML = `
+    document.getElementById('i_total_display').innerHTML = `
         <span style="font-size:12px; color:#666;">Total Claims</span><br>
         <span style="font-size:20px; color:var(--ios-orange); font-weight:800;">
         RM ${total.toLocaleString(undefined,{minimumFractionDigits:2})}
@@ -2256,14 +2254,24 @@ const net = total - salvage - pg + taxAmount;
 
         <br><br>
 
-        <span style="font-size:12px; color:#666;">Tax Amount</span><br>
-<span style="font-size:16px; color:#555; font-weight:600;">
-RM ${taxAmount.toLocaleString(undefined,{minimumFractionDigits:2})}
-</span>
+        <div style="display:flex; justify-content: flex-end; gap:20px; text-align:right;">
+            <div>
+                <span style="font-size:11px; color:#666;">Tax Amount</span><br>
+                <span style="font-size:14px; color:#555; font-weight:600;">
+                RM ${taxAmount.toLocaleString(undefined,{minimumFractionDigits:2})}
+                </span>
+            </div>
+            <div>
+                <span style="font-size:11px; color:#FF3B30;">Penalty</span><br>
+                <span style="font-size:14px; color:#FF3B30; font-weight:600;">
+                RM ${penalty.toLocaleString(undefined,{minimumFractionDigits:2})}
+                </span>
+            </div>
+        </div>
 
-        <br><br>
+        <br>
 
-        <span style="font-size:12px; color:#666;">Nett Claims After Subtraction & Tax</span><br>
+        <span style="font-size:12px; color:#666;">Nett Claims After Subtraction, Tax & Penalty</span><br>
         <span style="font-size:20px; color:var(--ios-blue); font-weight:800;">
         RM ${net.toLocaleString(undefined,{minimumFractionDigits:2})}
         </span>
@@ -2271,6 +2279,7 @@ RM ${taxAmount.toLocaleString(undefined,{minimumFractionDigits:2})}
 
     return total;
 }
+
 
 async function submitInterim(){
 
@@ -2329,7 +2338,11 @@ const taxAmount = parseFloat(
     document.getElementById('i_tax_amount').dataset.rawValue || 0
 );
 
-const net = total - salvage - pg + taxAmount;
+const penalty = parseFloat(
+    document.getElementById('i_penalty').dataset.rawValue || 0
+);
+
+const net = total - salvage - pg + taxAmount - penalty;
 
 const payload = {
 
@@ -2344,6 +2357,8 @@ salvage_value: salvage,
 performance_guarantee_sum: pg,
 
 tax: taxAmount,
+
+penalty: penalty,
 
 claim_breakdown: breakdown,
 
@@ -2957,8 +2972,10 @@ document.getElementById('i_date_received').value =
 [
     ['i_salvage', i.salvage_value],
     ['i_pg_sum', i.performance_guarantee_sum],
-    ['i_tax_amount', i.tax]
+    ['i_tax_amount', i.tax],
+    ['i_penalty', i.penalty]
 ].forEach(([id,val])=>{
+
 
     const num = Number(val || 0);
     const el = document.getElementById(id);
