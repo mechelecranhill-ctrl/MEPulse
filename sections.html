@@ -703,15 +703,17 @@ function formatRM(value) {
 
 function findProvisionalSumKey(breakdown) {
     if (!breakdown) return null;
+    // Cari key (contoh: "F", "Section F") yang mempunyai nilai .desc secara padanan 1:1 tepat dengan "PROVISIONAL SUM"
     return Object.keys(breakdown).find(k => {
         const item = breakdown[k];
-        const description = typeof item === 'object' ? (item.desc || '') : '';
-        return k.toUpperCase().trim().includes("PROVISIONAL SUM")
-            || description.toUpperCase().trim().includes("PROVISIONAL SUM");
+        if (typeof item === 'object' && item.desc) {
+            return item.desc.toUpperCase().trim() === "PROVISIONAL SUM";
+        }
+        return false;
     });
 }
 
-/* ── KEMASKINI PENUH: getProvisionalSumBalance SEBIJI IKUT buildInterimMatrix ── */
+/* ── KEMASKINI PENUH: Kiraan baki Provisional Sum mengikut tapisan ketat ── */
 function getProvisionalSumBalance(c) {
     const breakdown = c.contract_sections_breakdown || {};
     const cache = contractClaimCache[c.id] || { interimUsed: {}, woUsed: {} };
@@ -726,7 +728,7 @@ function getProvisionalSumBalance(c) {
         typeof pSumValue === 'object' ? (pSumValue.amt || pSumValue.amount || 0) : pSumValue
     ) || 0;
 
-    // Tambah VO ke budget — sebiji ikut logik pengiraan voBreakdown dalam buildInterimMatrix
+    // Tambah nilai VO ke dalam budget jika ada breakdown seksyen tersebut
     let voAmt = 0;
     Object.values(voBreakdown).forEach(vo => {
         if (vo && vo.breakdown && vo.breakdown[pSumKey]) {
@@ -735,12 +737,47 @@ function getProvisionalSumBalance(c) {
     });
     const budget = baseAmt + voAmt;
 
+    // Ambil jumlah yang telah di-claim daripada jadual interims
     const totalInterimClaim = Number(cache.interimUsed[keyUpper] || 0);
+    
+    // Ambil jumlah komitmen daripada jadual work_orders yang belum diproses masuk interim
     const totalOngoingWO = Number(cache.woUsed[keyUpper] || 0);
+    
     const used = totalInterimClaim + totalOngoingWO;
     const balance = budget - used;
 
     return { budget, used, balance };
+}
+
+function isFinancialDeficitRisk(c) {
+    if (!c.contract_start || !c.contract_end || !c.contract_sections_breakdown) return false;
+
+    const hariIni = new Date();
+    const start = new Date(c.contract_start);
+    const end = new Date(c.contract_end);
+
+    // Abaikan kontrak lama yang dah tamat tempoh sepenuhnya
+    if (end < hariIni) return false;
+
+    const totalMonths = Math.max(1,
+        (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth())
+    );
+    let monthsElapsed = (hariIni.getFullYear() - start.getFullYear()) * 12
+        + (hariIni.getMonth() - start.getMonth()) + 1;
+    monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
+
+    const breakdown = c.contract_sections_breakdown || {};
+    const pSumKey = findProvisionalSumKey(breakdown);
+    if (!pSumKey) return false;
+
+    const financial = getProvisionalSumBalance(c);
+    if (financial.budget === 0) return false;
+
+    // Pengiraan unjuran (pro-rated planned budget) setakat bulan semasa
+    const plannedTotalToDate = (financial.budget / totalMonths) * monthsElapsed;
+
+    // Kontrak dikira 'burst' / deficit risk jika penggunaan sebenar melebihi unjuran jadual
+    return financial.used > plannedTotalToDate;
 }
 
 function openDetail(type) {
