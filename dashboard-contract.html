@@ -613,16 +613,17 @@
         } catch (error) { console.error("Error processing UI:", error); }
     }
 
-                function updateChartDirect(labels, targetAvgData, actualAvgData) {
+            function updateChartDirect(labels, targetAvgData, actualAvgData) {
+        // Kekalkan labels asal (tiada lagi pemotongan perkataan "SECTION")
         const isMobile = window.innerWidth <= 768;
 
         if (myChart) {
             myChart.data.labels = labels;
             myChart.data.datasets[0].data = targetAvgData;
             myChart.data.datasets[1].data = actualAvgData;
+            // Kemaskini orientation ticks paksi-X secara dinamik jika saiz skrin berubah
             myChart.options.scales.x.ticks.maxRotation = isMobile ? 45 : 0;
             myChart.options.scales.x.ticks.minRotation = isMobile ? 45 : 0;
-            myChart.options.layout.padding.bottom = isMobile ? 30 : 25; // Tingkatkan padding bawah untuk mobile
             myChart.update('none'); 
         } else {
             const ctx = document.getElementById('healthChart').getContext('2d');
@@ -639,10 +640,11 @@
                     responsive: true, 
                     maintainAspectRatio: false,
                     animation: { duration: 150 },
+                    // --- TAMBAH PADDING LAYOUT UTK ELAK TEKS BAWAH TERPOTONG ---
                     layout: {
                         padding: {
-                            bottom: isMobile ? 30 : 25, // Tambah ruang extra di bawah supaya teks senget mobile tak terpotong
-                            top: 20, // Tambah ruang atas supaya label atas bar ada ruang bernafas
+                            bottom: isMobile ? 10 : 25, // Beri ruang ekstra di bawah carta untuk label panjang
+                            top: 5,
                             left: 5,
                             right: 5
                         }
@@ -651,29 +653,27 @@
                         legend: { position: 'top', labels: { font: { size: 10, weight: 'bold' } } },
                         datalabels: { 
                             font: { size: 9, weight: 'bold' },
-                            // --- KEKALKAN SEMUA DI ATAS BAR UNTUK MOBILE ---
-                            anchor: 'end', 
-                            align: (context) => {
-                                if (!isMobile) {
-                                    // LOGIK DESKTOP: Guna top/bottom jika nilai terlalu rapat
-                                    const index = context.dataIndex;
-                                    const isPlanned = context.datasetIndex === 0;
-                                    const pVal = Number(context.chart.data.datasets[0].data[index] || 0);
-                                    const aVal = Number(context.chart.data.datasets[1].data[index] || 0);
+                            anchor: (context) => {
+                                const index = context.dataIndex;
+                                const isPlanned = context.datasetIndex === 0;
+                                const pVal = Number(context.chart.data.datasets[0].data[index] || 0);
+                                const aVal = Number(context.chart.data.datasets[1].data[index] || 0);
 
-                                    if (Math.abs(pVal - aVal) < (Math.max(pVal, aVal) * 0.15)) {
-                                        return isPlanned ? 'bottom' : 'top';
-                                    }
-                                    return 'top';
-                                } else {
-                                    // LOGIK MOBILE: Semua di atas bar, tapi Planned condong ke kiri (-45°), Actual condong ke kanan (45°)
-                                    // Ini mengelakkan teks bertindih walaupun bar sangat kurus
-                                    return context.datasetIndex === 0 ? 'left' : 'right';
+                                if (Math.abs(pVal - aVal) < (Math.max(pVal, aVal) * 0.15)) {
+                                    return isPlanned ? 'start' : 'end';
                                 }
+                                return 'end';
                             },
-                            // Jika di mobile, kita serongkan sikit teks RM tu supaya tak berlaga
-                            rotation: (context) => {
-                                return isMobile ? (context.datasetIndex === 0 ? -25 : 25) : 0;
+                            align: (context) => {
+                                const index = context.dataIndex;
+                                const isPlanned = context.datasetIndex === 0;
+                                const pVal = Number(context.chart.data.datasets[0].data[index] || 0);
+                                const aVal = Number(context.chart.data.datasets[1].data[index] || 0);
+
+                                if (Math.abs(pVal - aVal) < (Math.max(pVal, aVal) * 0.15)) {
+                                    return isPlanned ? 'bottom' : 'top';
+                                }
+                                return 'top';
                             },
                             formatter: (v) => v > 0 ? `RM${Math.round(v).toLocaleString()}` : '' 
                         }
@@ -681,16 +681,19 @@
                     scales: { 
                         y: { 
                             beginAtZero: true,
-                            grace: '20%' // Tingkatkan ke 20% supaya ada ruang untuk ejas posisi datalabels
+                            grace: '15%' 
                         }, 
                         x: { 
-                            grid: { display: false },
+                            // --- TETAPAN PAKSI-X SUPAYA TEKS AMAN & TIDAK HILANG ---
+                            grid: {
+                                display: false // Tutup grid menegak supaya chart nampak lebih 'clean'
+                            },
                             ticks: { 
                                 font: { size: 10, weight: 'bold' }, 
-                                autoSkip: false, 
-                                maxRotation: isMobile ? 45 : 0, 
+                                autoSkip: false, // Wajib false supaya Chart.js tak sorok mana-mana nama section
+                                maxRotation: isMobile ? 45 : 0, // Senget 45 darjah di mobile, mendatar lurus di desktop
                                 minRotation: isMobile ? 45 : 0,
-                                padding: 10 
+                                padding: 8 // Jarak antara bar graf dengan teks label di bawahnya
                             } 
                         } 
                     }
