@@ -197,7 +197,7 @@ async function startAutoDownload() {
                     });
                 });
 
-                const addSpecialRow = (label, interimKey, isNet = false) => {
+                                const addSpecialRow = (label, interimKey, isNet = false) => {
                     const rIdx = ws_data.length;
                     let row = ["", label, "", 0];
                     if(isNet) {
@@ -217,13 +217,40 @@ async function startAutoDownload() {
                             let totalContractAmt = 0;
                             sectionNames.forEach(s => totalContractAmt += Number(sections[s]?.amt || 0));
                             Object.values(voBreakdown).forEach(vo => { totalContractAmt += Number(vo.amt || 0); });
+                            
                             let totalOngoingSum = 0;
                             workorders.filter(w => w.status !== 'Claimed').forEach(w => {
                                 if(w.section_category) {
                                     sectionNames.forEach(s => totalOngoingSum += Number(w.section_category[s]?.amt || 0));
                                 } else { totalOngoingSum += Number(w.total_amount || 0); }
                             });
-                            const totalBalance = totalContractAmt - totalClaimSum;
+
+                            // --- LOGIK INTEGRASI PENALTY KE BAKI KONTRAK ---
+                            let totalClaimAllSections = 0;
+                            let totalPgSum = 0;
+                            let totalSalvageSum = 0;
+                            let totalTaxSum = 0;
+                            let totalPenaltySum = 0;
+
+                            interims.forEach(int => {
+                                totalPgSum += Number(int.performance_guarantee_sum || 0);
+                                totalSalvageSum += Number(int.salvage_value || 0);
+                                totalTaxSum += Number(int.tax || 0);
+                                totalPenaltySum += Number(int.penalty || 0);
+
+                                sectionNames.forEach(sec => {
+                                    totalClaimAllSections += Number(int.claim_breakdown?.[sec]?.amt || 0);
+                                    Object.keys(voBreakdown).forEach(voName => {
+                                        if (int.claim_breakdown?.[sec]?.vo?.[voName]) {
+                                            totalClaimAllSections += Number(int.claim_breakdown[sec].vo[voName].amt || 0);
+                                        }
+                                    });
+                                });
+                            });
+
+                            // Formula baki mengambil kira - Penalty & - Tax
+                            const totalBalance = totalContractAmt - totalClaimAllSections + totalSalvageSum + totalPgSum - totalTaxSum - totalPenaltySum;
+                            
                             row.push(totalClaimSum, totalBalance, totalOngoingSum, (totalBalance - totalOngoingSum));
                         } else { row.push(totalClaimSum, 0, 0, 0); }
                     }
@@ -231,11 +258,14 @@ async function startAutoDownload() {
                     merges.push({ s: { r: rIdx, c: 1 }, e: { r: rIdx, c: 2 } });
                 };
 
+                // PANGGILAN BARIS KHAS (Termasuk Penalty)
                 addSpecialRow("PERFORMANCE GUARANTEE SUM", "performance_guarantee_sum");
-addSpecialRow("SALVAGE VALUE", "salvage_value");
-addSpecialRow("TAX", "tax");
-addSpecialRow("TOTAL BRING TO INTERIM PAYMENT", "", true);
+                addSpecialRow("SALVAGE VALUE", "salvage_value");
+                addSpecialRow("TAX", "tax");
+                addSpecialRow("PENALTY", "penalty"); // <--- BARIS BARU BARU DITAMBAH
+                addSpecialRow("TOTAL BRING TO INTERIM PAYMENT", "", true);
                 ws_data.push([]); 
+ 
             }
 
             // ===== Bilangan lajur INTERIM: default 1-10, 11-20, 21-26.
