@@ -613,31 +613,84 @@
         } catch (error) { console.error("Error processing UI:", error); }
     }
 
-    function updateChartDirect(labels, targetAvgData, actualAvgData) {
+        function updateChartDirect(labels, targetAvgData, actualAvgData) {
+        // --- 1. LOGIK PENAPISAN NAMA PAKSI-X (DESKTOP VS MOBILE) ---
+        const isMobile = window.innerWidth <= 768;
+        const processedLabels = labels.map(label => {
+            if (!isMobile) {
+                // Saring huruf sahaja jika mengandungi perkataan "SECTION X"
+                const match = label.match(/SECTION\s+([A-Z])/i);
+                return match ? match[1] : label;
+            }
+            return label; // Kekalkan asal jika di mobile
+        });
+
         if (myChart) {
-            myChart.data.labels = labels;
+            myChart.data.labels = processedLabels;
             myChart.data.datasets[0].data = targetAvgData;
             myChart.data.datasets[1].data = actualAvgData;
-            myChart.update('none'); // Mod 'none' melangkau overhead animasi re-render carta
+            myChart.update('none'); // Mod 'none' melangkau overhead rendering animasi
         } else {
             const ctx = document.getElementById('healthChart').getContext('2d');
             myChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: labels,
+                    labels: processedLabels,
                     datasets: [
                         { label: 'Planned', data: targetAvgData, backgroundColor: 'rgba(200, 200, 205, 0.5)', borderRadius: 5 },
                         { label: 'Actual', data: actualAvgData, backgroundColor: '#007AFF', borderRadius: 5 }
                     ]
                 },
                 options: {
-                    responsive: true, maintainAspectRatio: false,
-                    animation: { duration: 150 }, // PENGOPTIMUMAN GPU: Ringkaskan masa rendering awal carta
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    animation: { duration: 150 }, 
                     plugins: { 
                         legend: { position: 'top', labels: { font: { size: 10, weight: 'bold' } } },
-                        datalabels: { anchor: 'end', align: 'top', font: { size: 9, weight: 'bold' }, formatter: (v) => v > 0 ? `RM${Math.round(v).toLocaleString()}` : '' }
+                        // --- 2. LOGIK ATASI DATA LABELS BERTINDIH ---
+                        datalabels: { 
+                            font: { size: 9, weight: 'bold' },
+                            // Tukar anchor/align secara dinamik berdasarkan perbandingan nilai
+                            anchor: (context) => {
+                                const index = context.dataIndex;
+                                const isPlanned = context.datasetIndex === 0;
+                                const pVal = Number(targetAvgData[index] || 0);
+                                const aVal = Number(actualAvgData[index] || 0);
+
+                                // Jika nilai terlalu rapat, hantar salah satu ke dalam bar (start/center)
+                                if (Math.abs(pVal - aVal) < (Math.max(pVal, aVal) * 0.15)) {
+                                    return isPlanned ? 'start' : 'end';
+                                }
+                                return 'end';
+                            },
+                            align: (context) => {
+                                const index = context.dataIndex;
+                                const isPlanned = context.datasetIndex === 0;
+                                const pVal = Number(targetAvgData[index] || 0);
+                                const aVal = Number(actualAvgData[index] || 0);
+
+                                if (Math.abs(pVal - aVal) < (Math.max(pVal, aVal) * 0.15)) {
+                                    return isPlanned ? 'top' : 'top';
+                                }
+                                return 'top';
+                            },
+                            formatter: (v) => v > 0 ? `RM${Math.round(v).toLocaleString()}` : '' 
+                        }
                     },
-                    scales: { y: { beginAtZero: true }, x: { ticks: { font: { size: 10, weight: 'bold' }, maxRotation: 45, minRotation: 45 } } }
+                    scales: { 
+                        y: { 
+                            beginAtZero: true,
+                            // Tambah padding atas paksi Y sebanyak 15% supaya label tertinggi tak terpotong
+                            grace: '15%' 
+                        }, 
+                        x: { 
+                            ticks: { 
+                                font: { size: 10, weight: 'bold' }, 
+                                maxRotation: isMobile ? 45 : 0, // Kekalkan senget di mobile, tegak di desktop
+                                minRotation: isMobile ? 45 : 0 
+                            } 
+                        } 
+                    }
                 }
             });
         }
