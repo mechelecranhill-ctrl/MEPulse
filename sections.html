@@ -640,6 +640,22 @@ const headers = {
     Authorization: `Bearer ${SB_KEY}`
 };
 
+async function fetchAllRows(url) {
+    let all = [];
+    let from = 0;
+    const pageSize = 1000;
+    while (true) {
+        const res = await fetch(url, {
+            headers: { ...headers, Range: `${from}-${from + pageSize - 1}` }
+        });
+        const chunk = await res.json();
+        all = all.concat(chunk);
+        if (chunk.length < pageSize) break;
+        from += pageSize;
+    }
+    return all;
+}
+
 const wheel = document.getElementById("wheel");
 const title = document.getElementById("title");
 const card = document.getElementById("infoCard");
@@ -880,15 +896,11 @@ openBtn.addEventListener("click", (e) => {
 
 async function loadSections(){
     try {
-        const [secRes, interimRes, woRes] = await Promise.all([
-            fetch(`${SB_URL}/rest/v1/me_sections?select=*,units(*,contract(id,contract_code,contract_name,contract_start,contract_end,contract_sum,contract_sections_breakdown,vo_breakdown))`, { headers }),
-            fetch(`${SB_URL}/rest/v1/interims?select=contract_id,claim_breakdown`, { headers }),
-            fetch(`${SB_URL}/rest/v1/work_orders?select=contract_id,interim_no,section_category,additional,status`, { headers })
+        const [sections, allInterims, allWOs] = await Promise.all([
+            fetch(`${SB_URL}/rest/v1/me_sections?select=*,units(*,contract(id,contract_code,contract_name,contract_start,contract_end,contract_sum,contract_sections_breakdown,vo_breakdown))`, { headers }).then(r => r.json()),
+            fetchAllRows(`${SB_URL}/rest/v1/interims?select=contract_id,claim_breakdown`),
+            fetchAllRows(`${SB_URL}/rest/v1/work_orders?select=contract_id,interim_no,section_category,additional,status`)
         ]);
-
-        const sections = await secRes.json();
-        const allInterims = await interimRes.json();
-        const allWOs = await woRes.json();
 
         contractClaimCache = {};
         contractPSumKeyCache = {};
@@ -931,6 +943,9 @@ async function loadSections(){
 
             // Skip jika status adalah VO kerana VO ditapis berasingan masuk terus ke kiraan Budget
             if (statusUpper === "VARIATION ORDER" || statusUpper === "VO") return;
+
+            // Skip jika kerja telah dibatalkan
+            if (statusUpper === "CANCEL") return;
 
             if (!contractClaimCache[wo.contract_id]) {
                 contractClaimCache[wo.contract_id] = { interimUsed: {}, woUsed: {} };
@@ -977,35 +992,6 @@ async function loadSections(){
     } catch(err) {
         console.error("Failed to fetch data:", err);
     }
-}
-
-function isFinancialDeficitRisk(c) {
-    if (!c.contract_start || !c.contract_end || !c.contract_sections_breakdown) return false;
-
-    const hariIni = new Date();
-    const start = new Date(c.contract_start);
-    const end = new Date(c.contract_end);
-
-    if (end < hariIni) return false;
-
-    const totalMonths = Math.max(1,
-        (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth())
-    );
-    let monthsElapsed = (hariIni.getFullYear() - start.getFullYear()) * 12
-        + (hariIni.getMonth() - start.getMonth()) + 1;
-    monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
-
-    const breakdown = c.contract_sections_breakdown || {};
-    const pSumKey = findProvisionalSumKey(breakdown);
-    if (!pSumKey) return false;
-
-    // Guna getProvisionalSumBalance untuk dapat budget (sudah termasuk VO)
-    const financial = getProvisionalSumBalance(c);
-    if (financial.budget === 0) return false;
-
-    const plannedTotalToDate = (financial.budget / totalMonths) * monthsElapsed;
-
-    return financial.used > plannedTotalToDate;
 }
 
 /* ── CREATE WHEEL ── */
@@ -1121,16 +1107,6 @@ function update(){
             const tarikhTamat = new Date(c.contract_end);
 
             if (isFinancialDeficitRisk(c)) currentLists.risk.push(c);
-
-// ── TEMP DEBUG ──
-        if (c.contract_code === "RSAJ/KP/T/111/2023") {
-            const pKey = findProvisionalSumKey(c.contract_sections_breakdown);
-            console.log("pSumKey:", pKey);
-            console.log("cache.interimUsed:", contractClaimCache[c.id]?.interimUsed);
-            console.log("cache.woUsed:", contractClaimCache[c.id]?.woUsed);
-            console.log(getProvisionalSumBalance(c));
-        }
-        // ── END TEMP DEBUG ──
 
             if (tarikhTamat < hariIni) {
                 currentLists.cpc.push(c);
