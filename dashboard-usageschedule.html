@@ -1186,6 +1186,8 @@ function renderTable(data, showArea = true){
     const tbody = document.getElementById('workOrderTbody');
     let html = '';
     let currentArea = '';
+    
+    // Langkah 1: Kumpul data mengikut sequence untuk dapatkan semua gabungan ID
     const seqGroups = {};
     data.forEach(w => {
         const seq = (w.sequence_no || '').trim();
@@ -1196,136 +1198,85 @@ function renderTable(data, showArea = true){
             seqGroups[groupKey].push(w);
         }
     });
-    const processedSeqs = new Set();
+
+    // Set untuk track sequence mana yang butang Blueformnya dah dipaparkan
+    const renderedBlueformSeqs = new Set();
+
+    // Langkah 2: Render setiap baris secara berasingan (Row Asing)
     data.forEach(w => {
         const seq = (w.sequence_no || '').trim();
         const district = (w.district || '').trim().toUpperCase();
         const groupKey = district + '||' + seq;
         const area = (w.area_code || 'LAIN').toUpperCase();
+        
+        // Render Area Header
         if(showArea && area !== currentArea){
             html += `<tr class="area-header"><td colspan="10" style="padding:10px;"><i class="fa fa-layer-group"></i> ${area}</td></tr>`;
             currentArea = area;
         }
-        if(seq !== '' && seqGroups[groupKey]){
-            if(processedSeqs.has(groupKey)) return;
-            processedSeqs.add(groupKey);
-            const group = seqGroups[groupKey];
-            const mainW = group[0];
-            const allWorkIds = group.map(g => g.work_id).join(', ');
-            const uniqueLocations = [...new Set(group.map(g => (g.location || '').trim()).filter(l => l !== ''))];
-            const combinedLocation = uniqueLocations.join(', ');
-            const uniqueDescriptions = [
-                ...new Map(
-                    group
-                        .map(g => [(g.description || '').trim().toLowerCase(), g.description])
-                        .filter(([k, v]) => k !== '')
-                ).values()
-            ];
 
-            const allDesc = uniqueDescriptions.join(', ');
-            const combinedAmt = group.reduce((sum, g) => sum + Number(g.amount_spent || 0), 0);
-            const combinedSec = {};
-            group.forEach(g => {
-                const s = g.section_category || {};
-                Object.keys(s).forEach(sec => {
-                    const amt = Number(s[sec]?.amt || 0);
-                    if(!combinedSec[sec]) combinedSec[sec] = 0;
-                    combinedSec[sec] += amt;
-                });
-                const add = Number(g.additional || 0);
-                if(add > 0){
-                    if(!combinedSec["PROVISIONAL SUM"]) combinedSec["PROVISIONAL SUM"] = 0;
-                    combinedSec["PROVISIONAL SUM"] += add;
-                }
-            });
-            let secHtml = '';
-            Object.keys(combinedSec).forEach(sec => {
-                const amt = combinedSec[sec];
-                if(amt <= 0) return;
-                secHtml += `<div style="display:flex;justify-content:space-between;font-size:11px;color:#666;"><span>${sec}</span><span>RM ${amt.toLocaleString(undefined,{minimumFractionDigits:2})}</span></div>`;
-            });
-            const allInterimNos = [...new Set(group.map(g => g.interim_no).filter(Boolean))];
-            const allClaimed = group.every(g => g.interim_no);
-            const groupStatus = allClaimed ? 'CLAIMED' : (mainW.status || 'BLUEFORM');
-            const allIdsStr = group.map(g => g.id).join(',');
-            const groupBadge = group.length > 1
-                ? `<span style="background:#007AFF20;color:#007AFF;border-radius:10px;padding:2px 7px;font-size:9px;font-weight:700;margin-left:6px;">${group.length} WO</span>`
-                : '';
-            
-            // ---> [SUNTIKAN KELAS DI SINI] Menyuntik css class status mengikut status group semasa
-            html += `
-            <tr class="status-${groupStatus.toLowerCase().replace(/\s+/g,'')}">
-                <td>
-                    <select onchange="updateStatusGroup('${allIdsStr}', this.value)" ${allClaimed ? 'disabled' : ''}
-                        style="width:100%;max-width:140px;padding:6px 8px;border-radius:10px;border:1px solid #ddd;font-size:11px;font-weight:700;background:${allClaimed ? '#f1f1f1' : 'white'};box-sizing:border-box;">
-                        <option value="BLUEFORM"        ${groupStatus === 'BLUEFORM'        ? 'selected' : ''}>BLUEFORM</option>
-                        <option value="APPROVED"        ${groupStatus === 'APPROVED'        ? 'selected' : ''}>APPROVED</option>
-                        <option value="INDENT"          ${groupStatus === 'INDENT'          ? 'selected' : ''}>INDENT</option>
-                        <option value="INDENT APPROVED" ${groupStatus === 'INDENT APPROVED' ? 'selected' : ''}>INDENT APPROVED</option>
-                        <option value="CANCEL"          ${groupStatus === 'CANCEL'          ? 'selected' : ''}>CANCEL</option>
-                        <option value="CLAIMED"         ${allClaimed                        ? 'selected' : ''}>CLAIMED</option>
-                    </select>
-                </td>
-                <td><strong>${seq}</strong>${groupBadge}</td>
-                <td><strong>${allWorkIds}</strong></td>
-                <td>
-                    <div style="font-weight:500;">${allDesc}</div>
-                    <div style="font-size:11px;color:var(--ios-orange);"><i class="fa-solid fa-map-pin"></i> ${combinedLocation || 'N/A'}</div>
-                </td>
-                <td><strong>${allInterimNos.length ? allInterimNos.map(n => 'INT-' + n).join(', ') : '-'}</strong></td>
-                <td><strong>RM ${combinedAmt.toLocaleString(undefined,{minimumFractionDigits:2})}</strong>${secHtml}</td>
-                <td style="font-weight:bold;color:var(--ios-green);">RM ${(allClaimed ? combinedAmt : 0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
-                <td>${formatTarikhBM(mainW.qpb_date)}</td>
-                <td>
+        const currentStatus = w.interim_no ? 'CLAIMED' : (w.status || 'BLUEFORM');
+        
+        // Logik Butang Blueform (Hanya pada ID terawal / row pertama)
+        let actionHtml = '';
+        let checkboxHtml = '';
+
+        if (seq !== '') {
+            // Jika dalam kumpulan sequence, semak adakah ini row pertama
+            if (!renderedBlueformSeqs.has(groupKey)) {
+                renderedBlueformSeqs.add(groupKey); // Tandakan sebagai dah papar butang
+                
+                // Ambil semua ID dalam sequence ini untuk dicetak sekaligus
+                const allIdsStr = seqGroups[groupKey].map(g => g.id).join(',');
+                
+                actionHtml = `
                     <button class="btn-action" style="background:var(--ios-orange);padding:8px 14px;font-size:12px;" onclick="openBlueformGroup('${allIdsStr}')">
                         <i class="fa-solid fa-print"></i> Blueform
-                    </button>
-                </td>
-                <td style="text-align:center;">
-                    <input type="checkbox" class="bf-checkbox" value="${allIdsStr}" style="width:18px;height:18px;cursor:pointer;">
-                </td>
-            </tr>`;
+                    </button>`;
+                checkboxHtml = `<input type="checkbox" class="bf-checkbox" value="${allIdsStr}" style="width:18px;height:18px;cursor:pointer;">`;
+            }
         } else {
-            const currentStatus = w.interim_no ? 'CLAIMED' : (w.status || 'BLUEFORM');
-
-            // ---> [SUNTIKAN KELAS DI SINI] Menyuntik css class status mengikut status individu semasa
-            html += `
-            <tr class="status-${currentStatus.toLowerCase().replace(/\s+/g,'')}">
-                <td>
-                    <select onchange="updateStatus(${w.id}, this.value)" ${w.interim_no ? 'disabled' : ''}
-                        style="width:100%;max-width:140px;padding:6px 8px;border-radius:10px;border:1px solid #ddd;font-size:11px;font-weight:700;background:${w.interim_no ? '#f1f1f1' : 'white'};box-sizing:border-box;">
-                        <option value="BLUEFORM"        ${currentStatus === 'BLUEFORM'        ? 'selected' : ''}>BLUEFORM</option>
-                        <option value="APPROVED"        ${currentStatus === 'APPROVED'        ? 'selected' : ''}>APPROVED</option>
-                        <option value="INDENT"          ${currentStatus === 'INDENT'          ? 'selected' : ''}>INDENT</option>
-                        <option value="INDENT APPROVED" ${currentStatus === 'INDENT APPROVED' ? 'selected' : ''}>INDENT APPROVED</option>
-                        <option value="CANCEL"          ${currentStatus === 'CANCEL'          ? 'selected' : ''}>CANCEL</option>
-                        <option value="CLAIMED"         ${w.interim_no                        ? 'selected' : ''}>CLAIMED</option>
-                    </select>
-                </td>
-                <td><strong>${w.sequence_no || '-'}</strong></td>
-                <td><strong>${w.work_id}</strong></td>
-                <td>
-                    <div style="font-weight:500;">${w.description}</div>
-                    <div style="font-size:11px;color:var(--ios-orange);"><i class="fa-solid fa-map-pin"></i> ${w.location || 'N/A'}</div>
-                </td>
-                <td><strong>${w.interim_no ? 'INT-' + w.interim_no : '-'}</strong></td>
-                <td><strong>RM ${(w.amount_spent || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</strong>${buildSectionBreakdown(w)}</td>
-                <td style="font-weight:bold;color:var(--ios-green);">RM ${(w.interim_no ? w.amount_spent : 0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
-                <td>${formatTarikhBM(w.qpb_date)}</td>
-                <td>
-                    <button class="btn-action" style="background:var(--ios-orange);padding:8px 14px;font-size:12px;" onclick="openBlueform(${w.id})">
-                        <i class="fa-solid fa-print"></i> Blueform
-                    </button>
-                </td>
-                <td style="text-align:center;">
-                    <input type="checkbox" class="bf-checkbox" value="${w.id}" style="width:18px;height:18px;cursor:pointer;">
-                </td>
-            </tr>`;
+            // Jika tiada sequence (standalone work order), render macam biasa
+            actionHtml = `
+                <button class="btn-action" style="background:var(--ios-orange);padding:8px 14px;font-size:12px;" onclick="openBlueform(${w.id})">
+                    <i class="fa-solid fa-print"></i> Blueform
+                </button>`;
+            checkboxHtml = `<input type="checkbox" class="bf-checkbox" value="${w.id}" style="width:18px;height:18px;cursor:pointer;">`;
         }
+
+        // Bina HTML (Semua row berdiri sendiri)
+        html += `
+        <tr class="status-${currentStatus.toLowerCase().replace(/\s+/g,'')}">
+            <td>
+                <select onchange="updateStatus(${w.id}, this.value)" ${w.interim_no ? 'disabled' : ''}
+                    style="width:100%;max-width:140px;padding:6px 8px;border-radius:10px;border:1px solid #ddd;font-size:11px;font-weight:700;background:${w.interim_no ? '#f1f1f1' : 'white'};box-sizing:border-box;">
+                    <option value="BLUEFORM"        ${currentStatus === 'BLUEFORM'        ? 'selected' : ''}>BLUEFORM</option>
+                    <option value="APPROVED"        ${currentStatus === 'APPROVED'        ? 'selected' : ''}>APPROVED</option>
+                    <option value="INDENT"          ${currentStatus === 'INDENT'          ? 'selected' : ''}>INDENT</option>
+                    <option value="INDENT APPROVED" ${currentStatus === 'INDENT APPROVED' ? 'selected' : ''}>INDENT APPROVED</option>
+                    <option value="CANCEL"          ${currentStatus === 'CANCEL'          ? 'selected' : ''}>CANCEL</option>
+                    <option value="CLAIMED"         ${w.interim_no                        ? 'selected' : ''}>CLAIMED</option>
+                </select>
+            </td>
+            <td><strong>${seq || '-'}</strong></td>
+            <td><strong>${w.work_id}</strong></td>
+            <td>
+                <div style="font-weight:500;">${w.description}</div>
+                <div style="font-size:11px;color:var(--ios-orange);"><i class="fa-solid fa-map-pin"></i> ${w.location || 'N/A'}</div>
+            </td>
+            <td><strong>${w.interim_no ? 'INT-' + w.interim_no : '-'}</strong></td>
+            <td><strong>RM ${(w.amount_spent || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</strong>${buildSectionBreakdown(w) || ''}</td>
+            <td style="font-weight:bold;color:var(--ios-green);">RM ${(w.interim_no ? w.amount_spent : 0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+            <td>${formatTarikhBM(w.qpb_date)}</td>
+            <td>${actionHtml}</td>
+            <td style="text-align:center;">${checkboxHtml}</td>
+        </tr>`;
     });
+    
     tbody.innerHTML = html;
     if(window.innerWidth <= 768){ renderMobileCards(data); }
 }
+
 
 function renderMobileCards(data){
     const container = document.getElementById('mobileCardContainer');
