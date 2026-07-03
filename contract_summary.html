@@ -457,16 +457,48 @@ async function startAutoDownload() {
             const daerahList = districtString.split(',').map(d => d.trim());
             
             const allSectionKeys = Object.keys(sections || {});
-            const dynamicSectionKeys = allSectionKeys.filter(key => {
+            const selectedSections = c.selected_sections || [];
+
+            // Section "asas" (kekal walaupun tiada dalam selected_sections)
+            const isBaseSection = (key) => {
                 const desc = (sections[key]?.desc || key).toUpperCase();
-                return desc.includes("LABOUR") || 
-                    desc.includes("WORKMANSHIP") || 
-                    desc.includes("SPARE") || 
-                    desc.includes("REFURBISHMENT") || 
+                return desc.includes("LABOUR") ||
+                    desc.includes("WORKMANSHIP") ||
+                    desc.includes("SPARE") ||
+                    desc.includes("REFURBISHMENT") ||
                     desc.includes("PROVISIONAL");
-            }).sort(); 
-            
-            const sectionCount = dynamicSectionKeys.length;
+            };
+
+            // Susunan kekal ikut urutan asal A,B,C,D,E... (tiada .sort() supaya
+            // susunan sentiasa ikut kedudukan asal dalam contract_sections_breakdown).
+            // Section asas (LABOUR/SPARE/PROVISIONAL/dll) sentiasa dikekalkan, dan
+            // sebarang section TAMBAHAN yang dipilih dalam selected_sections turut disertakan.
+            const dynamicSectionKeys = allSectionKeys.filter(key =>
+                isBaseSection(key) || selectedSections.includes(key)
+            );
+
+            // Warna bagi setiap section (LABOUR=oren, SPARE/PROVISIONAL=kuning,
+            // REFURBISHMENT=kelabu gelap, tambahan dari selected_sections=kelabu)
+            const getSectionColor = (key) => {
+                const desc = (sections[key]?.desc || key).toUpperCase();
+                if (desc.includes("LABOUR") || desc.includes("WORKMANSHIP")) return "FFCC99";
+                if (desc.includes("SPARE") || desc.includes("PROVISIONAL")) return "FFFF00";
+                if (desc.includes("REFURBISHMENT")) return "A9A9A9";
+                return "D9D9D9"; // tambahan dari selected_sections
+            };
+
+            // Bina senarai lajur (columnDefs): setiap section biasa, dan khas untuk
+            // PROVISIONAL SUM disisipkan satu lajur tambahan "NON SOR" di sebelahnya.
+            let columnDefs = [];
+            dynamicSectionKeys.forEach(key => {
+                columnDefs.push({ key, label: sections[key]?.desc || key, isExtra: false });
+                const desc = (sections[key]?.desc || key).toUpperCase();
+                if (desc.includes("PROVISIONAL")) {
+                    columnDefs.push({ key, label: "NON SOR", isExtra: true });
+                }
+            });
+
+            const sectionCount = columnDefs.length;
             
             let ws3_data = [];
             let currentMerges = [];
@@ -474,7 +506,6 @@ async function startAutoDownload() {
             daerahList.forEach((daerah) => {
                 // 1. Kenalpasti baris permulaan untuk daerah ini 
                 const startRow = ws3_data.length;
-                const sectionCount = dynamicSectionKeys.length;
                 const lastColIdx = 3 + (sectionCount * 2) + 2;
    
                 // Tajuk Daerah & Header
@@ -491,14 +522,14 @@ async function startAutoDownload() {
     h1.push("QUOTATION APPROVAL DATE", "STATUS / PAID AS PER INTERIM NO");
     ws3_data.push(h1);
 
-    // BARIS 6: Tajuk Seksyen Dinamik (E.g. SECTION C, SECTION D...)
+    // BARIS 6: Tajuk Seksyen Dinamik (E.g. SECTION C, SECTION D... + NON SOR)
     let h2 = ["", "", "", ""];
-    dynamicSectionKeys.forEach(key => {
-    h2.push(sections[key]?.desc || key);
+    columnDefs.forEach(col => {
+    h2.push(col.label);
 });
 
-dynamicSectionKeys.forEach(key => {
-    h2.push(sections[key]?.desc || key);
+columnDefs.forEach(col => {
+    h2.push(col.label);
 });
     h2.push("", "");
     ws3_data.push(h2);
@@ -544,16 +575,16 @@ dynamicSectionKeys.forEach(key => {
             let rowData = [index + 1, wo.description || "-", wo.location || "-", wo.work_id || "-"];
             
             // Masukkan data Quotation
-            dynamicSectionKeys.forEach((key, kIdx) => {
-                const amt = Number(cat[key]?.amt || 0);
+            columnDefs.forEach((col, kIdx) => {
+                const amt = col.isExtra ? Number(cat[col.key]?.extra || 0) : Number(cat[col.key]?.amt || 0);
                 const quotationVal = (wo.status === 'Claimed') ? 0 : amt;
                 rowData.push(quotationVal);
                 dTotals[kIdx] += quotationVal;
             });
 
             // Masukkan data Payment (Jika Claimed)
-            dynamicSectionKeys.forEach((key, kIdx) => {
-                const amt = Number(cat[key]?.amt || 0);
+            columnDefs.forEach((col, kIdx) => {
+                const amt = col.isExtra ? Number(cat[col.key]?.extra || 0) : Number(cat[col.key]?.amt || 0);
                 const paymentVal = (wo.status === 'Claimed') ? amt : 0;
                 rowData.push(paymentVal);
                 dTotals[sectionCount + kIdx] += paymentVal;
@@ -658,10 +689,8 @@ if (
     val === "QUOTATION APPROVAL DATE" ||
     val === "STATUS / PAID AS PER INTERIM NO" ||
 
-    // tambah section description sekali
-    dynamicSectionKeys.some(key => 
-        val === (sections[key]?.desc || key)
-    )
+    // tambah section description sekali (termasuk label NON SOR)
+    columnDefs.some(col => val === col.label)
 ) {
 
     ws3[ref].s.fill = {
@@ -748,8 +777,9 @@ if (
 
             if (currentSecIdx !== undefined) {
 
-                const secKey = dynamicSectionKeys[currentSecIdx];
-                const secDesc = (sections[secKey]?.desc || secKey).toUpperCase();
+                const colDef = columnDefs[currentSecIdx];
+                const secKey = colDef.key;
+                const secColor = getSectionColor(secKey);
 
                 // CHECK ADA PAYMENT / INTERIM
 // =========================
@@ -811,43 +841,12 @@ if (
         }
     }
 }
-                // LABOUR
-                if (
-                    !isPaymentColumn &&
-                    (
-                        secDesc.includes("LABOUR") ||
-                        secDesc.includes("WORKMANSHIP")
-                    )
-                ) 
-                {
-
+                // Warna lajur ikut section (LABOUR=oren, SPARE/PROVISIONAL=kuning,
+                // REFURBISHMENT=kelabu gelap, tambahan selected_sections=kelabu).
+                // Lajur NON SOR turut guna warna section induknya (PROVISIONAL).
+                if (!isPaymentColumn) {
                     ws3[ref].s.fill = {
-                        fgColor: { rgb: "FFCC99" }
-                    };
-                }
-
-                // SPARE / PROVISIONAL
-                else if (
-    !isPaymentColumn &&
-    (
-        secDesc.includes("SPARE") ||
-        secDesc.includes("PROVISIONAL")
-    )
-) {
-
-                    ws3[ref].s.fill = {
-                        fgColor: { rgb: "FFFF00" }
-                    };
-                }
-
-                // REFURBISHMENT
-                else if (
-    !isPaymentColumn &&
-    secDesc.includes("REFURBISHMENT")
-) {
-
-                    ws3[ref].s.fill = {
-                        fgColor: { rgb: "A9A9A9" }
+                        fgColor: { rgb: secColor }
                     };
                 }
                 if (isGrandTotalRow) {
