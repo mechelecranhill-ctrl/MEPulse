@@ -1905,59 +1905,63 @@ oninput="formatCurrencyInput(this); calcTotalWork()">
     return html;
 }
 
-function renderWorkIdCards(){
+function renderWorkIdCards(skipSave = false){
 
     const container = document.getElementById("w_id_cards_container");
     if(!container) return;
 
-    // ==========================
-    // Simpan data semasa
-    // ==========================
-    document.querySelectorAll(".w-id-card").forEach(card=>{
+    if(!skipSave){
 
-        const workId = card.dataset.workId;
-        if(!workId) return;
+        // ==========================
+        // Simpan data semasa
+        // ==========================
+        document.querySelectorAll(".w-id-card").forEach(card=>{
 
-        if(!workIdCardDataMap[workId]){
-            workIdCardDataMap[workId]={};
-        }
+            const workId = card.dataset.workId;
+            if(!workId) return;
 
-        workIdCardDataMap[workId].location =
-            card.querySelector(".w_card_location")?.value || "";
-
-        if(!workIdCardDataMap[workId].section_category){
-            workIdCardDataMap[workId].section_category={};
-        }
-
-        card.querySelectorAll(".w_sec_amt").forEach(input=>{
-
-            const sec=input.dataset.sec;
-
-            if(!workIdCardDataMap[workId].section_category[sec]){
-                workIdCardDataMap[workId].section_category[sec]={};
+            if(!workIdCardDataMap[workId]){
+                workIdCardDataMap[workId]={};
             }
 
-            workIdCardDataMap[workId]
-                .section_category[sec]
-                .amt=parseFloat(input.dataset.rawValue||0);
+            workIdCardDataMap[workId].location =
+                card.querySelector(".w_card_location")?.value || "";
+
+            if(!workIdCardDataMap[workId].section_category){
+                workIdCardDataMap[workId].section_category={};
+            }
+
+            card.querySelectorAll(".w_sec_amt").forEach(input=>{
+
+                const sec=input.dataset.sec;
+
+                if(!workIdCardDataMap[workId].section_category[sec]){
+                    workIdCardDataMap[workId].section_category[sec]={};
+                }
+
+                workIdCardDataMap[workId]
+                    .section_category[sec]
+                    .amt=parseFloat(input.dataset.rawValue||0);
+
+            });
+
+            card.querySelectorAll(".w_sec_extra").forEach(input=>{
+
+                const sec=input.dataset.sec;
+
+                if(!workIdCardDataMap[workId].section_category[sec]){
+                    workIdCardDataMap[workId].section_category[sec]={};
+                }
+
+                workIdCardDataMap[workId]
+                    .section_category[sec]
+                    .extra=parseFloat(input.dataset.rawValue||0);
+
+            });
 
         });
 
-        card.querySelectorAll(".w_sec_extra").forEach(input=>{
-
-            const sec=input.dataset.sec;
-
-            if(!workIdCardDataMap[workId].section_category[sec]){
-                workIdCardDataMap[workId].section_category[sec]={};
-            }
-
-            workIdCardDataMap[workId]
-                .section_category[sec]
-                .extra=parseFloat(input.dataset.rawValue||0);
-
-        });
-
-    });
+    }
 
     const currentIds=getCurrentWorkIdsFromRows();
 
@@ -2892,7 +2896,7 @@ function autoDetectWork(){
             district.dataset.originalDistrict =
                 group[0].district || "";
 
-            renderWorkIdCards();
+            renderWorkIdCards(true);
 
             calcTotalWork();
 
