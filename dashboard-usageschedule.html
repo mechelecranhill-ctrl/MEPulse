@@ -1524,8 +1524,7 @@ async function buildBlueformData(id, sharedData = null) {
     const interimDateMap = buildInterimDateMap(allInterims);
 
     let sectionUsed = {};
-let extraUsed = 0;
-let totalSalvage = 0, totalPG = 0, totalTax = 0, totalPenalty = 0;
+let totalSalvage = 0, totalPG = 0, totalTax = 0, totalPenalty = 0; // Tambah variable penalty
 
 allInterims.forEach(int => {
     const intDate = new Date(int.date_received);
@@ -1534,7 +1533,7 @@ allInterims.forEach(int => {
     totalSalvage += Number(int.salvage_value || 0);
     totalPG += Number(int.performance_guarantee_sum || 0);
     totalTax += Number(int.tax || 0);
-    totalPenalty += Number(int.penalty || 0);
+    totalPenalty += Number(int.penalty || 0); // Ambil data penalty dari interim
 
         const cat = int.claim_breakdown || {};
         Object.keys(cat).forEach(sec => {
@@ -1556,7 +1555,6 @@ allInterims.forEach(int => {
         if (!isWOPendingAtCutoff(wo, interimDateMap, cutoffDate)) return;
 
         const cat = wo.section_category || {};
-extraUsed += Number(cat.extra || 0);
         Object.keys(cat).forEach(sec => {
             const amt = Number(cat[sec]?.amt || 0);
             if (!sectionUsed[sec]) sectionUsed[sec] = 0;
@@ -1618,8 +1616,7 @@ bakiKontrak -= Number(int.penalty || 0); // Tolak denda untuk dapatkan baki bers
     return {
     data, c, b, s,
     totalWorkValue, provisionalExtra,
-    sectionUsed: sectionUsed,
-    extraUsed: extraUsed,
+    sectionUsed,
     totalSalvage, totalPG, totalTax, totalPenalty,
     bakiKontrak,
     voBreakdown, activeVO
@@ -1699,7 +1696,6 @@ const combinedDesc = uniqueDescriptions.join(', ');
     const interimDateMap = buildInterimDateMap(allInterims);
 
     let sectionUsed = {};
-let extraUsed = 0;
 
 let totalSalvage = 0;
 let totalPG = 0;
@@ -1735,7 +1731,6 @@ totalPenalty += Number(int.penalty || 0);
         if (!isWOPendingAtCutoff(wo, interimDateMap, cutoffDate)) return;
 
         const cat = wo.section_category || {};
-extraUsed += Number(cat.extra || 0);
         Object.keys(cat).forEach(sec => {
             const amt = Number(cat[sec]?.amt || 0);
             if (!sectionUsed[sec]) sectionUsed[sec] = 0;
@@ -1815,7 +1810,6 @@ bakiKontrak -= Number(int.penalty || 0);
         totalWorkValue,
         provisionalExtra: combinedProvisional,
         sectionUsed,
-    extraUsed,
         totalSalvage, totalPG, totalTax,totalPenalty,
         bakiKontrak,
         voBreakdown, activeVO
@@ -2010,21 +2004,13 @@ function buildBlueformHTML(payload) {
     <div class="bf-colon">:</div>
     <div class="bf-value">RM ${totalTax.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
 </div>
-
 <div class="bf-row" style="font-size:9px;">
-        <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">PENALTY</span></div>
-        <div class="bf-colon">:</div>
-        <div class="bf-value" style="color: #dc2626;">RM ${totalPenalty.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
-    </div>
-    
-    ${payload.extraUsed > 0 ? `
-    <div class="bf-row" style="font-size:9px;">
-        <div class="bf-label" style="width:220px;"><span style="margin-left:25px; font-weight:bold; color:#c0392b;">NON SOR</span></div>
-        <div class="bf-colon">:</div>
-        <div class="bf-value" style="color:#c0392b;">RM ${payload.extraUsed.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
-    </div>` : ''}
+    <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">PENALTY</span></div>
+    <div class="bf-colon">:</div>
+    <div class="bf-value" style="color: #dc2626;">RM ${totalPenalty.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
 </div>
 
+            </div>
         </div>
 
         <div class="bf-row" style="margin-top:8px;">
