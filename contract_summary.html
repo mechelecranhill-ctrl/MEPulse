@@ -148,6 +148,8 @@ async function startAutoDownload() {
                         row.push(val || 0);
                     }
 
+                    let ongoingExtraForSec = 0; // NON SOR untuk section ini
+
                     if (isLastSet) {
                         let totalClaimAll = 0;
                         interims.forEach(int => totalClaimAll += Number(int.claim_breakdown?.[sec]?.amt || 0));
@@ -155,13 +157,24 @@ async function startAutoDownload() {
                         workorders.filter(w => w.status !== 'Claimed').forEach(w => {
                             const cat = w.section_category || {};
                             ongoing += Number(cat[sec]?.amt || 0);
+                            ongoingExtraForSec += Number(cat[sec]?.extra || 0);
                             if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) ongoing += Number(w.additional || 0);
                         });
                         const balance = contractAmt - totalClaimAll;
-                        row.push(totalClaimAll, balance, ongoing, (balance - ongoing));
+                        const afterWO = balance - ongoing - ongoingExtraForSec;
+                        row.push(totalClaimAll, balance, ongoing, afterWO);
                     }
                     ws_data.push(row);
                     merges.push({ s: { r: currentRowIdx, c: 1 }, e: { r: currentRowIdx, c: 2 } });
+
+                    if (isLastSet && ongoingExtraForSec > 0) {
+                        const nonSorRowIdx = ws_data.length;
+                        let nonSorRow = ["", "↳ NON SOR", "", ""];
+                        for (let i = startInt; i <= endInt; i++) nonSorRow.push("");
+                        nonSorRow.push("", "", ongoingExtraForSec, "");
+                        ws_data.push(nonSorRow);
+                        merges.push({ s: { r: nonSorRowIdx, c: 1 }, e: { r: nonSorRowIdx, c: 2 } });
+                    }
 
                     // ===== VO ROWS (samakan dengan dashboard) =====
                     Object.entries(voBreakdown).forEach(([voName, voData]) => {
