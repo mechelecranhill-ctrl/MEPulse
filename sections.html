@@ -45,20 +45,26 @@ background: var(--bg-color);
 -webkit-tap-highlight-color: transparent;
 }
 
-body{
-    display:flex;
-    justify-content:center;
-    align-items:flex-start;
-    position:relative;
-
-    background-image:url("Prjectbck.png");
-    background-position:center;
-    background-repeat:no-repeat;
-    background-size:cover;
-    background-attachment:fixed;
-
-    transition:background-image .35s ease;
+/* Buang background dari body utama */
+body {
+    height: 100dvh;
+    width: 100%;
+    margin: 0;
+    overflow: hidden;
+    background-color: var(--bg-color); /* Warna fallback */
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-attachment: fixed;
+    transition: background-image 0.6s ease-in-out; /* Transisi smooth */
+    -webkit-tap-highlight-color: transparent;
 }
+
+/* Class untuk setiap background */
+.bg-maint { background-image: url("Maintbck.png"); }
+.bg-comp { background-image: url("Compbck.png"); }
+.bg-asset { background-image: url("Assetbck.png"); }
+.bg-project { background-image: url("Prjectbck.png"); }
 
 body::before {
     content: "";
@@ -898,15 +904,12 @@ function getHelmSrc(name){
     return null;
 }
 
-function getBackgroundImage(name){
+function getBackgroundClass(name) {
     const n = name.toUpperCase();
-
-    if(n.includes("SELENGGARA")) return "Maintbck.png";
-    if(n.includes("PEMATUHAN")) return "Compbck.png";
-    if(n.includes("ASET")) return "Assetbck.png";
-    if(n.includes("PROJEK")) return "Prjectbck.png";
-
-    return "Prjectbck.png";
+    if (n.includes("SELENGGARA")) return "bg-maint";
+    if (n.includes("PEMATUHAN")) return "bg-comp";
+    if (n.includes("ASET")) return "bg-asset";
+    return "bg-project"; // Default
 }
 
 
@@ -1097,8 +1100,8 @@ function positionItems(){
 }
 
 /* ── UPDATE DATA CARD ── */
-function update(){
-    if(itemEls.length === 0) return;
+function update() {
+    if (itemEls.length === 0) return;
 
     closeDetail();
 
@@ -1108,9 +1111,13 @@ function update(){
     const item = items[index];
     activeSection = { id: item.id, name: item.title };
 
-document.body.style.backgroundImage =
-    `url("${getBackgroundImage(item.title)}")`;
-
+    /* --- BAHAGIAN BARU UNTUK BACKGROUND --- */
+    const newBgClass = getBackgroundClass(item.title);
+    // Buang semua class background sedia ada
+    document.body.classList.remove("bg-maint", "bg-comp", "bg-asset", "bg-project");
+    // Tambah class baru
+    document.body.classList.add(newBgClass);
+    /* -------------------------------------- */
 
     title.innerText = item.title;
     cardTitle.innerText = item.title;
