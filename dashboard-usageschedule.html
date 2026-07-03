@@ -2124,18 +2124,18 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
 
     const pendingWO = workorders.filter(w => w.status !== 'Claimed');
     const ongoingBase = {};
-    const ongoingExtra = {}; // --- TAMBAHAN: Simpan nilai extra ---
+    const ongoingExtra = {}; // kekal dikira, cuma tak dipaparkan sbg column berasingan
     const ongoingVO = {};
 
     sectionNames.forEach(sec => {
         ongoingBase[sec] = 0;
-        ongoingExtra[sec] = 0; // --- TAMBAHAN: Reset extra ---
+        ongoingExtra[sec] = 0;
         ongoingVO[sec] = 0;
         pendingWO.forEach(w => {
             const cat = w.section_category || {};
             if(w.status !== 'Variation Order' && w.status !== 'VO'){
                 ongoingBase[sec] += Number(cat[sec]?.amt || 0);
-                ongoingExtra[sec] += Number(cat[sec]?.extra || 0); // --- TAMBAHAN: Kira extra ---
+                ongoingExtra[sec] += Number(cat[sec]?.extra || 0);
                 if(sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]){
                     ongoingBase[sec] += Number(w.additional || 0);
                 }
@@ -2150,7 +2150,7 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
     <th>DESCRIPTION</th>
     <th>AS PER CONTRACT</th>`;
     for(let i = 1; i <= interimCount; i++) head += `<th>INTERIM ${i}</th>`;
-    head += `<th>TOTAL CLAIM</th><th>CONTRACT BALANCE</th><th>ON GOING WORKS</th><th>NON SOR</th><th>ON GOING CONTRACT BALANCE</th></tr>`; // --- TAMBAHAN: Tambah header NON SOR ---
+    head += `<th>TOTAL CLAIM</th><th>CONTRACT BALANCE</th><th>ON GOING WORKS</th><th>ON GOING CONTRACT BALANCE</th></tr>`;
     document.getElementById("interimHead").innerHTML = head;
 
     let body = '';
@@ -2159,7 +2159,7 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
     let grandTotalClaim = 0;
     let grandTotalContractBalance = 0;
     let grandTotalOngoing = 0;
-    let grandTotalExtra = 0; // --- TAMBAHAN: Grand total extra ---
+    let grandTotalExtra = 0; // kekal untuk pengiraan dalaman sahaja
     let grandTotalOngoingBalance = 0;
 
     sectionNames.forEach((sec, index) => {
@@ -2181,25 +2181,16 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
 
         const balanceBase = originalContractAmt - totalClaimBase;
         const ongoingB = ongoingBase[sec];
-        const extraB = ongoingExtra[sec]; // --- TAMBAHAN: Ambil nilai extra ---
-        const afterWOBase = balanceBase - ongoingB - extraB; // --- TAMBAHAN: Tolak extra dari balance ---
+        const extraB = ongoingExtra[sec]; // masih ditolak dalam kiraan balance
+        const afterWOBase = balanceBase - ongoingB - extraB;
 
         rowBase += `
         <td style="text-align:right;">${formatRM(totalClaimBase)}</td>
         <td style="text-align:right;">${formatRM(balanceBase)}</td>
         <td style="text-align:right;">${formatRM(ongoingB)}</td>
-        <td style="text-align:right;">${formatRM(extraB)}</td>
         <td style="text-align:right;font-weight:bold;color:${afterWOBase < 0 ? 'red' : 'black'};">${formatRM(afterWOBase)}</td>
         </tr>`;
         body += rowBase;
-
-        // --- TAMBAHAN: Row NON SOR ---
-        if (extraB > 0) {
-            body += `<tr style="background:#fffafa; color:#c0392b; font-size: 9px; font-style: italic;">
-                <td></td><td>↳ NON SOR</td><td>-</td>${'<td>-</td>'.repeat(interimCount)}
-                <td>-</td><td>-</td><td>-</td><td>${formatRM(extraB)}</td><td>-</td>
-            </tr>`;
-        }
 
         grandTotalContract += originalContractAmt;
         grandTotalContractBalance += balanceBase;
@@ -2241,7 +2232,6 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
                     <td style="text-align:right;font-weight:600;">${formatRM(totalClaimVO)}</td>
                     <td style="text-align:right;">${formatRM(balanceVO)}</td>
                     <td style="text-align:right;">${formatRM(ongoingV)}</td>
-                    <td style="text-align:right;">-</td>
                     <td style="text-align:right;font-weight:bold;color:${afterWOVO < 0 ? 'red' : '#c0392b'};">${formatRM(afterWOVO)}</td>
                     </tr>`;
                     body += rowVO;
@@ -2264,7 +2254,7 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
         grandTotalInterims[i] += val;
         salvageRow += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
     });
-    salvageRow += `<td style="text-align:right;">${formatRM(salvageTotal)}</td><td colspan="3"></td></tr>`;
+    salvageRow += `<td style="text-align:right;">${formatRM(salvageTotal)}</td><td colspan="2"></td></tr>`;
     body += salvageRow;
 
     let pgTotal = 0;
@@ -2275,7 +2265,7 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
         grandTotalInterims[i] += val;
         pgRow += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
     });
-    pgRow += `<td style="text-align:right;">${formatRM(pgTotal)}</td><td colspan="3"></td></tr>`;
+    pgRow += `<td style="text-align:right;">${formatRM(pgTotal)}</td><td colspan="2"></td></tr>`;
     body += pgRow;
 
     let taxTotal = 0;
@@ -2286,25 +2276,23 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
         grandTotalInterims[i] -= val;
         taxRow += `<td style="text-align:right;">${val ? formatRM(val) : '-'}</td>`;
     });
-    taxRow += `<td style="text-align:right;">${formatRM(taxTotal)}</td><td colspan="3"></td></tr>`;
+    taxRow += `<td style="text-align:right;">${formatRM(taxTotal)}</td><td colspan="2"></td></tr>`;
     body += taxRow;
 
     let penaltyTotal = 0;
     let penaltyRow = `<tr><td></td><td>PENALTY</td><td style="text-align:right;">-</td>`;
     interims.forEach((int, i) => {
-        const val = Number(int.penalty || 0); // Ambil nilai dari field database
+        const val = Number(int.penalty || 0);
         penaltyTotal += val;
-        grandTotalInterims[i] -= val; // Mengurangkan jumlah bersih bayaran interim
+        grandTotalInterims[i] -= val;
         penaltyRow += `<td style="text-align:right;color:#dc2626;">${val ? formatRM(val) : '-'}</td>`;
     });
-    penaltyRow += `<td style="text-align:right;color:#dc2626;">${formatRM(penaltyTotal)}</td><td colspan="3"></td></tr>`;
+    penaltyRow += `<td style="text-align:right;color:#dc2626;">${formatRM(penaltyTotal)}</td><td colspan="2"></td></tr>`;
     body += penaltyRow;
 
-        // Sertakan sekali - penaltyTotal dalam formula imbangan baki kontrak
-    grandTotalOngoingBalance += salvageTotal + pgTotal - taxTotal - penaltyTotal; 
+    grandTotalOngoingBalance += salvageTotal + pgTotal - taxTotal - penaltyTotal;
     grandTotalClaim = interims.reduce((acc, int) => acc + Number(int.net_amount || 0), 0);
 
-    // Total Row
     let totalRow = `<tr style="font-weight:bold;background:#eef4fc;border-top:2px solid #b0c4de;">
     <td colspan="2">TOTAL</td>
     <td style="text-align:right;">${formatRM(grandTotalContract)}</td>`;
@@ -2315,14 +2303,12 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
     <td style="text-align:right;">${formatRM(grandTotalClaim)}</td>
     <td style="text-align:right;">${formatRM(grandTotalContractBalance + salvageTotal + pgTotal - taxTotal - penaltyTotal)}</td>
     <td style="text-align:right;">${formatRM(grandTotalOngoing)}</td>
-    <td style="text-align:right;">${formatRM(grandTotalExtra)}</td>
     <td style="text-align:right;font-weight:bold;">${formatRM(grandTotalOngoingBalance)}</td>
     </tr>`;
     body += totalRow;
 
     document.getElementById("interimBody").innerHTML = body;
 }
-
 function openSummary(){
     const id = currentContractId;
     if(!id){ alert("Tiada kontrak dipilih."); return; }
