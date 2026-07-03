@@ -1311,48 +1311,23 @@ document.getElementById('workOrderForm').addEventListener('submit', async (e) =>
 
         let sequenceToUse = currentWorkSequenceNo;
 
-    const originalDistrict =
-    document.getElementById("w_dist")
-    .dataset.originalDistrict || "";
-
-if (
-    originalDistrict &&
-    originalDistrict.trim().toUpperCase() !==
-    districtSelected.trim().toUpperCase()
-) {
-    currentWorkSequenceNo = null;
-    sequenceToUse = null;
-}
-
-// jika edit dan district berubah, paksa generate sequence baru
-if(
-    currentWorkSequenceNo &&
-    originalLoadedWorkIds.length > 0
-){
-
-    const firstCard =
-        document.querySelector("#w_id_cards_container .w-id-card");
-
-    if(firstCard){
-
-        const loadedDistrict =
+        // ===== SATU-SATUNYA sumber kebenaran untuk "district berubah" =====
+        const originalDistrict =
             document.getElementById("w_dist").dataset.originalDistrict || "";
 
-        if(
-            loadedDistrict &&
-            loadedDistrict !== districtSelected
-        ){
+        const districtChanged =
+            originalDistrict.trim().toUpperCase() !==
+            districtSelected.trim().toUpperCase();
+
+        if (originalDistrict && districtChanged) {
+            currentWorkSequenceNo = null;
             sequenceToUse = null;
         }
 
-    }
-
-}
-
-if(!sequenceToUse){
+        if(!sequenceToUse){
 
     const seqRes = await fetch(
-`${SB_URL}/rest/v1/work_orders?select=sequence_no`,
+`${SB_URL}/rest/v1/work_orders?select=sequence_no&contract_id=eq.${contractId}`,
     {headers}
     );
 
@@ -1385,19 +1360,19 @@ if(!sequenceToUse){
 
         const sharedFields = {
 
-    contract_id: contractId,
+            contract_id: contractId,
 
-    sequence_no: sequenceToUse,
+            sequence_no: sequenceToUse,
 
-    qpb_date:
-        document.getElementById("w_qpb_date").value,
+            qpb_date:
+                document.getElementById("w_qpb_date").value,
 
-    district: districtSelected,
+            district: districtSelected,
 
-    description:
-        document.getElementById("w_desc").value
+            description:
+                document.getElementById("w_desc").value
 
-};
+        };
 
         const perWorkIdPayload = {};
 
@@ -1448,35 +1423,31 @@ if(!sequenceToUse){
             if(!payload) continue;
 
             const checkRes = await fetch(
-`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}`,
-{ headers });
+                `${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}`,
+                { headers });
             
             const existing = await checkRes.json();
 
-            const districtChanged =
-    document.getElementById("w_dist").dataset.originalDistrict !== districtSelected;
+            if(existing.length > 0){
 
-if(existing.length > 0){
+                await fetch(
+                `${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`,
+                {
+                    method: 'PATCH',
+                    headers: headers,
+                    body: JSON.stringify({
 
-    await fetch(
-    `${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`,
-    {
-        method: 'PATCH',
-        headers: headers,
-        body: JSON.stringify({
+                        ...payload,
 
-            ...payload,
+                        // guna districtChanged yang SATU sahaja, konsisten untuk semua Work ID
+                        sequence_no: sequenceToUse,
 
-            sequence_no: districtChanged
-                ? sequenceToUse
-                : payload.sequence_no,
+                        district: districtSelected
 
-            district: districtSelected
+                    })
+                });
 
-        })
-    });
-
-}else{
+            }else{
                 await fetch(
                 `${SB_URL}/rest/v1/work_orders`,
                 {
