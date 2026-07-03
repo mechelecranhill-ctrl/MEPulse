@@ -1266,7 +1266,7 @@ function renderTable(data, showArea = true){
             </td>
             <td><strong>${w.interim_no ? 'INT-' + w.interim_no : '-'}</strong></td>
             <td><strong>RM ${(w.amount_spent || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</strong>${buildSectionBreakdown(w) || ''}</td>
-            <td style="font-weight:bold;color:var(--ios-green);">RM ${(w.interim_no ? w.amount_spent : 0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+<td style="font-weight:bold;color:var(--ios-green);">RM ${(w.interim_no ? w.amount_spent : 0).toLocaleString(undefined,{minimumFractionDigits:2})}${w.interim_no ? (buildSectionBreakdown(w) || '') : ''}</td>
             <td>${formatTarikhBM(w.qpb_date)}</td>
             <td>${actionHtml}</td>
             <td style="text-align:center;">${checkboxHtml}</td>
@@ -1409,15 +1409,25 @@ function getInitials(text){
 function buildSectionBreakdown(work){
     const s = work.section_category || {};
     let html = '';
+    let totalExtra = 0;
+
     Object.keys(s).forEach(sec=>{
         const amt = Number(s[sec]?.amt || 0);
+        const extra = Number(s[sec]?.extra || 0);
+        totalExtra += extra;
         if(amt <= 0) return;
         html += `<div style="display:flex;justify-content:space-between;font-size:11px;color:#666;"><span>${sec}</span><span>RM ${amt.toLocaleString(undefined,{minimumFractionDigits:2})}</span></div>`;
     });
+
     const add = Number(work.additional || 0);
     if(add > 0){
         html += `<div style="display:flex;justify-content:space-between;font-size:11px;color:#666;"><span>PROVISIONAL SUM</span><span>RM ${add.toLocaleString(undefined,{minimumFractionDigits:2})}</span></div>`;
     }
+
+    if(totalExtra > 0){
+        html += `<div style="display:flex;justify-content:space-between;font-size:11px;color:#c0392b;"><span>NON SOR</span><span>RM ${totalExtra.toLocaleString(undefined,{minimumFractionDigits:2})}</span></div>`;
+    }
+
     return html;
 }
 
@@ -2198,6 +2208,13 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
         grandTotalExtra += extraB;
         grandTotalOngoingBalance += afterWOBase;
         interimValsBase.forEach((v, i) => { grandTotalInterims[i] += v; });
+        
+        if (extraB > 0) {
+            body += `<tr style="background:#fffafa; color:#c0392b; font-size: 9px; font-style: italic;">
+                <td></td><td>↳ NON SOR</td><td>-</td>${'<td>-</td>'.repeat(interimCount)}
+                <td>-</td><td>-</td><td style="text-align:right;">${formatRM(extraB)}</td><td>-</td>
+            </tr>`;
+        }
 
         Object.entries(voBreakdown).forEach(([voName, voData]) => {
             if(voData && voData.breakdown && voData.breakdown[sec]){
