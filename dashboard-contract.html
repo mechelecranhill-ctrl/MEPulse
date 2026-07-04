@@ -15,32 +15,29 @@
         }
 
         html {
-    background: linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%);
-    height: 100%;
-    margin: 0;
-    padding: 0;
-}
+            background: linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%);
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
 
-body { 
-    font-family: -apple-system, system-ui, sans-serif;   
-    background: linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%); 
-    margin: 0; 
-    padding: 0;
-    
-    /* PENGAMBILAN KETINGGIAN PENUH KHAS UNTUK IPAD/IOS */
-    height: 100vh; /* Fallback untuk pelayar lama */
-    height: -webkit-fill-available; /* Memaksa iOS menggunakan ruang maksimum tersedia */
-    
-    display: flex; 
-    flex-direction: column; 
-    overflow: hidden; 
-    box-sizing: border-box;
-}
+        body { 
+            font-family: -apple-system, system-ui, sans-serif;   
+            background: linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%); 
+            margin: 0; 
+            padding: 0;
+            /* SELESAIKAN ISU KETINGGIAN IPAD SECARA TOTAL */
+            height: 100vh;
+            height: -webkit-fill-available;
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+        }
 
-/* Pastikan semua elemen anak akur pada pengiraan border-box */
-*, *:before, *:after {
-    box-sizing: border-box;
-}
+        /* Pastikan layout dikira berdasarkan kotak sempadan yang betul */
+        *, *:before, *:after {
+            box-sizing: border-box;
+        }
 
         .search-container {
             padding: 5px 10px 10px 0;
@@ -55,7 +52,7 @@ body {
             font-size: 13px;
             outline: none;
             box-sizing: border-box;
-            transition: border-color 0.2s; /* PENGOPTIMUMAN GPU: Hadkan transisi hanya pada border-color, bukan 'all' */
+            transition: border-color 0.2s; 
         }
         .search-box:focus {
             border-color: var(--ios-blue);
@@ -69,7 +66,7 @@ body {
             box-shadow: 0 1px 10px rgba(0,0,0,0.05); z-index: 1000; flex-shrink: 0;
             position: relative;
             height: calc(60px + env(safe-area-inset-top)); 
-    padding: env(safe-area-inset-top) 60px 0 60px; 
+            padding: env(safe-area-inset-top) 60px 0 60px; 
             box-sizing: border-box;
         }
 
@@ -98,8 +95,8 @@ body {
             font-weight: 600; 
             font-size: 12px; 
             white-space: nowrap; 
-            transition: background-color 0.2s, color 0.2s; /* PENGOPTIMUMAN GPU */
-            will-change: background-color; /* Sediakan GPU lebih awal */
+            transition: background-color 0.2s, color 0.2s; 
+            will-change: background-color; 
         }
         .unit-pill.active { 
             background: white;
@@ -127,19 +124,18 @@ body {
 
             .contract-sidebar {
                 width: 100% !important;
-       
                 transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                 will-change: transform;
             }
 
+            /* DIPERBAIKI: Menggunakan calc ketinggian penuh iPad Safari/Chrome untuk mengelak ruang putih */
             .analysis-container {
                 position: fixed;
-                top: 60px;
+                top: calc(60px + env(safe-area-inset-top));
                 left: 0;
                 right: 0;
                 bottom: 0;
-                width: auto;
-                height: auto;
+                height: calc(100% - (60px + env(safe-area-inset-top)));
                 box-sizing: border-box;
                 padding: 10px;
                 background: #f2f2f7;
@@ -252,18 +248,18 @@ body {
 
         .fab { 
             position: fixed; top: calc(env(safe-area-inset-top) + 12px); 
-    right: 20px; width: 35px; height: 35px; 
+            right: 20px; width: 35px; height: 35px; 
             background: var(--ios-blue); color: white; border-radius: 10px;
             display: flex; align-items: center; justify-content: center; 
             cursor: pointer; z-index: 1100;
         }
 
-        .main-wrapper { display: flex; flex: 1; overflow: hidden; padding: 10px; gap: 15px; }
+        .main-wrapper { display: flex; flex: 1; overflow: hidden; padding: 10px; gap: 15px; height: 100%; }
         .contract-sidebar { width: 220px; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
         #contractList { 
-    flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; 
-    padding-right: 5px; 
-}
+            flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; 
+            padding-right: 5px; 
+        }
         
         .c-card { background: var(--card-bg); border-radius: 12px; padding: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); cursor: pointer; border: 1px solid rgba(0,0,0,0.05); }
         .c-card.active { border-color: var(--ios-blue); background: #f0f7ff; }
@@ -370,11 +366,9 @@ body {
     let currentWO = [];
     let selectedSections = [];
     let searchTimeout = null;
-    // PENGOPTIMUMAN FETCH: Simpan cache senarai kontrak tempatan mengikut unit_id untuk elak hit API Supabase berulang kali
     const cacheContracts = {}; 
 
     window.onload = () => {
-        // Tunggu Chart.js dimuat turun sepenuhnya secara 'defer' sebelum daftar plugin
         if (typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') {
             Chart.register(ChartDataLabels);
         }
@@ -394,7 +388,6 @@ body {
         const query = document.getElementById('contractSearch').value.toLowerCase();
         const cards = document.querySelectorAll('.c-card');
         
-        // PENGOPTIMUMAN RENDER: Sembunyikan elemen secara kelompok (Batch DOM manipulation)
         requestAnimationFrame(() => {
             cards.forEach(card => {
                 const code = card.querySelector('h4').innerText.toLowerCase();
@@ -454,7 +447,6 @@ body {
         document.getElementById('panel-title').innerText = 'Analisis';
         document.getElementById('panel-vendor').innerText = '';
 
-        // PENGOPTIMUMAN FETCH: Semak cache tempatan dahulu sebelum panggil Supabase REST API
         if (cacheContracts[unitId]) {
             renderContractList(cacheContracts[unitId]);
             return;
@@ -473,7 +465,6 @@ body {
                 return a.contract_code.localeCompare(b.contract_code, undefined, { numeric: true, sensitivity: "base" });
             });
 
-            // Simpan data ke dalam cache
             cacheContracts[unitId] = data;
             renderContractList(data);
         } catch (e) {
@@ -625,7 +616,6 @@ body {
             mainContainer.innerHTML = htmlBuilder;
             updateChartDirect(labels, targetAvgData, actualAvgData);
 
-            // PENGOPTIMUMAN GPU: Gunakan requestAnimationFrame berbanding setTimeout biasa untuk memicu animasi progress bar
             requestAnimationFrame(() => {
                 document.querySelectorAll('.prog-bar-fill').forEach(bar => {
                     bar.style.setProperty('width', bar.getAttribute('data-width'), 'important');
@@ -635,21 +625,20 @@ body {
         } catch (error) { console.error("Error processing UI:", error); }
     }
 
-            function updateChartDirect(labels, targetAvgData, actualAvgData) {
-        // Potong perkataan "Section" atau "Section " (case-insensitive) daripada label paksi-X
+    function updateChartDirect(labels, targetAvgData, actualAvgData) {
         const trimmedLabels = labels.map(label => label.replace(/^section\s*/i, ''));
 
         if (myChart) {
-            myChart.data.labels = trimmedLabels; // Gunakan label yang telah dipotong
+            myChart.data.labels = trimmedLabels; 
             myChart.data.datasets[0].data = targetAvgData;
             myChart.data.datasets[1].data = actualAvgData;
-            myChart.update('none'); // Mod 'none' melangkau overhead animasi re-render carta
+            myChart.update('none'); 
         } else {
             const ctx = document.getElementById('healthChart').getContext('2d');
             myChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: trimmedLabels, // Gunakan label yang telah dipotong di sini juga
+                    labels: trimmedLabels, 
                     datasets: [
                         { label: 'Planned', data: targetAvgData, backgroundColor: 'rgba(200, 200, 205, 0.5)', borderRadius: 5 },
                         { label: 'Actual', data: actualAvgData, backgroundColor: '#007AFF', borderRadius: 5 }
@@ -657,10 +646,10 @@ body {
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    animation: { duration: 150 }, // PENGOPTIMUMAN GPU: Ringkaskan masa rendering awal carta
+                    animation: { duration: 150 }, 
                     layout: {
                         padding: {
-                            bottom: 15, // Beri sedikit ruang di bawah paksi-X supaya teks tidak terkeluar dari canvas
+                            bottom: 15, 
                             top: 15
                         }
                     },
@@ -673,8 +662,8 @@ body {
                         x: { 
                             ticks: { 
                                 font: { size: 10, weight: 'bold' }, 
-                                maxRotation: 0, // Paksa huruf menegak 0 darjah (tidak senget)
-                                minRotation: 0  // Paksa huruf menegak 0 darjah (tidak senget)
+                                maxRotation: 0, 
+                                minRotation: 0  
                             } 
                         } 
                     }
