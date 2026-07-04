@@ -8,21 +8,22 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0" defer></script>
-        <style>
+            <style>
         :root { 
-            --ios-blue: #007AF7; --ios-green: #34C759; --ios-orange: #FF9500; --ios-red: #FF3B30;
+            --ios-blue: #007AFF; --ios-green: #34C759; --ios-orange: #FF9500; --ios-red: #FF3B30;
             --dark-bg: #1c1c1e; --card-bg: #ffffff; --glass: rgba(255,255,255,0.8);
         }
 
-        /* FIX UTAMA: Menggunakan hvh/dvh yang konsisten untuk mengelakkan ruang putih bawah */
+        /* 1. LOCK VIEWPORT SECARA TOTAL */
         html, body {
-            height: 100dvh;
-            width: 100%;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background: linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%);
-            background-attachment: fixed;
+            height: 100dvh !important;
+            max-height: 100dvh !important;
+            width: 100vw !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important; /* Menghalang scroll pada body utama */
+            background: linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%) !important;
+            background-attachment: fixed !important;
         }
 
         body { 
@@ -48,11 +49,8 @@
             font-size: 13px;
             outline: none;
             box-sizing: border-box;
-            transition: border-color 0.2s; 
         }
-        .search-box:focus {
-            border-color: var(--ios-blue);
-        }
+
         .mobile-usage-btn { display: none; } 
 
         .glass-header { 
@@ -66,73 +64,37 @@
             box-sizing: border-box;
         }
 
-        .unit-container-wrapper {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-        }
-
-        .unit-container {
-            display: flex;
-            flex-wrap: wrap;         
-            justify-content: center; 
-            gap: 8px;
-            padding: 0;
-        }
-
+        .unit-container-wrapper { display: flex; justify-content: center; align-items: center; width: 100%; }
+        .unit-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding: 0; }
         .unit-pill { 
-            padding: 8px 16px;
-            border-radius: 15px;     
-            background: rgba(255,255,255,.2);
-            color: white;
-            border: none; 
-            cursor: pointer; 
-            font-weight: 600; 
-            font-size: 12px; 
-            white-space: nowrap; 
-            transition: background-color 0.2s, color 0.2s; 
-            will-change: background-color; 
+            padding: 8px 16px; border-radius: 15px; background: rgba(255,255,255,.2); color: white;
+            border: none; cursor: pointer; font-weight: 600; font-size: 12px; white-space: nowrap; 
         }
-        .unit-pill.active { 
-            background: white;
-            color: #0b3d91; 
-        }
+        .unit-pill.active { background: white; color: #0b3d91; }
 
-        /* Susun atur asas skrin besar */
+        /* 2. WRAPPER UTAMA - HADKAN TINGGI */
         .main-wrapper { 
             display: flex; 
             flex: 1; 
             overflow: hidden; 
             padding: 10px; 
             gap: 15px; 
-            height: calc(100dvh - (60px + env(safe-area-inset-top))); 
+            height: calc(100dvh - (60px + env(safe-area-inset-top))) !important; 
+            max-height: calc(100dvh - (60px + env(safe-area-inset-top))) !important;
         }
 
         @media (max-width: 768px) {
-            #panel-vendor, 
-            .next-container { 
-                display: none !important; 
-            }
-
+            #panel-vendor, .next-container { display: none !important; }
             .mobile-usage-btn {
-                display: flex;
-                background: var(--ios-blue);
-                color: white;
-                text-decoration: none;
-                padding: 6px 12px;
-                border-radius: 10px;
-                font-size: 11px;
-                font-weight: 800;
-                align-items: center;
-                gap: 5px;
+                display: flex; background: var(--ios-blue); color: white; text-decoration: none;
+                padding: 6px 12px; border-radius: 10px; font-size: 11px; font-weight: 800; align-items: center; gap: 5px;
             }
 
-            /* FIX 100dvh pada wrapper utama versi iPad/Mobile */
             .main-wrapper {
                 position: relative;
                 width: 100%;
                 height: calc(100dvh - (60px + env(safe-area-inset-top))) !important;
+                max-height: calc(100dvh - (60px + env(safe-area-inset-top))) !important;
                 overflow: hidden !important;
             }
 
@@ -143,15 +105,11 @@
                 will-change: transform;
             }
 
-            /* FIX KEDUDUKAN PANEL ANALISIS IPAD: Menggunakan takwim mutlak berasaskan 100% viewport kontena */
+            /* 3. PANEL ANALISIS IPAD KETAT */
             .analysis-container {
                 position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                width: 100%;
-                height: 100%;
+                top: 0; left: 0; right: 0; bottom: 0;
+                width: 100%; height: 100%;
                 box-sizing: border-box;
                 padding: 10px;
                 background: #f2f2f7;
@@ -159,126 +117,74 @@
                 transform: translateX(100%);
                 transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                 will-change: transform;
-                overflow-x: hidden;
+                overflow: hidden !important; /* Kunci limpahan luar */
             }
 
-            body.analysis-active .analysis-container { 
-                transform: translateX(0);
-            }
-            body.analysis-active .contract-sidebar {
-                transform: translateX(-100%);
-            }
+            body.analysis-active .analysis-container { transform: translateX(0); }
+            body.analysis-active .contract-sidebar { transform: translateX(-100%); }
 
             #analysis-panel {
                 border-radius: 20px 20px 0 0 !important;
                 height: 100%; 
-                min-width: 0;
                 display: flex;
                 flex-direction: column;
+                overflow: hidden !important;
             }
+
+            /* GRID CARTA & SECTIONS BOLEH SCROLL */
             .health-grid {
                 grid-template-columns: 1fr !important;
                 overflow-y: auto !important; 
-                min-width: 0;
+                -webkit-overflow-scrolling: touch;
                 flex: 1;
-                padding-bottom: env(safe-area-inset-bottom);
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+                padding-bottom: calc(20px + env(safe-area-inset-bottom)) !important;
             }
+
+            /* FORCE CARTA UNTUK TIDAK MELIMPAH */
             .chart-box {
-                min-height: 250px;
-                flex-shrink: 0; 
-                min-width: 0;
+                height: 260px !important; 
+                min-height: 260px !important;
+                max-height: 260px !important;
+                flex-shrink: 0 !important; 
+                overflow: hidden !important;
             }
 
-            .glass-header {
-                padding: env(safe-area-inset-top) 10px 0 10px; 
-            }
-
-            .unit-container-wrapper {
-                flex: 1;
-                overflow: hidden;
-                margin: 0 50px;  
-            }
-
-            .unit-container {
-                flex-wrap: nowrap;           
-                justify-content: flex-start;
-                overflow-x: auto;
-                scroll-behavior: smooth;
-                scroll-snap-type: x mandatory;
-                scrollbar-width: none;
-                padding: 0 16px;
-            }
-
+            .glass-header { padding: env(safe-area-inset-top) 10px 0 10px; }
+            .unit-container-wrapper { flex: 1; overflow: hidden; margin: 0 50px; }
+            .unit-container { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; padding: 0 16px; }
             .unit-container::-webkit-scrollbar { display: none; }
-
-            .unit-container::before,
-            .unit-container::after {
-                display: block;
-                content: "";
-                flex: 0 0 50%;
-            }
-
-            .unit-pill {
-                scroll-snap-align: center;
-            }
+            .unit-container::before, .unit-container::after { display: block; content: ""; flex: 0 0 50%; }
+            .unit-pill { scroll-snap-align: center; }
         }
 
         .nav-btn {
-            position: absolute;
-            background: #e5e5ea;
-            border: none;
-            height: 35px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            color: var(--ios-blue);
-            padding: 0 10px;
+            position: absolute; background: #e5e5ea; border: none; height: 35px;
+            border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: var(--ios-blue); padding: 0 10px;
         }
 
         .next-container {
-            position: fixed;
-            bottom: calc(30px + env(safe-area-inset-bottom));
-            right: 30px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            z-index: 2000;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px 15px;
-            border-radius: 20px;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-            border: 1px solid rgba(0, 122, 255, 0.2);
+            position: fixed; bottom: calc(30px + env(safe-area-inset-bottom)); right: 30px;
+            display: flex; align-items: center; gap: 12px; z-index: 2000;
+            background: rgba(255, 255, 255, 0.9); padding: 10px 15px; border-radius: 20px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15); border: 1px solid rgba(0, 122, 255, 0.2);
         }
         .next-label { font-size: 11px; font-weight: 800; color: #48484a; letter-spacing: 0.8px; text-align: right; }
         .next-btn-circle {
-            background: var(--ios-blue);
-            border: none;
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            color: white;
-            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.4);
+            background: var(--ios-blue); border: none; width: 45px; height: 45px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; cursor: pointer; color: white;
         }
 
         .fab { 
-            position: fixed; top: calc(env(safe-area-inset-top) + 12px); 
-            right: 20px; width: 35px; height: 35px; 
-            background: var(--ios-blue); color: white; border-radius: 10px;
-            display: flex; align-items: center; justify-content: center; 
-            cursor: pointer; z-index: 1100;
+            position: fixed; top: calc(env(safe-area-inset-top) + 12px); right: 20px; width: 35px; height: 35px; 
+            background: var(--ios-blue); color: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; z-index: 1100;
         }
 
         .contract-sidebar { width: 220px; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
-        #contractList { 
-            flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; 
-            padding-right: 5px; 
-        }
+        #contractList { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 5px; }
         
         .c-card { background: var(--card-bg); border-radius: 12px; padding: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); cursor: pointer; border: 1px solid rgba(0,0,0,0.05); }
         .c-card.active { border-color: var(--ios-blue); background: #f0f7ff; }
@@ -294,7 +200,6 @@
 
         .section-row { background: #fff; border: 1px solid var(--ios-blue); border-radius: 12px; padding: 10px; margin-bottom: 8px; }
         .prog-bar-bg { width: 100%; height: 8px; background: #eee; border-radius: 4px; margin-top: 5px; overflow: hidden; }
-     
         .prog-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease-out !important; width: 0 !important; will-change: width;}
         .avg-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 5px; }
         .avg-item { font-size: 9px; font-weight: 600; color: #666; }
@@ -303,6 +208,7 @@
         .sel-chip { display: inline-block; padding: 4px 10px; border-radius: 12px; background: #e5e5ea; margin: 3px; font-size: 10px; cursor: pointer; font-weight: 600; }
         .sel-chip.active { background: var(--ios-blue); color: white; }
     </style>
+
 
     <link rel="stylesheet" href="style.css">
 
