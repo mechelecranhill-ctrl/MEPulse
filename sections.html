@@ -1,753 +1,1234 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Contract Dashboard</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Department Sections</title>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0" defer></script>
-    <style>
-        :root { 
-            --ios-blue: #007AFF; --ios-green: #34C759; --ios-orange: #FF9500; --ios-red: #FF3B30;
-            --dark-bg: #1c1c1e; --card-bg: #ffffff; --glass: rgba(255,255,255,0.8);
-        }
+<link rel="preload" href="MaintHelm.png" as="image">
+<link rel="preload" href="CompHelm.png" as="image">
+<link rel="preload" href="AssetFinHelm.png" as="image">
+<link rel="preload" href="ProjectsHelm.png" as="image">
 
-        html {
-            background: linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%);
-            height: 100%;
-            margin: 0;
-            padding: 0;
-        }
+<link rel="preload" href="Maintbck.png" as="image">
+<link rel="preload" href="Compbck.png" as="image">
+<link rel="preload" href="Assetbck.png" as="image">
+<link rel="preload" href="Prjectbck.png" as="image">
 
-        body { 
-            font-family: -apple-system, system-ui, sans-serif;   
-            background: linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%); 
-            margin: 0; 
-            padding: 0;
-            height: 100vh;
-            height: -webkit-fill-available;
-            display: flex; 
-            flex-direction: column; 
-            overflow: hidden; 
-        }
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
-        *, *:before, *:after {
-            box-sizing: border-box;
-        }
+<style>
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Inter,system-ui;
+}
 
-        .search-container {
-            padding: 5px 10px 10px 0;
-            flex-shrink: 0;
-        }
-        .search-box {
-            width: 100%;
-            padding: 10px 15px;
-            border-radius: 12px;
-            border: 1px solid #d1d1d6;
-            background: white;
-            font-size: 13px;
-            outline: none;
-            box-sizing: border-box;
-            transition: border-color 0.2s; 
-        }
-        .search-box:focus {
-            border-color: var(--ios-blue);
-        }
-        .mobile-usage-btn { display: none; } 
+html, body {
+height: 100dvh;
+width: 100%;
+margin: 0;
+padding: 0;
+overflow: hidden;
+background: var(--bg-color);
+-webkit-tap-highlight-color: transparent;
+}
 
-        .glass-header { 
-            width: 100%; 
-            background: linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%);
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 1px 10px rgba(0,0,0,0.05); z-index: 1000; flex-shrink: 0;
-            position: relative;
-            height: calc(60px + env(safe-area-inset-top)); 
-            padding: env(safe-area-inset-top) 60px 0 60px; 
-            box-sizing: border-box;
-        }
+:root {
+    --bg-color: #05264d;
+}
 
-        .unit-container-wrapper {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-        }
+body {
+    height: 100dvh;
+    width: 100%;
+    margin: 0;
+    overflow: hidden;
+    background-color: var(--bg-color); /* Warna fallback */
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-attachment: fixed;
+    transition: background-image 0.6s ease-in-out; /* Transisi smooth */
+    -webkit-tap-highlight-color: transparent;
+}
 
-        .unit-container {
-            display: flex;
-            flex-wrap: wrap;         
-            justify-content: center; 
-            gap: 8px;
-            padding: 0;
-        }
+/* Class untuk setiap background */
+.bg-maint { background-image: url("Maintbck.png"); }
+.bg-comp { background-image: url("Compbck.png"); }
+.bg-asset { background-image: url("Assetbck.png"); }
+.bg-project { background-image: url("Prjectbck.png"); }
 
-        .unit-pill { 
-            padding: 8px 16px;
-            border-radius: 15px;     
-            background: rgba(255,255,255,.2);
-            color: white;
-            border: none; 
-            cursor: pointer; 
-            font-weight: 600; 
-            font-size: 12px; 
-            white-space: nowrap; 
-            transition: background-color 0.2s, color 0.2s; 
-            will-change: background-color; 
-        }
-        .unit-pill.active { 
-            background: white;
-            color: #0b3d91; 
-        }
+body::before {
+    content: "";
+    position: fixed;
+    inset: -20%;
+    background:
+        radial-gradient(circle at 20% 80%, rgba(255,255,255,.18), transparent 25%),
+        radial-gradient(circle at 80% 20%, rgba(255,255,255,.10), transparent 30%);
+    filter: blur(40px);
+    animation: fogMove 10s ease-in-out infinite alternate;
+    z-index: 0;
+}
 
-        @media (max-width: 768px) {
-            #panel-vendor, 
-            .next-container { 
-                display: none !important; 
-            }
+@keyframes fogMove{
+from{ transform:translateX(-30px) translateY(0); }
+to{ transform:translateX(30px) translateY(-20px); }
+}
 
-            .mobile-usage-btn {
-                display: flex;
-                background: var(--ios-blue);
-                color: white;
-                text-decoration: none;
-                padding: 6px 12px;
-                border-radius: 10px;
-                font-size: 11px;
-                font-weight: 800;
-                align-items: center;
-                gap: 5px;
-            }
+.stage {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+}
 
-            /* FIX: Menghalang limpahan skrin luar di peringkat utama wrapper */
-            .main-wrapper {
-                position: relative;
-                width: 100%;
-                height: calc(100% - (60px + env(safe-area-inset-top))) !important;
-                overflow: hidden !important;
-            }
+.wheel {
+    position: absolute;
+    width: 650px;
+    height: 650px;
+    left: -325px;
+    top: 50%;
+    transform: translateY(-50%) rotate(0deg);
+    transition: transform 0.7s cubic-bezier(.22,1,.36,1);
+    transform-origin: center center;
+    pointer-events: auto;
+}
 
-            .contract-sidebar {
-                width: 100% !important;
-                height: 100%;
-                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                will-change: transform;
-            }
+.item{
+position:absolute;
+width:120px;
+height:120px;
+border-radius:18px;
+background:transparent;
+border:none;
+display:flex;
+justify-content:center;
+align-items:center;
+text-align:center;
+color:white;
+font-weight:600;
+backdrop-filter:none;
+transition:0.3s;
+opacity:0.4;
+transform:scale(0.9);
+pointer-events: none;
+cursor: default;
+}
 
-            /* FIX UTAMA IPAD: Mengubah mekanisme kedudukan daripada 'fixed' kepada 'absolute' 
-               di dalam .main-wrapper berserta pembersihan pengiraan top/height secara total */
-            .analysis-container {
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                width: 100%;
-                height: 100%;
-                box-sizing: border-box;
-                padding: 10px;
-                background: #f2f2f7;
-                z-index: 1500;
-                transform: translateX(100%);
-                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                will-change: transform;
-                overflow-x: hidden;
-            }
+.item.active{
+background:transparent;
+border:none;
+box-shadow:none;
+opacity:1;
+transform:scale(1.25);
+pointer-events: auto;
+cursor: pointer;
+}
 
-            body.analysis-active .analysis-container { 
-                transform: translateX(0);
-            }
-            body.analysis-active .contract-sidebar {
-                transform: translateX(-100%);
-            }
+.panel{
+position:absolute;
+z-index:2;
+right:80px;
+color:white;
+}
+.panel h1{ font-size:46px; }
+.panel p{ opacity:0.6; }
 
-            #analysis-panel {
-                border-radius: 20px 20px 0 0 !important;
-                height: 100%; 
-                min-width: 0;
-                display: flex;
-                flex-direction: column;
-            }
-            .health-grid {
-                grid-template-columns: 1fr !important;
-                overflow-y: auto !important; 
-                min-width: 0;
-                flex: 1;
-            }
-            .chart-box {
-                min-height: 250px;
-                flex-shrink: 0; 
-                min-width: 0;
-            }
+.info-card {
+    position: absolute;
+    z-index: 10;
+    right: 80px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 340px;
+    padding: 24px;
+    border-radius: 24px;
+    background: rgba(90, 90, 90, 0.85); 
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(18px);
+    color: white;
+    opacity: 0;
+    animation: none;
+    pointer-events: auto;
+}
 
-            .glass-header {
-                padding: env(safe-area-inset-top) 10px 0 10px; 
-            }
+@keyframes fadeInRight{
+from{ opacity:0; transform:translateY(-50%) translateX(50px); }
+to{ opacity:1; transform:translateY(-50%) translateX(0); }
+}
+.info-card.show{
+animation:fadeInRight .45s ease forwards;
+}
 
-            .unit-container-wrapper {
-                flex: 1;
-                overflow: hidden;
-                margin: 0 50px;  
-            }
+.info-card h2{ margin-bottom:10px; font-size:22px; }
+.info-card p{ opacity:.7; line-height:1.6; }
 
-            .unit-container {
-                flex-wrap: nowrap;           
-                justify-content: flex-start;
-                overflow-x: auto;
-                scroll-behavior: smooth;
-                scroll-snap-type: x mandatory;
-                scrollbar-width: none;
-                padding: 0 16px;
-            }
+.status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    margin-bottom: 6px;
+    border-radius: 14px;
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.1);
+    font-size: 13.5px;
+    font-weight: 500;
+    gap: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
 
-            .unit-container::-webkit-scrollbar { display: none; }
+.status-row:active {
+    background: rgba(255,255,255,.12);
+}
 
-            .unit-container::before,
-            .unit-container::after {
-                display: block;
-                content: "";
-                flex: 0 0 50%;
-            }
+.status-row span:first-child {
+    flex: 1;
+    word-break: break-word;
+}
 
-            .unit-pill {
-                scroll-snap-align: center;
-            }
-        }
+.status-badge {
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 8px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
 
-        .nav-btn {
-            position: absolute;
-            background: #e5e5ea;
-            border: none;
-            height: 35px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            color: var(--ios-blue);
-            padding: 0 10px;
-        }
+.detail-panel {
+    position: absolute;
+    inset: 0;
+    border-radius: 24px;
+    background: rgba(10, 20, 40, 0.85);
+    backdrop-filter: blur(24px);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 20;
+    overflow: hidden;
+}
 
-        .next-container {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            z-index: 2000;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px 15px;
-            border-radius: 20px;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-            border: 1px solid rgba(0, 122, 255, 0.2);
-        }
-        .next-label { font-size: 11px; font-weight: 800; color: #48484a; letter-spacing: 0.8px; text-align: right; }
-        .next-btn-circle {
-            background: var(--ios-blue);
-            border: none;
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            color: white;
-            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.4);
-        }
+.detail-panel.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
 
-        .fab { 
-            position: fixed; top: calc(env(safe-area-inset-top) + 12px); 
-            right: 20px; width: 35px; height: 35px; 
-            background: var(--ios-blue); color: white; border-radius: 10px;
-            display: flex; align-items: center; justify-content: center; 
-            cursor: pointer; z-index: 1100;
-        }
+.detail-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+}
 
-        .main-wrapper { display: flex; flex: 1; overflow: hidden; padding: 10px; gap: 15px; height: 100%; }
-        .contract-sidebar { width: 220px; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
-        #contractList { 
-            flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; 
-            padding-right: 5px; 
-        }
-        
-        .c-card { background: var(--card-bg); border-radius: 12px; padding: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); cursor: pointer; border: 1px solid rgba(0,0,0,0.05); }
-        .c-card.active { border-color: var(--ios-blue); background: #f0f7ff; }
-        .c-card h4 { margin: 0; font-size: 11px; color: #1c1c1e; overflow: hidden; text-overflow: ellipsis; }
-        .c-card .sub-text { font-size: 9px; color: #888; margin-top: 2px; }
+.detail-panel-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    opacity: 0.6;
+    text-transform: uppercase;
+}
 
-        .analysis-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-        #analysis-panel { display: none; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); flex: 1; overflow: hidden; flex-direction: column; }
+.detail-back-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
 
-        .health-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; flex: 1; overflow: hidden; margin-top: 5px; }
+.detail-back-btn:active {
+    background: rgba(255,255,255,0.2);
+}
 
-        .chart-box { padding: 10px; background: #f9f9fb; border-radius: 15px; flex: 1; position: relative; min-height: 0; display: flex; flex-direction: column; transform: translateZ(0); }
+.detail-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-right: 2px;
+}
 
-        .section-row { background: #fff; border: 1px solid var(--ios-blue); border-radius: 12px; padding: 10px; margin-bottom: 8px; }
-        .prog-bar-bg { width: 100%; height: 8px; background: #eee; border-radius: 4px; margin-top: 5px; overflow: hidden; }
-     
-        .prog-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease-out !important; width: 0 !important; will-change: width;}
-        .avg-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 5px; }
-        .avg-item { font-size: 9px; font-weight: 600; color: #666; }
-        .manage-btn { background: #f2f2f7; border: none; padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; color: var(--ios-blue); cursor: pointer; }
-        #selectedSectionContainer { flex: 1; overflow-y: auto; padding-right: 5px; }
-        .sel-chip { display: inline-block; padding: 4px 10px; border-radius: 12px; background: #e5e5ea; margin: 3px; font-size: 10px; cursor: pointer; font-weight: 600; }
-        .sel-chip.active { background: var(--ios-blue); color: white; }
-        
-    </style>
+.detail-list::-webkit-scrollbar { width: 3px; }
+.detail-list::-webkit-scrollbar-track { background: transparent; }
+.detail-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
 
-    <link rel="stylesheet" href="style.css">
+.detail-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-radius: 11px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.09);
+    gap: 10px;
+    flex-shrink: 0;
+}
 
-    <script src="session.js" defer></script>
-    <script src="sidebar.js" defer></script>
+.detail-item-code {
+    font-size: 12px;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+}
+
+.detail-item-sub {
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0.75;
+    text-align: right;
+    flex: 1;
+    word-break: break-all;
+}
+
+.detail-item-sub.warn {
+    color: #fde047;
+}
+
+.detail-item-sub.danger {
+    color: #ff6b6b;
+}
+
+.detail-item-sub.safe {
+    color: #4ade80;
+}
+
+.section-helm{
+width:160px;
+height:160px;
+object-fit:contain;
+pointer-events:none;
+transition: transform 0.3s, filter 0.3s;
+}
+
+.item.active .section-helm{
+transform:scale(1.15);
+filter:
+drop-shadow(0 0 10px rgba(255,255,255,.6))
+drop-shadow(0 0 20px rgba(56,189,248,.4));
+}
+
+#openBtn{
+display:block;
+width:100%;
+margin-top:10px;
+padding:12px 0;
+border-radius:14px;
+border:none;
+background:rgba(56,189,248,0.3);
+border:1px solid rgba(56,189,248,0.5);
+color:white;
+font-size:15px;
+font-weight:600;
+letter-spacing:0.3px;
+cursor:pointer;
+backdrop-filter:blur(10px);
+transition:background 0.2s, transform 0.15s;
+flex-shrink: 0;
+}
+#openBtn:active{
+background:rgba(56,189,248,0.5);
+transform:scale(0.97);
+}
+
+.floating-helm{
+position:fixed;
+object-fit:contain;
+z-index:1001;
+pointer-events:none;
+transition:
+top 0.5s cubic-bezier(.22,1,.36,1),
+left 0.5s cubic-bezier(.22,1,.36,1),
+width 0.5s cubic-bezier(.22,1,.36,1),
+height 0.5s cubic-bezier(.22,1,.36,1);
+filter:
+drop-shadow(0 0 10px rgba(56,189,248,.8))
+drop-shadow(0 0 20px rgba(56,189,248,.5));
+}
+
+.nav-controls{
+    position: fixed;
+    bottom: calc(30px + env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 18px;
+    z-index: 9999;
+}
+
+.nav-controls button{
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.08);
+    color: white;
+    font-size: 18px;
+    backdrop-filter: blur(10px);
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.nav-controls button:active{
+    transform: scale(0.92);
+}
+
+@media (max-width:768px){
+    .panel { display:none; }
+
+    .info-card {
+        position: fixed;
+        /* Gunakan inset untuk memastikan ia berada tepat di tengah secara melintang */
+        left: 20px;
+        right: 20px;
+        bottom: calc(20px + env(safe-area-inset-bottom));
+        width: calc(100% - 40px); /* Tolak kiri 20px + kanan 20px */
+        height: auto;
+        max-height: 55vh;
+        margin: 0 auto; /* Memastikan ia sentiasa di tengah */
+        padding: 20px;
+        border-radius: 24px;
+        z-index: 10000;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(40px);
+        transition: opacity .35s ease, transform .35s ease, visibility .35s;
+        /* Tambah ini untuk elakkan isu overflow */
+        box-sizing: border-box; 
+    }
+
+#cardDesc {
+    flex: none;
+    overflow: hidden !important;
+    margin-bottom: 4px;
+}
+
+.info-card.show-mobile{
+opacity:1;
+visibility:visible;
+transform:translateY(0);
+}
+
+body.hide-wheel .wheel{
+opacity:0;
+transform:translateY(-50%) scale(0.6);
+pointer-events:none;
+transition:0.4s ease;
+}
+
+body.hide-wheel .item{
+opacity:0;
+transition:0.3s ease;
+}
+
+body.hide-wheel .item.active{
+opacity:0 !important;
+}
+}
+
+@media (min-width: 769px) {
+    .panel { display:none; }
+
+    .info-card {
+        position: fixed !important;
+        top: 0 !important;
+        right: 0 !important;
+        transform: none !important; /* Buang centering vertical */
+        width: 50vw !important;     /* Sentiasa separuh skrin tepat */
+        height: 100vh !important;   /* Penuh ketinggian skrin */
+        max-height: 100vh !important;
+        padding: 40px !important;
+        border-radius: 30px !important;
+        border-left: 1px solid rgba(255, 255, 255, .12);
+        border-top: none !important;
+        border-right: none !important;
+        border-bottom: none !important;
+        background: rgba(90, 90, 90, 0.85); 
+        backdrop-filter: blur(30px);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        overflow: hidden !important;
+        opacity: 0;
+        visibility: visible !important;
+    }
+
+    /* Kemaskini panel detail supaya ikut format flat full-height */
+    .detail-panel {
+        border-radius: 0 !important;
+        background: rgba(10, 20, 40, 0.95);
+    }
+
+    .info-card h2 {
+        font-size: 34px;
+        margin-bottom: 24px;
+        line-height: 1.2;
+        flex-shrink: 0;
+    }
+
+    #cardDesc {
+        flex: none;
+        overflow: hidden !important;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        gap: 4px; /* Jarakkan sikit antara row */
+    }
+
+    .status-row {
+        padding: 16px 20px;
+        margin-bottom: 8px;
+        font-size: 16px;
+    }
+
+    .status-badge {
+        font-size: 14px;
+        padding: 5px 12px;
+    }
+
+    #openBtn {
+        margin-top: 24px;
+        padding: 16px 0;
+        font-size: 16px;
+        flex-shrink: 0;
+    }
+
+    @keyframes fadeInRightDesktop {
+        from { opacity: 0; transform: translateX(100%); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+
+    .info-card.show {
+        animation: fadeInRightDesktop .45s cubic-bezier(.22, 1, .36, 1) forwards !important;
+    }
+}
+
+  /* ===============================
+   Large Monitor Scaling
+   (2K / 4K / Ultrawide)
+=================================*/
+@media (min-width: 1800px){
+
+    .wheel{
+        width: 820px;
+        height: 820px;
+        left:-410px;
+    }
+
+    .item{
+        width:160px;
+        height:160px;
+    }
+
+    .section-helm{
+        width:210px;
+        height:210px;
+    }
+
+    .item.active{
+        transform:scale(1.35);
+    }
+
+    .info-card{
+        width:calc(50vw - 60px) !important;
+        max-width:900px;
+        padding:38px !important;
+    }
+
+    .info-card h2{
+        font-size:38px;
+    }
+
+    .status-row{
+        padding:18px 22px;
+        font-size:18px;
+    }
+
+    .status-badge{
+        font-size:16px;
+        padding:6px 14px;
+    }
+
+    #openBtn{
+        font-size:18px;
+        padding:16px 0;
+    }
+
+}
+</style>
+
+<link rel="stylesheet" href="style.css">
+<script src="session.js"></script>
+<script src="sidebar.js" defer></script>
+
 </head>
+
 <body>
 
-    <app-sidebar></app-sidebar>
-    <div class="fab" onclick="window.location.href='contract-forms.html'">
-        <i class="fa fa-plus"></i>
-    </div>
+<app-sidebar></app-sidebar>
 
-<div class="glass-header">
-    <div class="unit-container-wrapper">
-        <div class="unit-container" id="unitNav"></div>
+<div class="stage">
+<div class="wheel" id="wheel"></div>
+</div>
+
+<div class="panel">
+<h1 id="title">M&E</h1>
+<p>Department Sections</p>
+</div>
+
+<div class="nav-controls">
+    <button id="prevBtn"><i class="fa fa-chevron-left"></i></button>
+    <button id="nextBtn"><i class="fa fa-chevron-right"></i></button>
+</div>
+
+<div class="info-card" id="infoCard">
+    <h2 id="cardTitle"></h2>
+    <div id="cardDesc"></div>
+    <button id="openBtn">Open Dashboard</button>
+
+    <div class="detail-panel" id="detailPanel">
+        <div class="detail-panel-header">
+            <span class="detail-panel-title" id="detailPanelTitle"></span>
+            <button class="detail-back-btn" id="detailBackBtn">
+                <i class="fa fa-chevron-left"></i> Back
+            </button>
+        </div>
+        <div class="detail-list" id="detailList"></div>
     </div>
 </div>
 
-    <div class="next-container">
-        <span class="next-label">USAGE<br>SCHEDULE</span>
-        <button class="next-btn-circle" onclick="goToUsage()">
-            <i class="fa fa-chevron-right"></i>
-        </button>
-    </div>
-
-    <div class="main-wrapper">
-        <div class="contract-sidebar">
-            <div class="search-container">
-                <input type="text" id="contractSearch" class="search-box" placeholder="Search Code/Contract" onkeyup="debouncedFilterContracts()">
-            </div>
-            <div id="contractList"></div>
-        </div>
-
-        <div class="analysis-container">
-            <div id="analysis-panel">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #f2f2f7;">
-                    <div>
-                        <h1 id="panel-title" style="margin:0; font-size: 24px; letter-spacing: -0.5px; color: var(--ios-blue);">Analysis</h1>
-                        <p id="panel-vendor" style="margin:2px 0 0 0; color: #8e8e93; font-size: 13px; font-weight: 500;"></p>
-                    </div>
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <a href="#" class="mobile-usage-btn" onclick="goToUsage()">
-                            USAGE <i class="fa fa-chevron-right" style="font-size: 8px;"></i>
-                        </a>
-                    </div>
-                </div>
-
-                <div class="health-grid">
-                    <div class="chart-box">
-                        <div style="font-size: 11px; font-weight: bold; color: #666; margin-bottom: 10px;">MONTHLY AVERAGE: ACTUAL VS PLANNED (RM)</div>
-                        <canvas id="healthChart"></canvas>
-                    </div>
-                    <div style="display: flex; flex-direction: column; overflow: hidden;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; flex-shrink: 0; margin-bottom: 8px;">
-                            <h3 style="margin:0; font-size: 16px;">Sections</h3>
-                            <button id="manageBtn" class="manage-btn" onclick="toggleSelector()"><i class="fa fa-cog"></i> Setting</button>
-                        </div>
-                        <div id="sectionSelector" style="display:none; background: #f9f9fb; padding: 10px; border-radius: 15px; margin-bottom: 10px; border: 1px dashed #ccc;">
-                            <div id="fullSectionList"></div>
-                        </div>
-                        <div id="selectedSectionContainer"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
 <script>
-    const role = localStorage.getItem("role");
-    const isAdmin = role === "admin" || role === "@dm1n";
+window.addEventListener("DOMContentLoaded", async () => {
+    if(typeof checkSession === "function") await checkSession();
+    loadSections();
+});
+
+const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
+
+const headers = {
+    apikey: SB_KEY,
+    Authorization: `Bearer ${SB_KEY}`
+};
+
+async function fetchAllRows(url) {
+    let all = [];
+    let from = 0;
+    const pageSize = 1000;
+    while (true) {
+        const res = await fetch(url, {
+            headers: { ...headers, Range: `${from}-${from + pageSize - 1}` }
+        });
+        const chunk = await res.json();
+        all = all.concat(chunk);
+        if (chunk.length < pageSize) break;
+        from += pageSize;
+    }
+    return all;
+}
+
+const wheel = document.getElementById("wheel");
+const title = document.getElementById("title");
+const card = document.getElementById("infoCard");
+const cardTitle = document.getElementById("cardTitle");
+const cardDesc = document.getElementById("cardDesc");
+const openBtn = document.getElementById("openBtn");
+const prevBtn = document.getElementById("prevBtn");
+const nextBtn = document.getElementById("nextBtn");
+const detailPanel = document.getElementById("detailPanel");
+const detailPanelTitle = document.getElementById("detailPanelTitle");
+const detailList = document.getElementById("detailList");
+const detailBackBtn = document.getElementById("detailBackBtn");
+
+const isMobile = window.innerWidth <= 768;
+
+let radius;
+
+if (isMobile) {
+    radius = 180;
+} else {
+    radius = Math.min(
+        Math.max(window.innerWidth * 0.16, 240),
+        340
+    );
+}
+
+let index = 0;
+let baseAngle = 0;
+let stepAngle = 0;
+let lock = false;
+let items = [];
+let itemEls = [];
+let currentFloating = null;
+let activeSection = "";
+
+let contractClaimCache = {};
+let contractPSumKeyCache = {};
+
+let currentLists = {
+    ongoing: [],
+    renewal: [],
+    cpc: [],
+    risk: []
+};
+
+prevBtn.addEventListener("click", () => { prev(); });
+nextBtn.addEventListener("click", () => { next(); });
+
+detailBackBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeDetail();
+});
+
+function closeDetail() {
+    detailPanel.classList.remove("visible");
+}
+
+function formatRM(value) {
+    return "RM " + Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function findProvisionalSumKey(breakdown) {
+    if (!breakdown) return null;
+    // Cari key (contoh: "F", "Section F") yang mempunyai nilai .desc secara padanan 1:1 tepat dengan "PROVISIONAL SUM"
+    return Object.keys(breakdown).find(k => {
+        const item = breakdown[k];
+        if (typeof item === 'object' && item.desc) {
+            return item.desc.toUpperCase().trim() === "PROVISIONAL SUM";
+        }
+        return false;
+    });
+}
+
+/* ── KEMASKINI PENUH: Kiraan baki Provisional Sum mengikut tapisan ketat ── */
+function getProvisionalSumBalance(c) {
+    const breakdown = c.contract_sections_breakdown || {};
+    const cache = contractClaimCache[c.id] || { interimUsed: {}, woUsed: {} };
+    const voBreakdown = c.vo_breakdown || {};
+
+    const pSumKey = findProvisionalSumKey(breakdown);
+    if (!pSumKey) return { budget: 0, used: 0, balance: 0 };
+
+    const keyUpper = pSumKey.toUpperCase().trim();
+    const pSumValue = breakdown[pSumKey] || 0;
+    const baseAmt = Number(
+        typeof pSumValue === 'object' ? (pSumValue.amt || pSumValue.amount || 0) : pSumValue
+    ) || 0;
+
+    // Tambah nilai VO ke dalam budget jika ada breakdown seksyen tersebut
+    let voAmt = 0;
+    Object.values(voBreakdown).forEach(vo => {
+        if (vo && vo.breakdown && vo.breakdown[pSumKey]) {
+            voAmt += Number(vo.breakdown[pSumKey].amt || 0);
+        }
+    });
+    const budget = baseAmt + voAmt;
+
+    // Ambil jumlah yang telah di-claim daripada jadual interims
+    const totalInterimClaim = Number(cache.interimUsed[keyUpper] || 0);
     
-    var SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
-    var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
-    const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
+    // Ambil jumlah komitmen daripada jadual work_orders yang belum diproses masuk interim
+    const totalOngoingWO = Number(cache.woUsed[keyUpper] || 0);
+    
+    const used = totalInterimClaim + totalOngoingWO;
+    const balance = budget - used;
 
-    let myChart = null;
-    let currentContract = null;
-    let currentWO = [];
-    let selectedSections = [];
-    let searchTimeout = null;
-    const cacheContracts = {}; 
+    return { budget, used, balance };
+}
 
-    window.onload = () => {
-        if (typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') {
-            Chart.register(ChartDataLabels);
-        }
-        fetchUnits();
-        if(!isAdmin){
-            const btn = document.getElementById("manageBtn");
-            if(btn) btn.style.display = "none";
-        }
-    };
+function isFinancialDeficitRisk(c) {
+    if (!c.contract_start || !c.contract_end || !c.contract_sections_breakdown) return false;
 
-    function debouncedFilterContracts() {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(filterContracts, 150);
-    }
+    const hariIni = new Date();
+    const start = new Date(c.contract_start);
+    const end = new Date(c.contract_end);
 
-    function filterContracts() {
-        const query = document.getElementById('contractSearch').value.toLowerCase();
-        const cards = document.querySelectorAll('.c-card');
-        
-        requestAnimationFrame(() => {
-            cards.forEach(card => {
-                const code = card.querySelector('h4').innerText.toLowerCase();
-                const name = card.querySelector('.sub-text').innerText.toLowerCase();
-                card.style.display = (code.includes(query) || name.includes(query)) ? 'block' : 'none';
-            });
-        });
-    }
+    // Abaikan kontrak lama yang dah tamat tempoh sepenuhnya
+    if (end < hariIni) return false;
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const selectedSectionName = urlParams.get('section');
+    const totalMonths = Math.max(1,
+        (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth())
+    );
+    let monthsElapsed = (hariIni.getFullYear() - start.getFullYear()) * 12
+        + (hariIni.getMonth() - start.getMonth()) + 1;
+    monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
 
-    async function fetchUnits() {
-        try {
-            const [secRes, unitsRes] = await Promise.all([
-                fetch(`${SB_URL}/rest/v1/me_sections?select=id`, { headers }),
-                fetch(`${SB_URL}/rest/v1/units?select=id,unit_name,section_id`, { headers })
-            ]);
-            const sections = await secRes.json();
-            const units = await unitsRes.json();
+    const breakdown = c.contract_sections_breakdown || {};
+    const pSumKey = findProvisionalSumKey(breakdown);
+    if (!pSumKey) return false;
 
-            let selectedSection = null;
-            if (selectedSectionName) {
-                selectedSection = sections.find(s => s.id == selectedSectionName);
-            }
+    const financial = getProvisionalSumBalance(c);
+    if (financial.budget === 0) return false;
 
-            const filteredUnits = selectedSection
-                ? units.filter(u => u.section_id === selectedSection.id)
-                : units;
+    // Pengiraan unjuran (pro-rated planned budget) setakat bulan semasa
+    const plannedTotalToDate = (financial.budget / totalMonths) * monthsElapsed;
 
-            const nav = document.getElementById('unitNav');
-            nav.innerHTML = filteredUnits.map(u => `
-                <button class="unit-pill" id="unit-${u.id}" onclick="fetchContracts(${u.id}, this)">
-                    ${u.unit_name}
-                </button>
-            `).join('');
+    // Kontrak dikira 'burst' / deficit risk jika penggunaan sebenar melebihi unjuran jadual
+    return financial.used > plannedTotalToDate;
+}
 
-            if (filteredUnits.length > 0) {
-                document.getElementById(`unit-${filteredUnits[0].id}`).click();
-            }
-        } catch (e) {
-            console.error("Error units:", e);
-        }
-    }
-
-    async function fetchContracts(unitId, btn) {
-        document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
-        btn.classList.add('active');
-        centerActiveUnit(btn);
-
-        document.getElementById('contractSearch').value = '';
-        document.body.classList.remove('analysis-active');
-        document.getElementById('analysis-panel').style.display = 'none';
-
-        currentContract = null;
-        currentWO = [];
-        document.getElementById('panel-title').innerText = 'Analisis';
-        document.getElementById('panel-vendor').innerText = '';
-
-        if (cacheContracts[unitId]) {
-            renderContractList(cacheContracts[unitId]);
-            return;
-        }
-
-        try {
-            const res = await fetch(
-                `${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}&select=id,contract_code,contract_name,contract_start,contract_end,selected_sections,contract_sections_breakdown`,
-                { headers }
-            );
-            let data = await res.json();
-
-            data.sort((a, b) => {
-                const dateDiff = new Date(a.contract_start) - new Date(b.contract_start);
-                if (dateDiff !== 0) return dateDiff;
-                return a.contract_code.localeCompare(b.contract_code, undefined, { numeric: true, sensitivity: "base" });
-            });
-
-            cacheContracts[unitId] = data;
-            renderContractList(data);
-        } catch (e) {
-            console.error("Error contracts:", e);
-        }
-    }
-
-    function renderContractList(data) {
-        const list = document.getElementById('contractList');
-        list.innerHTML = data.map(c => `
-            <div class="c-card" id="card-${c.id}">
-                <h4>${c.contract_code}</h4>
-                <div class="sub-text">${c.contract_name}</div>
-            </div>
-        `).join('');
-
-        data.forEach(c => {
-            const cardEl = document.getElementById(`card-${c.id}`);
-            if (cardEl) {
-                cardEl.addEventListener('click', () => {
-                    selectCard(c.id);
-                    openAnalysis(c);
-                });
-            }
-        });
-
-        if (data.length > 0 && window.innerWidth > 768) {
-            selectCard(data[0].id);
-            openAnalysis(data[0]);
-        }
-    }
-
-    function selectCard(id) {
-        const currentActive = document.querySelector('.c-card.active');
-        if(currentActive) currentActive.classList.remove('active');
-        const activeCard = document.getElementById(`card-${id}`);
-        if(activeCard) activeCard.classList.add('active');
-    }
-
-    async function openAnalysis(contract) {
-        document.body.classList.add('analysis-active');
-        document.getElementById('analysis-panel').style.display = 'flex';
-        document.getElementById('panel-title').innerText = contract.contract_code;
-        document.getElementById('panel-vendor').innerText = contract.contract_name;
-
-        currentContract = contract;
-
-        try {
-            const [resW, resI] = await Promise.all([
-                fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}&select=interim_no,section_category`, { headers }),
-                fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${currentContract.id}&order=date_received.asc&select=claim_breakdown`, { headers })
-            ]);
-
-            currentWO = await resW.json();
-            const currentInterims = await resI.json();
-
-            selectedSections = (currentContract.selected_sections && currentContract.selected_sections.length > 0) 
-                ? currentContract.selected_sections 
-                : Object.keys(currentContract.contract_sections_breakdown || {});
-            
-            renderUI(currentInterims);
-        } catch (error) { 
-            console.error(error); 
-        }
-    }
-
-    async function renderUI(currentInterims = []) {
-        if(!currentContract) return;
-
-        try {
-            const sections = currentContract.contract_sections_breakdown || {};
-            const start = new Date(currentContract.contract_start);
-            const end = new Date(currentContract.contract_end);
-            const today = new Date();
-
-            const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
-            let monthsElapsed = (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()) + 1;
-            monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
-
-            document.getElementById('fullSectionList').innerHTML = Object.keys(sections).sort().map(s => `
-                <span class="sel-chip ${selectedSections.includes(s) ? 'active' : ''}" onclick="toggleSection('${s}')">${s}</span>
-            `).join('');
-
-            const mainContainer = document.getElementById('selectedSectionContainer');
-            let htmlBuilder = '';
-
-            const interimMap = {};
-            const woMap = {};
-
-            currentInterims.forEach(int => {
-                if (int.claim_breakdown) {
-                    Object.keys(int.claim_breakdown).forEach(s => {
-                        interimMap[s] = (interimMap[s] || 0) + (int.claim_breakdown[s].amt || 0);
-                    });
-                }
-            });
-
-            currentWO.forEach(wo => {
-                if (!wo.interim_no && wo.section_category) {
-                    Object.keys(wo.section_category).forEach(s => {
-                        woMap[s] = (woMap[s] || 0) + (wo.section_category[s].amt || 0);
-                    });
-                }
-            });
-
-            let labels = [], targetAvgData = [], actualAvgData = [];
-
-            selectedSections.sort().forEach(s => {
-                if(!sections[s]) return;
+function openDetail(type) {
+    const configs = {
+        ongoing: {
+            title: "Ongoing Contracts",
+            color: "#4ade80",
+            render: (c) => ({
+                code: c.contract_code || c.id,
+                sub: c.contract_name || "",
+                subClass: ""
+            })
+        },
+        renewal: {
+            title: "Renewals Within 6 Months",
+            color: "#fde047",
+            render: (c) => ({
+                code: c.contract_code || c.id,
+                sub: c.contract_end ? "Ends: " + formatDate(c.contract_end) : "",
+                subClass: "warn"
+            })
+        },
+        cpc: {
+            title: "Available for Closing",
+            color: "#c084fc",
+            render: (c) => ({
+                code: c.contract_code || c.id,
+                sub: c.contract_end ? "Ended: " + formatDate(c.contract_end) : "",
+                subClass: ""
+            })
+        },
+                        risk: {
+            title: "Financial Deficit Risk (S.O.R)",
+            color: "#ff6b6b",
+            render: (c) => {
+                const financial = getProvisionalSumBalance(c);
                 
-                const totalInterimClaim = interimMap[s] || 0;
-                const totalPendingWO = woMap[s] || 0;
-
-                const used = totalInterimClaim + totalPendingWO;
-                const budget = sections[s].amt || 0; 
-                const plannedTotalToDate = (budget / totalMonths) * monthsElapsed;
-                const variance = used - plannedTotalToDate;
-                const variancePercent = plannedTotalToDate ? (variance / plannedTotalToDate) * 100 : 0;
-                const color = used > plannedTotalToDate ? 'var(--ios-red)' : 'var(--ios-green)';
-                const progressPercent = budget ? (used / budget) * 100 : 0;
-
-                labels.push(s);
-                targetAvgData.push((budget / totalMonths).toFixed(2));
-                actualAvgData.push((used / monthsElapsed).toFixed(2));
-
-                htmlBuilder += `
-    <div class="section-row">
-        <div style="display:flex; justify-content:space-between; align-items:start;">
-            <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">
-                ${s}: ${sections[s].desc || s}
-            </div>
-                            ${isAdmin ? `<i class="fa fa-times-circle" style="color:#ccc; cursor:pointer;" onclick="toggleSection('${s}')"></i>` : ``}
-                        </div>
-                        <div class="avg-stats">
-                            <div class="avg-item">BUDGET: RM ${budget.toLocaleString()}</div>
-                            <div class="avg-item" style="color: #8e8e93;">PLANNED: RM ${plannedTotalToDate.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
-                        </div>
-                        <div class="avg-stats">
-                            <div class="avg-item">ACTUAL: RM ${used.toLocaleString()}</div>
-                            <div class="avg-item" style="color: ${color};">VARIANCE: ${variancePercent > 0 ? '+' : ''}${variancePercent.toFixed(1)}%</div>
-                        </div>
-                        <div class="prog-bar-bg">
-                            <div class="prog-bar-fill" data-width="${Math.min(100, progressPercent)}%" style="background:${color}"></div>
-                        </div>
-                    </div>
-                `;
-            });
-
-            mainContainer.innerHTML = htmlBuilder;
-            updateChartDirect(labels, targetAvgData, actualAvgData);
-
-            requestAnimationFrame(() => {
-                document.querySelectorAll('.prog-bar-fill').forEach(bar => {
-                    bar.style.setProperty('width', bar.getAttribute('data-width'), 'important');
-                });
-            });
-
-        } catch (error) { console.error("Error processing UI:", error); }
-    }
-
-    function updateChartDirect(labels, targetAvgData, actualAvgData) {
-        const trimmedLabels = labels.map(label => label.replace(/^section\s*/i, ''));
-
-        if (myChart) {
-            myChart.data.labels = trimmedLabels; 
-            myChart.data.datasets[0].data = targetAvgData;
-            myChart.data.datasets[1].data = actualAvgData;
-            myChart.update('none'); 
-        } else {
-            const ctx = document.getElementById('healthChart').getContext('2d');
-            myChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: trimmedLabels, 
-                    datasets: [
-                        { label: 'Planned', data: targetAvgData, backgroundColor: 'rgba(200, 200, 205, 0.5)', borderRadius: 5 },
-                        { label: 'Actual', data: actualAvgData, backgroundColor: '#007AFF', borderRadius: 5 }
-                    ]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    animation: { duration: 150 }, 
-                    layout: {
-                        padding: {
-                            bottom: 15, 
-                            top: 15
+                let remainingText = "Overdue";
+                if (c.contract_end) {
+                    const hariIni = new Date();
+                    const tarikhTamat = new Date(c.contract_end);
+                    
+                    if (tarikhTamat > hariIni) {
+                        let diffY = tarikhTamat.getFullYear() - hariIni.getFullYear();
+                        let diffM = tarikhTamat.getMonth() - hariIni.getMonth();
+                        
+                        // Laraskan bulan jika hari belum sampai tarikh matang bulanan
+                        if (tarikhTamat.getDate() < hariIni.getDate()) {
+                            diffM--;
                         }
-                    },
-                    plugins: { 
-                        legend: { position: 'top', labels: { font: { size: 10, weight: 'bold' } } },
-                        datalabels: { anchor: 'end', align: 'top', font: { size: 9, weight: 'bold' }, formatter: (v) => v > 0 ? `RM${Math.round(v).toLocaleString()}` : '' }
-                    },
-                    scales: { 
-                        y: { beginAtZero: true }, 
-                        x: { 
-                            ticks: { 
-                                font: { size: 10, weight: 'bold' }, 
-                                maxRotation: 0, 
-                                minRotation: 0  
-                            } 
-                        } 
+                        if (diffM < 0) {
+                            diffM += 12;
+                            diffY--;
+                        }
+                        
+                        let parts = [];
+                        if (diffY > 0) parts.push(`${diffY} Year`);
+                        if (diffM > 0 || parts.length === 0) parts.push(`${diffM} Month`);
+                        
+                        remainingText = "Duration: " + parts.join(" ");
                     }
                 }
+
+                return {
+                    code: c.contract_code || c.id,
+                    sub: `
+                        <div style="font-size: 11px; color: #fde047; font-weight: 600; margin-bottom: 2px;">
+                            <i class="fa-regular fa-clock" style="font-size: 10px; margin-right: 3px;"></i>${remainingText}
+                        </div>
+                        <div class="danger" style="font-weight: 600;">Balance: ${formatRM(financial.balance)}</div>
+                    `,
+                    subClass: ""
+                };
+            }
+        }
+
+
+    };
+
+    const cfg = configs[type];
+    if (!cfg) return;
+
+    const list = currentLists[type];
+
+    detailPanelTitle.textContent = cfg.title;
+    detailPanelTitle.style.color = cfg.color;
+    detailPanelTitle.style.opacity = "1";
+
+    if (list.length === 0) {
+        detailList.innerHTML = `<div style="opacity:0.4; font-size:13px; text-align:center; margin-top:20px;">No contracts</div>`;
+    } else {
+        detailList.innerHTML = list.map(c => {
+            const rendered = cfg.render(c);
+            return `
+                <div class="detail-item">
+                    <span class="detail-item-code">${rendered.code}</span>
+                    <span class="detail-item-sub ${rendered.subClass}">${rendered.sub}</span>
+                </div>
+            `;
+        }).join("");
+    }
+
+    detailPanel.classList.add("visible");
+}
+
+function formatDate(dateStr) {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("ms-MY", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function getHelmSrc(name){
+    const n = name.toUpperCase();
+    if(n.includes("SELENGGARA")) return "MaintHelm.png";
+    if(n.includes("PEMATUHAN")) return "CompHelm.png";
+    if(n.includes("ASET")) return "AssetFinHelm.png";
+    if(n.includes("PROJEK")) return "ProjectsHelm.png";
+    return null;
+}
+
+function getBackgroundClass(name) {
+    const n = name.toUpperCase();
+    if (n.includes("SELENGGARA")) return "bg-maint";
+    if (n.includes("PEMATUHAN")) return "bg-comp";
+    if (n.includes("ASET")) return "bg-asset";
+    return "bg-project"; // Default
+}
+
+
+openBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if(!activeSection) { alert("Please select a section first."); return; }
+    window.location.href = `dashboard-contract.html?section=${activeSection.id}`;
+});
+
+async function loadSections(){
+    try {
+        const [sections, allInterims, allWOs] = await Promise.all([
+            fetch(`${SB_URL}/rest/v1/me_sections?select=*,units(*,contract(id,contract_code,contract_name,contract_start,contract_end,contract_sum,contract_sections_breakdown,vo_breakdown))`, { headers }).then(r => r.json()),
+            fetchAllRows(`${SB_URL}/rest/v1/interims?select=contract_id,claim_breakdown`),
+            fetchAllRows(`${SB_URL}/rest/v1/work_orders?select=contract_id,interim_no,section_category,additional,status`)
+        ]);
+
+        contractClaimCache = {};
+        contractPSumKeyCache = {};
+
+        // ── Bina pSumKey cache ──
+        sections.forEach(sec => {
+            (sec.units || []).forEach(u => {
+                (u.contract || []).forEach(c => {
+                    if (!c.id || !c.contract_sections_breakdown) return;
+                    const pKey = findProvisionalSumKey(c.contract_sections_breakdown);
+                    if (pKey) {
+                        contractPSumKeyCache[c.id] = pKey.toUpperCase().trim();
+                    }
+                });
             });
-        }
-    }
-
-    function updateChart(currentInterims = []) {
-        renderUI(currentInterims);
-    }
-
-    async function toggleSection(s) {
-        if(!isAdmin){ alert("Access denied"); return; }
-        if(selectedSections.includes(s)) selectedSections = selectedSections.filter(x => x !== s);
-        else selectedSections.push(s);
-        
-        renderUI([]);
-        
-        await fetch(`${SB_URL}/rest/v1/contract?id=eq.${currentContract.id}`, {
-            method: 'PATCH',
-            headers: headers,
-            body: JSON.stringify({ selected_sections: selectedSections })
         });
+
+        // ── 1. Accumulate interim claims ──
+        allInterims.forEach(im => {
+            if (!im.contract_id || !im.claim_breakdown) return;
+            if (!contractClaimCache[im.contract_id]) {
+                contractClaimCache[im.contract_id] = { interimUsed: {}, woUsed: {} };
+            }
+            Object.entries(im.claim_breakdown).forEach(([s, val]) => {
+                const amt = Number(typeof val === 'object' ? (val.amt || val.amount || 0) : val) || 0;
+                const keyUpper = s.toUpperCase().trim();
+                contractClaimCache[im.contract_id].interimUsed[keyUpper] =
+                    (contractClaimCache[im.contract_id].interimUsed[keyUpper] || 0) + amt;
+            });
+        });
+
+        // ── 2. Accumulate pending WO (Kemas kini penapisan mengikut buildInterimMatrix) ──
+        allWOs.forEach(wo => {
+            if (!wo.contract_id) return;
+
+            const statusUpper = wo.status ? wo.status.toUpperCase().trim() : "";
+
+            // Skip jika sudah di-claim (Sebiji ikut buildInterimMatrix)
+            if (statusUpper === "CLAIMED") return;
+
+            // Skip jika status adalah VO kerana VO ditapis berasingan masuk terus ke kiraan Budget
+            if (statusUpper === "VARIATION ORDER" || statusUpper === "VO") return;
+
+            // Skip jika kerja telah dibatalkan
+            if (statusUpper === "CANCEL") return;
+
+            if (!contractClaimCache[wo.contract_id]) {
+                contractClaimCache[wo.contract_id] = { interimUsed: {}, woUsed: {} };
+            }
+
+            const pSumKeyRaw = contractPSumKeyCache[wo.contract_id];
+
+            // Pecahan section_category — accumulate ke seksyen berkaitan
+            if (wo.section_category) {
+                Object.entries(wo.section_category).forEach(([s, val]) => {
+                    const amt = Number(typeof val === 'object' ? (val.amt || val.amount || 0) : val) || 0;
+                    if (amt <= 0) return;
+                    const keyUpper = s.toUpperCase().trim();
+                    contractClaimCache[wo.contract_id].woUsed[keyUpper] =
+                        (contractClaimCache[wo.contract_id].woUsed[keyUpper] || 0) + amt;
+                });
+            }
+
+            // Serapan automatic 'additional' jika tiada breakdown khusus "PROVISIONAL SUM"
+            const secCat = wo.section_category || {};
+            const hasPSumInCat = Object.keys(secCat).some(
+                k => k.toUpperCase().trim() === (pSumKeyRaw ? pSumKeyRaw.toUpperCase().trim() : "PROVISIONAL SUM")
+            );
+            
+            const add = Number(wo.additional || 0);
+            if (add > 0 && !hasPSumInCat) {
+                if (pSumKeyRaw) {
+                    const pKeyUpper = pSumKeyRaw.toUpperCase().trim();
+                    contractClaimCache[wo.contract_id].woUsed[pKeyUpper] =
+                        (contractClaimCache[wo.contract_id].woUsed[pKeyUpper] || 0) + add;
+                }
+            }
+        });
+
+        items = sections.map(sec => ({
+            id: sec.id,
+            title: sec.section_name,
+            units: sec.units || []
+        }));
+
+        stepAngle = 360 / items.length;
+        createWheel();
+
+    } catch(err) {
+        console.error("Failed to fetch data:", err);
     }
+}
 
-    function toggleSelector() {
-        if(!isAdmin){ alert("Access denied"); return; }
-        const el = document.getElementById('sectionSelector');
-        el.style.display = el.style.display === 'none' ? 'block' : 'none';
+/* ── CREATE WHEEL ── */
+function createWheel(){
+    wheel.innerHTML = "";
+    items.forEach(item => {
+        const el = document.createElement("div");
+        el.className = "item";
+        const src = getHelmSrc(item.title);
+        if(src) el.innerHTML = `<img src="${src}" class="section-helm">`;
+        else el.innerText = item.title;
+        wheel.appendChild(el);
+    });
+
+    itemEls = document.querySelectorAll(".item");
+
+    itemEls.forEach((el, i) => {
+        el.addEventListener("click", (e) => {
+            closeDetail();
+            if(!isMobile) {
+                let diff = i - index;
+                if (diff > items.length / 2) diff -= items.length;
+                if (diff < -items.length / 2) diff += items.length;
+                baseAngle -= diff * stepAngle;
+                index = i;
+                update(); render();
+                return;
+            }
+            index = i;
+            update(); render();
+            dismissFloating();
+
+            const img = el.querySelector(".section-helm");
+            document.body.classList.add("hide-wheel");
+            if(img){
+                const r = img.getBoundingClientRect();
+                const fl = document.createElement("img");
+                fl.src = img.src;
+                fl.className = "floating-helm";
+                fl.style.transition = "none";
+                fl.style.top = r.top + "px";
+                fl.style.left = r.left + "px";
+                fl.style.width = r.width + "px";
+                fl.style.height = r.height + "px";
+                document.body.appendChild(fl);
+                currentFloating = fl;
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        fl.style.transition = "";
+                        const cardH = card.offsetHeight || 220;
+                        const cardTop = window.innerHeight - cardH - 20;
+                        fl.style.left = (window.innerWidth / 2 - r.width / 2) + "px";
+                        fl.style.top = (cardTop - r.height - 12) + "px";
+                    });
+                });
+            }
+            setTimeout(() => card.classList.add("show-mobile"), 120);
+        });
+    });
+
+    positionItems();
+    update();
+    render();
+}
+
+function dismissFloating(){
+    if(currentFloating){ currentFloating.remove(); currentFloating = null; }
+}
+
+function positionItems(){
+    itemEls.forEach((el, i) => {
+        const theta = (i / items.length) * Math.PI * 2;
+        const x = Math.cos(theta) * radius;
+        const y = Math.sin(theta) * radius;
+
+        const size = el.offsetWidth;
+
+        el.style.left = `calc(50% + ${x}px - ${size/2}px)`;
+        el.style.top = `calc(50% + ${y}px - ${size/2}px)`;
+    });
+}
+
+/* ── UPDATE DATA CARD ── */
+function update() {
+    if (itemEls.length === 0) return;
+
+    closeDetail();
+
+    itemEls.forEach(e => e.classList.remove("active"));
+    itemEls[index].classList.add("active");
+
+    const item = items[index];
+    activeSection = { id: item.id, name: item.title };
+
+    /* --- BAHAGIAN BARU UNTUK BACKGROUND --- */
+    const newBgClass = getBackgroundClass(item.title);
+    // Buang semua class background sedia ada
+    document.body.classList.remove("bg-maint", "bg-comp", "bg-asset", "bg-project");
+    // Tambah class baru
+    document.body.classList.add(newBgClass);
+    /* -------------------------------------- */
+
+    title.innerText = item.title;
+    cardTitle.innerText = item.title;
+
+    currentLists = { ongoing: [], renewal: [], cpc: [], risk: [] };
+
+    const hariIni = new Date();
+    const enamBulanLagi = new Date();
+    enamBulanLagi.setMonth(hariIni.getMonth() + 6);
+
+    item.units.forEach(u => {
+        (u.contract || []).forEach(c => {
+            if (!c.contract_end) return;
+            const tarikhTamat = new Date(c.contract_end);
+
+            if (isFinancialDeficitRisk(c)) currentLists.risk.push(c);
+
+            if (tarikhTamat < hariIni) {
+                currentLists.cpc.push(c);
+            } else if (tarikhTamat <= enamBulanLagi) {
+                currentLists.renewal.push(c);
+            } else {
+                currentLists.ongoing.push(c);
+            }
+        });
+    });
+
+    cardDesc.innerHTML = `
+        <div class="status-row" onclick="openDetail('ongoing')">
+            <span>Ongoing Contracts</span>
+            <span class="status-badge" style="background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3);">
+                ${currentLists.ongoing.length}
+            </span>
+        </div>
+        <div class="status-row" onclick="openDetail('renewal')">
+            <span>Contracts Renewals (Within 6M)</span>
+            <span class="status-badge" style="background:rgba(234,179,8,0.15);color:#fde047;border:1px solid rgba(234,179,8,0.3);">
+                ${currentLists.renewal.length}
+            </span>
+        </div>
+        <div class="status-row" onclick="openDetail('cpc')">
+            <span>Available for Closing</span>
+            <span class="status-badge" style="background:rgba(147,51,234,0.15);color:#c084fc;border:1px solid rgba(147,51,234,0.3);">
+                ${currentLists.cpc.length}
+            </span>
+        </div>
+        <div class="status-row" onclick="openDetail('risk')">
+            <span>Financial Deficit Risk (S.O.R)</span>
+            <span class="status-badge" style="background:rgba(255,59,48,0.15);color:#ff6b6b;border:1px solid rgba(255,59,48,0.3);">
+                ${currentLists.risk.length}
+            </span>
+        </div>
+    `;
+
+    openBtn.innerText = "Open Dashboard";
+
+    if(!isMobile){
+        card.classList.remove("show");
+        void card.offsetWidth;
+        card.classList.add("show");
     }
+}
 
-    function goToUsage(){
-        if(!currentContract){ alert("Please choose a contract"); return; }
-        window.location.href = `dashboard-usageschedule.html?id=${currentContract.id}`;
+/* ── RENDER ── */
+function render(){
+    if(itemEls.length === 0) return;
+    wheel.style.transform = `translateY(-50%) rotate(${baseAngle}deg)`;
+    itemEls.forEach(el => { el.style.transform = `rotate(${-baseAngle}deg) scale(0.9)`; });
+    const activeScale = window.innerWidth >= 1800 ? 1.35 : 1.25;
+
+itemEls[index].style.transform =
+    `rotate(${-baseAngle}deg) scale(${activeScale})`;
+}
+
+function next(){ index=(index+1)%items.length; baseAngle-=stepAngle; closeDetail(); update(); render(); }
+function prev(){ index=(index-1+items.length)%items.length; baseAngle+=stepAngle; closeDetail(); update(); render(); }
+
+let buffer = 0;
+window.addEventListener("wheel", e => {
+    if(lock) return;
+    lock = true;
+    buffer += e.deltaY;
+    if(buffer > 80){ next(); buffer=0; }
+    if(buffer < -80){ prev(); buffer=0; }
+    setTimeout(() => lock=false, 120);
+}, { passive:true });
+
+let startX = 0;
+const isCardOpen = () => card.classList.contains("show-mobile");
+
+window.addEventListener("touchstart", e => {
+    if(isCardOpen()) return;
+    startX = e.touches[0].clientX;
+}, { passive:true });
+
+window.addEventListener("touchend", e => {
+    if(isCardOpen()) return;
+    const diff = startX - e.changedTouches[0].clientX;
+    if(Math.abs(diff) < 40) return;
+    if(diff > 0) next(); else prev();
+}, { passive:true });
+
+document.addEventListener("click", e => {
+    if(!isMobile) return;
+    if(!card.contains(e.target) && !e.target.closest(".item") && e.target.id !== "openBtn"){
+        card.classList.remove("show-mobile");
+        document.body.classList.remove("hide-wheel");
+        dismissFloating();
+        closeDetail();
     }
+});
 
-    function centerActiveUnit(btn) {
-        if(window.innerWidth <= 768) {
-            btn.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-        }
-    }
-
-    let touchStartX = 0;
-    let touchEndX = 0;
-    const contractSidebar = document.querySelector('.contract-sidebar');
-
-    contractSidebar.addEventListener('touchstart', e => {
-        touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
-
-    contractSidebar.addEventListener('touchend', e => {
-        touchEndX = e.changedTouches[0].screenX;
-        handleUnitSwipe();
-    }, { passive: true });
-
-    function handleUnitSwipe() {
-        if(window.innerWidth > 768) return;
-        const diff = touchStartX - touchEndX;
-        if(Math.abs(diff) < 60) return;
-
-        const units = [...document.querySelectorAll('.unit-pill')];
-        const activeIndex = units.findIndex(btn => btn.classList.contains('active'));
-        if(activeIndex === -1) return;
-
-        if(diff > 0 && activeIndex < units.length - 1) {
-            units[activeIndex + 1].click();
-        }
-        if(diff < 0 && activeIndex > 0) {
-            units[activeIndex - 1].click();
-        }
-    }
+window.addEventListener("keydown", (e) => {
+    if(e.key === "Escape") closeDetail();
+    if(e.key === "ArrowLeft" || e.key === "ArrowUp") prev();
+    if(e.key === "ArrowRight" || e.key === "ArrowDown") next();
+});
 </script>
 </body>
 </html>
