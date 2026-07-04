@@ -6,7 +6,6 @@
 <title>Usage Trend Dashboard (Improved Dummy)</title>
 
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 :root{
@@ -152,10 +151,9 @@ th{
 
 <div class="header">
     <div class="title">CONTRACT HEALTH DASHBOARD</div>
-    <div class="subtitle">Improved Dummy - Realistic Interim Claim Pattern</div>
+    <div class="subtitle">Memuatkan data kontrak...</div>
 </div>
 
-<!-- LIFECYCLE -->
 <div class="lifecycle">
     <div class="step done"><div class="dot"><i class="fa fa-check"></i></div><span>AWARD</span></div>
     <div class="line"></div>
@@ -175,35 +173,32 @@ th{
     <div class="step"><div class="dot">SFA</div></div>
 </div>
 
-<!-- SUMMARY -->
 <div class="summary">
     <div class="card">
         <div class="label">CONTRACT VALUE</div>
-        <div class="value">RM 500,000</div>
+        <div class="value" id="contractValue">RM 0.00</div>
     </div>
 
     <div class="card">
         <div class="label">USED</div>
-        <div class="value" id="usedValue"></div>
+        <div class="value" id="usedValue">RM 0.00</div>
     </div>
 
     <div class="card">
         <div class="label">BALANCE</div>
-        <div class="value" id="balanceValue"></div>
+        <div class="value" id="balanceValue">RM 0.00</div>
     </div>
 
     <div class="card">
         <div class="label">PROGRESS</div>
-        <div class="value" id="progressValue"></div>
+        <div class="value" id="progressValue">0%</div>
     </div>
 </div>
 
-<!-- CHART -->
 <div class="chartBox">
     <canvas id="chart"></canvas>
 </div>
 
-<!-- TABLE -->
 <table>
 <thead>
 <tr>
@@ -216,338 +211,164 @@ th{
 <tbody id="tableBody"></tbody>
 </table>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-
 const SB_URL="https://ywmsvowroxzhrjwrhsru.supabase.co";
 const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
 
-const supabase = window.supabase.createClient(
-    SB_URL,
-    SB_KEY
-);
-
+const supabase = window.supabase.createClient(SB_URL, SB_KEY);
 let chartInstance = null;
 
 function formatRM(value){
-    return "RM " + Number(value || 0).toLocaleString(
-        "en-MY",
-        {
-            minimumFractionDigits:2,
-            maximumFractionDigits:2
-        }
-    );
+    return "RM " + Number(value || 0).toLocaleString("en-MY", {
+        minimumFractionDigits:2,
+        maximumFractionDigits:2
+    });
 }
 
 async function loadDashboard(){
-
     try{
-
-        // Menggunakan Contract ID 2 secara sementara untuk tujuan dummy/testing
-const contractId = "2";
-
+        // ID ditukar kepada format Integer (int4) tanpa tanda pembuka/penutup kata ("")
+        const contractId = 2;
 
         /* ==========================
-           CONTRACT
+           CONTRACT FETCH
         ========================== */
-
-        const {
-            data:contract,
-            error:contractError
-        } = await supabase
-        .from("contract")
-        .select("*")
-        .eq("id",contractId)
-        .single();
+        const { data:contract, error:contractError } = await supabase
+            .from("contract")
+            .select("*")
+            .eq("id", contractId)
+            .maybeSingle(); // Menggunakan maybeSingle untuk elakkan ralat gandaan baris data
 
         if(contractError) throw contractError;
 
+        if(!contract) {
+            document.querySelector(".subtitle").innerHTML = `<span style="color:red;font-weight:bold;">Ralat: Kontrak ID ${contractId} tidak dijumpai!</span>`;
+            return;
+        }
+
         document.querySelector(".subtitle").innerHTML =
-            contract.contract_code +
-            " • " +
-            contract.contract_name;
+            (contract.contract_code || "N/A") + " • " + (contract.contract_name || "Tiada Nama Kontrak");
 
         /* ==========================
-           INTERIMS
+           INTERIMS FETCH
         ========================== */
-
-        const {
-            data:interims,
-            error:interimError
-        } = await supabase
-        .from("interims")
-        .select("*")
-        .eq("contract_id",contractId)
-        .order("claim_date");
+        const { data:interims, error:interimError } = await supabase
+            .from("interims")
+            .select("*")
+            .eq("contract_id", contractId)
+            .order("claim_date");
 
         if(interimError) throw interimError;
 
-        const contractValue =
-            Number(contract.contract_sum || 0);
+        const contractValue = Number(contract.contract_sum || 0);
+        const safeInterims = interims || [];
+        
+        const totalUsed = safeInterims.reduce((sum, row) => 
+            sum + Number(row.net_amount || row.claim_amount || 0), 0
+        );
 
-        const totalUsed =
-            interims.reduce(
-                (sum,row)=>
-                sum + Number(
-                    row.net_amount ||
-                    row.claim_amount ||
-                    0
-                ),
-                0
-            );
-
-        const balance =
-            contractValue - totalUsed;
-
-        const progress =
-            contractValue
-            ? ((totalUsed / contractValue)*100)
-                .toFixed(1)
-            : 0;
+        const balance = contractValue - totalUsed;
+        const progress = contractValue ? ((totalUsed / contractValue) * 100).toFixed(1) : 0;
 
         /* ==========================
-           KPI
+           KPI INTERFACE UPDATE
         ========================== */
-
-        document.querySelectorAll(".value")[0]
-            .innerText =
-            formatRM(contractValue);
-
-        document.getElementById("usedValue")
-            .innerText =
-            formatRM(totalUsed);
-
-        document.getElementById("balanceValue")
-            .innerText =
-            formatRM(balance);
-
-        document.getElementById("progressValue")
-            .innerText =
-            progress + "%";
+        document.getElementById("contractValue").innerText = formatRM(contractValue);
+        document.getElementById("usedValue").innerText = formatRM(totalUsed);
+        document.getElementById("balanceValue").innerText = formatRM(balance);
+        document.getElementById("progressValue").innerText = progress + "%";
 
         /* ==========================
-           MONTHLY DATA
+           MONTHLY DATA PROCESSING
         ========================== */
-
         const monthlyMap = {};
 
-        interims.forEach(item=>{
-
+        safeInterims.forEach(item => {
             if(!item.claim_date) return;
-
-            const date =
-                new Date(item.claim_date);
-
-            const month =
-                date.toLocaleString(
-                    "en",
-                    {
-                        month:"short"
-                    }
-                );
-
-            monthlyMap[month] =
-                (monthlyMap[month] || 0)
-                +
-                Number(
-                    item.net_amount ||
-                    item.claim_amount ||
-                    0
-                );
+            const date = new Date(item.claim_date);
+            const month = date.toLocaleString("en", { month: "short" });
+            monthlyMap[month] = (monthlyMap[month] || 0) + Number(item.net_amount || item.claim_amount || 0);
         });
 
-        const months =
-            Object.keys(monthlyMap);
+        let months = Object.keys(monthlyMap);
+        let actual = Object.values(monthlyMap);
 
-        const actual =
-            Object.values(monthlyMap);
+        if(months.length === 0) {
+            months = ["Jan", "Feb", "Mar"];
+            actual = [0, 0, 0];
+        }
 
-        const planned =
-            months.map(()=>
-                contractValue / 12
-            );
+        const planned = months.map(() => contractValue / 12);
 
-        buildChart(
-            months,
-            planned,
-            actual
-        );
+        buildChart(months, planned, actual);
+        buildTable(Object.keys(monthlyMap), planned, actual);
+        updateLifecycle(contract, safeInterims);
 
-        buildTable(
-            months,
-            planned,
-            actual
-        );
-
-        updateLifecycle(
-            contract,
-            interims
-        );
-
-    }catch(err){
-
-        console.error(err);
-
-        alert(
-            err.message ||
-            "Failed loading dashboard"
-        );
+    } catch(err) {
+        console.error("Ralat Papan Pemuka:", err);
+        alert(err.message || "Gagal memuatkan data dari pangkalan data.");
     }
 }
 
-function buildChart(
-    months,
-    planned,
-    actual
-){
+function buildChart(months, planned, actual){
+    const ctx = document.getElementById("chart");
+    if(!ctx) return;
+    if(chartInstance){ chartInstance.destroy(); }
 
-    const ctx =
-        document
-        .getElementById("chart");
-
-    if(chartInstance){
-        chartInstance.destroy();
-    }
-
-    chartInstance =
-    new Chart(ctx,{
-        type:"line",
-        data:{
-            labels:months,
-            datasets:[
-                {
-                    label:"Planned",
-                    data:planned,
-                    borderColor:"#8e8e93",
-                    borderDash:[6,4],
-                    fill:false,
-                    tension:0.3
-                },
-                {
-                    label:"Actual Interim Claims",
-                    data:actual,
-                    borderColor:"#007AFF",
-                    backgroundColor:
-                        "rgba(0,122,255,0.15)",
-                    fill:true,
-                    tension:0.35,
-                    pointRadius:5
-                }
+    chartInstance = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: months,
+            datasets: [
+                { label: "Planned", data: planned, borderColor: "#8e8e93", borderDash: [6,4], fill: false, tension: 0.3 },
+                { label: "Actual Interim Claims", data: actual, borderColor: "#007AFF", backgroundColor: "rgba(0,122,255,0.15)", fill: true, tension: 0.35, pointRadius: 5 }
             ]
         },
-        options:{
-            responsive:true,
-            plugins:{
-                legend:{
-                    position:"top"
-                }
-            },
-            scales:{
-                y:{
-                    beginAtZero:true
-                }
-            }
-        }
+        options: { responsive: true, plugins: { legend: { position: "top" } }, scales: { y: { beginAtZero: true } } }
     });
 }
 
-function buildTable(
-    months,
-    planned,
-    actual
-){
-
-    const body =
-        document.getElementById(
-            "tableBody"
-        );
-
+function buildTable(months, planned, actual){
+    const body = document.getElementById("tableBody");
+    if(!body) return;
     body.innerHTML = "";
 
-    months.forEach((m,i)=>{
+    if(months.length === 0) {
+        body.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#8e8e93;">Tiada rekod tuntutan interim ditemui</td></tr>`;
+        return;
+    }
 
-        const variance =
-            actual[i] - planned[i];
-
-        const color =
-            variance > 0
-            ? "#FF3B30"
-            : "#34C759";
-
-        body.innerHTML += `
-        <tr>
-            <td>${m}</td>
-            <td>${formatRM(planned[i])}</td>
-            <td>${formatRM(actual[i])}</td>
-            <td style="
-                color:${color};
-                font-weight:700;
-            ">
-                ${formatRM(variance)}
-            </td>
-        </tr>
-        `;
+    months.forEach((m, i) => {
+        const variance = (actual[i] || 0) - (planned[i] || 0);
+        const color = variance > 0 ? "#FF3B30" : "#34C759";
+        body.innerHTML += `<tr><td>${m}</td><td>${formatRM(planned[i])}</td><td>${formatRM(actual[i])}</td><td style="color:${color}; font-weight:700;">${formatRM(variance)}</td></tr>`;
     });
 }
 
-function updateLifecycle(
-    contract,
-    interims
-){
-
-    const steps =
-        document.querySelectorAll(
-            ".step"
-        );
-
-    steps.forEach(
-        s=>s.classList.remove(
-            "done",
-            "current",
-            "overdue"
-        )
-    );
+function updateLifecycle(contract, interims){
+    const steps = document.querySelectorAll(".step");
+    if(!steps.length) return;
+    steps.forEach(s => s.classList.remove("done", "current", "overdue"));
 
     if(interims.length > 0){
-
-        steps[0].classList.add("done");
-        steps[1].classList.add("done");
-        steps[2].classList.add("current");
-
-    }else{
-
-        steps[0].classList.add("done");
-        steps[1].classList.add("current");
+        steps[0].classList.add("done"); steps[1].classList.add("done"); steps[2].classList.add("current");
+    } else {
+        steps[0].classList.add("done"); steps[1].classList.add("current");
     }
 
-    const today =
-        new Date();
-
-    const endDate =
-        new Date(
-            contract.contract_end
-        );
-
-    if(today > endDate){
-
-        steps[2].classList.remove(
-            "current"
-        );
-
-        steps[2].classList.add(
-            "done"
-        );
-
-        steps[3].classList.add(
-            "current"
-        );
+    if(contract && contract.contract_end){
+        const today = new Date();
+        const endDate = new Date(contract.contract_end);
+        if(!isNaN(endDate.getTime()) && today > endDate){
+            steps[2].classList.remove("current"); steps[2].classList.add("done"); steps[3].classList.add("current");
+        }
     }
 }
 
-loadDashboard();
-
+window.addEventListener("DOMContentLoaded", () => { loadDashboard(); });
 </script>
 
 </body>
