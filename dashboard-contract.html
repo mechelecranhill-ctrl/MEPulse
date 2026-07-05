@@ -95,17 +95,56 @@
             }
 
             .mobile-usage-btn {
-                display: flex;
-                background: var(--ios-blue);
-                color: white;
-                text-decoration: none;
-                padding: 6px 12px;
-                border-radius: 10px;
-                font-size: 11px;
-                font-weight: 800;
-                align-items: center;
-                gap: 5px;
-            }
+        display: flex;
+        background: var(--ios-blue);
+        color: white;
+        text-decoration: none;
+        padding: 10px; /* Padding sama rata untuk bentuk bulat/petak comel */
+        border-radius: 50%; /* Bulat apabila mengecil */
+        font-size: 14px;
+        font-weight: 800;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        will-change: width, border-radius;
+        width: 35px;
+        height: 35px;
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+    /* Sembunyikan teks dan anak panah secara lalai */
+    .mobile-usage-btn .btn-text,
+    .mobile-usage-btn .icon-arrow {
+        display: none;
+        opacity: 0;
+        white-space: nowrap;
+    }
+
+    /* Keadaan apabila butang di-Expand */
+    .mobile-usage-btn.expanded {
+        position: absolute; /* Guna absolute supaya ia boleh float di atas tajuk/contract_code */
+        right: 20px;
+        top: 20px;
+        width: auto; /* Biarkan ia memanjang mengikut kandungan */
+        padding: 6px 15px;
+        border-radius: 12px; /* Tukar jadi pill shape balik */
+        gap: 8px;
+        z-index: 10;
+        box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+    }
+
+    .mobile-usage-btn.expanded .btn-text,
+    .mobile-usage-btn.expanded .icon-arrow {
+        display:inline-block;
+        opacity: 1;
+    }
+    
+    .mobile-usage-btn.expanded .icon-arrow {
+        font-size: 9px;
+    }
+}
 
             .contract-sidebar {
                 width: 100% !important;
@@ -257,7 +296,7 @@
 
         .section-row { background: #fff; border: 1px solid var(--ios-blue); border-radius: 12px; padding: 10px; margin-bottom: 8px; }
         .prog-bar-bg { width: 100%; height: 8px; background: #eee; border-radius: 4px; margin-top: 5px; overflow: hidden; }
-        /* PENGOPTIMUMAN GPU: Kurangkan transition time dan paksa perkakasan render width melalui will-change */
+
         .prog-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease-out !important; width: 0 !important; will-change: width;}
         .avg-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 5px; }
         .avg-item { font-size: 9px; font-weight: 600; color: #666; }
@@ -309,9 +348,11 @@
                         <p id="panel-vendor" style="margin:2px 0 0 0; color: #8e8e93; font-size: 13px; font-weight: 500;"></p>
                     </div>
                     <div style="display: flex; gap: 8px; align-items: center;">
-                        <a href="#" class="mobile-usage-btn" onclick="goToUsage()">
-                            USAGE <i class="fa fa-chevron-right" style="font-size: 8px;"></i>
-                        </a>
+                        <a href="#" class="mobile-usage-btn" id="mobileUsageBtn" onclick="handleMobileUsageClick(event)">
+    <i class="fa fa-arrow-right icon-main"></i> 
+    <span class="btn-text">USAGE</span>
+    <i class="fa fa-chevron-right icon-arrow"></i>
+</a>
                     </div>
                 </div>
 
@@ -492,6 +533,9 @@
     }
 
     async function openAnalysis(contract) {
+
+const mobileBtn = document.getElementById('mobileUsageBtn');
+if(mobileBtn) mobileBtn.classList.remove('expanded');
         document.body.classList.add('analysis-active');
         document.getElementById('analysis-panel').style.display = 'flex';
         document.getElementById('panel-title').innerText = contract.contract_code;
@@ -684,6 +728,33 @@
         const el = document.getElementById('sectionSelector');
         el.style.display = el.style.display === 'none' ? 'block' : 'none';
     }
+
+function handleMobileUsageClick(e) {
+    e.preventDefault(); // Elak page jump anchors
+    e.stopPropagation(); // Elak trigger event click outside secara langsung
+    
+    const btn = document.getElementById('mobileUsageBtn');
+    
+    // Jika belum expand, expand-kan dia dahulu
+    if (!btn.classList.contains('expanded')) {
+        btn.classList.add('expanded');
+    } else {
+        // Jika sudah expand dan ditekan kali kedua, baru pergi ke page usage
+        goToUsage();
+    }
+}
+
+// PENGOPTIMUMAN: Tutup semula butang (menjadi simbol balik) jika user tekan di tempat lain
+document.addEventListener('click', (e) => {
+    const btn = document.getElementById('mobileUsageBtn');
+    if (btn && btn.classList.contains('expanded')) {
+        // Jika klik bukan pada kawasan butang, jadikannya simbol semula
+        if (!btn.contains(e.target)) {
+            btn.classList.remove('expanded');
+        }
+    }
+});
+
 
     function goToUsage(){
         if(!currentContract){ alert("Please choose a contract"); return; }
