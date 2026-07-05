@@ -42,8 +42,6 @@ class AppSidebar extends HTMLElement {
             </div>
 
 <div class="hamburger-wrapper">
-    <div class="hamburger-box"></div> 
-
     <button class="hamburger" id="hamburger">
         <input type="checkbox" id="menuToggle">
         <svg viewBox="0 0 32 32">
@@ -59,6 +57,7 @@ class AppSidebar extends HTMLElement {
         </svg>
     </button>
 </div>
+<div class="hamburger-box"></div>
 
             <div class="logout-modal" id="logoutModal">
                 <div class="logout-box">
