@@ -457,78 +457,87 @@ function editStaff(id){
     }
 }
     async function saveStaff(){
-
     const body = {
-        name:document.getElementById("fName").value,
-        position:document.getElementById("fPosition").value,
-        employee_id:document.getElementById("fEmployee").value,
-        phone_no:document.getElementById("fPhone").value,
-        email:document.getElementById("fEmail").value
+        name: document.getElementById("fName").value,
+        position: document.getElementById("fPosition").value,
+        employee_id: document.getElementById("fEmployee").value,
+        phone_no: document.getElementById("fPhone").value,
+        email: document.getElementById("fEmail").value
     };
 
-    try{
-
+    try {
+        let res;
         if(editingStaff){
-
-            await fetch(
+            // Ditukar ke sintaksis standard query Supabase
+            res = await fetch(
                 `${SB_URL}/rest/v1/staff?id=eq.${editingStaff.id}`,
                 {
-                    method:"PATCH",
-                    headers,
-                    body:JSON.stringify(body)
+                    method: "PATCH",
+                    headers: {
+                        ...headers,
+                        "Prefer": "return=minimal" // Memastikan Supabase memproses kemas kini tanpa ralat pemulangan data
+                    },
+                    body: JSON.stringify(body)
                 }
             );
-
-        }else{
-
-            await fetch(
+        } else {
+            res = await fetch(
                 `${SB_URL}/rest/v1/staff`,
                 {
-                    method:"POST",
-                    headers,
-                    body:JSON.stringify(body)
+                    method: "POST",
+                    headers: {
+                        ...headers,
+                        "Prefer": "return=minimal"
+                    },
+                    body: JSON.stringify(body)
                 }
             );
+        }
 
+        if (!res.ok) {
+            const errData = await res.json();
+            alert("Ralat: " + JSON.stringify(errData));
+            return;
         }
 
         closeModal();
-        loadStaff();
+        loadStaff(); // Memuatkan semula senarai terkini
 
-    }catch(err){
-
+    } catch(err) {
         alert(err.message);
-
     }
-
 }
 
+
 async function deleteStaff(id, name){
-
-    const ok = confirm(
-        `PADAM ${name.toUpperCase()} ?`
-    );
-
+    const ok = confirm(`PADAM ${name.toUpperCase()} ?`);
     if(!ok) return;
 
-    try{
-
-        await fetch(
+    try {
+        const res = await fetch(
             `${SB_URL}/rest/v1/staff?id=eq.${id}`,
             {
-                method:'DELETE',
-                headers
+                method: 'DELETE',
+                headers: {
+                    ...headers,
+                    "Prefer": "return=minimal"
+                }
             }
         );
 
+        if (!res.ok) {
+            const errData = await res.json();
+            alert("Gagal memadam: " + JSON.stringify(errData));
+            return;
+        }
+
         loadStaff();
 
-    } catch(err){
-
+    } catch(err) {
         alert(err.message);
-
     }
 }
+
 
 window.onload = loadStaff;
 
