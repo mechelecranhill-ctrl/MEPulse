@@ -897,9 +897,9 @@ tr.status-cancel td strong { color: #FF3B30; }
     <div id="templateModal" class="no-print">
 
         <div class="modal-box">
-            <h3 style="margin-top:0;">Konfigurasi Section Blueform</h3>
+            <h3 style="margin-top:0;">Blueform Configurations</h3>
             <div style="margin-bottom:15px;">
-                <label style="font-size:11px; font-weight:bold;">Preset No. Rujukan</label> 
+                <label style="font-size:11px; font-weight:bold;">Reference No. Preset</label> 
                 <input id="refPrefixInput"       
                     type="text"
                     value="RSAJ/M&E/IP/11-"
@@ -909,8 +909,8 @@ tr.status-cancel td strong { color: #FF3B30; }
             <div id="dynamicRowsContainer"></div>
 
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-                <button class="btn-action" style="background:#eee; color:#333;" onclick="closeTemplate()">Batal</button>
-                <button class="btn-action" style="background:var(--ios-blue);" onclick="saveTemplate()">Simpan Template</button>
+                <button class="btn-action" style="background:#eee; color:#333;" onclick="closeTemplate()">Cancel</button>
+                <button class="btn-action" style="background:var(--ios-blue);" onclick="saveTemplate()">Save Template</button>
             </div> 
         </div>   
     </div>
@@ -924,7 +924,7 @@ tr.status-cancel td strong { color: #FF3B30; }
             </div>
             <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
                 <button class="btn-action" style="background:#333;" onclick="openTemplate()">
-                    <i class="fa-solid fa-sliders"></i> Urus Template BF
+                    <i class="fa-solid fa-sliders"></i> Template BF Settings
                 </button>
                 <button class="btn-action"
     id="btnBulkBlueform"
@@ -932,7 +932,7 @@ tr.status-cancel td strong { color: #FF3B30; }
     onclick="bulkDownloadBlueform()">
 
     <i class="fa-solid fa-download"></i>
-    Bulk Blueform
+    Bulk Download
 </button>
                 <button class="btn-action" style="background:var(--ios-blue);" onclick="openSummary()">
                     <i class="fa-solid fa-chart-line"></i> Contract Summary
@@ -942,6 +942,11 @@ tr.status-cancel td strong { color: #FF3B30; }
         </div>
 
         <div class="glass-card" id="tableWrapper" style="display: none;">
+
+<div class="glass-header">
+        <div id="unitHeader" style="font-size: 18px; color: var(--ios-blue); background: rgba(255,255,255,0.6); padding: 8px 20px; border-radius: 20px; border: 1px solid var(--glass-border); box-shadow: 0 4px 12px rgba(0,0,0,0.05);"></div>
+    </div>
+
             <div id="contractDashboard" style="margin-bottom:20px;">
                 <div style="background:white;border-radius:15px;padding:15px;margin-top:15px;box-shadow:0 3px 8px rgba(0,0,0,0.08);">
                     <div style="font-weight:bold;font-size:13px;margin-bottom:10px;">
@@ -966,13 +971,13 @@ tr.status-cancel td strong { color: #FF3B30; }
                     <tr>
                         <th>Status</th>
                         <th>No.</th>
-                        <th>ID Kerja</th>
-                        <th>Keterangan & Lokasi</th>
+                        <th>Work ID</th>
+                        <th>Description & Location</th>
                         <th>Interim No</th>
-                        <th>Amaun Kerja (RM)</th>
-                        <th>Amaun Claim (RM)</th>
-                        <th>Tarikh</th>
-                        <th>Tindakan</th>
+                        <th>Work Amount (RM)</th>
+                        <th>Claim Amount(RM)</th>
+                        <th>Date</th>
+                        <th>Actions</th>
 
 <th style="width:60px;text-align:center;">
     <input type="checkbox" id="checkAllBF" onchange="toggleAllBF(this)">
@@ -1011,10 +1016,10 @@ tr.status-cancel td strong { color: #FF3B30; }
             <div style="color:white;font-size:13px;font-weight:600;" id="bulkPreviewCount"></div>
             <div style="display:flex;gap:10px;">
                 <button class="btn-action" style="background:#555;" onclick="closeBulkPreview()">
-                    <i class="fa fa-times"></i> Tutup
+                    <i class="fa fa-times"></i> Close
                 </button>
                 <button class="btn-action" style="background:var(--ios-green);" onclick="window.print()">
-                    <i class="fa fa-print"></i> Cetak / Simpan PDF
+                    <i class="fa fa-print"></i> Print / Save PDF
                 </button>
             </div>
         </div>
@@ -1130,7 +1135,7 @@ async function saveTemplate() {
         method: 'PATCH', headers,
         body: JSON.stringify({ reference: prefix })
     });
-    alert("Prefix berjaya disimpan!");
+    alert("Prefix saved!");
     closeTemplate();
 }
 
@@ -1167,6 +1172,14 @@ async function loadSingleContract(id){
         areaList.forEach((a,i)=>{ areaPriority[a] = i + 1; });
         document.getElementById('viewTitle').innerText = c.contract_code;
         document.getElementById('viewSubtitle').innerText = c.contract_name;
+        
+        // Masukkan kod kontrak ke dalam glass header baru
+        const unitHeaderEl = document.getElementById('unitHeader');
+        if(unitHeaderEl) {
+            unitHeaderEl.innerHTML = `<i class="fa-solid fa-file-contract"></i> ${c.contract_code}`;
+        }
+        // -------------------------
+
         document.getElementById('tableWrapper').style.display = 'block';
         const [woRes, intRes] = await Promise.all([
             fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}`, { headers }),
@@ -1180,6 +1193,7 @@ async function loadSingleContract(id){
         filterDistrict('ALL', document.querySelector('.district-tab'));
     }catch(e){ console.error(e); }
 }
+
 
 function renderTable(data, showArea = true){
     currentTableData = data;
