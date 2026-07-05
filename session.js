@@ -30,6 +30,8 @@ if (localStorage.getItem("loggedIn") === "true" && !localStorage.getItem("lastAc
    CHECK LOGIN GUARD
 ========================= */
 async function checkSession() {
+
+return true;
     const loggedIn = localStorage.getItem("loggedIn");
 
     if (loggedIn !== "true") {
@@ -293,6 +295,8 @@ channel.onmessage = (e) => {
    MAIN ENGINE LOOP
 ========================= */
 setInterval(() => {
+
+return;
     if (sessionExpired || localStorage.getItem("sessionExpired") === "true" || localStorage.getItem("loggedIn") !== "true") return;
 
     const state = getUserState();
@@ -310,4 +314,4 @@ setInterval(() => {
 }, CHECK_INTERVAL);
 
 // Jalankan semakan keselamatan sebaik fail ini dimuat turun
-checkSession();
+//checkSession();//
