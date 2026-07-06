@@ -256,12 +256,13 @@ function closeWarningModalLocal() {
 }
 
 /* =========================
-   CLEAR AUTH STATES HELPERS
+   CLEAR AUTH STATES HELPERS (Di dalam session.js)
 ========================= */
 function clearAuthStates() {
     localStorage.removeItem("loggedIn");
     localStorage.removeItem("lastActivity");
     localStorage.removeItem("sessionExpired");
+    localStorage.removeItem("supabase_token"); // TAMBAH BARIS INI: Buang token keselamatan apabila keluar
 }
 
 /* =========================
