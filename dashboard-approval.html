@@ -100,16 +100,21 @@
         const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
         const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
         
-        // Initialize Supabase Client
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-        // Fungsi utama untuk load semua data dashboard
+        // Fungsi utama untuk load semua data dari table 'work_orders'
         async function fetchDashboards() {
             try {
-                // DIPERBAIKI: Menggunakan nama table 'contract'
-                const { data: contracts, error } = await supabaseClient
-                    .from('contract')
-                    .select('*');
+                // DIKEMASKINI: Ambil status dari table 'work_orders' dan bawa masuk (JOIN) nama dari table 'contract'
+                const { data: workOrders, error } = await supabaseClient
+                    .from('work_orders')
+                    .select(`
+                        work_id,
+                        status,
+                        contract (
+                            contract_name
+                        )
+                    `);
 
                 if (error) throw error;
 
@@ -118,34 +123,44 @@
                 document.getElementById('table-sect').innerHTML = '';
                 document.getElementById('table-dept').innerHTML = '';
 
-                // Agihkan data ke dashboard mengikut status semasa
                 let countExec = 0, countSect = 0, countDept = 0;
 
-                contracts.forEach(item => {
+                workOrders.forEach(item => {
+                    // Dapatkan nama kontrak hasil daripada JOIN (jika ada hubungan foreign key)
+                    // Jika data contract disimpan sebagai array (one-to-many), ambil indeks 0. Jika object, terus baca property.
+                    let contractName = 'Tiada Maklumat';
+                    if (item.contract) {
+                        contractName = Array.isArray(item.contract) ? item.contract[0]?.contract_name : item.contract.contract_name;
+                    }
+
+                    const refinedItem = {
+                        work_id: item.work_id,
+                        status: item.status,
+                        contract_name: contractName
+                    };
+
                     if (item.status === 'BLUEFORM') {
-                        appendRow('table-exec', item, 'APP-EXEC', 'Approve (Exec)', 'bg-amber-600 hover:bg-amber-700');
+                        appendRow('table-exec', refinedItem, 'APP-EXEC', 'Approve (Exec)', 'bg-amber-600 hover:bg-amber-700');
                         countExec++;
                     } else if (item.status === 'APP-EXEC') {
-                        appendRow('table-sect', item, 'APP-SECT', 'Approve (Sect)', 'bg-indigo-600 hover:bg-indigo-700');
+                        appendRow('table-sect', refinedItem, 'APP-SECT', 'Approve (Sect)', 'bg-indigo-600 hover:bg-indigo-700');
                         countSect++;
                     } else if (item.status === 'APP-SECT') {
-                        appendRow('table-dept', item, 'APPROVED', 'Kelulusan Akhir', 'bg-emerald-600 hover:bg-emerald-700');
+                        appendRow('table-dept', refinedItem, 'APPROVED', 'Kelulusan Akhir', 'bg-emerald-600 hover:bg-emerald-700');
                         countDept++;
                     }
                 });
 
-                // Papar mesej kosong jika tiada tugasan
                 if (countExec === 0) showEmptyRow('table-exec', 'Tiada kontrak berstatus BLUEFORM.');
                 if (countSect === 0) showEmptyRow('table-sect', 'Menunggu kelulusan Eksekutif.');
                 if (countDept === 0) showEmptyRow('table-dept', 'Menunggu kelulusan Ketua Seksyen.');
 
             } catch (err) {
                 console.error("Ralat memuat data:", err.message);
-                alert("Gagal memuatkan data dari table 'contract': " + err.message);
+                alert("Gagal memuatkan data dari table 'work_orders': " + err.message);
             }
         }
 
-        // Fungsi bantuan untuk bina baris jadual (table row)
         function appendRow(tableId, item, nextStatus, buttonText, buttonClass) {
             const tbody = document.getElementById(tableId);
             const badgeColor = item.status === 'BLUEFORM' ? 'bg-amber-100 text-amber-800' : 
@@ -171,7 +186,6 @@
             tbody.insertAdjacentHTML('beforeend', row);
         }
 
-        // Fungsi paparan jika jadual tiada rekod
         function showEmptyRow(tableId, message) {
             document.getElementById(tableId).innerHTML = `
                 <tr>
@@ -181,22 +195,20 @@
                 </tr>`;
         }
 
-        // Fungsi utama menukar status di Supabase (Proses Approval)
+        // Fungsi utama menukar status di table 'work_orders'
         async function approveContract(workId, nextStatus) {
             if (!confirm(`Adakah anda pasti untuk menukar status Work ID: ${workId} ke ${nextStatus}?`)) return;
 
             try {
-                // DIPERBAIKI: Menggunakan nama table 'contract'
+                // DIKEMASKINI: Proses update kini dilakukan ke atas table 'work_orders'
                 const { error } = await supabaseClient
-                    .from('contract')
+                    .from('work_orders')
                     .update({ status: nextStatus })
                     .eq('work_id', workId);
 
                 if (error) throw error;
 
                 alert(`Berjaya dikemaskini ke status ${nextStatus}!`);
-                
-                // Refresh data dashboard secara automatik selepas update berjaya
                 fetchDashboards();
 
             } catch (err) {
@@ -205,7 +217,6 @@
             }
         }
 
-        // Jalankan fungsi load data sebaik sahaja page dibuka
         window.onload = fetchDashboards;
     </script>
 </body>
