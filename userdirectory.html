@@ -457,25 +457,53 @@ function editStaff(id){
     }
 }
     async function saveStaff(){
-    const body = {
-        name: document.getElementById("fName").value,
-        position: document.getElementById("fPosition").value,
-        employee_id: document.getElementById("fEmployee").value,
-        phone_no: document.getElementById("fPhone").value,
-        email: document.getElementById("fEmail").value
-    };
+    const name = document.getElementById("fName").value;
+    const position = document.getElementById("fPosition").value;
+    const employee_id = document.getElementById("fEmployee").value;
+    const phone_no = document.getElementById("fPhone").value;
+    const email = document.getElementById("fEmail").value;
+
+    const body = { name, position, employee_id, phone_no, email };
 
     try {
         let res;
+        
+        // 1. JIKA STAFF BARU -> DAFTAR KE SUPABASE AUTH DULU
+        if (!editingStaff) {
+            // Kita tetapkan kata laluan lalai (default password) sementara waktu
+            // Pengguna boleh tukar atau reset kemudian hari
+            const defaultPassword = "StaffPassword123!"; 
+
+            const authRes = await fetch(`${SB_URL}/auth/v1/signup`, {
+                method: "POST",
+                headers: headers,
+                body: JSON.stringify({
+                    email: email,
+                    password: defaultPassword
+                })
+            });
+
+            const authData = await authRes.json();
+
+            if (!authRes.ok) {
+                alert("Ralat Pendaftaran Auth: " + (authData.msg || JSON.stringify(authData)));
+                return; // Berhenti jika pendaftaran akaun gagal
+            }
+
+            // Opsional: Jika jadual 'staff' anda mempunyai kolum untuk 'user_id' (foreign key dari auth),
+            // anda boleh masukkannya di sini:
+            // body.user_id = authData.id;
+        }
+
+        // 2. SIMPAN / KEMAS KINI DATA DI JADUAL STAFF
         if(editingStaff){
-            // Ditukar ke sintaksis standard query Supabase
             res = await fetch(
                 `${SB_URL}/rest/v1/staff?id=eq.${editingStaff.id}`,
                 {
                     method: "PATCH",
                     headers: {
                         ...headers,
-                        "Prefer": "return=minimal" // Memastikan Supabase memproses kemas kini tanpa ralat pemulangan data
+                        "Prefer": "return=minimal"
                     },
                     body: JSON.stringify(body)
                 }
@@ -496,18 +524,18 @@ function editStaff(id){
 
         if (!res.ok) {
             const errData = await res.json();
-            alert("Ralat: " + JSON.stringify(errData));
+            alert("Ralat Simpan Data: " + JSON.stringify(errData));
             return;
         }
 
+        alert(editingStaff ? "Staff dikemaskini!" : "Staff baru didaftarkan ke sistem & Auth!");
         closeModal();
-        loadStaff(); // Memuatkan semula senarai terkini
+        loadStaff(); 
 
     } catch(err) {
         alert(err.message);
     }
 }
-
 
 async function deleteStaff(id, name){
     const ok = confirm(`PADAM ${name.toUpperCase()} ?`);
