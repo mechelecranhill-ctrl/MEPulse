@@ -25,7 +25,7 @@ class AppSidebar extends HTMLElement {
 
                 <div class="menu-group">
                     <a href="#" class="menu-parent" id="dashboardBtn">
-                        Dashboard <span class="arrow">▼</span>
+                        Dashboard  <span class="arrow">▼</span>
                     </a>
 
                     <div class="submenu" id="dashboardMenu">
