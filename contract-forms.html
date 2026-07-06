@@ -682,8 +682,6 @@ color: #0b3d91;
 
 </div>
 
-<textarea id="w_desc" rows="2" placeholder="Work Description"></textarea>
-
 <label>District</label>
 <select id="w_dist" required>
     <option value="">Pilih Kontrak Dahulu</option>
@@ -1909,12 +1907,10 @@ function renderWorkIdCards(skipSave = false){
     if(!container) return;
 
     if(!skipSave){
-
         // ==========================
-        // Simpan data semasa
+        // Simpan data semasa ke dalam Map cache
         // ==========================
         document.querySelectorAll(".w-id-card").forEach(card=>{
-
             const workId = card.dataset.workId;
             if(!workId) return;
 
@@ -1922,62 +1918,42 @@ function renderWorkIdCards(skipSave = false){
                 workIdCardDataMap[workId]={};
             }
 
-            workIdCardDataMap[workId].location =
-                card.querySelector(".w_card_location")?.value || "";
+            workIdCardDataMap[workId].location = card.querySelector(".w_card_location")?.value || "";
+            // Simpan description unik per Work ID
+            workIdCardDataMap[workId].description = card.querySelector(".w_card_desc")?.value || "";
 
             if(!workIdCardDataMap[workId].section_category){
                 workIdCardDataMap[workId].section_category={};
             }
 
             card.querySelectorAll(".w_sec_amt").forEach(input=>{
-
                 const sec=input.dataset.sec;
-
                 if(!workIdCardDataMap[workId].section_category[sec]){
                     workIdCardDataMap[workId].section_category[sec]={};
                 }
-
-                workIdCardDataMap[workId]
-                    .section_category[sec]
-                    .amt=parseFloat(input.dataset.rawValue||0);
-
+                workIdCardDataMap[workId].section_category[sec].amt=parseFloat(input.dataset.rawValue||0);
             });
 
             card.querySelectorAll(".w_sec_extra").forEach(input=>{
-
                 const sec=input.dataset.sec;
-
                 if(!workIdCardDataMap[workId].section_category[sec]){
                     workIdCardDataMap[workId].section_category[sec]={};
                 }
-
-                workIdCardDataMap[workId]
-                    .section_category[sec]
-                    .extra=parseFloat(input.dataset.rawValue||0);
-
+                workIdCardDataMap[workId].section_category[sec].extra=parseFloat(input.dataset.rawValue||0);
             });
-
         });
-
     }
 
     const currentIds=getCurrentWorkIdsFromRows();
-
     container.innerHTML="";
 
     currentIds.forEach(workId=>{
-
-        const saved=
-            workIdCardDataMap[workId] || {};
-
-        const location=
-            saved.location || "";
-
-        const breakdown=
-            saved.section_category || {};
+        const saved= workIdCardDataMap[workId] || {};
+        const location= saved.location || "";
+        const description= saved.description || ""; // Ambil description yang disimpan
+        const breakdown= saved.section_category || {};
 
         const card=document.createElement("div");
-
         card.className="w-id-card";
         card.dataset.workId=workId;
 
@@ -1985,98 +1961,42 @@ function renderWorkIdCards(skipSave = false){
             <span class="w-id-card-label">${workId}</span>
 
             <label>Location</label>
+            <input type="text" class="w_card_location" value="${escapeAttr(location)}" placeholder="Location">
 
-            <input
-                type="text"
-                class="w_card_location"
-                value="${escapeAttr(location)}"
-                placeholder="Location">
+            <label>Work Description</label>
+            <textarea class="w_card_desc" rows="2" placeholder="Description bagi ${workId}">${escapeAttr(description)}</textarea>
 
             <label>Cost Breakdown</label>
-
             <div class="funding-grid">
         `;
 
-        Object.keys(currentContractSections)
-        .sort()
-        .forEach(sec=>{
-
-            const desc=
-                currentContractSections[sec].desc || "";
-
-            const data=
-                breakdown[sec] || {};
-
-            const amt=
-                Number(data.amt || 0);
-
-            const extra=
-                Number(data.extra || 0);
-
-            const provisional=
-                desc.toUpperCase().includes("PROVISIONAL");
+        Object.keys(currentContractSections).sort().forEach(sec=>{
+            const desc= currentContractSections[sec].desc || "";
+            const data= breakdown[sec] || {};
+            const amt= Number(data.amt || 0);
+            const extra= Number(data.extra || 0);
+            const provisional= desc.toUpperCase().includes("PROVISIONAL");
 
             html+=`
-
-<div class="funding-item">
-
-<label>${sec}</label>
-
-<span class="sec-desc">${desc}</span>
-
-<input
-type="text"
-class="w_sec_amt"
-data-sec="${escapeAttr(sec)}"
-data-work-id="${escapeAttr(workId)}"
-data-raw-value="${amt}"
-value="${amt.toLocaleString('en-MY',{
-minimumFractionDigits:2,
-maximumFractionDigits:2
-})}"
-oninput="
-formatCurrencyInput(this);
-calcTotalWork();
-">
-
-${provisional?`
-
-<input
-type="text"
-class="w_sec_extra"
-data-sec="${escapeAttr(sec)}"
-data-work-id="${escapeAttr(workId)}"
-data-raw-value="${extra}"
-value="${extra.toLocaleString('en-MY',{
-minimumFractionDigits:2,
-maximumFractionDigits:2
-})}"
-oninput="
-formatCurrencyInput(this);
-calcTotalWork();
-">
-
-`:``}
-
-</div>
-
-`;
-
+                <div class="funding-item">
+                    <label>${sec}</label>
+                    <span class="sec-desc">${desc}</span>
+                    <input type="text" class="w_sec_amt" data-sec="${escapeAttr(sec)}" data-work-id="${escapeAttr(workId)}" data-raw-value="${amt}" value="${amt.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}" oninput="formatCurrencyInput(this); calcTotalWork();">
+                    ${provisional?`
+                        <input type="text" class="w_sec_extra" data-sec="${escapeAttr(sec)}" data-work-id="${escapeAttr(workId)}" data-raw-value="${extra}" value="${extra.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}" oninput="formatCurrencyInput(this); calcTotalWork();">
+                    `:``}
+                </div>
+            `;
         });
 
-        html+=`
-            </div>
-        `;
-
+        html+=`</div>`;
         card.innerHTML=html;
-
         container.appendChild(card);
-
     });
 
     calcTotalWork();
-
 }
+
 /* ============================================================
    INTERIM
    ============================================================ */
