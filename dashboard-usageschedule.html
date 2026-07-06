@@ -859,12 +859,13 @@
         <div class="modal-box">
             <h3 style="margin-top:0;"> Blueform Configurations</h3>
             <div style="margin-bottom:15px;">
-                <label style="font-size:11px; font-weight:bold;">Blueform Refence No.</label> 
-                <input id="refPrefixInput"       
-                    type="text"
-                    value="RSAJ/M&E/IP/11-"
-                    style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; font-size:12px;">
-            </div>     
+    <label style="font-size:11px; font-weight:bold;">Blueform Reference No. (Auto-Preset)</label> 
+    <input id="refPrefixInput"       
+        type="text"
+        readonly
+        style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; font-size:12px; background:#f5f5f5; color:#666; cursor:not-allowed;">
+    <small style="color: #666; font-size: 10px;">* Format dijana automatik dari Kod Kontrak dan tidak boleh diedit.</small>
+</div>     
             
             <div id="dynamicRowsContainer"></div>
 
@@ -1055,6 +1056,28 @@ document.getElementById('tableSearch').addEventListener('keyup', debounce(functi
     }
 }, 300));
 
+// 1. FUNGSI LOGIK UNTUK GENERATE PRESET DARI CONTRACT CODE
+function generatePresetFromContractCode(contractCode) {
+    if (!contractCode) return 'RSAJ/M&E/IP/11-';
+    
+    // Contoh input: RSAJ/KP/T/111/2023 atau RSAJ/KP/T/111/23
+    let parts = contractCode.toUpperCase().split('/');
+    
+    // Ambil No. Kontrak (Contoh: 111)
+    let contractNo = parts[parts.length - 2] || ''; 
+    
+    // Ambil Tahun (Contoh: 2023 atau 23)
+    let yearPart = parts[parts.length - 1] || '';
+    let shortYear = yearPart.length === 4 ? yearPart.substring(2) : yearPart; // Ambil 2 angka terakhir (23)
+
+    if (contractNo && shortYear) {
+        return `RSAJ/M&E/IP/11-${contractNo}/${shortYear}`;
+    }
+    
+    return 'RSAJ/M&E/IP/11-';
+}
+
+// 2. KEMAS KINI FUNGSI BUKA MODAL
 async function openTemplate() {
     const id = currentContractId;
     if(!id){ alert("Tiada kontrak dipilih."); return; }
@@ -1063,8 +1086,11 @@ async function openTemplate() {
     const contract = data[0];
     const sections = contract.contract_sections_breakdown || {};
     const saved = contract.selected_sections || [];
-    const savedPrefix = contract.reference || 'RSAJ/M&E/IP/11-';
-    document.getElementById('refPrefixInput').value = savedPrefix;
+    
+    // GENERATE PRESET IKUT CONTRACT_CODE AUTOMATIK
+    const autoPreset = generatePresetFromContractCode(contract.contract_code);
+    document.getElementById('refPrefixInput').value = autoPreset;
+    
     const container = document.getElementById('dynamicRowsContainer');
     container.innerHTML = '';
     Object.keys(sections).forEach(key => {
@@ -1082,14 +1108,15 @@ async function openTemplate() {
     document.getElementById('templateModal').style.display = 'flex';
 }
 
+// 3. KEMAS KINI FUNGSI SIMPAN MODAL
 async function saveTemplate() {
     const id = currentContractId;
-    const prefix = document.getElementById('refPrefixInput').value;
+    const prefix = document.getElementById('refPrefixInput').value; // Tetap simpan nilai preset auto ke DB
     await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, {
         method: 'PATCH', headers,
         body: JSON.stringify({ reference: prefix })
     });
-    alert("Prefix berjaya disimpan!");
+    alert("Konfigurasi template berjaya dikemas kini!");
     closeTemplate();
 }
 
@@ -1834,8 +1861,12 @@ function buildBlueformHTML(payload) {
     const effectiveVO = activeVO || voBreakdown;
 
     const seq = data.sequence_no || '';
-    const refPrefix = c.reference || 'RSAJ/M&E/IP/11-';
-    let formattedRef = seq.replace(/([A-Z]{2,4}\d+)$/i, ' - $1');
+// Gunakan data preset dari DB, jika tiada/kosong baru generate terus dari c.contract_code
+const refPrefix = c.reference || generatePresetFromContractCode(c.contract_code); 
+
+// Memastikan sambungan sequence no. cantik (Contoh hasil: RSAJ/M&E/IP/11-111/23 - JBP01)
+let formattedRef = seq ? ` - ${seq}` : ''; 
+
     const unitName = (c.units?.unit_name || '').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
     const tpl = Array.isArray(c.selected_sections) ? c.selected_sections : [];
 
@@ -1929,6 +1960,7 @@ function buildBlueformHTML(payload) {
 
     const contentHtml = `
         <div class="bf-row"><div class="bf-label"><span class="bf-no">1</span><span>   No. Rujukan</span></div><div class="bf-colon">:</div><div class="bf-value">${refPrefix}${formattedRef}</div></div>
+
         <div class="bf-row"><div class="bf-label"><span class="bf-no">2</span><span>   No. Work Order</span></div><div class="bf-colon">:</div><div class="bf-value">${data.work_id}</div></div>
         <div class="bf-row"><div class="bf-label"><span class="bf-no">3</span><span>   No. Kontrak</span></div><div class="bf-colon">:</div><div class="bf-value">${c.contract_code}</div></div>
         <div class="bf-row"><div class="bf-label"><span class="bf-no">4</span><span>   Nama Kontraktor</span></div><div class="bf-colon">:</div><div class="bf-value">${c.contractor}</div></div>
