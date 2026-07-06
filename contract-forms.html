@@ -1571,6 +1571,17 @@ const res = await fetch(
 
 const data = await res.json();
 
+// ===== SUSUN IKUT contract_start, kalau sama ikut nombor kontrak ascending =====
+data.sort((a, b) => {
+
+    const dateA = a.contract_start ? new Date(a.contract_start).getTime() : 0;
+    const dateB = b.contract_start ? new Date(b.contract_start).getTime() : 0;
+
+    if(dateA !== dateB) return dateA - dateB;
+
+    return extractContractNumber(a.contract_code) - extractContractNumber(b.contract_code);
+});
+
 contractSelect.innerHTML = '<option value="">Choose Contract</option>';
 
 data.forEach(c=>{
@@ -1595,6 +1606,12 @@ console.error(e);
 
 }
 
+// Helper: extract nombor kontrak dari format seperti "RSAJ/KP/T/57/2024" -> 57
+function extractContractNumber(code){
+    if(!code) return 0;
+    const match = String(code).match(/(\d+)\s*\/\s*\d{4}\s*$/);
+    return match ? parseInt(match[1], 10) : 0;
+}
     function onContractSelect(){
 
         resetWorkIdRows();
