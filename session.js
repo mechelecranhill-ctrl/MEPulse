@@ -1,8 +1,8 @@
 /* =========================
    CONFIG
 ========================= */
-const SESSION_TIMEOUT = 15 * 60 * 1000; // 15 min idle
-const WARNING_TIME = 10 * 1000;         // warning 10 sec before logout
+const SESSION_TIMEOUT = 30 * 60 * 1000;
+const WARNING_TIME = 10 * 1000;
 const CHECK_INTERVAL = 3000;
 
 const channel = new BroadcastChannel("auth_channel");
@@ -31,7 +31,6 @@ if (localStorage.getItem("loggedIn") === "true" && !localStorage.getItem("lastAc
 ========================= */
 async function checkSession() {
 
-return true;
     const loggedIn = localStorage.getItem("loggedIn");
 
     if (loggedIn !== "true") {
@@ -296,7 +295,6 @@ channel.onmessage = (e) => {
 ========================= */
 setInterval(() => {
 
-return;
     if (sessionExpired || localStorage.getItem("sessionExpired") === "true" || localStorage.getItem("loggedIn") !== "true") return;
 
     const state = getUserState();
@@ -314,4 +312,4 @@ return;
 }, CHECK_INTERVAL);
 
 // Jalankan semakan keselamatan sebaik fail ini dimuat turun
-//checkSession();//
+checkSession();
