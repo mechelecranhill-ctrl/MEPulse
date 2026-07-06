@@ -760,8 +760,46 @@ async function login(){
     }
 }
 
-function forgotPassword(){
-    alert("Sila hubungi admin untuk reset password.");
+async function forgotPassword(){
+    const employeeId = prompt("Masukkan Employee ID anda untuk reset password:");
+
+    if(!employeeId || !employeeId.trim()){
+        return;
+    }
+
+    const empId = employeeId.trim();
+
+    try {
+        const { data: lookupData, error: lookupError } = await sbClient
+            .from('staff')
+            .select('email')
+            .eq('employee_id', empId)
+            .single();
+
+        if (lookupError || !lookupData || !lookupData.email) {
+            alert("Employee ID tidak dijumpai. Sila hubungi admin.");
+            return;
+        }
+
+        const staffEmail = lookupData.email;
+
+        const { error: resetError } = await sbClient.auth.resetPasswordForEmail(
+            staffEmail,
+            { redirectTo: window.location.origin + window.location.pathname.replace(/login\.html$/, "") + "reset-password.html" }
+        );
+
+        if (resetError) {
+            console.error("Reset password error:", resetError);
+            alert("Gagal hantar email reset: " + resetError.message);
+            return;
+        }
+
+        alert("Email reset password telah dihantar ke " + staffEmail + ". Sila semak inbox (dan folder spam).");
+
+    } catch(err){
+        console.error(err);
+        alert("Server error");
+    }
 }
 
 window.addEventListener("load", () => {
