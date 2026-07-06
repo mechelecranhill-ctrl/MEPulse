@@ -25,7 +25,7 @@ class AppSidebar extends HTMLElement {
 
                 <div class="menu-group">
                     <a href="#" class="menu-parent" id="dashboardBtn">
-                        Dashboard ▼
+                        Dashboard <span class="arrow">▼</span>
                     </a>
 
                     <div class="submenu" id="dashboardMenu">
@@ -41,23 +41,23 @@ class AppSidebar extends HTMLElement {
                 <a href="#" id="logoutBtn" class="menu-link">Logout</a>
             </div>
 
-<div class="hamburger-wrapper">
-    <button class="hamburger" id="hamburger">
-        <input type="checkbox" id="menuToggle">
-        <svg viewBox="0 0 32 32">
-            <path class="line line-top-bottom"
-                d="M27 10 13 10C10.8 10 9 8.2 9 6
-                9 3.5 10.8 2 13 2
-                15.2 2 17 3.8 17 6
-                L17 26C17 28.2 18.8 30 21 30
-                23.2 30 25 28.2 25 26
-                25 23.8 23.2 22 21 22
-                L7 22" />
-            <path class="line" d="M7 16 27 16" />
-        </svg>
-    </button>
-</div>
-<div class="hamburger-box"></div>
+            <div class="hamburger-wrapper">
+                <button class="hamburger" id="hamburger">
+                    <input type="checkbox" id="menuToggle">
+                    <svg viewBox="0 0 32 32">
+                        <path class="line line-top-bottom"
+                            d="M27 10 13 10C10.8 10 9 8.2 9 6
+                            9 3.5 10.8 2 13 2
+                            15.2 2 17 3.8 17 6
+                            L17 26C17 28.2 18.8 30 21 30
+                            23.2 30 25 28.2 25 26
+                            25 23.8 23.2 22 21 22
+                            L7 22" />
+                        <path class="line" d="M7 16 27 16" />
+                    </svg>
+                </button>
+            </div>
+            <div class="hamburger-box"></div>
 
             <div class="logout-modal" id="logoutModal">
                 <div class="logout-box">
@@ -86,9 +86,9 @@ class AppSidebar extends HTMLElement {
         this.logoutBtn = this.querySelector("#logoutBtn");
         this.logoutModal = this.querySelector("#logoutModal");
 
-        // Rujukan butang dan menu induk untuk Dashboard
         this.dashboardBtn = this.querySelector("#dashboardBtn");
         this.dashboardMenu = this.querySelector("#dashboardMenu");
+        this.arrowIndicator = this.querySelector("#dashboardBtn .arrow");
 
         this.menuLinks = this.querySelectorAll(".menu-link");
         this.subLinks = this.querySelectorAll("#dashboardMenu a[data-section]");
@@ -98,11 +98,16 @@ class AppSidebar extends HTMLElement {
         this.btn.addEventListener("click", () => this.toggle());
         this.overlay.addEventListener("click", () => this.close());
 
-        // Membolehkan menu "Dashboard ▼" dibuka/tutup apabila diklik manual
+        // Logik Buka/Tutup Expandable Submenu
         if (this.dashboardBtn && this.dashboardMenu) {
             this.dashboardBtn.addEventListener("click", (e) => {
                 e.preventDefault();
-                this.dashboardMenu.classList.toggle("open");
+                const isOpen = this.dashboardMenu.classList.toggle("open");
+                
+                // Tukar arah anak panah secara dinamik
+                if (this.arrowIndicator) {
+                    this.arrowIndicator.innerText = isOpen ? "▲" : "▼";
+                }
             });
         }
 
@@ -121,7 +126,6 @@ class AppSidebar extends HTMLElement {
         this.subLinks.forEach(link => {
             link.addEventListener("click", (e) => {
                 e.preventDefault();
-
                 const sectionId = link.dataset.sectionId;
                 if (sectionId) {
                     window.location.href = `dashboard-contract.html?section=${sectionId}`;
@@ -157,13 +161,11 @@ class AppSidebar extends HTMLElement {
                 const match = sections.find(
                     s => s.section_name === a.dataset.section
                 );
-
                 if (match) {
                     a.dataset.sectionId = match.id;
                 }
             });
 
-            // Kemaskini menu aktif selepas ID berjaya disuntik
             this.setActiveMenu();
 
         } catch (e) {
@@ -181,6 +183,7 @@ class AppSidebar extends HTMLElement {
             if (link.dataset.sectionId && link.dataset.sectionId === currentSection) {
                 link.classList.add("active");
                 this.dashboardMenu?.classList.add("open");
+                if (this.arrowIndicator) this.arrowIndicator.innerText = "▲";
             }
         });
 
