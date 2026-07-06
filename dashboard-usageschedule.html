@@ -1056,24 +1056,24 @@ document.getElementById('tableSearch').addEventListener('keyup', debounce(functi
     }
 }, 300));
 
-// 1. FUNGSI LOGIK UNTUK GENERATE PRESET DARI CONTRACT CODE
 function generatePresetFromContractCode(contractCode) {
     if (!contractCode) return 'RSAJ/M&E/IP/11-';
     
-    // Contoh input: RSAJ/KP/T/111/2023 atau RSAJ/KP/T/111/23
-    let parts = contractCode.toUpperCase().split('/');
+    // Sesuai untuk: 'RSAJ/KP/T/111/2023', 'RanhillSAJ/KP/T/110/2023', 'RSAJ/KP/T/111/23' dll.
+    // Regex ini mencari coretan "/[nombor]/[2 atau 4 digit tahun]" di bahagian paling belakang string
+    const match = contractCode.match(/\/(\d+)\/(\d{2,4})$/);
     
-    // Ambil No. Kontrak (Contoh: 111)
-    let contractNo = parts[parts.length - 2] || ''; 
-    
-    // Ambil Tahun (Contoh: 2023 atau 23)
-    let yearPart = parts[parts.length - 1] || '';
-    let shortYear = yearPart.length === 4 ? yearPart.substring(2) : yearPart; // Ambil 2 angka terakhir (23)
-
-    if (contractNo && shortYear) {
+    if (match) {
+        let contractNo = match[1]; // Mengambil angka kontrak (Contoh: 110 atau 111)
+        let yearPart = match[2];   // Mengambil angka tahun (Contoh: 2023 atau 23)
+        
+        // Jika tahun ditulis 4 digit (2023), kita potong ambil 2 digit belakang sahaja (23)
+        let shortYear = yearPart.length === 4 ? yearPart.substring(2) : yearPart;
+        
         return `RSAJ/M&E/IP/11-${contractNo}/${shortYear}`;
     }
     
+    // Jika format contract_code pelik dan tidak menepati corak, ia akan return default preset ini
     return 'RSAJ/M&E/IP/11-';
 }
 
