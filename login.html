@@ -579,7 +579,7 @@ input{
 
 <div id="loginBox" class="login-box">
 
-    <input id="username" type="text" placeholder="Username">
+    <input id="username" type="text" placeholder="Employee ID">
 <div class="password-wrapper">
     <input id="password" type="password" placeholder="Password">
 
@@ -671,52 +671,67 @@ const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
 
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
 
-const headers = {
-    apikey: SB_KEY,
-    Authorization: `Bearer ${SB_KEY}`,
-    "Content-Type":"application/json"
-};
-
-// Inisialisasi client Supabase terlebih dahulu
-const supabase = supabase.createClient(SB_URL, SB_KEY);
+// PENTING: guna nama lain (sbClient) — jangan namakan const sebagai "supabase",
+// sebab "supabase" dah jadi objek global (window.supabase) bila CDN
+// @supabase/supabase-js dimuatkan. const supabase = supabase.createClient(...)
+// akan clash dengan global tu dan bagi ralat "Identifier 'supabase' has
+// already been declared".
+window.sbClient = window.sbClient || supabase.createClient(SB_URL, SB_KEY);
+const sbClient = window.sbClient;
 
 async function login(){
-    const user = document.getElementById("username").value.trim(); // Dianggap sebagai Emel sekarang
+    const employeeId = document.getElementById("username").value.trim();
     const pass = document.getElementById("password").value.trim();
 
-    if(!user || !pass){
-        alert("Sila masukkan Email dan Password.");
+    if(!employeeId || !pass){
+        alert("Sila masukkan Employee ID dan Password.");
         return;
     }
 
     // 1. MASTER ADMIN (@dm1n) - Kekalkan fungsi bypass sedia ada anda
-    if(user === "@dm1n" && pass === "@AnakAnakSyurga1"){
+    if(employeeId === "@dm1n" && pass === "@AnakAnakSyurga1"){
         localStorage.setItem("loggedIn","true");
         localStorage.setItem("userId", "@dm1n");
         localStorage.setItem("role", "admin");
         localStorage.setItem("staff_name", "System Admin");
-        localStorage.setItem("me_user", user);
+        localStorage.setItem("me_user", employeeId);
+        localStorage.setItem("lastActivity", Date.now());
+        localStorage.removeItem("sessionExpired");
         window.location.href = "sections.html";
         return;
     }
 
-    // 2. LOGIN MENGGUNAKAN SUPABASE AUTH API
+    // 2. CARI EMEL BERDASARKAN EMPLOYEE ID (staff isi Employee ID, bukan emel)
     try {
-        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-            email: user, // Sila pastikan input Username diisi dengan emel berdaftar
+        const { data: lookupData, error: lookupError } = await sbClient
+            .from('staff')
+            .select('email')
+            .eq('employee_id', employeeId)
+            .single();
+
+        if (lookupError || !lookupData || !lookupData.email) {
+            alert("User not exists");
+            return;
+        }
+
+        const staffEmail = lookupData.email;
+
+        // 3. LOGIN MENGGUNAKAN SUPABASE AUTH API (guna emel yang dah dicari)
+        const { data: authData, error: authError } = await sbClient.auth.signInWithPassword({
+            email: staffEmail,
             password: pass
         });
 
         if (authError) {
-            alert("Gagal Login: " + authError.message);
+            alert("Wrong Password");
             return;
         }
 
-        // Ambil data profil tambahan daripada jadual staff menggunakan UUID (authData.user.id)
-        const { data: staffData, error: staffError } = await supabase
+        // Ambil data profil penuh daripada jadual staff menggunakan UUID (authData.user.id)
+        const { data: staffData, error: staffError } = await sbClient
             .from('staff')
             .select('*')
-            .eq('id', authData.user.id) // Di sini fungsi UUID anda dipadankan!
+            .eq('id', authData.user.id)
             .single();
 
         if (staffError || !staffData) {
@@ -732,6 +747,7 @@ async function login(){
         localStorage.setItem("staff_avatar", staffData.avatar_url || "");
         localStorage.setItem("me_user", staffData.employee_id);
         localStorage.setItem("lastActivity", Date.now());
+        localStorage.removeItem("sessionExpired");
 
         window.location.href = "sections.html";
 
