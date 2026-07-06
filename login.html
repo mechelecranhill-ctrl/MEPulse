@@ -12,6 +12,8 @@
 <link rel="stylesheet"
 href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <style>
 
 html,
@@ -675,75 +677,61 @@ const headers = {
     "Content-Type":"application/json"
 };
 
+// Inisialisasi client Supabase terlebih dahulu
+const supabase = supabase.createClient(SB_URL, SB_KEY);
+
 async function login(){
-
-    const user =
-    document.getElementById("username").value.trim();
-
-    const pass =
-    document.getElementById("password").value.trim();
+    const user = document.getElementById("username").value.trim(); // Dianggap sebagai Emel sekarang
+    const pass = document.getElementById("password").value.trim();
 
     if(!user || !pass){
-        alert("Sila masukkan Employee ID dan Password.");
+        alert("Sila masukkan Email dan Password.");
         return;
     }
 
-    // =========================
-    // 1. MASTER ADMIN (@dm1n)
-    // =========================
+    // 1. MASTER ADMIN (@dm1n) - Kekalkan fungsi bypass sedia ada anda
     if(user === "@dm1n" && pass === "@AnakAnakSyurga1"){
-
         localStorage.setItem("loggedIn","true");
         localStorage.setItem("userId", "@dm1n");
         localStorage.setItem("role", "admin");
         localStorage.setItem("staff_name", "System Admin");
-        localStorage.setItem("staff_avatar", "https://ywmsvowroxzhrjwrhsru.supabase.co/storage/v1/object/public/avatars/admin-avatar.png");
         localStorage.setItem("me_user", user);
-        localStorage.setItem("lastActivity", Date.now());
-        localStorage.removeItem("sessionExpired");
-
         window.location.href = "sections.html";
         return;
     }
 
-    // =========================
-    // 2. STAFF FROM SUPABASE (login pakai employee_id)
-    // =========================
+    // 2. LOGIN MENGGUNAKAN SUPABASE AUTH API
     try {
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+            email: user, // Sila pastikan input Username diisi dengan emel berdaftar
+            password: pass
+        });
 
-        const res = await fetch(
-            `${SB_URL}/rest/v1/staff?employee_id=eq.${encodeURIComponent(user)}&select=*`,
-            { headers }
-        );
-
-        if(!res.ok){
-            alert("Server error");
+        if (authError) {
+            alert("Gagal Login: " + authError.message);
             return;
         }
 
-        const data = await res.json();
+        // Ambil data profil tambahan daripada jadual staff menggunakan UUID (authData.user.id)
+        const { data: staffData, error: staffError } = await supabase
+            .from('staff')
+            .select('*')
+            .eq('id', authData.user.id) // Di sini fungsi UUID anda dipadankan!
+            .single();
 
-        if(data.length === 0){
-            alert("User not exists");
+        if (staffError || !staffData) {
+            alert("Data profil kakitangan tidak ditemui.");
             return;
         }
 
-        const staff = data[0];
-
-        if(staff.password !== pass){
-            alert("Wrong Password");
-            return;
-        }
-
-        // LOGIN SUCCESS STAFF
+        // JIKA BERJAYA, SIMPAN DATA SESI
         localStorage.setItem("loggedIn","true");
-        localStorage.setItem("userId", staff.employee_id);
-        localStorage.setItem("role", staff.position);
-        localStorage.setItem("staff_name", staff.name);
-        localStorage.setItem("staff_avatar", staff.avatar_url || "");
-        localStorage.setItem("me_user", staff.employee_id);
+        localStorage.setItem("userId", staffData.employee_id);
+        localStorage.setItem("role", staffData.position);
+        localStorage.setItem("staff_name", staffData.name);
+        localStorage.setItem("staff_avatar", staffData.avatar_url || "");
+        localStorage.setItem("me_user", staffData.employee_id);
         localStorage.setItem("lastActivity", Date.now());
-        localStorage.removeItem("sessionExpired");
 
         window.location.href = "sections.html";
 
@@ -752,6 +740,7 @@ async function login(){
         alert("Server error");
     }
 }
+
 function forgotPassword(){
     alert("Sila hubungi admin untuk reset password.");
 }
