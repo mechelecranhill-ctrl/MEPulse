@@ -20,11 +20,26 @@ let lastScrollTime = Date.now();
 let lastMouseTime = Date.now();
 
 /* =========================
-   INIT SESSION
+   INIT SESSION & AUTO-REFRESH TOKEN
 ========================= */
 if (localStorage.getItem("loggedIn") === "true" && !localStorage.getItem("lastActivity")) {
     localStorage.setItem("lastActivity", Date.now());
 }
+
+// PENAMBAHBAIKAN: Selagi pengguna aktif, Supabase akan hantar token baharu 
+// sebelum token lama mati (setiap 1 jam). Kita tangkap & simpan token fresh itu.
+if (window.sbClient) {
+    window.sbClient.auth.onAuthStateChange((event, session) => {
+        if (session && session.access_token) {
+            localStorage.setItem("supabase_token", session.access_token);
+            // Kemas kini aktiviti juga sebab ada interaksi dengan server
+            if (localStorage.getItem("loggedIn") === "true") {
+                localStorage.setItem("lastActivity", Date.now());
+            }
+        }
+    });
+}
+
 
 /* =========================
    CHECK LOGIN GUARD
