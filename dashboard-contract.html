@@ -108,11 +108,9 @@
         align-items: center;
         justify-content: center;
         
-        /* PENGOPTIMUMAN GPU: Guna transition khusus & transform-origin kanan supaya ia mengembang ke kiri */
         transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-radius 0.3s ease, padding 0.3s ease;
         will-change: width, border-radius;
-        
-        /* Tetapkan kedudukan tetap sejak awal supaya elemen lain (tajuk/vendor) tidak melompat */
+    
         position: absolute;
         right: 0;
         top: 0;
@@ -123,7 +121,6 @@
         z-index: 1510;
     }
 
-    /* Sembunyikan teks USAGE secara lalai dengan opacity untuk kesan fade-in yang smooth */
     .mobile-usage-btn .btn-text {
         opacity: 0;
         width: 0;
@@ -139,14 +136,12 @@
     }
 
     .mobile-usage-btn.expanded {
-        width: 105px; /* Lebar tetap yang ngam untuk teks USAGE + ikon */
+        width: 105px;
         padding: 0 12px;
-        border-radius: 10px; /* Kembali jadi bentuk asal dashboard anda */
-        justify-content: space-between; /* Teks kiri, ikon kanan */
+        border-radius: 10px;
         box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
     }
 
-    /* Paparkan teks dengan kesan fade-in apabila berkembang */
     .mobile-usage-btn.expanded .btn-text {
         opacity: 1;
         width: auto;
@@ -233,6 +228,28 @@
             .unit-pill {
                 scroll-snap-align: center;
             }
+
+.fab {
+        top: 12px;
+        right: 15px; /* Laraskan kedudukan sikit untuk mobile */
+        border-radius: 50%; /* Bulat secara lalai seperti butang usage mobile */
+        will-change: width, border-radius;
+    }
+
+    /* Kelas apabila di-klik pada mobile (Mengembang) */
+    .fab.expanded {
+        width: 150px; 
+        padding: 0 12px;
+        border-radius: 10px; /* Kembali menjadi bentuk bucu bulat dashboard */
+        justify-content: space-between;
+        box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+    }
+
+    .fab.expanded .fab-text {
+        opacity: 1;
+        width: auto;
+        margin-right: 5px;
+    }
         }
 
         .nav-btn {
@@ -279,11 +296,38 @@
         }
 
         .fab { 
-            position: fixed; top: 12px; right: 20px; width: 35px; height: 35px; 
-            background: var(--ios-blue); color: white; border-radius: 10px;
-            display: flex; align-items: center; justify-content: center; 
-            cursor: pointer; z-index: 1100;
-        }
+    position: fixed; 
+    top: 12px; 
+    right: 20px; 
+    height: 35px; 
+    width: 35px; /* Lebar asal berbentuk petak mini */
+    background: var(--ios-blue); 
+    color: white; 
+    border-radius: 10px;
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    cursor: pointer; 
+    z-index: 1100;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s ease;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.fab .fab-text {
+    opacity: 0;
+    width: 0;
+    white-space: nowrap;
+    transition: opacity 0.2s ease, margin 0.3s ease;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+}
+
+.fab .icon-main {
+    font-size: 14px;
+    flex-shrink: 0;
+}
 
         .main-wrapper { display: flex; flex: 1; overflow: hidden; padding: 10px; gap: 15px; }
         .contract-sidebar { width: 220px; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
@@ -311,6 +355,20 @@
         #selectedSectionContainer { flex: 1; overflow-y: auto; padding-right: 5px; }
         .sel-chip { display: inline-block; padding: 4px 10px; border-radius: 12px; background: #e5e5ea; margin: 3px; font-size: 10px; cursor: pointer; font-weight: 600; }
         .sel-chip.active { background: var(--ios-blue); color: white; }
+
+@media (min-width: 769px) {
+    .fab:hover {
+        width: 150px; /* Lebar yang cukup untuk teks "REGISTER FORMS" + ikon */
+        padding: 0 12px;
+        justify-content: space-between;
+        box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+    }
+    .fab:hover .fab-text {
+        opacity: 1;
+        width: auto;
+        margin-right: 5px;
+    }
+}
         
     </style>
 
@@ -322,9 +380,10 @@
 <body>
 
     <app-sidebar></app-sidebar>
-    <div class="fab" onclick="window.location.href='contract-forms.html'">
-        <i class="fa fa-plus"></i>
-    </div>
+    <div class="fab" id="fabBtn" onclick="handleFabClick(event)">
+    <span class="fab-text">REGISTER FORMS</span>
+    <i class="fa fa-plus icon-main"></i>
+</div>
 
 <div class="glass-header">
     <div class="unit-container-wrapper">
@@ -742,7 +801,6 @@ function handleMobileUsageClick(e) {
     
     const btn = document.getElementById('mobileUsageBtn');
     
-    // Jika belum expand, expand-kan dia dahulu
     if (!btn.classList.contains('expanded')) {
         btn.classList.add('expanded');
     } else {
@@ -751,7 +809,6 @@ function handleMobileUsageClick(e) {
     }
 }
 
-// PENGOPTIMUMAN: Tutup semula butang (menjadi simbol balik) jika user tekan di tempat lain
 document.addEventListener('click', (e) => {
     const btn = document.getElementById('mobileUsageBtn');
     if (btn && btn.classList.contains('expanded')) {
@@ -767,6 +824,52 @@ document.addEventListener('click', (e) => {
         if(!currentContract){ alert("Please choose a contract"); return; }
         window.location.href = `dashboard-usageschedule.html?id=${currentContract.id}`;
     }
+
+// Tambah fungsi ini di dalam tag <script> anda
+function handleFabClick(e) {
+    // Jika pada paparan desktop, terus buka pautan
+    if (window.innerWidth > 768) {
+        window.location.href = 'contract-forms.html';
+        return;
+    }
+
+    // Kawalan untuk paparan mobile
+    e.preventDefault(); 
+    e.stopPropagation(); 
+    
+    const fabBtn = document.getElementById('fabBtn');
+    
+    // Jika belum berkembang, kembangkan dahulu
+    if (!fabBtn.classList.contains('expanded')) {
+        // Tutup butang usage jika ia sedang terbuka (elak bertindan)
+        const usageBtn = document.getElementById('mobileUsageBtn');
+        if(usageBtn) usageBtn.classList.remove('expanded');
+        
+        fabBtn.classList.add('expanded');
+    } else {
+        // Klik kali kedua baru bawa ke page contract-forms
+        window.location.href = 'contract-forms.html';
+    }
+}
+
+// Kemaskini event listener 'click' global yang sedia ada untuk menutup butang jika klik di luar
+document.addEventListener('click', (e) => {
+    const usageBtn = document.getElementById('mobileUsageBtn');
+    if (usageBtn && usageBtn.classList.contains('expanded')) {
+        if (!usageBtn.contains(e.target)) {
+            usageBtn.classList.remove('expanded');
+        }
+    }
+
+    // Tambahan untuk FAB Mobile: Tutup jika klik di luar kawasan FAB
+    const fabBtn = document.getElementById('fabBtn');
+    if (fabBtn && fabBtn.classList.contains('expanded')) {
+        if (!fabBtn.contains(e.target)) {
+            fabBtn.classList.remove('expanded');
+        }
+    }
+});
+
 
     function centerActiveUnit(btn) {
         if(window.innerWidth <= 768) {
