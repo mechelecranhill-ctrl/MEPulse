@@ -1367,63 +1367,52 @@ document.getElementById('workOrderForm').addEventListener('submit', async (e) =>
 }
 
         const sharedFields = {
-
-            contract_id: contractId,
-
-            sequence_no: sequenceToUse,
-
-            qpb_date:
-                document.getElementById("w_qpb_date").value,
-
-            district: districtSelected,
-
-            description:
-                document.getElementById("w_desc").value
-
-        };
+    contract_id: contractId,
+    sequence_no: sequenceToUse,
+    qpb_date: document.getElementById("w_qpb_date").value,
+    district: districtSelected
+    // description dipindahkan keluar dari sharedFields kerana nilainya kini unik
+};
 
         const perWorkIdPayload = {};
 
         document.querySelectorAll('#w_id_cards_container .w-id-card').forEach(card=>{
+    const workId = card.dataset.workId;
+    if(!workId) return;
 
-            const workId = card.dataset.workId;
-            if(!workId) return;
+    const locationInput = card.querySelector('.w_card_location');
+    const location = locationInput ? locationInput.value : '';
 
-            const locationInput = card.querySelector('.w_card_location');
-            const location = locationInput ? locationInput.value : '';
+    // AMBIL INPUT DESCRIPTION DARI KAD SINI
+    const descInput = card.querySelector('.w_card_desc');
+    const description = descInput ? descInput.value : '';
 
-            const breakdown = {};
-            let totalAmount = 0;
-            let additionalTotal = 0;
+    const breakdown = {};
+    let totalAmount = 0;
+    let additionalTotal = 0;
 
-            card.querySelectorAll('.w_sec_amt').forEach(i=>{
+    card.querySelectorAll('.w_sec_amt').forEach(i=>{
+        const sec = i.dataset.sec;
+        const base = parseFloat(i.dataset.rawValue || 0);
+        const extraInput = card.querySelector(`.w_sec_extra[data-sec="${escapeAttr(sec)}"]`);
+        const extra = parseFloat(extraInput?.dataset.rawValue || 0);
 
-                const sec = i.dataset.sec;
-                const base = parseFloat(i.dataset.rawValue || 0);
+        breakdown[sec] = { amt: base, extra: extra };
+        totalAmount += base;
+        additionalTotal += extra;
+    });
 
-                const extraInput = card.querySelector(
-                    `.w_sec_extra[data-sec="${escapeAttr(sec)}"]`
-                );
+    perWorkIdPayload[workId] = {
+        ...sharedFields,
+        work_id: workId,
+        location: location,
+        description: description, // Dimasukkan secara unik mengikut ID ke pangkalan data
+        section_category: breakdown,
+        additional: additionalTotal,
+        amount_spent: totalAmount + additionalTotal
+    };
+});
 
-                const extra = parseFloat(extraInput?.dataset.rawValue || 0);
-
-                breakdown[sec] = { amt: base, extra: extra };
-
-                totalAmount += base;
-                additionalTotal += extra;
-
-            });
-
-            perWorkIdPayload[workId] = {
-                ...sharedFields,
-                work_id: workId,
-                location: location,
-                section_category: breakdown,
-                additional: additionalTotal,
-                amount_spent: totalAmount + additionalTotal
-            };
-
-        });
 
         for(const workIdValue of currentWorkIds){
 
@@ -2748,21 +2737,14 @@ function autoDetectWork(){
             // Simpan data sedia ada
             // ===========================
 
-            group.forEach(w=>{
-
-                workIdCardDataMap[w.work_id]={
-
-                    location:
-                        w.location || "",
-
-                    section_category:
-                        structuredClone(
-                            w.section_category || {}
-                        )
-
-                };
-
-            });
+            // Cari bahagian ini di dalam autoDetectWork() dan gantikan:
+group.forEach(w=>{
+    workIdCardDataMap[w.work_id]={
+        location: w.location || "",
+        description: w.description || "", // Masukkan baris ini untuk fungsi Auto-Load
+        section_category: structuredClone(w.section_category || {})
+    };
+});
 
             // ===========================
             // Bina semula Work ID rows
