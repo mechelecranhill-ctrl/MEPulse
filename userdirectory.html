@@ -756,15 +756,50 @@ s.position.toLowerCase().includes(keyword)
 );
 
 
+// staff yang position dia KETUA JABATAN - tak perlu tunjuk berulang kat setiap seksyen/unit
+let kjIds = new Set(
+  staffData.filter(s=> s.position?.toUpperCase()==="KETUA JABATAN")
+  .map(s=>s.id)
+);
+
+
 
 let html="";
+
+
+// ===== TUNJUK KETUA JABATAN SEKALI SAHAJA DI ATAS =====
+
+let kjStaff = staffData
+  .filter(s=> kjIds.has(s.id) && filteredIds.has(s.id))
+  .sort(sortByHierarki);
+
+if(kjStaff.length){
+
+  html += `
+
+  <div class="tree-group">
+
+  <div class="section-title">
+  <i class="fa fa-crown"></i>
+  Ketua Jabatan
+  </div>
+
+  <div class="tree-wrapper">
+  ${kjStaff.map(staffCardHtml).join("")}
+  </div>
+
+  </div>
+
+  `;
+
+}
 
 
 
 sectionData.forEach(sec=>{
 
 
-// staff assigned directly to the section (e.g Ketua Seksyen)
+// staff assigned direct ke section (KECUALIKAN Ketua Jabatan)
 
 let sectionStaffIds = staffSectionAssignments
 .filter(a=>a.section_id===sec.id)
@@ -772,9 +807,8 @@ let sectionStaffIds = staffSectionAssignments
 
 
 let sectionStaff = staffData
-.filter(s=> sectionStaffIds.includes(s.id) && filteredIds.has(s.id))
+.filter(s=> sectionStaffIds.includes(s.id) && filteredIds.has(s.id) && !kjIds.has(s.id))
 .sort(sortByHierarki);
-
 
 
 let unitsInSection = unitData
@@ -795,8 +829,9 @@ let unitStaffIds = staffUnitAssignments
 .map(a=>a.staff_id);
 
 
+// KECUALIKAN Ketua Jabatan daripada unit jugak
 let unitStaff = staffData
-.filter(s=> unitStaffIds.includes(s.id) && filteredIds.has(s.id))
+.filter(s=> unitStaffIds.includes(s.id) && filteredIds.has(s.id) && !kjIds.has(s.id))
 .sort(sortByHierarki);
 
 
@@ -854,7 +889,7 @@ ${unitBlocks}
 
 
 
-// staff not assigned to any section AND not assigned to any unit
+// staff yang tak assigned ke section/unit mana-mana (KECUALIKAN Ketua Jabatan sebab dah tunjuk kat atas)
 
 
 let assignedIds = new Set([
@@ -866,7 +901,7 @@ let assignedIds = new Set([
 
 
 let unassigned = staffData
-.filter(s=> !assignedIds.has(s.id) && filteredIds.has(s.id))
+.filter(s=> !assignedIds.has(s.id) && filteredIds.has(s.id) && !kjIds.has(s.id))
 .sort(sortByHierarki);
 
 
@@ -906,7 +941,6 @@ document.getElementById("staffList").innerHTML=html;
 
 
 }
-
 
 window.onload=async()=>{
 
