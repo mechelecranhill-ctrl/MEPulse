@@ -849,63 +849,75 @@ async function assignActingStaff(staffId){
     let url = "";
     let body = {};
 
+    // Sediakan data ID dengan selamat (Pastikan integer ditukar dengan betul)
+    let cleanTargetId = isNaN(currentActingTargetId) ? currentActingTargetId : Number(currentActingTargetId);
+
     if(currentActingType === 'section'){
         url = `${SB_URL}/rest/v1/staff_section_assignment`;
-        body = { staff_id: staffId, section_id: Number(currentActingTargetId), is_acting: true };
+        body = { staff_id: staffId, section_id: cleanTargetId, is_acting: true };
     } else if(currentActingType === 'unit'){
         url = `${SB_URL}/rest/v1/staff_unit_assignment`;
-        body = { staff_id: staffId, unit_id: Number(currentActingTargetId), is_acting: true };
+        body = { staff_id: staffId, unit_id: cleanTargetId, is_acting: true };
     } else {
         alert("Nota: Bagi jawatan Ketua Jabatan, sila edit rekod asal jawatan tersebut.");
         closeActingModal();
         return;
     }
 
-    let res = await fetch(url, {
-        method: "POST",
-        headers: { ...headers, "Prefer": "return=minimal" },
-        body: JSON.stringify(body)
-    });
+    try {
+        let res = await fetch(url, {
+            method: "POST",
+            headers: { ...headers, "Prefer": "return=minimal" },
+            body: JSON.stringify(body)
+        });
 
-    if(res.ok){
-        closeActingModal();
-        await loadAssignments();
-        renderStaff();
-    } else {
-        alert("Gagal melantik pemangku di pangkalan data.");
+        if(res.ok){
+            closeActingModal();
+            await loadAssignments();
+            renderStaff();
+        } else {
+            let errorData = await res.json().catch(() => ({}));
+            alert("Gagal melantik pemangku: " + (errorData.message || res.statusText));
+        }
+    } catch(err) {
+        console.error("Error signing acting staff:", err);
+        alert("Ralat sistem: Gagal berhubung ke pangkalan data.");
     }
 }
 
 async function removeActing(type, targetId, staffId){
     if(!confirm("Adakah anda ingin menggugurkan status pemangku bagi jawatan ini?")) return;
     
+    // Sediakan nilai penapis URL dengan selamat
+    let cleanTargetId = isNaN(targetId) ? targetId : Number(targetId);
     let url = "";
+    
     if(type === 'section'){
-        // Pastikan targetId ditukar kepada Number jika ID seksyen anda adalah integer
-        url = `${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${staffId}&section_id=eq.${Number(targetId)}&is_acting=eq.true`;
+        url = `${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${staffId}&section_id=eq.${cleanTargetId}&is_acting=eq.true`;
     } else if(type === 'unit'){
-        // Pastikan targetId ditukar kepada Number jika ID unit anda adalah integer
-        url = `${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${staffId}&unit_id=eq.${Number(targetId)}&is_acting=eq.true`;
+        url = `${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${staffId}&unit_id=eq.${cleanTargetId}&is_acting=eq.true`;
     }
 
     try {
-        let res = await fetch(url, { method: "DELETE", headers });
+        // Menggunakan method DELETE memerlukan padanan header yang tepat
+        let res = await fetch(url, { 
+            method: "DELETE", 
+            headers: headers 
+        });
         
         if(res.ok){
             await loadAssignments();
             renderStaff();
         } else {
-            // Jika Supabase pulangkan ralat, kita paparkan mesej ralat sebenar
-            let errorData = await res.json();
-            console.error("Supabase Error:", errorData);
+            let errorData = await res.json().catch(() => ({}));
+            console.error("Supabase API Error:", errorData);
             alert(`Gagal membuang pemangku: ${errorData.message || res.statusText}`);
         }
     } catch (err) {
-        console.error("Network Error:", err);
-        alert("Ralat rangkaian/sistem gagal berhubung ke Supabase.");
+        console.error("Network Catch Error:", err);
+        alert("Ralat rangkaian: Sila periksa sambungan internet atau tetapan CORS database anda.");
     }
 }
-
 
 async function saveAssignment(){
     if(!currentTargetStaff) return;
