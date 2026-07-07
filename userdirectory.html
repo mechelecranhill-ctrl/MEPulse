@@ -282,6 +282,18 @@ body {
     };
 
     let staffData = [];
+    let unitData = [];
+let selectedStaffId = null;
+
+    async function loadUnits(){
+
+    const res = await fetch(
+        `${SB_URL}/rest/v1/units?select=id,unit_name`,
+        {headers}
+    );
+
+    unitData = await res.json();
+}
 
     async function loadStaff(){
         try {
@@ -357,13 +369,22 @@ body {
                         </div>
                     </div>
                     <div class="action-group">
-                        <button class="icon-btn edit-btn" onclick="editStaff('${s.id}')">
-                            <i class="fa fa-pen"></i>
-                        </button>
-                        <button class="icon-btn delete-btn" onclick="deleteStaff('${s.id}', '${s.name}')">
-                            <i class="fa fa-trash"></i>
-                        </button>
-                    </div>
+
+    <button class="icon-btn" 
+        style="background:#34C759"
+        onclick="assignUnit('${s.id}','${s.name}')">
+        <i class="fa fa-sitemap"></i>
+    </button>
+
+    <button class="icon-btn edit-btn" onclick="editStaff('${s.id}')">
+        <i class="fa fa-pen"></i>
+    </button>
+
+    <button class="icon-btn delete-btn" onclick="deleteStaff('${s.id}', '${s.name}')">
+        <i class="fa fa-trash"></i>
+    </button>
+
+</div>
                 </div>
                 `;
             });
@@ -502,7 +523,126 @@ body {
         }
     }
 
-    window.onload = loadStaff;
+    async function assignUnit(staffId,name){
+
+    selectedStaffId = staffId;
+
+    document.getElementById("assignTitle").innerHTML =
+    "Assign Unit : " + name;
+
+
+    const res = await fetch(
+        `${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${staffId}&select=unit_id`,
+        {headers}
+    );
+
+
+    const assigned = await res.json();
+
+    let assignedIds =
+        assigned.map(x=>x.unit_id);
+
+
+    let html="";
+
+
+    unitData.forEach(u=>{
+
+        let checked =
+        assignedIds.includes(u.id)
+        ? "checked"
+        : "";
+
+
+        html +=`
+
+        <label style="
+        display:flex;
+        gap:10px;
+        padding:10px;
+        background:#f5f5f5;
+        border-radius:10px;
+        margin-bottom:8px">
+
+        <input 
+        type="checkbox"
+        class="unitCheck"
+        value="${u.id}"
+        ${checked}>
+
+        ${u.unit_name}
+
+        </label>
+
+        `;
+
+    });
+
+
+    document.getElementById("unitList").innerHTML=html;
+
+    document.getElementById("unitModal")
+    .style.display="flex";
+
+}
+    async function saveUnitAssignment(){
+
+
+    // buang assignment lama
+
+    await fetch(
+    `${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${selectedStaffId}`,
+    {
+        method:"DELETE",
+        headers
+    });
+
+
+
+    let selected =
+    [...document.querySelectorAll(".unitCheck:checked")]
+    .map(x=>({
+
+        staff_id:selectedStaffId,
+        unit_id:Number(x.value)
+
+    }));
+
+
+    if(selected.length){
+
+        await fetch(
+        `${SB_URL}/rest/v1/staff_unit_assignment`,
+        {
+            method:"POST",
+            headers:{
+                ...headers,
+                "Prefer":"return=minimal"
+            },
+            body:JSON.stringify(selected)
+        });
+
+    }
+
+
+    alert("Unit berjaya disimpan");
+
+    closeUnitModal();
+
+}
+
+    function closeUnitModal(){
+
+document.getElementById("unitModal")
+.style.display="none";
+
+}
+
+    window.onload = async function(){
+    await loadUnits();
+    await loadStaff();
+};
+    
 </script>
 
 <div id="staffModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); justify-content:center; align-items:center; z-index:9999;">
@@ -520,6 +660,63 @@ body {
             <button onclick="saveStaff()" style="padding:10px 18px; border:none; border-radius:10px; background:#007AFF; color:#fff; cursor:pointer;">Save</button>
         </div>
     </div>
+</div>
+
+    <div id="unitModal"
+style="
+display:none;
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.45);
+justify-content:center;
+align-items:center;
+z-index:9999">
+
+
+<div style="
+background:white;
+width:400px;
+max-width:90%;
+border-radius:20px;
+padding:20px">
+
+
+<h3 id="assignTitle">
+Assign Unit
+</h3>
+
+
+<div id="unitList"></div>
+
+
+<div style="
+display:flex;
+justify-content:flex-end;
+gap:10px;
+margin-top:15px">
+
+
+<button onclick="closeUnitModal()">
+Cancel
+</button>
+
+
+<button 
+onclick="saveUnitAssignment()"
+style="
+background:#34C759;
+color:white;
+padding:10px 15px;
+border-radius:10px;
+border:none">
+Save
+</button>
+
+
+</div>
+
+
+</div>
 </div>
     
 </body>
