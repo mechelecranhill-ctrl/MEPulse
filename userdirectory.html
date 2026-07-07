@@ -164,6 +164,8 @@ body {
 
     position:relative;
 
+    cursor:pointer;
+
 }
 
 .staff-left{
@@ -216,6 +218,44 @@ margin-bottom:10px;
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
+
+}
+
+.staff-details{
+
+    max-height:0;
+    overflow:hidden;
+    width:100%;
+    transition:max-height .25s ease;
+
+}
+
+.staff-card.expanded .staff-details{
+
+    max-height:200px;
+
+}
+
+.expand-hint{
+
+    font-size:11px;
+    color:#c7c7cc;
+    margin-top:8px;
+    display:flex;
+    align-items:center;
+    gap:4px;
+
+}
+
+.staff-card.expanded .expand-hint i{
+
+    transform:rotate(180deg);
+
+}
+
+.expand-hint i{
+
+    transition:transform .2s ease;
 
 }
 
@@ -597,6 +637,17 @@ position==="KETUA JABATAN"
 // =========================
 
 
+function toggleCard(el, evt){
+
+// don't toggle when clicking action buttons
+
+if(evt.target.closest(".action-group")) return;
+
+el.classList.toggle("expanded");
+
+}
+
+
 function staffCardHtml(s){
 
 
@@ -609,7 +660,7 @@ let initials = s.name
 
 return `
 
-<div class="staff-card">
+<div class="staff-card" onclick="toggleCard(this, event)">
 
 
 <div class="staff-left">
@@ -632,6 +683,23 @@ ${initials}
 <p><b>${s.position}</b></p>
 
 
+</div>
+
+
+<div class="expand-hint">
+<span>Butiran</span>
+<i class="fa fa-chevron-down"></i>
+</div>
+
+
+</div>
+
+
+
+
+<div class="staff-details">
+
+
 <p>
 <i class="fa fa-id-badge"></i>
 ${s.employee_id||'-'}
@@ -648,14 +716,6 @@ ${s.phone_no||'-'}
 <i class="fa fa-envelope"></i>
 ${s.email||'-'}
 </p>
-
-
-</div>
-
-
-</div>
-
-
 
 
 <div class="action-group">
@@ -703,6 +763,9 @@ onclick="deleteStaff('${s.id}','${s.name}')">
 
 </button>
 
+
+
+</div>
 
 
 </div>
@@ -776,8 +839,6 @@ let kjStaff = staffData
 if(kjStaff.length){
 
   html += `
-
-  <div class="tree-group">
 
   <div class="section-title">
   <i class="fa fa-crown"></i>
