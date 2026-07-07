@@ -548,77 +548,133 @@ function sortByHierarki(a,b){
 }
 
 function renderStaff(){
-    let keyword=document.getElementById("searchStaff").value.toLowerCase();
+    let keyword = document.getElementById("searchStaff").value.toLowerCase();
 
-    let filteredIds = new Set(
-        staffData.filter(s=> s.name.toLowerCase().includes(keyword) || s.position.toLowerCase().includes(keyword)).map(s=>s.id)
-    );
-
-    let kjIds = new Set(staffData.filter(s=> s.position?.toUpperCase()==="KETUA JABATAN").map(s=>s.id));
-    let html="";
-
-    // KETUA JABATAN
-    let kjStaff = staffData.filter(s=> kjIds.has(s.id) && filteredIds.has(s.id)).sort(sortByHierarki);
-    if(kjStaff.length){
-        html += `
-        <div class="section-title"><i class="fa fa-crown"></i> Ketua Jabatan</div>
-        <div class="tree-wrapper">${kjStaff.map(staffCardHtml).join("")}</div>
+    // Pembantu fungsi untuk bina kad kosong (Empty Slot)
+    function emptyCardHtml(position, slotType) {
+        return `
+        <div class="staff-card" style="border: 1px dashed #d1d1d6; background: #fafafa; opacity: 0.7; cursor: default;">
+            <div class="staff-left">
+                <div class="staff-avatar" style="background: #e5e5ea; color: #aeaeb2;">
+                    <i class="fa-solid fa-user-slash"></i>
+                </div>
+                <div class="staff-info">
+                    <h4 style="color: #8e8e93; font-style: italic;">Kosong (Kekosongan)</h4>
+                    <p style="color: #aeaea2; font-weight: 600;">${position}</p>
+                </div>
+            </div>
+        </div>
         `;
     }
 
-    // SECTIONS & UNITS
-    sectionData.forEach(sec=>{
-        let sectionStaffIds = staffSectionAssignments.filter(a=>a.section_id===sec.id).map(a=>a.staff_id);
-        let sectionStaff = staffData.filter(s=> sectionStaffIds.includes(s.id) && filteredIds.has(s.id) && !kjIds.has(s.id)).sort(sortByHierarki);
-        let unitsInSection = unitData.filter(u=>u.section_id===sec.id);
-        let unitBlocks="";
-        let sectionHasContent = sectionStaff.length > 0;
+    let html = "";
 
-        unitsInSection.forEach(u=>{
-            let unitStaffIds = staffUnitAssignments.filter(a=>a.unit_id===u.id).map(a=>a.staff_id);
-            let unitStaff = staffData.filter(s=> unitStaffIds.includes(s.id) && filteredIds.has(s.id) && !kjIds.has(s.id)).sort(sortByHierarki);
+    // ==========================================
+    // 1. KETUA JABATAN (Sentiasa Ada)
+    // ==========================================
+    let kjStaff = staffData.find(s => s.position?.toUpperCase() === "KETUA JABATAN");
+    let matchKj = kjStaff && (kjStaff.name.toLowerCase().includes(keyword) || kjStaff.position.toLowerCase().includes(keyword));
+    
+    // Tunjukkan kalau tiada keyword (default) ATAU kalau keyword match dengan data Ketua Jabatan
+    if (!keyword || matchKj) {
+        html += `<div class="section-title"><i class="fa fa-crown"></i> Ketua Jabatan</div>
+                 <div class="tree-wrapper">
+                    ${kjStaff ? staffCardHtml(kjStaff) : emptyCardHtml("KETUA JABATAN")}
+                 </div>`;
+    }
+
+    // ==========================================
+    // 2. SEKSYEN & UNIT (Sentiasa Ada Struktur)
+    // ==========================================
+    sectionData.forEach(sec => {
+        // Cari Ketua Seksyen untuk seksyen ini
+        let secStaffIds = staffSectionAssignments.filter(a => a.section_id === sec.id).map(a => a.staff_id);
+        let ksStaff = staffData.find(s => secStaffIds.includes(s.id) && s.position?.toUpperCase() === "KETUA SEKSYEN");
+
+        // Cari staff lain dalam seksyen (Eksekutif Kanan, dll) yang direct bawah seksyen
+        let otherSecStaff = staffData.filter(s => 
+            secStaffIds.includes(s.id) && 
+            s.position?.toUpperCase() !== "KETUA SEKSYEN" && 
+            s.position?.toUpperCase() !== "KETUA JABATAN" &&
+            (s.name.toLowerCase().includes(keyword) || s.position.toLowerCase().includes(keyword))
+        ).sort(sortByHierarki);
+
+        let unitBlocks = "";
+        let sectionHasMatch = false;
+
+        // Loop setiap unit di bawah seksyen ini
+        let unitsInSection = unitData.filter(u => u.section_id === sec.id);
+        
+        unitsInSection.forEach(u => {
+            let unitStaffIds = staffUnitAssignments.filter(a => a.unit_id === u.id).map(a => a.staff_id);
             
-            if(unitStaff.length===0) return;
-            sectionHasContent = true;
+            // Cari Eksekutif Unit (atau apa-apa jawatan Eksekutif tertinggi dalam unit)
+            let eksekutifUnit = staffData.find(s => unitStaffIds.includes(s.id) && s.position?.toUpperCase().includes("EKSEKUTIF"));
+            
+            // Cari staff biasa dalam unit (Juruteknik, Kerani, dll)
+            let otherUnitStaff = staffData.filter(s => 
+                unitStaffIds.includes(s.id) && 
+                s.id !== eksekutifUnit?.id &&
+                (s.name.toLowerCase().includes(keyword) || s.position.toLowerCase().includes(keyword))
+            ).sort(sortByHierarki);
 
-            unitBlocks += `
-            <div class="unit-title"><i class="fa fa-angle-right"></i> ${u.unit_name}</div>
-            <div class="tree-wrapper">${unitStaff.map(staffCardHtml).join("")}</div>
-            `;
+            // Semak penapisan keyword carian
+            let matchKsInUnit = eksekutifUnit && (eksekutifUnit.name.toLowerCase().includes(keyword) || eksekutifUnit.position.toLowerCase().includes(keyword));
+            
+            if (!keyword || matchKsInUnit || otherUnitStaff.length > 0) {
+                sectionHasMatch = true;
+                
+                unitBlocks += `
+                <div class="unit-title"><i class="fa fa-angle-right"></i> ${u.unit_name}</div>
+                <div class="tree-wrapper">
+                    ${eksekutifUnit ? staffCardHtml(eksekutifUnit) : emptyCardHtml("EKSEKUTIF UNIT")}
+                    ${otherUnitStaff.map(staffCardHtml).join("")}
+                </div>`;
+            }
         });
 
-        if(!sectionHasContent) return;
-
-        html += `
-        <div class="tree-group">
-            <div class="section-title"><i class="fa fa-building"></i> ${sec.section_name}</div>
-            ${sectionStaff.length ? `<div class="tree-wrapper">${sectionStaff.map(staffCardHtml).join("")}</div>` : ""}
-            ${unitBlocks}
-        </div>
-        `;
+        // Semak penapisan keyword untuk bahagian Seksyen
+        let matchKs = ksStaff && (ksStaff.name.toLowerCase().includes(keyword) || ksStaff.position.toLowerCase().includes(keyword));
+        
+        if (!keyword || matchKs || otherSecStaff.length > 0 || sectionHasMatch) {
+            html += `
+            <div class="tree-group">
+                <div class="section-title"><i class="fa fa-building"></i> ${sec.section_name}</div>
+                <div class="tree-wrapper">
+                    ${ksStaff ? staffCardHtml(ksStaff) : emptyCardHtml("KETUA SEKSYEN")}
+                    ${otherSecStaff.map(staffCardHtml).join("")}
+                </div>
+                ${unitBlocks}
+            </div>`;
+        }
     });
 
-    // UNASSIGNED
+    // ==========================================
+    // 3. STAFF YANG BELUM DITETAPKAN (Unassigned)
+    // ==========================================
     let assignedIds = new Set([
-        ...staffSectionAssignments.map(a=>a.staff_id),
-        ...staffUnitAssignments.map(a=>a.staff_id)
+        ...staffSectionAssignments.map(a => a.staff_id),
+        ...staffUnitAssignments.map(a => a.staff_id),
+        ...(kjStaff ? [kjStaff.id] : [])
     ]);
 
-    let unassigned = staffData.filter(s=> !assignedIds.has(s.id) && filteredIds.has(s.id) && !kjIds.has(s.id)).sort(sortByHierarki);
-    if(unassigned.length){
+    let unassigned = staffData.filter(s => !assignedIds.has(s.id) && (s.name.toLowerCase().includes(keyword) || s.position.toLowerCase().includes(keyword))).sort(sortByHierarki);
+    
+    if (unassigned.length) {
         html += `
         <div class="tree-group">
             <div class="section-title"><i class="fa fa-circle-question"></i> Belum Ditetapkan</div>
-            <div class="tree-wrapper">${unassigned.map(staffCardHtml).join("")}</div>
-        </div>
-        `;
+            <div class="tree-wrapper">
+                ${unassigned.map(staffCardHtml).join("")}
+            </div>
+        </div>`;
     }
 
-    if(!html){
-        html = `<div class="empty-state">Tiada staff dijumpai</div>`;
+    if (!html) {
+        html = `<div class="empty-state">Tiada rekod dijumpai</div>`;
     }
 
-    document.getElementById("staffList").innerHTML=html;
+    document.getElementById("staffList").innerHTML = html;
 }
 
 window.onload=async()=>{
