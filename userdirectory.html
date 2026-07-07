@@ -768,18 +768,32 @@ function renderStaff(){
             <div class="tree-group">
                 <div class="section-title"><i class="fa fa-building"></i> ${sec.section_name}</div>
                 
-                <div class="section-container">
-                    <div class="tree-wrapper">`;
+                <div class="section-container">`;
+            
+            // LOGIK BAHARU: Hanya papar kad Ketua Seksyen jika ada pengisian, ada pemangku, 
+            // ATAU jika seksyen tersebut mengandungi Eksekutif/Eksekutif Kanan di bawah struktur terusnya.
+            // Jika ia seksyen pentadbiran biasa (contoh: Admin) yang tiada struktur jawatan pengurusan tertinggi, kad kosong disembunyikan.
+            let hasHighLevelStaff = otherSecStaff.some(s => {
+                let pos = s.position?.toUpperCase() || "";
+                return pos.includes("EKSEKUTIF KANAN") || pos.includes("EKSEKUTIF");
+            });
+
             if (ksStaff) {
-                html += staffCardHtml(ksStaff);
+                html += `<div class="tree-wrapper">${staffCardHtml(ksStaff)}</div>`;
             } else if (actingKsStaff) {
-                html += staffCardHtml(actingKsStaff, true, 'section', sec.id);
-            } else {
-                html += emptyCardHtml("KETUA SEKSYEN", "section", sec.id);
+                html += `<div class="tree-wrapper">${staffCardHtml(actingKsStaff, true, 'section', sec.id)}</div>`;
+            } else if (hasHighLevelStaff || (!ksStaff && otherSecStaff.length === 0 && unitsInSection.length > 0)) {
+                // Tunjukkan kotak kekosongan jika struktur memerlukan jawatan pengurusan tertinggi
+                html += `<div class="tree-wrapper">${emptyCardHtml("KETUA SEKSYEN", "section", sec.id)}</div>`;
             }
-            html += otherSecStaff.map(s => staffCardHtml(s, false)).join("") + `
-                    </div>
-                    ${unitBlocks}
+
+            if (otherSecStaff.length > 0) {
+                html += `<div class="tree-wrapper" style="margin-top: 12px;">
+                    ${otherSecStaff.map(s => staffCardHtml(s, false)).join("")}
+                </div>`;
+            }
+
+            html += `${unitBlocks}
                 </div>
             </div>`;
         }
