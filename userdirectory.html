@@ -693,14 +693,14 @@ function renderStaff(){
         
         let ksAssignment = secAssignments.find(a => {
             let s = staffData.find(x => x.id === a.staff_id);
-            return s && s.position?.toUpperCase() === "KETUA SEKSYEN" && !a.is_acting;
+            return s && s.position?.toUpperCase() === "KETUA SEKSYEN" && (!a.is_acting || a.is_acting === 'false' || a.is_acting === false);
         });
         let ksStaff = ksAssignment ? staffData.find(x => x.id === ksAssignment.staff_id) : null;
 
         let actingKsAssignment = secAssignments.find(a => a.is_acting === true || a.is_acting === 'true');
         let actingKsStaff = actingKsAssignment ? staffData.find(x => x.id === actingKsAssignment.staff_id) : null;
 
-        let otherSecStaffIds = secAssignments.filter(a => !a.is_acting && a.staff_id !== ksStaff?.id).map(a => a.staff_id);
+        let otherSecStaffIds = secAssignments.filter(a => (!a.is_acting || a.is_acting === false || a.is_acting === 'false') && a.staff_id !== ksStaff?.id).map(a => a.staff_id);
         let otherSecStaff = staffData.filter(s => 
             otherSecStaffIds.includes(s.id) && 
             s.position?.toUpperCase() !== "KETUA JABATAN" &&
@@ -713,16 +713,21 @@ function renderStaff(){
         
         unitsInSection.forEach(u => {
             let unitAssignments = staffUnitAssignments.filter(a => a.unit_id === u.id);
+            
             let eksekutifAssignment = unitAssignments.find(a => {
                 let s = staffData.find(x => x.id === a.staff_id);
-                return s && s.position?.toUpperCase().includes("EKSEKUTIF") && !a.is_acting;
+                return s && s.position?.toUpperCase().includes("EKSEKUTIF") && (!a.is_acting || a.is_acting === false || a.is_acting === 'false');
             });
             let eksekutifUnit = eksekutifAssignment ? staffData.find(x => x.id === eksekutifAssignment.staff_id) : null;
 
             let actingUnitAssignment = unitAssignments.find(a => a.is_acting === true || a.is_acting === 'true');
             let actingUnitStaff = actingUnitAssignment ? staffData.find(x => x.id === actingUnitAssignment.staff_id) : null;
 
-            let otherUnitStaffIds = unitAssignments.filter(a => !a.is_acting && a.staff_id !== eksekutifUnit?.id).map(a => a.staff_id);
+            let otherUnitStaffIds = unitAssignments.filter(a => {
+                let isActing = a.is_acting === true || a.is_acting === 'true';
+                return !isActing && a.staff_id !== eksekutifUnit?.id;
+            }).map(a => a.staff_id);
+
             let otherUnitStaff = staffData.filter(s => 
                 otherUnitStaffIds.includes(s.id) && 
                 (s.name.toLowerCase().includes(keyword) || s.position.toLowerCase().includes(keyword))
@@ -737,6 +742,7 @@ function renderStaff(){
                 <div class="unit-container">
                     <div class="unit-title"><i class="fa fa-sitemap"></i> ${u.unit_name}</div>
                     <div class="tree-wrapper">`;
+                
                 if (eksekutifUnit) {
                     unitBlocks += staffCardHtml(eksekutifUnit);
                 } else if (actingUnitStaff) {
@@ -744,7 +750,8 @@ function renderStaff(){
                 } else {
                     unitBlocks += emptyCardHtml("EKSEKUTIF UNIT", "unit", u.id);
                 }
-                unitBlocks += otherUnitStaff.map(staffCardHtml).join("") + `
+
+                unitBlocks += otherUnitStaff.map(s => staffCardHtml(s, false)).join("") + `
                     </div>
                 </div>`;
             }
@@ -766,7 +773,7 @@ function renderStaff(){
             } else {
                 html += emptyCardHtml("KETUA SEKSYEN", "section", sec.id);
             }
-            html += otherSecStaff.map(staffCardHtml).join("") + `
+            html += otherSecStaff.map(s => staffCardHtml(s, false)).join("") + `
                     </div>
                     ${unitBlocks}
                 </div>
@@ -787,7 +794,7 @@ function renderStaff(){
         <div class="tree-group" style="border-left: 4px solid var(--text-muted);">
             <div class="section-title"><i class="fa fa-circle-question"></i> Belum Ditetapkan (Tiada Hubungan)</div>
             <div class="tree-wrapper">
-                ${unassigned.map(staffCardHtml).join("")}
+                ${unassigned.map(s => staffCardHtml(s, false)).join("")}
             </div>
         </div>`;
     }
@@ -974,7 +981,6 @@ async function deleteStaff(id,name){
     loadStaff();
     await loadAssignments();
 }
-
 </script>
 </body>
 </html>
