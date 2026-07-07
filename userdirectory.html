@@ -925,52 +925,109 @@ async function removeActing(type, targetId, staffId, event){
     }
 }
 
+// Variable global tambahan untuk menyimpan state pilihan sementara
+let selectedSections = new Set();
+let selectedUnits = new Set();
+
 async function openAssignModal(staffId){
     currentTargetStaff = staffData.find(x => x.id === staffId);
     if(!currentTargetStaff) return;
     
     document.getElementById("assignModalTitle").innerText = `Assign Penempatan: ${currentTargetStaff.name}`;
     
+    // Ambil data penempatan sedia ada dari database
     let assignedSecs = staffSectionAssignments.filter(a => a.staff_id === staffId && (!a.is_acting || a.is_acting==='false')).map(a => a.section_id);
     let assignedUnits = staffUnitAssignments.filter(a => a.staff_id === staffId && (!a.is_acting || a.is_acting==='false')).map(a => a.unit_id);
 
-    let html = `<div class="modal-group-title">Seksyen</div>`;
-    sectionData.forEach(sec => {
-        let isChecked = assignedSecs.includes(sec.id) ? "checked" : "";
-        html += `
-        <label class="modal-option-label">
-            <input type="checkbox" class="sectionCheck" value="${sec.id}" ${isChecked}>
-            <span>${sec.section_name}</span>
-        </label>`;
-    });
+    // Set state awal berdasarkan data sedia ada
+    selectedSections = new Set(assignedSecs.map(Number));
+    selectedUnits = new Set(assignedUnits.map(Number));
 
-    html += `<div class="modal-group-title" style="margin-top:16px;">Unit</div>`;
-    unitData.forEach(u => {
-        let isChecked = assignedUnits.includes(u.id) ? "checked" : "";
+    renderAssignOptions();
+    document.getElementById("assignModal").style.display = "flex";
+}
+
+function renderAssignOptions() {
+    let isKetuaSeksyen = currentTargetStaff.position?.toUpperCase() === "KETUA SEKSYEN";
+    let html = `<div class="modal-group-title">Pilih Seksyen</div>`;
+    
+    sectionData.forEach(sec => {
+        let isSecChecked = selectedSections.has(Number(sec.id)) ? "checked" : "";
+        
         html += `
-        <label class="modal-option-label">
-            <input type="checkbox" class="unitCheck" value="${u.id}" ${isChecked}>
-            <span>${u.unit_name} (${u.me_sections?.section_name || 'Tiada Seksyen'})</span>
-        </label>`;
+        <div style="margin-bottom: 12px; background: #f2f2f7; border-radius: 10px; padding: 4px;">
+            <label class="modal-option-label" style="margin-bottom: 0; background: transparent; width: 100%;">
+                <input type="checkbox" class="sectionCheck" value="${sec.id}" ${isSecChecked} onchange="toggleSectionSelection(this, ${sec.id})">
+                <span style="font-weight: 600;">${sec.section_name}</span>
+            </label>`;
+        
+        // JIKA BUKAN KETUA SEKSYEN, dan Seksyen ini dipilih (Checked), paparkan Unit di bawahnya
+        if (!isKetuaSeksyen && selectedSections.has(Number(sec.id))) {
+            let unitsInSection = unitData.filter(u => u.section_id === sec.id);
+            
+            if (unitsInSection.length > 0) {
+                html += `<div class="unit-sub-group" style="padding: 4px 12px 10px 32px; border-top: 1px solid rgba(0,0,0,0.05);">
+                            <div style="font-size: 11px; font-weight:700; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase;">Pilih Unit di bawah Seksyen ini:</div>`;
+                
+                unitsInSection.forEach(u => {
+                    let isUnitChecked = selectedUnits.has(Number(u.id)) ? "checked" : "";
+                    html += `
+                    <label class="modal-option-label" style="padding: 8px 12px; margin-bottom: 4px; background: #ffffff; font-size: 13px;">
+                        <input type="checkbox" class="unitCheck" value="${u.id}" ${isUnitChecked} onchange="toggleUnitSelection(this, ${u.id})">
+                        <span>${u.unit_name}</span>
+                    </label>`;
+                });
+                
+                html += `</div>`;
+            } else {
+                html += `<div style="padding: 4px 12px 10px 32px; font-size: 12px; color: var(--text-muted); font-style: italic;">Tiada unit di bawah seksyen ini.</div>`;
+            }
+        }
+        
+        html += `</div>`;
     });
 
     document.getElementById("assignOptionsList").innerHTML = html;
-    document.getElementById("assignModal").style.display = "flex";
+}
+
+// Fungsi apabila checkbox Seksyen berubah status
+function toggleSectionSelection(checkbox, sectionId) {
+    if (checkbox.checked) {
+        selectedSections.add(Number(sectionId));
+    } else {
+        selectedSections.delete(Number(sectionId));
+        // Jika seksyen dibuang, buang juga semua unit di bawah seksyen tersebut dari pilihan data
+        let unitsToRemove = unitData.filter(u => u.section_id === sectionId).map(u => Number(u.id));
+        unitsToRemove.forEach(id => selectedUnits.delete(id));
+    }
+    // Render semula sub-popup/sub-menu unit secara dinamik
+    renderAssignOptions();
+}
+
+// Fungsi apabila checkbox Unit berubah status
+function toggleUnitSelection(checkbox, unitId) {
+    if (checkbox.checked) {
+        selectedUnits.add(Number(unitId));
+    } else {
+        selectedUnits.delete(Number(unitId));
+    }
 }
 
 async function saveAssignment(){
     if(!currentTargetStaff) return;
     let id = currentTargetStaff.id;
 
+    // Padam rekod lama penempatan biasa (bukan pemangku)
     await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${id}&is_acting=eq.false`, { method:"DELETE", headers });
     await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${id}&is_acting=eq.false`, { method:"DELETE", headers });
 
-    let checkedSections = [...document.querySelectorAll(".sectionCheck:checked")].map(x => ({ staff_id: id, section_id: Number(x.value), is_acting: false }));
+    // Sediakan data untuk dihantar berdasarkan set pilihan terkini
+    let checkedSections = Array.from(selectedSections).map(secId => ({ staff_id: id, section_id: secId, is_acting: false }));
     if(checkedSections.length){
         await fetch(`${SB_URL}/rest/v1/staff_section_assignment`, { method:"POST", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(checkedSections) });
     }
 
-    let checkedUnits = [...document.querySelectorAll(".unitCheck:checked")].map(x => ({ staff_id: id, unit_id: Number(x.value), is_acting: false }));
+    let checkedUnits = Array.from(selectedUnits).map(unitId => ({ staff_id: id, unit_id: unitId, is_acting: false }));
     if(checkedUnits.length){
         await fetch(`${SB_URL}/rest/v1/staff_unit_assignment`, { method:"POST", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(checkedUnits) });
     }
@@ -983,6 +1040,8 @@ async function saveAssignment(){
 function closeAssignModal(){ 
     document.getElementById("assignModal").style.display = "none"; 
     currentTargetStaff = null;
+    selectedSections.clear();
+    selectedUnits.clear();
 }
 
 let editingStaff=null;
