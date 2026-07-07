@@ -162,7 +162,6 @@ body {
     word-break: break-word;
 }
 
-/* Garisan visual kecil untuk Unit */
 .unit-title::before {
     content: "";
     position: absolute;
@@ -182,7 +181,6 @@ body {
     width: 100%;
 }
 
-/* Mobile responsive override */
 @media (max-width: 480px) {
     .tree-wrapper {
         grid-template-columns: 1fr;
@@ -441,6 +439,33 @@ body {
     color: white;
 }
 
+/* CSS baru untuk pengelompokan dalam modal */
+.modal-group-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin: 12px 0 6px 0;
+    padding-left: 4px;
+}
+
+.modal-option-label {
+    display: flex; 
+    gap: 10px; 
+    padding: 12px; 
+    background: #f2f2f7; 
+    border-radius: 10px; 
+    margin-bottom: 8px; 
+    font-size: 14px; 
+    cursor: pointer;
+    align-items: center;
+    transition: background 0.2s;
+}
+
+.modal-option-label:hover {
+    background: #e5e5ea;
+}
+
 @keyframes slideUp {
     from { transform: translateY(100%); }
     to { transform: translateY(0); }
@@ -481,24 +506,13 @@ body {
     </div>
 </div>
 
-<div id="unitModal" class="modal-overlay">
+<div id="assignModal" class="modal-overlay">
     <div class="modal-content">
-        <h3 id="assignTitle">Assign Unit</h3>
-        <div id="unitList"></div>
+        <h3 id="assignModalTitle">Assign</h3>
+        <div id="assignOptionsList"></div>
         <div class="modal-actions">
-            <button onclick="closeUnitModal()">Cancel</button>
-            <button onclick="saveUnitAssignment()" style="background:var(--accent-green)!important;">Save</button>
-        </div>
-    </div>
-</div>
-
-<div id="sectionModal" class="modal-overlay">
-    <div class="modal-content">
-        <h3 id="assignSectionTitle">Assign Section</h3>
-        <div id="sectionList"></div>
-        <div class="modal-actions">
-            <button onclick="closeSectionModal()">Cancel</button>
-            <button onclick="saveSectionAssignment()" style="background:var(--accent-purple)!important;">Save</button>
+            <button onclick="closeAssignModal()">Cancel</button>
+            <button onclick="saveAssignment()" style="background:var(--accent-blue)!important;">Save</button>
         </div>
     </div>
 </div>
@@ -529,9 +543,7 @@ let unitData=[];
 let sectionData=[];
 let staffSectionAssignments=[];
 let staffUnitAssignments=[];
-let selectedStaffId=null;
-let selectedSectionStaff=null;
-let editingStaff=null;
+let currentTargetStaff=null; // Menyimpan objek staff yang sedang di-edit penempatannya
 
 async function loadUnits(){
     let res=await fetch(`${SB_URL}/rest/v1/units?select=id,unit_name,section_id,me_sections(section_name)`, {headers});
@@ -557,11 +569,6 @@ async function loadStaff(){
     renderStaff();
 }
 
-// Dibuka untuk semua staff tanpa had jawatan
-function canAssignSection(position){
-    return true;
-}
-
 function toggleCard(el, evt){
     if(evt.target.closest(".action-group")) return;
     el.classList.toggle("expanded");
@@ -570,6 +577,7 @@ function toggleCard(el, evt){
 function staffCardHtml(s){
     let avatarHtml = `<i class="fa-solid fa-user"></i>`;
     let safeName = s.name ? s.name.replace(/'/g, "\\'") : "";
+    let isKJ = s.position?.toUpperCase() === "KETUA JABATAN";
 
     return `
     <div class="staff-card" onclick="toggleCard(this, event)">
@@ -588,14 +596,11 @@ function staffCardHtml(s){
             <p><i class="fa fa-phone"></i> ${s.phone_no||'-'}</p>
             <p><i class="fa fa-envelope"></i> ${s.email||'-'}</p>
             <div class="action-group">
-                ${canAssignSection(s.position)?`
-                <button class="icon-btn" style="background:var(--accent-purple)" onclick="assignSection('${s.id}','${safeName}')" title="Assign Section">
-                    <i class="fa fa-layer-group"></i>
-                </button>
-                `:''}
-                <button class="icon-btn" style="background:var(--accent-green)" onclick="assignUnit('${s.id}','${safeName}')" title="Assign Unit">
+                ${!isKJ ? `
+                <button class="icon-btn" style="background:var(--accent-blue)" onclick="openAssignModal('${s.id}')" title="Assign Penempatan">
                     <i class="fa fa-sitemap"></i>
                 </button>
+                ` : ''}
                 <button class="icon-btn edit-btn" onclick="editStaff('${s.id}')">
                     <i class="fa fa-pen"></i>
                 </button>
@@ -741,7 +746,101 @@ window.onload=async()=>{
     await loadStaff();
 };
 
-// MODAL CONTROLS
+// LOGIK MODAL PINTAR GABUNGAN
+async function openAssignModal(id){
+    let staff = staffData.find(x => x.id === id);
+    if(!staff) return;
+    currentTargetStaff = staff;
+
+    document.getElementById("assignModalTitle").innerText = "Assign Penempatan : " + staff.name;
+    let html = "";
+    let isKS = staff.position?.toUpperCase() === "KETUA SEKSYEN";
+
+    if (isKS) {
+        // KETUA SEKSYEN: Auto pick seksyen sahaja (Sembunyikan unit)
+        let res = await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${id}&select=section_id`, {headers});
+        let current = await res.json();
+        let selectedSecs = current.map(x => x.section_id);
+
+        html += `<div class="modal-group-title">Pilih Seksyen (Ketua Seksyen)</div>`;
+        sectionData.forEach(s => {
+            html += `
+            <label class="modal-option-label">
+                <input type="checkbox" class="sectionCheck" value="${s.id}" ${selectedSecs.includes(s.id) ? "checked" : ""}>
+                ${s.section_name}
+            </label>`;
+        });
+    } else {
+        // KAKITANGAN LAIN: Cek kalau seksyen ada unit atau tidak
+        let resUnit = await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${id}&select=unit_id`, {headers});
+        let currentUnit = await resUnit.json();
+        let selectedUnits = currentUnit.map(x => x.unit_id);
+
+        let resSec = await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${id}&select=section_id`, {headers});
+        let currentSec = await resSec.json();
+        let selectedSecs = currentSec.map(x => x.section_id);
+
+        sectionData.forEach(sec => {
+            let units = unitData.filter(u => u.section_id === sec.id);
+
+            if (units.length > 0) {
+                // Seksyen ada unit -> Expand senarai unit sahaja
+                html += `<div class="modal-group-title">${sec.section_name} (Pilih Unit)</div>`;
+                units.forEach(u => {
+                    html += `
+                    <label class="modal-option-label" style="padding-left: 24px;">
+                        <input type="checkbox" class="unitCheck" value="${u.id}" ${selectedUnits.includes(u.id) ? "checked" : ""}>
+                        <i class="fa fa-sitemap" style="color:var(--accent-green); font-size:12px; margin-right:4px;"></i> ${u.unit_name}
+                    </label>`;
+                });
+            } else {
+                // Seksyen tiada unit -> Terus bagi pilihan assign seksyen
+                html += `<div class="modal-group-title">${sec.section_name} (Tiada Unit)</div>`;
+                html += `
+                <label class="modal-option-label">
+                    <input type="checkbox" class="sectionCheck" value="${sec.id}" ${selectedSecs.includes(sec.id) ? "checked" : ""}>
+                    <i class="fa fa-building" style="color:var(--accent-purple); font-size:12px; margin-right:4px;"></i> Assign ke Seksyen Ini
+                </label>`;
+            }
+        });
+    }
+
+    document.getElementById("assignOptionsList").innerHTML = html;
+    document.getElementById("assignModal").style.display = "flex";
+}
+
+async function saveAssignment(){
+    if(!currentTargetStaff) return;
+    let id = currentTargetStaff.id;
+
+    // Bersihkan semua rekod lama penempatan staff ini terlebih dahulu
+    await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${id}`, { method:"DELETE", headers });
+    await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${id}`, { method:"DELETE", headers });
+
+    // Simpan Seksyen jika ada ditanda
+    let checkedSections = [...document.querySelectorAll(".sectionCheck:checked")].map(x => ({ staff_id: id, section_id: Number(x.value) }));
+    if(checkedSections.length){
+        await fetch(`${SB_URL}/rest/v1/staff_section_assignment`, { method:"POST", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(checkedSections) });
+    }
+
+    // Simpan Unit jika ada ditanda
+    let checkedUnits = [...document.querySelectorAll(".unitCheck:checked")].map(x => ({ staff_id: id, unit_id: Number(x.value) }));
+    if(checkedUnits.length){
+        await fetch(`${SB_URL}/rest/v1/staff_unit_assignment`, { method:"POST", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(checkedUnits) });
+    }
+
+    closeAssignModal();
+    await loadAssignments();
+    renderStaff();
+}
+
+function closeAssignModal(){ 
+    document.getElementById("assignModal").style.display = "none"; 
+    currentTargetStaff = null;
+}
+
+// MODAL CONTROLS (STAFF CRUD)
+let editingStaff=null;
 function addStaff(existing=null){
     editingStaff=existing;
     document.getElementById("modalTitle").innerHTML = existing ? "Edit Staff" : "New Staff";
@@ -788,70 +887,6 @@ async function deleteStaff(id,name){
     await fetch(`${SB_URL}/rest/v1/staff?id=eq.${id}`, { method:"DELETE", headers });
     loadStaff();
 }
-
-async function assignUnit(id,name){
-    selectedStaffId=id;
-    document.getElementById("assignTitle").innerText = "Assign Unit : " + name;
-    let res = await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${id}&select=unit_id`, {headers});
-    let current = await res.json();
-    let selected = current.map(x=>x.unit_id);
-    let html="";
-
-    unitData.forEach(u=>{
-        html+=`
-        <label style="display:flex; gap:10px; padding:12px; background:#f2f2f7; border-radius:10px; margin-bottom:8px; font-size:14px; cursor:pointer;">
-            <input type="checkbox" class="unitCheck" value="${u.id}" ${selected.includes(u.id)?"checked":""}>
-            ${u.unit_name}
-        </label>`;
-    });
-    unitList.innerHTML=html;
-    unitModal.style.display="flex";
-}
-
-async function saveUnitAssignment(){
-    await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${selectedStaffId}`, { method:"DELETE", headers });
-    let data = [...document.querySelectorAll(".unitCheck:checked")].map(x=>({ staff_id:selectedStaffId, unit_id:Number(x.value) }));
-    if(data.length){
-        await fetch(`${SB_URL}/rest/v1/staff_unit_assignment`, { method:"POST", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(data) });
-    }
-    closeUnitModal();
-    await loadAssignments();
-    renderStaff();
-}
-
-function closeUnitModal(){ unitModal.style.display="none"; }
-
-async function assignSection(id,name){
-    selectedSectionStaff=id;
-    document.getElementById("assignSectionTitle").innerText = "Assign Section : " + name;
-    let res = await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${id}&select=section_id`, {headers});
-    let current = await res.json();
-    let selected = current.map(x=>x.section_id);
-    let html="";
-
-    sectionData.forEach(s=>{
-        html+=`
-        <label style="display:flex; gap:10px; padding:12px; background:#f2f2f7; border-radius:10px; margin-bottom:8px; font-size:14px; cursor:pointer;">
-            <input type="checkbox" class="sectionCheck" value="${s.id}" ${selected.includes(s.id)?"checked":""}>
-            ${s.section_name}
-        </label>`;
-    });
-    sectionList.innerHTML=html;
-    sectionModal.style.display="flex";
-}
-
-async function saveSectionAssignment(){
-    await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${selectedSectionStaff}`, { method:"DELETE", headers });
-    let data = [...document.querySelectorAll(".sectionCheck:checked")].map(x=>({ staff_id:selectedSectionStaff, section_id:Number(x.value) }));
-    if(data.length){
-        await fetch(`${SB_URL}/rest/v1/staff_section_assignment`, { method:"POST", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(data) });
-    }
-    closeSectionModal();
-    await loadAssignments();
-    renderStaff();
-}
-
-function closeSectionModal(){ sectionModal.style.display="none"; }
 </script>
 </body>
 </html>
