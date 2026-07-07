@@ -284,6 +284,8 @@ body {
     let staffData = [];
     let unitData = [];
 let selectedStaffId = null;
+    let sectionData=[];
+let selectedSectionStaff=null;
 
     async function loadUnits(){
 
@@ -293,6 +295,17 @@ let selectedStaffId = null;
     );
 
     unitData = await res.json();
+}
+    async function loadSections(){
+
+const res = await fetch(
+`${SB_URL}/rest/v1/me_sections?select=id,section_name`,
+{
+headers
+});
+
+sectionData = await res.json();
+
 }
 
     async function loadStaff(){
@@ -369,6 +382,14 @@ let selectedStaffId = null;
                         </div>
                     </div>
                     <div class="action-group">
+
+<button class="icon-btn"
+style="background:#5856D6"
+onclick="assignSection('${s.id}','${s.name}')">
+
+<i class="fa fa-layer-group"></i>
+
+</button>
 
     <button class="icon-btn" 
         style="background:#34C759"
@@ -523,6 +544,119 @@ let selectedStaffId = null;
         }
     }
 
+    async function assignSection(staffId,name){
+
+selectedSectionStaff = staffId;
+
+
+const res = await fetch(
+`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${staffId}&select=section_id`,
+{
+headers
+});
+
+
+const assigned = await res.json();
+
+
+let selected =
+assigned.map(x=>x.section_id);
+
+
+
+let html="";
+
+
+sectionData.forEach(s=>{
+
+
+let checked =
+selected.includes(s.id)
+?"checked":"";
+
+
+html += `
+
+<label style="
+display:flex;
+gap:10px;
+padding:10px;
+background:#f5f5f5;
+border-radius:10px;
+margin-bottom:8px">
+
+
+<input 
+type="checkbox"
+class="sectionCheck"
+value="${s.id}"
+${checked}>
+
+
+${s.section_name}
+
+
+</label>
+
+`;
+
+});
+
+
+document.getElementById("sectionList").innerHTML=html;
+
+
+document.getElementById("sectionModal")
+.style.display="flex";
+
+
+}
+
+    async function saveSectionAssignment(){
+
+
+await fetch(
+`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${selectedSectionStaff}`,
+{
+method:"DELETE",
+headers
+});
+
+
+let data =
+[...document.querySelectorAll(".sectionCheck:checked")]
+.map(x=>({
+
+staff_id:selectedSectionStaff,
+
+section_id:Number(x.value)
+
+}));
+
+
+if(data.length){
+
+await fetch(
+`${SB_URL}/rest/v1/staff_section_assignment`,
+{
+method:"POST",
+headers:{
+...headers,
+"Prefer":"return=minimal"
+},
+body:JSON.stringify(data)
+});
+
+}
+
+
+alert("Section berjaya disimpan");
+
+closeSectionModal();
+
+
+}
+
     async function assignUnit(staffId,name){
 
     selectedStaffId = staffId;
@@ -639,9 +773,14 @@ document.getElementById("unitModal")
 }
 
     window.onload = async function(){
-    await loadUnits();
-    await loadStaff();
-};
+
+await loadUnits();
+
+await loadSections();
+
+await loadStaff();
+
+}
     
 </script>
 
