@@ -949,38 +949,59 @@ async function openAssignModal(staffId){
 
 function renderAssignOptions() {
     let isKetuaSeksyen = currentTargetStaff.position?.toUpperCase() === "KETUA SEKSYEN";
-    let html = `<div class="modal-group-title">Pilih Seksyen</div>`;
+    let html = `<div class="modal-group-title">Pilih Penempatan</div>`;
     
     sectionData.forEach(sec => {
-        let isSecChecked = selectedSections.has(Number(sec.id)) ? "checked" : "";
+        let unitsInSection = unitData.filter(u => u.section_id === sec.id);
+        let hasUnits = unitsInSection.length > 0;
         
-        html += `
-        <div style="margin-bottom: 12px; background: #f2f2f7; border-radius: 10px; padding: 4px;">
+        // Pembungkus utama bagi setiap Seksyen
+        html += `<div style="margin-bottom: 12px; background: #f2f2f7; border-radius: 10px; padding: 4px; overflow: hidden;">`;
+        
+        if (isKetuaSeksyen) {
+            // SITUASI 1: Jika KETUA SEKSYEN -> Papar checkbox Seksyen biasa (Tiada kaitan dengan Unit)
+            let isSecChecked = selectedSections.has(Number(sec.id)) ? "checked" : "";
+            html += `
             <label class="modal-option-label" style="margin-bottom: 0; background: transparent; width: 100%;">
-                <input type="checkbox" class="sectionCheck" value="${sec.id}" ${isSecChecked} onchange="toggleSectionSelection(this, ${sec.id})">
-                <span style="font-weight: 600;">${sec.section_name}</span>
+                <input type="checkbox" class="sectionCheck" value="${sec.id}" ${isSecChecked} onchange="toggleSectionSelection(this, ${sec.id}, false)">
+                <span style="font-weight: 600; color: var(--accent-blue);"><i class="fa fa-building"></i> ${sec.section_name}</span>
             </label>`;
-        
-        // JIKA BUKAN KETUA SEKSYEN, dan Seksyen ini dipilih (Checked), paparkan Unit di bawahnya
-        if (!isKetuaSeksyen && selectedSections.has(Number(sec.id))) {
-            let unitsInSection = unitData.filter(u => u.section_id === sec.id);
             
-            if (unitsInSection.length > 0) {
-                html += `<div class="unit-sub-group" style="padding: 4px 12px 10px 32px; border-top: 1px solid rgba(0,0,0,0.05);">
-                            <div style="font-size: 11px; font-weight:700; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase;">Pilih Unit di bawah Seksyen ini:</div>`;
-                
-                unitsInSection.forEach(u => {
-                    let isUnitChecked = selectedUnits.has(Number(u.id)) ? "checked" : "";
-                    html += `
-                    <label class="modal-option-label" style="padding: 8px 12px; margin-bottom: 4px; background: #ffffff; font-size: 13px;">
-                        <input type="checkbox" class="unitCheck" value="${u.id}" ${isUnitChecked} onchange="toggleUnitSelection(this, ${u.id})">
-                        <span>${u.unit_name}</span>
-                    </label>`;
-                });
-                
-                html += `</div>`;
+        } else {
+            // SITUASI 2: Jika STAF BIASA
+            if (!hasUnits) {
+                // Seksyen tiada unit -> Papar checkbox Seksyen untuk di-assign secara langsung
+                let isSecChecked = selectedSections.has(Number(sec.id)) ? "checked" : "";
+                html += `
+                <label class="modal-option-label" style="margin-bottom: 0; background: transparent; width: 100%;">
+                    <input type="checkbox" class="sectionCheck" value="${sec.id}" ${isSecChecked} onchange="toggleSectionSelection(this, ${sec.id}, false)">
+                    <span style="font-weight: 600;"><i class="fa fa-building"></i> ${sec.section_name} <small style="color:var(--text-muted); font-weight:normal;">(Terus ke Seksyen)</small></span>
+                </label>`;
             } else {
-                html += `<div style="padding: 4px 12px 10px 32px; font-size: 12px; color: var(--text-muted); font-style: italic;">Tiada unit di bawah seksyen ini.</div>`;
+                // Seksyen ada unit -> Klik seksyen hanya untuk collapse/buka unit (Tiada Checkbox Seksyen)
+                // Kita gunakan state 'selectedSections' sebagai penanda sama ada menu unit sedang terbuka atau tertutup
+                let isOpen = selectedSections.has(Number(sec.id));
+                html += `
+                <div onclick="toggleSectionDropdown(${sec.id})" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; cursor: pointer; user-select: none;">
+                    <span style="font-weight: 600; color: var(--text-main);"><i class="fa fa-folder-open" style="color: var(--accent-orange); margin-right: 6px;"></i> ${sec.section_name}</span>
+                    <i class="fa ${isOpen ? 'fa-chevron-up' : 'fa-chevron-down'}" style="color: var(--text-muted); font-size: 12px;"></i>
+                </div>`;
+                
+                // Papar senarai unit di bawahnya jika status dropdown dibuka
+                if (isOpen) {
+                    html += `<div class="unit-sub-group" style="padding: 4px 12px 10px 16px; border-top: 1px solid rgba(0,0,0,0.05); background: rgba(255,255,255,0.5);">`;
+                    
+                    unitsInSection.forEach(u => {
+                        let isUnitChecked = selectedUnits.has(Number(u.id)) ? "checked" : "";
+                        html += `
+                        <label class="modal-option-label" style="padding: 10px 12px; margin-bottom: 6px; background: #ffffff; font-size: 13px; border: 1px solid rgba(0,0,0,0.03);">
+                            <input type="checkbox" class="unitCheck" value="${u.id}" ${isUnitChecked} onchange="toggleUnitSelection(this, ${u.id})">
+                            <span><i class="fa fa-sitemap" style="color: var(--accent-blue); margin-right:4px;"></i> ${u.unit_name}</span>
+                        </label>`;
+                    });
+                    
+                    html += `</div>`;
+                }
             }
         }
         
@@ -990,18 +1011,32 @@ function renderAssignOptions() {
     document.getElementById("assignOptionsList").innerHTML = html;
 }
 
-// Fungsi apabila checkbox Seksyen berubah status
+// Fungsi khas untuk staf biasa buka/tutup senarai unit tanpa mengganggu simpanan data seksyen
+function toggleSectionDropdown(sectionId) {
+    if (selectedSections.has(Number(sectionId))) {
+        selectedSections.delete(Number(sectionId));
+    } else {
+        selectedSections.add(Number(sectionId));
+    }
+    renderAssignOptions();
+}
+
+// Fungsi apabila checkbox Seksyen ditanda (Hanya untuk Ketua Seksyen ATAU Seksyen tanpa unit)
 function toggleSectionSelection(checkbox, sectionId) {
     if (checkbox.checked) {
         selectedSections.add(Number(sectionId));
     } else {
         selectedSections.delete(Number(sectionId));
-        // Jika seksyen dibuang, buang juga semua unit di bawah seksyen tersebut dari pilihan data
-        let unitsToRemove = unitData.filter(u => u.section_id === sectionId).map(u => Number(u.id));
-        unitsToRemove.forEach(id => selectedUnits.delete(id));
     }
-    // Render semula sub-popup/sub-menu unit secara dinamik
-    renderAssignOptions();
+}
+
+// Fungsi apabila checkbox Unit ditanda
+function toggleUnitSelection(checkbox, unitId) {
+    if (checkbox.checked) {
+        selectedUnits.add(Number(unitId));
+    } else {
+        selectedUnits.delete(Number(unitId));
+    }
 }
 
 // Fungsi apabila checkbox Unit berubah status
