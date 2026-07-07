@@ -456,7 +456,7 @@ body {
 
 <div id="sectionModal" class="modal-overlay">
     <div class="modal-content">
-        <h3>Assign Section</h3>
+        <h3 id="assignSectionTitle">Assign Section</h3>
         <div id="sectionList"></div>
         <div class="modal-actions">
             <button onclick="closeSectionModal()">Cancel</button>
@@ -466,7 +466,7 @@ body {
 </div>
 
 <script>
-const SB_URL = 'https://ywmsvowroxzhrjwrhsru.co'; // Diubahsuai mengikut struktur asal
+const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co'; 
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
 
 const headers={
@@ -531,6 +531,9 @@ function toggleCard(el, evt){
 
 function staffCardHtml(s){
     let avatarHtml = `<i class="fa-solid fa-user"></i>`;
+    // Safe escape untuk nama yang ada tanda '
+    let safeName = s.name ? s.name.replace(/'/g, "\\'") : "";
+
     return `
     <div class="staff-card" onclick="toggleCard(this, event)">
         <div class="staff-left">
@@ -549,17 +552,17 @@ function staffCardHtml(s){
             <p><i class="fa fa-envelope"></i> ${s.email||'-'}</p>
             <div class="action-group">
                 ${canAssignSection(s.position)?`
-                <button class="icon-btn" style="background:var(--accent-purple)" onclick="assignSection('${s.id}','${s.name}')">
+                <button class="icon-btn" style="background:var(--accent-purple)" onclick="assignSection('${s.id}','${safeName}')">
                     <i class="fa fa-layer-group"></i>
                 </button>
                 `:''}
-                <button class="icon-btn" style="background:var(--accent-green)" onclick="assignUnit('${s.id}','${s.name}')">
+                <button class="icon-btn" style="background:var(--accent-green)" onclick="assignUnit('${s.id}','${safeName}')">
                     <i class="fa fa-sitemap"></i>
                 </button>
                 <button class="icon-btn edit-btn" onclick="editStaff('${s.id}')">
                     <i class="fa fa-pen"></i>
                 </button>
-                <button class="icon-btn delete-btn" onclick="deleteStaff('${s.id}','${s.name}')">
+                <button class="icon-btn delete-btn" onclick="deleteStaff('${s.id}','${safeName}')">
                     <i class="fa fa-trash"></i>
                 </button>
             </div>
@@ -572,7 +575,6 @@ function sortByHierarki(a,b){
     return ((hierarki[a.position]||99) - (hierarki[b.position]||99));
 }
 
-// RENDER BERASASKAN HUBUNG KAIT / RELATIONSHIP TREE
 function renderStaff(){
     let keyword = document.getElementById("searchStaff").value.toLowerCase();
 
@@ -594,7 +596,7 @@ function renderStaff(){
 
     let html = "";
 
-    // 1. KETUA JABATAN (TOP LEVEL PARENT)
+    // 1. KETUA JABATAN
     let kjStaff = staffData.find(s => s.position?.toUpperCase() === "KETUA JABATAN");
     let matchKj = kjStaff && (kjStaff.name.toLowerCase().includes(keyword) || kjStaff.position.toLowerCase().includes(keyword));
     
@@ -608,7 +610,7 @@ function renderStaff(){
         </div>`;
     }
 
-    // 2. SEKSYEN & UNIT (CHILD LEVEL RELATIONSHIPS)
+    // 2. SEKSYEN & UNIT
     sectionData.forEach(sec => {
         let secStaffIds = staffSectionAssignments.filter(a => a.section_id === sec.id).map(a => a.staff_id);
         let ksStaff = staffData.find(s => secStaffIds.includes(s.id) && s.position?.toUpperCase() === "KETUA SEKSYEN");
@@ -753,7 +755,7 @@ async function deleteStaff(id,name){
 
 async function assignUnit(id,name){
     selectedStaffId=id;
-    assignTitle.innerHTML= "Assign Unit : "+name;
+    document.getElementById("assignTitle").innerText = "Assign Unit : " + name;
     let res = await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${id}&select=unit_id`, {headers});
     let current = await res.json();
     let selected = current.map(x=>x.unit_id);
@@ -785,6 +787,7 @@ function closeUnitModal(){ unitModal.style.display="none"; }
 
 async function assignSection(id,name){
     selectedSectionStaff=id;
+    document.getElementById("assignSectionTitle").innerText = "Assign Section : " + name;
     let res = await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${id}&select=section_id`, {headers});
     let current = await res.json();
     let selected = current.map(x=>x.section_id);
