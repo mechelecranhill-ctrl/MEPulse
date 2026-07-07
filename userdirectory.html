@@ -881,78 +881,31 @@ async function removeActing(type, targetId, staffId){
     
     let url = "";
     if(type === 'section'){
-        url = `${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${staffId}&section_id=eq.${targetId}&is_acting=eq.true`;
+        // Pastikan targetId ditukar kepada Number jika ID seksyen anda adalah integer
+        url = `${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${staffId}&section_id=eq.${Number(targetId)}&is_acting=eq.true`;
     } else if(type === 'unit'){
-        url = `${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${staffId}&unit_id=eq.${targetId}&is_acting=eq.true`;
+        // Pastikan targetId ditukar kepada Number jika ID unit anda adalah integer
+        url = `${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${staffId}&unit_id=eq.${Number(targetId)}&is_acting=eq.true`;
     }
 
-    let res = await fetch(url, { method: "DELETE", headers });
-    if(res.ok){
-        await loadAssignments();
-        renderStaff();
-    } else {
-        alert("Gagal membuang pemangku.");
+    try {
+        let res = await fetch(url, { method: "DELETE", headers });
+        
+        if(res.ok){
+            await loadAssignments();
+            renderStaff();
+        } else {
+            // Jika Supabase pulangkan ralat, kita paparkan mesej ralat sebenar
+            let errorData = await res.json();
+            console.error("Supabase Error:", errorData);
+            alert(`Gagal membuang pemangku: ${errorData.message || res.statusText}`);
+        }
+    } catch (err) {
+        console.error("Network Error:", err);
+        alert("Ralat rangkaian/sistem gagal berhubung ke Supabase.");
     }
 }
 
-// LOGIK MODAL GABUNGAN (ASSIGN PENEMPATAN UTAMA)
-async function openAssignModal(id){
-    let staff = staffData.find(x => x.id === id);
-    if(!staff) return;
-    currentTargetStaff = staff;
-
-    document.getElementById("assignModalTitle").innerText = "Assign Penempatan : " + staff.name;
-    let html = "";
-    let isKS = staff.position?.toUpperCase() === "KETUA SEKSYEN";
-
-    if (isKS) {
-        let res = await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${id}&is_acting=eq.false&select=section_id`, {headers});
-        let current = await res.json();
-        let selectedSecs = current.map(x => x.section_id);
-
-        html += `<div class="modal-group-title">Pilih Seksyen (Ketua Seksyen)</div>`;
-        sectionData.forEach(s => {
-            html += `
-            <label class="modal-option-label">
-                <input type="checkbox" class="sectionCheck" value="${s.id}" ${selectedSecs.includes(s.id) ? "checked" : ""}>
-                ${s.section_name}
-            </label>`;
-        });
-    } else {
-        let resUnit = await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${id}&is_acting=eq.false&select=unit_id`, {headers});
-        let currentUnit = await resUnit.json();
-        let selectedUnits = currentUnit.map(x => x.unit_id);
-
-        let resSec = await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${id}&is_acting=eq.false&select=section_id`, {headers});
-        let currentSec = await resSec.json();
-        let selectedSecs = currentSec.map(x => x.section_id);
-
-        sectionData.forEach(sec => {
-            let units = unitData.filter(u => u.section_id === sec.id);
-
-            if (units.length > 0) {
-                html += `<div class="modal-group-title">${sec.section_name} (Pilih Unit)</div>`;
-                units.forEach(u => {
-                    html += `
-                    <label class="modal-option-label" style="padding-left: 24px;">
-                        <input type="checkbox" class="unitCheck" value="${u.id}" ${selectedUnits.includes(u.id) ? "checked" : ""}>
-                        <i class="fa fa-sitemap" style="color:var(--accent-green); font-size:12px; margin-right:4px;"></i> ${u.unit_name}
-                    </label>`;
-                });
-            } else {
-                html += `<div class="modal-group-title">${sec.section_name} (Tiada Unit)</div>`;
-                html += `
-                <label class="modal-option-label">
-                    <input type="checkbox" class="sectionCheck" value="${sec.id}" ${selectedSecs.includes(sec.id) ? "checked" : ""}>
-                    <i class="fa fa-building" style="color:var(--accent-purple); font-size:12px; margin-right:4px;"></i> Assign ke Seksyen Ini
-                </label>`;
-            }
-        });
-    }
-
-    document.getElementById("assignOptionsList").innerHTML = html;
-    document.getElementById("assignModal").style.display = "flex";
-}
 
 async function saveAssignment(){
     if(!currentTargetStaff) return;
