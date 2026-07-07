@@ -700,7 +700,11 @@ function renderStaff(){
         let actingKsAssignment = secAssignments.find(a => a.is_acting === true || a.is_acting === 'true');
         let actingKsStaff = actingKsAssignment ? staffData.find(x => x.id === actingKsAssignment.staff_id) : null;
 
-        let otherSecStaffIds = secAssignments.filter(a => (!a.is_acting || a.is_acting === false || a.is_acting === 'false') && a.staff_id !== ksStaff?.id).map(a => a.staff_id);
+        let otherSecStaffIds = secAssignments.filter(a => {
+            let isActing = a.is_acting === true || a.is_acting === 'true';
+            return !isActing && a.staff_id !== ksStaff?.id;
+        }).map(a => a.staff_id);
+
         let otherSecStaff = staffData.filter(s => 
             otherSecStaffIds.includes(s.id) && 
             s.position?.toUpperCase() !== "KETUA JABATAN" &&
@@ -905,6 +909,39 @@ async function removeActing(type, targetId, staffId, event){
     } catch (err) {
         alert("Ralat sistem: Gagal berhubung ke pangkalan data.");
     }
+}
+
+async function openAssignModal(staffId){
+    currentTargetStaff = staffData.find(x => x.id === staffId);
+    if(!currentTargetStaff) return;
+    
+    document.getElementById("assignModalTitle").innerText = `Assign Penempatan: ${currentTargetStaff.name}`;
+    
+    let assignedSecs = staffSectionAssignments.filter(a => a.staff_id === staffId && (!a.is_acting || a.is_acting==='false')).map(a => a.section_id);
+    let assignedUnits = staffUnitAssignments.filter(a => a.staff_id === staffId && (!a.is_acting || a.is_acting==='false')).map(a => a.unit_id);
+
+    let html = `<div class="modal-group-title">Seksyen</div>`;
+    sectionData.forEach(sec => {
+        let isChecked = assignedSecs.includes(sec.id) ? "checked" : "";
+        html += `
+        <label class="modal-option-label">
+            <input type="checkbox" class="sectionCheck" value="${sec.id}" ${isChecked}>
+            <span>${sec.section_name}</span>
+        </label>`;
+    });
+
+    html += `<div class="modal-group-title" style="margin-top:16px;">Unit</div>`;
+    unitData.forEach(u => {
+        let isChecked = assignedUnits.includes(u.id) ? "checked" : "";
+        html += `
+        <label class="modal-option-label">
+            <input type="checkbox" class="unitCheck" value="${u.id}" ${isChecked}>
+            <span>${u.unit_name} (${u.me_sections?.section_name || 'Tiada Seksyen'})</span>
+        </label>`;
+    });
+
+    document.getElementById("assignOptionsList").innerHTML = html;
+    document.getElementById("assignModal").style.display = "flex";
 }
 
 async function saveAssignment(){
