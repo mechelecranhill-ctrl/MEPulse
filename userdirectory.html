@@ -16,6 +16,7 @@
     --accent-green: #34c759;
     --accent-purple: #5856d6;
     --accent-red: #ff3b30;
+    --accent-orange: #ff9500;
     --radius-lg: 16px;
     --radius-md: 12px;
     --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.04);
@@ -236,7 +237,6 @@ body {
     overflow: hidden;
 }
 
-/* Diubahsuai untuk benarkan nama wrap ke baris baru tanpa '...' */
 .staff-info h4 {
     margin: 0 0 4px 0;
     font-size: 14px;
@@ -255,6 +255,17 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.badge-acting {
+    background: var(--accent-orange);
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 4px;
 }
 
 .expand-hint {
@@ -331,6 +342,7 @@ body {
 
 .edit-btn { background: var(--accent-blue); }
 .delete-btn { background: var(--accent-red); }
+.acting-btn { background: var(--accent-orange); }
 
 /* Floating Action Button */
 .fab {
@@ -517,6 +529,17 @@ body {
     </div>
 </div>
 
+<div id="actingModal" class="modal-overlay">
+    <div class="modal-content">
+        <h3>Lantik Pemangku Jawatan</h3>
+        <p id="actingTargetLabel" style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;"></p>
+        <div id="actingStaffList" style="max-height: 300px; overflow-y: auto;"></div>
+        <div class="modal-actions">
+            <button onclick="closeActingModal()">Batal</button>
+        </div>
+    </div>
+</div>
+
 <script>
 const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co'; 
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
@@ -544,6 +567,13 @@ let sectionData=[];
 let staffSectionAssignments=[];
 let staffUnitAssignments=[];
 let currentTargetStaff=null;
+
+// Simpanan data pemangkuan tempatan secara dinamik (Gunakan struktur data ini)
+let actingAssignments = {
+    kj: null,             // staff_id yang memangku Ketua Jabatan
+    sections: {},         // section_id -> staff_id yang memangku Ketua Seksyen
+    units: {}             // unit_id -> staff_id yang memangku Eksekutif Unit
+};
 
 async function loadUnits(){
     let res=await fetch(`${SB_URL}/rest/v1/units?select=id,unit_name,section_id,me_sections(section_name)`, {headers});
@@ -574,18 +604,19 @@ function toggleCard(el, evt){
     el.classList.toggle("expanded");
 }
 
-function staffCardHtml(s){
+function staffCardHtml(s, isActing = false, actingType = "", targetId = null){
     let avatarHtml = `<i class="fa-solid fa-user"></i>`;
     let safeName = s.name ? s.name.replace(/'/g, "\\'") : "";
     let isKJ = s.position?.toUpperCase() === "KETUA JABATAN";
 
     return `
-    <div class="staff-card" onclick="toggleCard(this, event)">
+    <div class="staff-card ${isActing ? 'acting-card' : ''}" onclick="toggleCard(this, event)">
         <div class="staff-left">
-            <div class="staff-avatar">${avatarHtml}</div>
+            <div class="staff-avatar" ${isActing ? 'style="background:rgba(255,149,0,0.1); color:var(--accent-orange);"' : ''}>${avatarHtml}</div>
             <div class="staff-info">
+                ${isActing ? `<span class="badge-acting"><i class="fa fa-gavel"></i> MEMANGKU</span>` : ''}
                 <h4>${s.name}</h4>
-                <p>${s.position}</p>
+                <p>${isActing ? (actingType === 'kj' ? 'PEMANGKU KETUA JABATAN' : actingType === 'ks' ? 'PEMANGKU KETUA SEKSYEN' : 'PEMANGKU EKSEKUTIF UNIT') : s.position}</p>
             </div>
             <div class="expand-hint">
                 <i class="fa fa-chevron-down"></i>
@@ -596,17 +627,23 @@ function staffCardHtml(s){
             <p><i class="fa fa-phone"></i> ${s.phone_no||'-'}</p>
             <p><i class="fa fa-envelope"></i> ${s.email||'-'}</p>
             <div class="action-group">
-                ${!isKJ ? `
-                <button class="icon-btn" style="background:var(--accent-blue)" onclick="openAssignModal('${s.id}')" title="Assign Penempatan">
-                    <i class="fa fa-sitemap"></i>
-                </button>
-                ` : ''}
-                <button class="icon-btn edit-btn" onclick="editStaff('${s.id}')">
-                    <i class="fa fa-pen"></i>
-                </button>
-                <button class="icon-btn delete-btn" onclick="deleteStaff('${s.id}','${safeName}')">
-                    <i class="fa fa-trash"></i>
-                </button>
+                ${isActing ? `
+                    <button class="icon-btn" style="background:var(--accent-red);" onclick="removeActing('${actingType}', '${targetId}')" title="Gugurkan Pemangku">
+                        <i class="fa fa-user-minus"></i>
+                    </button>
+                ` : `
+                    ${!isKJ ? `
+                    <button class="icon-btn" style="background:var(--accent-blue)" onclick="openAssignModal('${s.id}')" title="Assign Penempatan">
+                        <i class="fa fa-sitemap"></i>
+                    </button>
+                    ` : ''}
+                    <button class="icon-btn edit-btn" onclick="editStaff('${s.id}')">
+                        <i class="fa fa-pen"></i>
+                    </button>
+                    <button class="icon-btn delete-btn" onclick="deleteStaff('${s.id}','${safeName}')">
+                        <i class="fa fa-trash"></i>
+                    </button>
+                `}
             </div>
         </div>
     </div>
@@ -620,9 +657,9 @@ function sortByHierarki(a,b){
 function renderStaff(){
     let keyword = document.getElementById("searchStaff").value.toLowerCase();
 
-    function emptyCardHtml(position) {
+    function emptyCardHtml(position, type, targetId = null) {
         return `
-        <div class="staff-card" style="border: 1px dashed #d1d1d6; background: #fafafa; opacity: 0.6; cursor: default;">
+        <div class="staff-card" style="border: 1px dashed #d1d1d6; background: #fafafa; opacity: 0.8; cursor: default;">
             <div class="staff-left">
                 <div class="staff-avatar" style="background: #e5e5ea; color: #aeaeb2;">
                     <i class="fa-solid fa-user-slash"></i>
@@ -632,13 +669,18 @@ function renderStaff(){
                     <p style="color: #8e8e93; font-weight: 600;">${position}</p>
                 </div>
             </div>
+            <div class="action-group" style="margin-top: 10px;">
+                <button class="icon-btn acting-btn" onclick="openActingModal('${type}', '${targetId}', '${position}')" title="Lantik Pemangku Dari Senarai Staff" style="width: auto; padding: 0 10px; gap: 4px;">
+                    <i class="fa fa-user-plus"></i> Pemangku
+                </button>
+            </div>
         </div>
         `;
     }
 
     let html = "";
 
-    // 1. KETUA JABATAN (Ikon ditukar dari Crown ke User-Tie yang lebih korporat)
+    // 1. KETUA JABATAN
     let kjStaff = staffData.find(s => s.position?.toUpperCase() === "KETUA JABATAN");
     let matchKj = kjStaff && (kjStaff.name.toLowerCase().includes(keyword) || kjStaff.position.toLowerCase().includes(keyword));
     
@@ -646,10 +688,16 @@ function renderStaff(){
         html += `
         <div class="tree-group" style="border-left: 4px solid var(--accent-blue);">
             <div class="section-title" style="margin-top:0;"><i class="fa fa-user-tie" style="color:#004b93;"></i> Ketua Jabatan</div>
-            <div class="tree-wrapper">
-                ${kjStaff ? staffCardHtml(kjStaff) : emptyCardHtml("KETUA JABATAN")}
-            </div>
-        </div>`;
+            <div class="tree-wrapper">`;
+        if (kjStaff) {
+            html += staffCardHtml(kjStaff);
+        } else if (actingAssignments.kj) {
+            let actingUser = staffData.find(x => x.id === actingAssignments.kj);
+            html += actingUser ? staffCardHtml(actingUser, true, 'kj', 'kj') : emptyCardHtml("KETUA JABATAN", "kj", "kj");
+        } else {
+            html += emptyCardHtml("KETUA JABATAN", "kj", "kj");
+        }
+        html += `</div></div>`;
     }
 
     // 2. SEKSYEN & UNIT
@@ -686,9 +734,16 @@ function renderStaff(){
                 unitBlocks += `
                 <div class="unit-container">
                     <div class="unit-title"><i class="fa fa-sitemap"></i> ${u.unit_name}</div>
-                    <div class="tree-wrapper">
-                        ${eksekutifUnit ? staffCardHtml(eksekutifUnit) : emptyCardHtml("EKSEKUTIF UNIT")}
-                        ${otherUnitStaff.map(staffCardHtml).join("")}
+                    <div class="tree-wrapper">`;
+                if (eksekutifUnit) {
+                    unitBlocks += staffCardHtml(eksekutifUnit);
+                } else if (actingAssignments.units[u.id]) {
+                    let actingUser = staffData.find(x => x.id === actingAssignments.units[u.id]);
+                    unitBlocks += actingUser ? staffCardHtml(actingUser, true, 'unit', u.id) : emptyCardHtml("EKSEKUTIF UNIT", "unit", u.id);
+                } else {
+                    unitBlocks += emptyCardHtml("EKSEKUTIF UNIT", "unit", u.id);
+                }
+                unitBlocks += otherUnitStaff.map(staffCardHtml).join("") + `
                     </div>
                 </div>`;
             }
@@ -702,11 +757,17 @@ function renderStaff(){
                 <div class="section-title"><i class="fa fa-building"></i> ${sec.section_name}</div>
                 
                 <div class="section-container">
-                    <div class="tree-wrapper">
-                        ${ksStaff ? staffCardHtml(ksStaff) : ''}
-                        ${otherSecStaff.map(staffCardHtml).join("")}
+                    <div class="tree-wrapper">`;
+            if (ksStaff) {
+                html += staffCardHtml(ksStaff);
+            } else if (actingAssignments.sections[sec.id]) {
+                let actingUser = staffData.find(x => x.id === actingAssignments.sections[sec.id]);
+                html += actingUser ? staffCardHtml(actingUser, true, 'section', sec.id) : emptyCardHtml("KETUA SEKSYEN", "section", sec.id);
+            } else {
+                html += emptyCardHtml("KETUA SEKSYEN", "section", sec.id);
+            }
+            html += otherSecStaff.map(staffCardHtml).join("") + `
                     </div>
-                    
                     ${unitBlocks}
                 </div>
             </div>`;
@@ -746,7 +807,63 @@ window.onload=async()=>{
     await loadStaff();
 };
 
-// LOGIK MODAL PINTAR GABUNGAN
+// LOGIK PEMANGKUAN (ACTING CONTROLS)
+let currentActingType = null;
+let currentActingTargetId = null;
+
+function openActingModal(type, targetId, positionName){
+    currentActingType = type;
+    currentActingTargetId = targetId;
+    document.getElementById("actingTargetLabel").innerText = `Memilih pemangku sedia ada untuk jawatan: ${positionName}`;
+    
+    let html = "";
+    if(staffData.length === 0){
+        html = "<p style='text-align:center;color:var(--text-muted);font-size:13px;'>Tiada staff sedia ada dalam sistem.</p>";
+    } else {
+        staffData.forEach(s => {
+            html += `
+            <div class="modal-option-label" onclick="assignActingStaff('${s.id}')">
+                <i class="fa fa-user" style="color:var(--accent-blue);margin-right:6px;"></i>
+                <div style="flex-grow:1;">
+                    <div style="font-weight:600; font-size:13px;">${s.name}</div>
+                    <div style="font-size:11px; color:var(--text-muted);">${s.position}</div>
+                </div>
+                <i class="fa fa-chevron-right" style="color:#c7c7cc;font-size:12px;"></i>
+            </div>`;
+        });
+    }
+    document.getElementById("actingStaffList").innerHTML = html;
+    document.getElementById("actingModal").style.display = "flex";
+}
+
+function closeActingModal(){
+    document.getElementById("actingModal").style.display = "none";
+    currentActingType = null;
+    currentActingTargetId = null;
+}
+
+function assignActingStaff(staffId){
+    if(currentActingType === 'kj'){
+        actingAssignments.kj = staffId;
+    } else if(currentActingType === 'section'){
+        actingAssignments.sections[currentActingTargetId] = staffId;
+    } else if(currentActingType === 'unit'){
+        actingAssignments.units[currentActingTargetId] = staffId;
+    }
+    closeActingModal();
+    renderStaff();
+}
+
+function removeActing(type, targetId){
+    if(confirm("Adakah anda ingin menggugurkan status pemangku bagi jawatan ini?")){
+        if(type === 'kj') actingAssignments.kj = null;
+        else if(type === 'section') delete actingAssignments.sections[targetId];
+        else if(type === 'unit') delete actingAssignments.units[targetId];
+        renderStaff();
+    }
+}
+
+// LOGIK MODAL PINTAR GABUNGAN (ASSIGN PENEMPATAN)
 async function openAssignModal(id){
     let staff = staffData.find(x => x.id === id);
     if(!staff) return;
@@ -832,7 +949,7 @@ function closeAssignModal(){
     currentTargetStaff = null;
 }
 
-// MODAL CONTROLS (STAFF CRUD)
+// MODAL CONTROLS (STAFF CRUD + LOGIK PINDAAN NAMA/EMEL BARU)
 let editingStaff=null;
 function addStaff(existing=null){
     editingStaff=existing;
@@ -857,17 +974,21 @@ async function saveStaff(){
     if(!body.name || !body.email){ alert("Nama dan Email wajib"); return; }
 
     let res;
-    if(!editingStaff){
+    // PERATURAN BARU: Jika mengedit staff tetapi menukar NAMA atau EMEL, anggap sebagai STAFF BARU
+    let treatAsNew = !editingStaff || (editingStaff.name !== body.name || editingStaff.email !== body.email);
+
+    if(treatAsNew){
+        // Daftarkan sebagai user baharu di Auth
         let auth = await fetch(`${SB_URL}/auth/v1/signup`, {
             method:"POST", headers, body:JSON.stringify({ email:body.email, password:"StaffPassword123!" })
         });
-        if(!auth.ok){ alert("Gagal create Auth"); return; }
-    }
-
-    if(editingStaff){
-        res = await fetch(`${SB_URL}/rest/v1/staff?id=eq.${editingStaff.id}`, { method:"PATCH", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(body) });
-    } else {
+        if(!auth.ok){ alert("Gagal create Auth untuk rekod baharu."); return; }
+        
+        // Simpan sebagai data entri baharu
         res = await fetch(`${SB_URL}/rest/v1/staff`, { method:"POST", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(body) });
+    } else {
+        // Jika semua data utama sama, lakukan proses kemaskini biasa (PATCH)
+        res = await fetch(`${SB_URL}/rest/v1/staff?id=eq.${editingStaff.id}`, { method:"PATCH", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(body) });
     }
 
     if(!res.ok){ alert("Gagal simpan staff"); return; }
@@ -876,8 +997,14 @@ async function saveStaff(){
 }
 
 async function deleteStaff(id,name){
-    if(!confirm(`PADAM ${name}?`)) return;
+    if(!confirm(`PADAM / RESIGN ${name}? Jawatan ini akan dikosongkan.`)) return;
     await fetch(`${SB_URL}/rest/v1/staff?id=eq.${id}`, { method:"DELETE", headers });
+    
+    // Auto reset jika staff yang dipadam itu sedang memangku mana-mana jawatan
+    if(actingAssignments.kj === id) actingAssignments.kj = null;
+    for (let key in actingAssignments.sections) { if(actingAssignments.sections[key] === id) delete actingAssignments.sections[key]; }
+    for (let key in actingAssignments.units) { if(actingAssignments.units[key] === id) delete actingAssignments.units[key]; }
+
     loadStaff();
 }
 </script>
