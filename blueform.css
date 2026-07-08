@@ -89,134 +89,79 @@
         margin: 0 !important;
         padding: 0 !important;
         background: white !important;
-        -webkit-print-color-adjust: exact; /* Pastikan warna/border double kekal */
+        -webkit-print-color-adjust: exact;
     }
     
     @page { 
-        size: A4;
+        size: A4; 
         margin: 0;
     }
 
-    body * {
-        visibility: hidden;
-    }
-
-    /* Buang terus elemen luar supaya tidak ambil ruang halimunan */
-    body > *:not(#bulkPreviewPage) {
-        display: none !important;
-    }
-
-    #bulkPreviewPage, #bulkPreviewPage * {
-        visibility: visible;
-    }
+    body * { visibility: hidden; }
+    body > *:not(#bulkPreviewPage) { display: none !important; }
+    #bulkPreviewPage, #bulkPreviewPage * { visibility: visible; }
 
     #bulkPreviewPage {
         position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
+        top: 0 !important; left: 0 !important;
         background: white !important;
         padding: 0 !important;
         overflow: visible !important;
     }
+    #bulkPreviewPage .bulk-toolbar { display: none !important; }
+    #bulkPagesContainer { display: block !important; padding: 0 !important; margin: 0 !important; }
 
-    #bulkPreviewPage .bulk-toolbar {
-        display: none !important;
-    }
-
-    #bulkPagesContainer {
-        display: block !important;
-        gap: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
-    }
-
-    /* FIX UTAMA: Paksa tinggi kontainer kurang sedikit (295mm-296mm) & matikan min-height */
+    /* FIX UTAMA: Pendekkan tinggi fizikal kontainer semasa print */
     #bulkPagesContainer .a4-container {
         page-break-after: always !important;
         page-break-inside: avoid !important;
         box-shadow: none !important;
         margin: 0 auto !important;
-        height: 295mm !important; /* Buffer selamat untuk elak page ke-2 kosong */
-        min-height: 0 !important;  /* Matikan gangguan 297mm */
+        
+        /* Kurangkan tinggi kepada 288mm untuk beri margin selamat daripada ditarik ke page 2 */
+        height: 288mm !important; 
+        min-height: 0 !important;
+        
+        /* Kurangkan sedikit padding bawah kontainer */
+        padding: 1.2cm 1.8cm 1.2cm 1.8cm !important;
         overflow: hidden !important;
-        display: block !important; /* Tukar dari flex kepada block untuk elak auto-stretch */
+        display: block !important;
     }
 
     #bulkPagesContainer .a4-container:last-child {
         page-break-after: auto !important;
     }
 
+    /* Melaraskan kedudukan double border */
     .a4-container::after {
         content: "";
         position: absolute;
-        top: 1cm; 
-        left: 1cm; 
-        right: 1cm; 
-        bottom: 1cm;
+        top: 0.8cm; left: 0.8cm; right: 0.8cm; bottom: 0.8cm;
         border: 4px double #000 !important;
     }
 
-    /* FIX TANDATANGAN: Kekalkan kedudukan absolute sewaktu print supaya tak lari ke page 2 */
+    /* Kunci tandatangan rapat ke bawah border */
     .bf-signature-grid {
         position: absolute !important;
-        bottom: 2.5cm !important; 
-        left: 2cm !important;
-        right: 2cm !important;
+        bottom: 1.8cm !important; /* Kekalkan kedudukan selamat di atas footer note */
+        left: 1.8cm !important;
+        right: 1.8cm !important;
         display: grid !important;
         grid-template-columns: 1fr 1fr !important;
-        row-gap: 40px !important; /* Kurangkan sikit gap jika kandungan di atas panjang */
+        row-gap: 20px !important; 
     }
-}
+    
+    .bf-signature-grid > div {
+        min-height: 60px !important; /* Optimumkan saiz ketinggian kotak tandatangan */
+    }
 
-/* CSS Utama untuk Skrin / Preview */
-.bf-signature-grid {
-    position: absolute;
-    bottom: 3cm; 
-    left: 2cm;
-    right: 2cm;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    margin-top: 20px;
-    column-gap: 25px;
-    row-gap: 60px; /* Kurangkan sedikit kedalaman baseline */
-    font-size: 10px;
+    /* FIX NOTA KAKI: Tolak teks masuk ke dalam kawasan selamat kertas */
+    .bf-footer-note {
+        position: absolute !important;
+        bottom: 1.1cm !important; /* Dinaikkan dari 0.4cm/0.6cm supaya berada di dalam double border */
+        left: 1.8cm !important;
+        font-size: 8.5px !important;
+    }
+    
+    hr { margin: 4px 0 !important; }
 }
-
-.bf-signature-grid strong {
-    font-size: 10px;
-    font-weight: normal;
-}
-
-.bf-signature-grid div {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-}
-
-.bf-signature-grid small {
-    text-align: left;
-    display: block;
-    font-size: 10px;
-    font-weight: bold;
-}
-
-.bf-sign-line {
-    border-bottom: 1px dotted #000;     
-    width: 80%;   
-    margin-top: 4px;
-}
-
-.bf-signature-grid > div {
-    min-height: 110px; /* Kurangkan dari 130px supaya tidak makan ruang kertas bawah */
-}
-
-#bf_content {
-    flex: 1;
-    min-height: 0;
-    display: block; /* Tukar flex kepada block untuk kurangkan aktiviti pushing baris */
-}
-
-#bf_content .bf-row {
-    margin-bottom: 3px; /* Kecilkan margin bottom baris untuk penjarakan selamat */
-}
-
