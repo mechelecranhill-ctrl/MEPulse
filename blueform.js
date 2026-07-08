@@ -766,3 +766,66 @@ function closeBulkPreview(){
     document.getElementById('bulkPreviewPage').style.display = 'none';
     document.getElementById('bulkPagesContainer').innerHTML = '';
 }
+
+/* ------------------------------------------------------------
+   GROUPING HELPERS (untuk approval pages: app-exec.html,
+   app-sect.html, app-dept.html, dll.)
+
+   Work order yang berkongsi district + sequence_no yang sama
+   patut digabung jadi SATU blueform (openBlueformGroup), bukan
+   dibuka berasingan. Helper ni sentralkan logic tu supaya setiap
+   page approval tak perlu tulis semula.
+   ------------------------------------------------------------ */
+
+// Bina map { "DISTRICT||SEQ": [wo1, wo2, ...] } daripada senarai work order
+function buildSequenceGroups(workOrders){
+    const seqGroups = {};
+    (workOrders || []).forEach(w => {
+        const seq = (w.sequence_no || '').trim();
+        if(seq !== ''){
+            const district = (w.district || '').trim().toUpperCase();
+            const groupKey = district + '||' + seq;
+            if(!seqGroups[groupKey]) seqGroups[groupKey] = [];
+            seqGroups[groupKey].push(w);
+        }
+    });
+    return seqGroups;
+}
+
+function getBlueformGroupKey(w){
+    const seq = (w.sequence_no || '').trim();
+    const district = (w.district || '').trim().toUpperCase();
+    return district + '||' + seq;
+}
+
+// Jana HTML butang blueform untuk SATU work order, ambil kira grouping.
+// - Kalau ada sequence_no & ini row pertama dalam group -> butang gabung (openBlueformGroup)
+// - Kalau ada sequence_no tapi bukan row pertama -> label "rujuk row pertama"
+// - Kalau tiada sequence_no (standalone) -> butang tunggal (openBlueform)
+//
+// seqGroups         : hasil buildSequenceGroups(workOrders)
+// renderedSeqsSet   : Set kosong yang dikongsi merentasi loop render (untuk track group mana dah papar)
+// opts.btnClass      : override tailwind/class butang (optional)
+// opts.groupLabel     : function(count) -> teks butang group (optional)
+// opts.singleLabel    : teks butang standalone (optional)
+function renderBlueformButtonHtml(item, seqGroups, renderedSeqsSet, opts = {}){
+    const btnClass = opts.btnClass ||
+        'text-white px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer bg-blue-600 hover:bg-blue-700 mr-2';
+    const groupLabel = opts.groupLabel || (count => `<i class="fa-solid fa-layer-group mr-1"></i> Lihat Blueform (${count})`);
+    const singleLabel = opts.singleLabel || `<i class="fa-solid fa-file-lines mr-1"></i> Lihat Blueform`;
+
+    const seq = (item.sequence_no || '').trim();
+
+    if(seq !== ''){
+        const groupKey = getBlueformGroupKey(item);
+        if(!renderedSeqsSet.has(groupKey)){
+            renderedSeqsSet.add(groupKey);
+            const group = seqGroups[groupKey] || [item];
+            const allIdsStr = group.map(g => g.id).join(',');
+            return `<button onclick="openBlueformGroup('${allIdsStr}')" class="${btnClass}">${groupLabel(group.length)}</button>`;
+        }
+        return `<span class="text-xs text-gray-400 italic mr-2">Rujuk row pertama sequence ${seq}</span>`;
+    }
+
+    return `<button onclick="openBlueform(${item.id})" class="${btnClass}">${singleLabel}</button>`;
+}
