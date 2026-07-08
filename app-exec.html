@@ -53,57 +53,86 @@
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
         async function fetchDashboard() {
-            try {
-                const { data: workOrders, error } = await supabaseClient
-                    .from('work_orders')
-                    .select(`
-                        work_id,
-                        status,
-                        contract (contract_name)
-                    `)
-                    .eq('status', 'BLUEFORM'); // Hanya tapis data berkaitan sahaja
-
-                if (error) throw error;
-
-                const tbody = document.getElementById('table-exec');
-                tbody.innerHTML = '';
-
-                if (workOrders.length === 0) {
-                    showEmptyRow('table-exec', 'Tiada kontrak berstatus BLUEFORM.');
-                    return;
-                }
-
-                workOrders.forEach(item => {
-                    let contractName = 'Tiada Maklumat';
-                    if (item.contract) {
-                        contractName = Array.isArray(item.contract) ? item.contract[0]?.contract_name : item.contract.contract_name;
-                    }
-
-                    const row = `
-                        <tr class="hover:bg-gray-50 transition-colors">
-                            <td class="px-6 py-4 whitespace-nowrap font-mono text-sm text-gray-900">${item.work_id}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${contractName || 'Tiada Nama'}</td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">
-                                    ${item.status}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <button onclick="approveContract('${item.work_id}', 'APP-EXEC')" 
-                                        class="text-white px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer bg-amber-600 hover:bg-amber-700">
-                                    <i class="fa-solid fa-check mr-1"></i> Approve (Exec)
-                                </button>
-                            </td>
-                        </tr>
-                    `;
-                    tbody.insertAdjacentHTML('beforeend', row);
-                });
-
-            } catch (err) {
-                console.error("Ralat memuat data:", err.message);
-                alert("Gagal memuatkan data: " + err.message);
-            }
+    try {
+        // 1. Dapatkan maklumat user yang sedang log masuk
+        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+        
+        if (userError || !user) {
+            showEmptyRow('table-exec', 'Sila log masuk terlebih dahulu.');
+            return;
         }
+
+        // 2. Dapatkan unit_id staff ini daripada table staff_unit_assignment
+        // (Nota: Sila pastikan nama kolum 'staff_id' atau 'user_id' sepadan dengan DB anda)
+        const { data: assignment, error: assignError } = await supabaseClient
+            .from('staff_unit_assignment')
+            .select('unit_id')
+            .eq('staff_id', user.id) // Tukar 'staff_id' mengikut nama kolum id staff anda
+            .maybeSingle();
+
+        if (assignError) throw assignError;
+        
+        if (!assignment || !assignment.unit_id) {
+            showEmptyRow('table-exec', 'Ralat: Akaun anda tidak ditugaskan kepada mana-mana unit.');
+            return;
+        }
+
+        const userUnitId = assignment.unit_id;
+
+        // 3. Tarik data work_orders dan tapis menggunakan unit_id staff tadi
+        const { data: workOrders, error: workError } = await supabaseClient
+            .from('work_orders')
+            .select(`
+                work_id,
+                status,
+                contract!inner (contract_name, unit_id)
+            `)
+            .eq('status', 'BLUEFORM')
+            .eq('contract.unit_id', userUnitId); // 👈 Tapis secara automatik mengikut unit staff!
+
+        if (workError) throw workError;
+
+        // 4. Paparkan data ke dalam jadual HTML
+        const tbody = document.getElementById('table-exec');
+        tbody.innerHTML = '';
+
+        if (workOrders.length === 0) {
+            showEmptyRow('table-exec', 'Tiada kontrak berstatus BLUEFORM untuk unit anda.');
+            return;
+        }
+
+        workOrders.forEach(item => {
+            let contractName = 'Tiada Maklumat';
+            if (item.contract) {
+                contractName = Array.isArray(item.contract) ? item.contract[0]?.contract_name : item.contract.contract_name;
+            }
+
+            const row = `
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4 whitespace-nowrap font-mono text-sm text-gray-900">${item.work_id}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${contractName || 'Tiada Nama'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">
+                            ${item.status}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="approveContract('${item.work_id}', 'APP-EXEC')" 
+                                class="text-white px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer bg-amber-600 hover:bg-amber-700">
+                            <i class="fa-solid fa-check mr-1"></i> Approve (Exec)
+                        </button>
+                    </td>
+                </tr>
+            `;
+            tbody.insertAdjacentHTML('beforeend', row);
+        });
+
+    } catch (err) {
+        console.error("Ralat memuat data:", err.message);
+        alert("Gagal memuatkan data: " + err.message);
+    }
+}
+
 
         function showEmptyRow(tableId, message) {
             document.getElementById(tableId).innerHTML = `
