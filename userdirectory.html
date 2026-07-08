@@ -600,10 +600,30 @@ function toggleCard(el, evt){
 function staffCardHtml(s, isActing = false, actingType = "", targetId = null){
     let avatarHtml = `<i class="fa-solid fa-user"></i>`;
     let safeName = s.name ? s.name.replace(/'/g, "\\'") : "";
-    let isKJ = s.position?.toUpperCase() === "KETUA JABATAN";
+    let positionUpper = s.position ? s.position.toUpperCase() : "";
+    let isKJ = positionUpper === "KETUA JABATAN";
+
+    // Tetapkan warna bar kiri secara dinamik berdasarkan jawatan/hierarki
+    let leftLineColor = "rgba(0,0,0,0.04)"; // Warna default jika tiada padanan
+    
+    if (isActing) {
+        leftLineColor = "var(--accent-orange)"; // Warna oren jika sedang memangku
+    } else if (isKJ) {
+        leftLineColor = "var(--accent-blue)"; // Biru untuk Ketua Jabatan
+    } else if (positionUpper === "KETUA SEKSYEN") {
+        leftLineColor = "var(--accent-purple)"; // Ungu untuk Ketua Seksyen
+    } else if (positionUpper.includes("EKSEKUTIF KANAN")) {
+        leftLineColor = "var(--accent-green)"; // Hijau untuk Eksekutif Kanan
+    } else if (positionUpper.includes("EKSEKUTIF")) {
+        leftLineColor = "#2bc4d9"; // Sian/Biru Muda untuk Eksekutif
+    } else if (positionUpper.includes("JURUTEKNIK") || positionUpper.includes("PENYELIA")) {
+        leftLineColor = "var(--accent-orange)"; // Oren untuk Juruteknik/Penyelia
+    } else if (positionUpper.includes("PEMBANTU") || positionUpper.includes("KERANI")) {
+        leftLineColor = "var(--text-muted)"; // Kelabu untuk Pembantu/Kerani
+    }
 
     return `
-    <div class="staff-card" onclick="toggleCard(this, event)">
+    <div class="staff-card" onclick="toggleCard(this, event)" style="border-left: 4px solid ${leftLineColor};">
         <div class="staff-left">
             <div class="staff-avatar" ${isActing ? 'style="background:rgba(255,149,0,0.1); color:var(--accent-orange);"' : ''}>${avatarHtml}</div>
             <div class="staff-info">
@@ -642,6 +662,7 @@ function staffCardHtml(s, isActing = false, actingType = "", targetId = null){
     </div>
     `;
 }
+
 
 function sortByHierarki(a,b){
     return ((hierarki[a.position]||99) - (hierarki[b.position]||99));
