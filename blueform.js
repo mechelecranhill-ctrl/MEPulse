@@ -19,8 +19,6 @@
       sebab function² ni terus manipulate elemen tu.
    ============================================================ */
 
-const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
-
 function generatePresetFromContractCode(contractCode) {
     if (!contractCode) return 'RSAJ/M&E/IP/11-';
     
