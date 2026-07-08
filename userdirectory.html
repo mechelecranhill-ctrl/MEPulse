@@ -1051,13 +1051,25 @@ function toggleUnitSelection(checkbox, unitId) {
 async function saveAssignment(){
     if(!currentTargetStaff) return;
     let id = currentTargetStaff.id;
+    let isKetuaSeksyen = currentTargetStaff.position?.toUpperCase() === "KETUA SEKSYEN";
 
     // Padam rekod lama penempatan biasa (bukan pemangku)
     await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${id}&is_acting=eq.false`, { method:"DELETE", headers });
     await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${id}&is_acting=eq.false`, { method:"DELETE", headers });
 
-    // Sediakan data untuk dihantar berdasarkan set pilihan terkini
-    let checkedSections = Array.from(selectedSections).map(secId => ({ staff_id: id, section_id: secId, is_acting: false }));
+    // --- LOGIK PENAPISAN BAHARU ---
+    let finalSections = Array.from(selectedSections);
+
+    // Jika BUKAN Ketua Seksyen, tapis keluar seksyen yang mempunyai unit di bawahnya
+    if (!isKetuaSeksyen) {
+        finalSections = finalSections.filter(secId => {
+            let hasUnits = unitData.some(u => u.section_id === secId);
+            return !hasUnits; // Hanya simpan seksyen yang mempunya 0 unit (terus ke seksyen)
+        });
+    }
+
+    // Sediakan data untuk dihantar berdasarkan set pilihan yang telah ditapis
+    let checkedSections = finalSections.map(secId => ({ staff_id: id, section_id: secId, is_acting: false }));
     if(checkedSections.length){
         await fetch(`${SB_URL}/rest/v1/staff_section_assignment`, { method:"POST", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(checkedSections) });
     }
