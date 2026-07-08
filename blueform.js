@@ -17,6 +17,9 @@
    5. Markup #bulkPreviewPage / #bulkPagesContainer / #bulkPreviewCount
       kena ada dalam HTML setiap page (copy dari contract-usage.html)
       sebab function² ni terus manipulate elemen tu.
+   6. Kalau page ada checkbox "select all" (cth: #checkAllBF) untuk
+      bulk blueform, panggil toggleAllBF(this) pada onchange -- ia
+      akan check/uncheck semua .bf-checkbox sekaligus.
    ============================================================ */
 
 const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
@@ -750,6 +753,12 @@ async function bulkDownloadBlueform() {
         alert("Ralat memuatkan bulk blueform.");
         document.getElementById('bulkPreviewCount').innerText = 'Ralat memuatkan data.';
     }
+}
+
+// Check/uncheck semua .bf-checkbox sekaligus. Panggil ni dari
+// onchange checkbox "select all" (cth: <input onchange="toggleAllBF(this)">)
+function toggleAllBF(el){
+    document.querySelectorAll('.bf-checkbox').forEach(cb => { cb.checked = el.checked; });
 }
 
 async function processInBatches(items, batchSize, fn){
