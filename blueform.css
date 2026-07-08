@@ -84,31 +84,24 @@
 .bf-baki-table .bf-row{ margin-bottom:2px !important; }
 
 @media print {
-
-     html, body {
-    overflow: hidden !important;
-}
+    html, body {
+        overflow: hidden !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white !important;
+        -webkit-print-color-adjust: exact; /* Pastikan warna/border double kekal */
+    }
+    
     @page { 
         size: A4;
         margin: 0;
-    }
-
-    html, body {
-        margin: 0;
-        padding: 0;
-        background: white;
     }
 
     body * {
         visibility: hidden;
     }
 
-    /* PENTING: visibility:hidden je TAK cukup -- elemen lain (sidebar,
-       dashboard, table kerja yang panjang) masih ambil ruang/tinggi
-       dalam layout walaupun tak nampak. Ini yang punca page ke-2 kosong
-       (baki tinggi content asal yang invisible). Buang terus daripada
-       layout guna display:none supaya hanya #bulkPreviewPage yang
-       tentukan tinggi dokumen semasa print. */
+    /* Buang terus elemen luar supaya tidak ambil ruang halimunan */
     body > *:not(#bulkPreviewPage) {
         display: none !important;
     }
@@ -137,113 +130,93 @@
         margin: 0 !important;
     }
 
+    /* FIX UTAMA: Paksa tinggi kontainer kurang sedikit (295mm-296mm) & matikan min-height */
     #bulkPagesContainer .a4-container {
         page-break-after: always !important;
+        page-break-inside: avoid !important;
         box-shadow: none !important;
         margin: 0 auto !important;
+        height: 295mm !important; /* Buffer selamat untuk elak page ke-2 kosong */
+        min-height: 0 !important;  /* Matikan gangguan 297mm */
+        overflow: hidden !important;
+        display: block !important; /* Tukar dari flex kepada block untuk elak auto-stretch */
     }
 
-    /* PENTING: buildBlueformHTML() letak page-break-after:always sebagai
-       inline style pada SETIAP .a4-container (termasuk yang terakhir).
-       Kalau tak di-override, Chrome akan buka 1 page kosong tambahan
-       lepas blueform terakhir (contohnya bila cetak 1 blueform sahaja
-       -> jadi 2 page, page ke-2 kosong). Rule ni matikan break lepas
-       container terakhir sahaja; break antara blueform dalam bulk
-       print tetap berfungsi macam biasa. */
     #bulkPagesContainer .a4-container:last-child {
         page-break-after: auto !important;
     }
 
-    /* PENTING: height:297mm (inline JS) sama tepat dengan saiz @page A4.
-       Sesetengah browser round up sikit semasa print -> dikira overflow
-       walau 1px lebih -> trigger 1 page tambahan (kosong). Bagi sedikit
-       buffer supaya container confirm muat dalam satu page. */
-    #bulkPagesContainer .a4-container {
-        height: 296mm !important;
-        min-height: 0 !important;
-        overflow: hidden !important;
-    }
-    /* ── END BULK PREVIEW PRINT ── */
-
-    .a4-container {
-        width: 210mm !important;
-        min-height: 297mm !important;
-        margin: 0 auto !important;
-        padding: 1.5cm 2cm 1.6cm 2cm !important;
-
-        display: flex !important;
-        flex-direction: column;
-
-        box-shadow: none !important;
-    }
-
     .a4-container::after {
-    content: "";
-    position: absolute;
-    top: 1cm; 
-    left: 1cm; 
-    right: 1cm; 
-    bottom: 1cm;
-    border: 4px double #000 !important;
-}
-    }
-
-    .bf-signature-grid {
-        display: grid !important;
-        grid-template-columns: 1fr 1fr;
-    }
-}
-
-/* ------------------------------------------------------------
-   PENTING: .bf-signature-grid di bawah ini SENGAJA dibuat
-   position:absolute (bukan grid) untuk paparan skrin/preview,
-   supaya blok tandatangan TIDAK bergerak/reflow ikut panjang
-   kandungan bf_content di atasnya. Ia hanya bertukar jadi
-   'display:grid' semasa print (rujuk @media print di atas).
-   JANGAN tukar rule ini kepada grid di luar media print.
-   ------------------------------------------------------------ */
-.bf-signature-grid{
+        content: "";
         position: absolute;
+        top: 1cm; 
+        left: 1cm; 
+        right: 1cm; 
+        bottom: 1cm;
+        border: 4px double #000 !important;
+    }
+
+    /* FIX TANDATANGAN: Kekalkan kedudukan absolute sewaktu print supaya tak lari ke page 2 */
+    .bf-signature-grid {
+        position: absolute !important;
+        bottom: 2.5cm !important; 
+        left: 2cm !important;
+        right: 2cm !important;
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        row-gap: 40px !important; /* Kurangkan sikit gap jika kandungan di atas panjang */
+    }
+}
+
+/* CSS Utama untuk Skrin / Preview */
+.bf-signature-grid {
+    position: absolute;
     bottom: 3cm; 
     left: 2cm;
     right: 2cm;
-    display:grid;
-    grid-template-columns:1fr 1fr;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     margin-top: 20px;
-    column-gap:25px;
-    row-gap:70px;
-    font-size:10px;
+    column-gap: 25px;
+    row-gap: 60px; /* Kurangkan sedikit kedalaman baseline */
+    font-size: 10px;
 }
-.bf-signature-grid strong{
-    font-size:10px;
-    font-weight:normal;
+
+.bf-signature-grid strong {
+    font-size: 10px;
+    font-weight: normal;
 }
-.bf-signature-grid div{
-display:flex;
-flex-direction:column;
-justify-content:flex-end;
+
+.bf-signature-grid div {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
 }
-.bf-signature-grid small{
-    text-align:left;
-    display:block;
-    font-size:10px;
-    font-weight:bold;
+
+.bf-signature-grid small {
+    text-align: left;
+    display: block;
+    font-size: 10px;
+    font-weight: bold;
 }
-.bf-sign-line{
-    border-bottom:1px dotted #000;     
-    width:80%;   
-    margin-top:4px;
+
+.bf-sign-line {
+    border-bottom: 1px dotted #000;     
+    width: 80%;   
+    margin-top: 4px;
 }
-.bf-signature-grid > div{
-min-height: 130px; 
+
+.bf-signature-grid > div {
+    min-height: 110px; /* Kurangkan dari 130px supaya tidak makan ruang kertas bawah */
 }
-#bf_content{
-    flex:1;
-    min-height:0;
-    display:flex;
-    flex-direction:column;
-    justify-content:space-between;
+
+#bf_content {
+    flex: 1;
+    min-height: 0;
+    display: block; /* Tukar flex kepada block untuk kurangkan aktiviti pushing baris */
 }
-#bf_content .bf-row{
-    flex-shrink:0;
-} 
+
+#bf_content .bf-row {
+    margin-bottom: 3px; /* Kecilkan margin bottom baris untuk penjarakan selamat */
+}
+
