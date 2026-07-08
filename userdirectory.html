@@ -506,18 +506,17 @@ body {
 <div id="staffModal" class="modal-overlay">
     <div class="modal-content">
         <h3 id="modalTitle">Staff</h3>
-<input id="fName" class="search-box" placeholder="Staff Name">
+        <input id="fName" class="search-box" placeholder="Staff Name">
 
-<div style="display: flex; gap: 8px; margin-bottom: 20px;">
-    <select id="fPosition" class="search-box" style="margin-bottom: 0; flex-grow: 1; -webkit-appearance: polyfill;">
-        </select>
-    <button type="button" onclick="addNewPositionOption()" style="padding: 0 14px; background: var(--text-main); color: white; border: none; border-radius: var(--radius-md); cursor: pointer;" title="Tambah Jawatan Baharu">
-        <i class="fa fa-plus"></i>
-    </button>
-</div>
+        <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+            <select id="fPosition" class="search-box" style="margin-bottom: 0; flex-grow: 1; -webkit-appearance: polyfill; height: 48px; padding: 12px 16px;">
+            </select>
+            <button type="button" onclick="addNewPositionOption()" style="padding: 0 16px; background: var(--text-main); color: white; border: none; border-radius: var(--radius-md); cursor: pointer;" title="Tambah Jawatan Baharu">
+                <i class="fa fa-plus"></i>
+            </button>
+        </div>
 
-<input id="fEmployee" class="search-box" placeholder="Employee ID">
-
+        <input id="fEmployee" class="search-box" placeholder="Employee ID">
         <input id="fPhone" class="search-box" placeholder="Phone No">
         <input id="fEmail" class="search-box" placeholder="Email">
         <div class="modal-actions">
@@ -612,23 +611,22 @@ function staffCardHtml(s, isActing = false, actingType = "", targetId = null){
     let positionUpper = s.position ? s.position.toUpperCase() : "";
     let isKJ = positionUpper === "KETUA JABATAN";
 
-    // Tetapkan warna bar kiri secara dinamik berdasarkan jawatan/hierarki
-    let leftLineColor = "rgba(0,0,0,0.04)"; // Warna default jika tiada padanan
+    let leftLineColor = "rgba(0,0,0,0.04)"; 
     
     if (isActing) {
-        leftLineColor = "var(--accent-orange)"; // Warna oren jika sedang memangku
+        leftLineColor = "var(--accent-orange)"; 
     } else if (isKJ) {
-        leftLineColor = "var(--accent-blue)"; // Biru untuk Ketua Jabatan
+        leftLineColor = "var(--accent-blue)"; 
     } else if (positionUpper === "KETUA SEKSYEN") {
-        leftLineColor = "var(--accent-purple)"; // Ungu untuk Ketua Seksyen
+        leftLineColor = "var(--accent-purple)"; 
     } else if (positionUpper.includes("EKSEKUTIF KANAN")) {
-        leftLineColor = "var(--accent-green)"; // Hijau untuk Eksekutif Kanan
+        leftLineColor = "var(--accent-green)"; 
     } else if (positionUpper.includes("EKSEKUTIF")) {
-        leftLineColor = "#2bc4d9"; // Sian/Biru Muda untuk Eksekutif
+        leftLineColor = "#2bc4d9"; 
     } else if (positionUpper.includes("JURUTEKNIK") || positionUpper.includes("PENYELIA")) {
-        leftLineColor = "var(--accent-orange)"; // Oren untuk Juruteknik/Penyelia
+        leftLineColor = "var(--accent-orange)"; 
     } else if (positionUpper.includes("PEMBANTU") || positionUpper.includes("KERANI")) {
-        leftLineColor = "var(--text-muted)"; // Kelabu untuk Pembantu/Kerani
+        leftLineColor = "var(--text-muted)"; 
     }
 
     return `
@@ -671,7 +669,6 @@ function staffCardHtml(s, isActing = false, actingType = "", targetId = null){
     </div>
     `;
 }
-
 
 function sortByHierarki(a,b){
     return ((hierarki[a.position]||99) - (hierarki[b.position]||99));
@@ -800,9 +797,6 @@ function renderStaff(){
                 
                 <div class="section-container">`;
             
-            // LOGIK BAHARU: Hanya papar kad Ketua Seksyen jika ada pengisian, ada pemangku, 
-            // ATAU jika seksyen tersebut mengandungi Eksekutif/Eksekutif Kanan di bawah struktur terusnya.
-            // Jika ia seksyen pentadbiran biasa (contoh: Admin) yang tiada struktur jawatan pengurusan tertinggi, kad kosong disembunyikan.
             let hasHighLevelStaff = otherSecStaff.some(s => {
                 let pos = s.position?.toUpperCase() || "";
                 return pos.includes("EKSEKUTIF KANAN") || pos.includes("EKSEKUTIF");
@@ -813,7 +807,6 @@ function renderStaff(){
             } else if (actingKsStaff) {
                 html += `<div class="tree-wrapper">${staffCardHtml(actingKsStaff, true, 'section', sec.id)}</div>`;
             } else if (hasHighLevelStaff || (!ksStaff && otherSecStaff.length === 0 && unitsInSection.length > 0)) {
-                // Tunjukkan kotak kekosongan jika struktur memerlukan jawatan pengurusan tertinggi
                 html += `<div class="tree-wrapper">${emptyCardHtml("KETUA SEKSYEN", "section", sec.id)}</div>`;
             }
 
@@ -854,11 +847,13 @@ function renderStaff(){
     document.getElementById("staffList").innerHTML = html;
 }
 
+// DIKEMASKINI: Ditambah fungsi populatePositionDropdown() supaya data diisi terus masa load aplikasi
 window.onload=async()=>{
     await loadUnits();
     await loadSections();
     await loadAssignments();
     await loadStaff();
+    populatePositionDropdown(); 
 };
 
 let currentActingType = null;
@@ -955,7 +950,6 @@ async function removeActing(type, targetId, staffId, event){
     }
 }
 
-// Variable global tambahan untuk menyimpan state pilihan sementara
 let selectedSections = new Set();
 let selectedUnits = new Set();
 
@@ -965,11 +959,9 @@ async function openAssignModal(staffId){
     
     document.getElementById("assignModalTitle").innerText = `Assign Penempatan: ${currentTargetStaff.name}`;
     
-    // Ambil data penempatan sedia ada dari database
     let assignedSecs = staffSectionAssignments.filter(a => a.staff_id === staffId && (!a.is_acting || a.is_acting==='false')).map(a => a.section_id);
     let assignedUnits = staffUnitAssignments.filter(a => a.staff_id === staffId && (!a.is_acting || a.is_acting==='false')).map(a => a.unit_id);
 
-    // Set state awal berdasarkan data sedia ada
     selectedSections = new Set(assignedSecs.map(Number));
     selectedUnits = new Set(assignedUnits.map(Number));
 
@@ -985,11 +977,9 @@ function renderAssignOptions() {
         let unitsInSection = unitData.filter(u => u.section_id === sec.id);
         let hasUnits = unitsInSection.length > 0;
         
-        // Pembungkus utama bagi setiap Seksyen
         html += `<div style="margin-bottom: 12px; background: #f2f2f7; border-radius: 10px; padding: 4px; overflow: hidden;">`;
         
         if (isKetuaSeksyen) {
-            // SITUASI 1: Jika KETUA SEKSYEN -> Papar checkbox Seksyen biasa (Tiada kaitan dengan Unit)
             let isSecChecked = selectedSections.has(Number(sec.id)) ? "checked" : "";
             html += `
             <label class="modal-option-label" style="margin-bottom: 0; background: transparent; width: 100%;">
@@ -998,9 +988,7 @@ function renderAssignOptions() {
             </label>`;
             
         } else {
-            // SITUASI 2: Jika STAF BIASA
             if (!hasUnits) {
-                // Seksyen tiada unit -> Papar checkbox Seksyen untuk di-assign secara langsung
                 let isSecChecked = selectedSections.has(Number(sec.id)) ? "checked" : "";
                 html += `
                 <label class="modal-option-label" style="margin-bottom: 0; background: transparent; width: 100%;">
@@ -1008,8 +996,6 @@ function renderAssignOptions() {
                     <span style="font-weight: 600;"><i class="fa fa-building"></i> ${sec.section_name} <small style="color:var(--text-muted); font-weight:normal;">(Terus ke Seksyen)</small></span>
                 </label>`;
             } else {
-                // Seksyen ada unit -> Klik seksyen hanya untuk collapse/buka unit (Tiada Checkbox Seksyen)
-                // Kita gunakan state 'selectedSections' sebagai penanda sama ada menu unit sedang terbuka atau tertutup
                 let isOpen = selectedSections.has(Number(sec.id));
                 html += `
                 <div onclick="toggleSectionDropdown(${sec.id})" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; cursor: pointer; user-select: none;">
@@ -1017,7 +1003,6 @@ function renderAssignOptions() {
                     <i class="fa ${isOpen ? 'fa-chevron-up' : 'fa-chevron-down'}" style="color: var(--text-muted); font-size: 12px;"></i>
                 </div>`;
                 
-                // Papar senarai unit di bawahnya jika status dropdown dibuka
                 if (isOpen) {
                     html += `<div class="unit-sub-group" style="padding: 4px 12px 10px 16px; border-top: 1px solid rgba(0,0,0,0.05); background: rgba(255,255,255,0.5);">`;
                     
@@ -1041,7 +1026,6 @@ function renderAssignOptions() {
     document.getElementById("assignOptionsList").innerHTML = html;
 }
 
-// Fungsi khas untuk staf biasa buka/tutup senarai unit tanpa mengganggu simpanan data seksyen
 function toggleSectionDropdown(sectionId) {
     if (selectedSections.has(Number(sectionId))) {
         selectedSections.delete(Number(sectionId));
@@ -1051,7 +1035,6 @@ function toggleSectionDropdown(sectionId) {
     renderAssignOptions();
 }
 
-// Fungsi apabila checkbox Seksyen ditanda (Hanya untuk Ketua Seksyen ATAU Seksyen tanpa unit)
 function toggleSectionSelection(checkbox, sectionId) {
     if (checkbox.checked) {
         selectedSections.add(Number(sectionId));
@@ -1060,16 +1043,6 @@ function toggleSectionSelection(checkbox, sectionId) {
     }
 }
 
-// Fungsi apabila checkbox Unit ditanda
-function toggleUnitSelection(checkbox, unitId) {
-    if (checkbox.checked) {
-        selectedUnits.add(Number(unitId));
-    } else {
-        selectedUnits.delete(Number(unitId));
-    }
-}
-
-// Fungsi apabila checkbox Unit berubah status
 function toggleUnitSelection(checkbox, unitId) {
     if (checkbox.checked) {
         selectedUnits.add(Number(unitId));
@@ -1083,22 +1056,18 @@ async function saveAssignment(){
     let id = currentTargetStaff.id;
     let isKetuaSeksyen = currentTargetStaff.position?.toUpperCase() === "KETUA SEKSYEN";
 
-    // Padam rekod lama penempatan biasa (bukan pemangku)
     await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${id}&is_acting=eq.false`, { method:"DELETE", headers });
     await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${id}&is_acting=eq.false`, { method:"DELETE", headers });
 
-    // --- LOGIK PENAPISAN BAHARU ---
     let finalSections = Array.from(selectedSections);
 
-    // Jika BUKAN Ketua Seksyen, tapis keluar seksyen yang mempunyai unit di bawahnya
     if (!isKetuaSeksyen) {
         finalSections = finalSections.filter(secId => {
             let hasUnits = unitData.some(u => u.section_id === secId);
-            return !hasUnits; // Hanya simpan seksyen yang mempunya 0 unit (terus ke seksyen)
+            return !hasUnits; 
         });
     }
 
-    // Sediakan data untuk dihantar berdasarkan set pilihan yang telah ditapis
     let checkedSections = finalSections.map(secId => ({ staff_id: id, section_id: secId, is_acting: false }));
     if(checkedSections.length){
         await fetch(`${SB_URL}/rest/v1/staff_section_assignment`, { method:"POST", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(checkedSections) });
@@ -1121,15 +1090,42 @@ function closeAssignModal(){
     selectedUnits.clear();
 }
 
+function populatePositionDropdown(selectedValue = "") {
+    let selectEl = document.getElementById("fPosition");
+    let html = `<option value="" disabled ${!selectedValue ? 'selected' : ''}>-- Pilih Jawatan --</option>`;
+    
+    Object.keys(hierarki).forEach(pos => {
+        let selected = pos.toUpperCase() === selectedValue.toUpperCase() ? "selected" : "";
+        html += `<option value="${pos}" ${selected}>${pos}</option>`;
+    });
+    
+    selectEl.innerHTML = html;
+}
+
+function addNewPositionOption() {
+    let newPos = prompt("Masukkan nama jawatan baharu:");
+    if (!newPos) return;
+    
+    newPos = newPos.trim().toUpperCase();
+    
+    if (!hierarki[newPos]) {
+        hierarki[newPos] = Object.keys(hierarki).length + 1; 
+    }
+    
+    populatePositionDropdown(newPos);
+}
+
 let editingStaff=null;
 function addStaff(existing=null){
     editingStaff=existing;
     document.getElementById("modalTitle").innerHTML = existing ? "Edit Staff" : "New Staff";
     document.getElementById("fName").value = existing?.name || "";
-    document.getElementById("fPosition").value = existing?.position || "";
     document.getElementById("fEmployee").value = existing?.employee_id || "";
     document.getElementById("fPhone").value = existing?.phone_no || "";
     document.getElementById("fEmail").value = existing?.email || "";
+    
+    populatePositionDropdown(existing?.position || "");
+    
     document.getElementById("staffModal").style.display="flex";
 }
 
@@ -1142,7 +1138,7 @@ function closeModal(){ document.getElementById("staffModal").style.display="none
 
 async function saveStaff(){
     let body={ name:fName.value, position:fPosition.value, employee_id:fEmployee.value, phone_no:fPhone.value, email:fEmail.value };
-    if(!body.name || !body.email){ alert("Nama dan Email wajib"); return; }
+    if(!body.name || !body.email || !body.position){ alert("Nama, Jawatan dan Email wajib diisi."); return; }
 
     let res;
     let treatAsNew = !editingStaff || (editingStaff.name !== body.name || editingStaff.email !== body.email);
