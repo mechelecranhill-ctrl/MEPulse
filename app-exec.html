@@ -109,7 +109,7 @@
 
                 const userUnitId = assignment.unit_id;
 
-                // 3. Fetch work_orders data
+                // 3. Fetch work_orders data (Termasuk contract_code daripada relation)
                 const { data: workOrders, error: workError } = await supabaseClient
                     .from('work_orders')
                     .select(`
@@ -118,7 +118,7 @@
                         status,
                         sequence_no,
                         district,
-                        contract!inner (id, contract_name, unit_id)
+                        contract!inner (id, contract_name, contract_code, unit_id)
                     `)
                     .eq('status', 'BLUEFORM')
                     .eq('contract.unit_id', userUnitId);
@@ -133,43 +133,47 @@
                 // Grouping by sequence_no for blueform-shared.js
                 const seqGroups = buildSequenceGroups(workOrders);
 
-                // 4. GROUP DATA BY CONTRACT
+                // 4. GROUP DATA BY CONTRACT CODE
                 const contractsMap = {};
                 workOrders.forEach(item => {
-                    let cName = 'No Information';
-                    let cId = 'unknown';
+                    let cCode = 'No Code';
+                    let cName = 'No Name';
                     
                     if (item.contract) {
                         const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
+                        cCode = contractData?.contract_code || 'No Code';
                         cName = contractData?.contract_name || 'No Name';
-                        cId = contractData?.id || 'unknown';
                     }
 
-                    if (!contractsMap[cId]) {
-                        contractsMap[cId] = {
+                    // Gunakan cCode sebagai unique key kumpulan
+                    if (!contractsMap[cCode]) {
+                        contractsMap[cCode] = {
+                            code: cCode,
                             name: cName,
                             orders: []
                         };
                     }
-                    contractsMap[cId].orders.push(item);
+                    contractsMap[cCode].orders.push(item);
                 });
 
                 // 5. RENDER CONTRACT SECTIONS
                 container.innerHTML = '';
                 const renderedBlueformSeqs = new Set();
 
-                for (const contractId in contractsMap) {
-                    const contract = contractsMap[contractId];
+                for (const contractCode in contractsMap) {
+                    const contract = contractsMap[contractCode];
                     
-                    // Create Section Wrapper for each contract
+                    // Create Section Wrapper
                     const contractSection = document.createElement('div');
                     contractSection.className = "bg-gray-50 rounded-lg p-4 border border-gray-200 shadow-sm mb-6";
                     
-                    // Contract Header HTML
+                    // Header HTML kini memaparkan [Kod Kontrak - Nama Kontrak]
                     let sectionHtml = `
                         <div class="bg-gray-200 px-4 py-2.5 rounded-t-lg border-b border-gray-300 flex justify-between items-center mb-3">
                             <h3 class="font-bold text-gray-800 text-sm md:text-base flex items-center">
-                                <i class="fa-solid fa-file-contract text-blue-700 mr-2"></i> ${contract.name}
+                                <i class="fa-solid fa-barcode text-blue-700 mr-2"></i> 
+                                <span class="bg-blue-700 text-white text-xs px-2 py-1 rounded font-mono mr-2">${contract.code}</span> 
+                                ${contract.name}
                             </h3>
                             <span class="text-xs bg-blue-100 text-blue-800 font-semibold px-2 py-0.5 rounded-full">
                                 ${contract.orders.length} Work Order(s)
