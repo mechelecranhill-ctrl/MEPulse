@@ -387,10 +387,10 @@
         <div class="form-tabs-wrapper">
             <div class="form-tabs" id="formsNav">
                 <button onclick="showPage('adminPage')">Contracts</button>
+                <button onclick="showPage('quotationPage')">Quotations</button>
                 <button class="active" onclick="showPage('registerWorkPage')">Blue Forms</button>
                 <button onclick="showPage('interimPage')">Interims</button>
                 <button onclick="showPage('voPage')">Variation Order</button>
-                <button onclick="showPage('quotationPage')">Quotations</button>
             </div>
         </div>
     </div>
@@ -404,7 +404,7 @@
                     <label>Contracts</label><select id="w_contract_id" onchange="onContractSelect()" required><option value="">Choose Unit First</option></select>
                     <label>Work Order Id(s)</label>
                     <div id="w_id_rows_container"></div>
-                    <button type="button" onclick="addWorkIdRow()" style="background:none; color:var(--ios-blue); border:1px dashed var(--ios-blue); font-size:12px; padding:10px; width:100%; border-radius:10px; cursor:pointer; margin-top:5px;">+ Add Work ID</button>
+                    <button type="button" onclick="addWorkIdRow('w')" style="background:none; color:var(--ios-blue); border:1px dashed var(--ios-blue); font-size:12px; padding:10px; width:100%; border-radius:10px; cursor:pointer; margin-top:5px;">+ Add Work ID</button>
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top:10px;">
                         <div>
@@ -595,11 +595,22 @@
             <div class="glass-card">
                 <h3 style="margin-top:0;"><i class="fa-solid fa-file-lines"></i> Quotation</h3>
                 <form id="quotationForm">
-                    <label>Work ID</label>
-                    <input type="text" id="q_work_id" placeholder="Example: C 123456" required>
+                    <label>Units</label>
+                    <select id="q_unit_id" onchange="loadContractsByUnit('q')" required><option value="">Choose Unit</option></select>
+                    
+                    <label>Contracts</label>
+                    <select id="q_contract_id" required><option value="">Choose Unit First</option></select>
 
-                    <label>Contract Code</label>
-                    <input type="text" id="q_contract_code" placeholder="Example: RSAJ/KP/T/57/2024" required>
+                    <label>Work Order Order Id(s)</label>
+                    <div id="q_id_rows_container"></div>
+                    <button type="button" onclick="addWorkIdRow('q')" style="background:none; color:var(--ios-blue); border:1px dashed var(--ios-blue); font-size:12px; padding:10px; width:100%; border-radius:10px; cursor:pointer; margin-top:5px; margin-bottom: 10px;">+ Add Work ID</button>
+
+                    <div style="display: grid; grid-template-columns: 1fr; gap: 10px;">
+                        <div>
+                            <label>Blueform Date</label>
+                            <input type="date" id="q_qpb_date" required>
+                        </div>
+                    </div>
 
                     <label>Status</label>
                     <select id="q_status" required onchange="toggleRejectReason(this.value)">
@@ -637,7 +648,8 @@
     let originalContractArea = '';
     let lastWorkIdNum = '';
 
-    let workIdRowCounter = 0;
+    let w_workIdRowCounter = 0;
+    let q_workIdRowCounter = 0;
     let originalLoadedWorkIds = [];
     let currentWorkSequenceNo = null;
     let currentContractSections = {};
@@ -663,7 +675,8 @@
         showPage('registerWorkPage');
         setupFormListeners();
         renderDistrictChecklist();
-        addWorkIdRow();
+        addWorkIdRow('w');
+        addWorkIdRow('q');
     }
 
     function showPage(id){
@@ -815,7 +828,7 @@
                 const index = districts.indexOf(districtSelected.trim().toUpperCase());
                 let areaCode = (index !== -1 && areaCodes[index]) ? areaCodes[index] : "WO";
 
-                const currentWorkIds = getCurrentWorkIdsFromRows();
+                const currentWorkIds = getCurrentWorkIdsFromRows('w');
                 if(currentWorkIds.length === 0){ alert("Sila masukkan sekurang-kurangnya satu Work Order ID!"); return; }
 
                 let sequenceToUse = currentWorkSequenceNo;
@@ -880,24 +893,37 @@
             } catch (error) { console.error(error); alert("Gagal memproses nombor turutan."); }
         });
 
-        // REVISED Quotation Form Submit (Mapped perfectly to your supabase schema)
+        // Quotation Form Submit
         const qForm = document.getElementById('quotationForm');
         if(qForm) {
             qForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 
-                const statusValue = document.getElementById('q_status').value;
-                const payload = {
-                    work_id: document.getElementById('q_work_id').value.trim().toUpperCase(),
-                    contract_code: document.getElementById('q_contract_code').value.trim().toUpperCase(),
-                    status: statusValue,
-                    reject_reason: statusValue === 'Rejected' ? document.getElementById('q_reject_reason').value : null,
-                    pdf_url: document.getElementById('q_pdf_url').value.trim() || null
-                };
+                const contractOpt = document.getElementById('q_contract_id').selectedOptions[0];
+                const contractCode = contractOpt ? contractOpt.text : '';
+                const currentWorkIds = getCurrentWorkIdsFromRows('q');
+                if(currentWorkIds.length === 0){ alert("Sila masukkan sekurang-kurangnya satu Work Order ID!"); return; }
 
-                const res = await fetch(`${SB_URL}/rest/v1/quotations`, { method: 'POST', headers, body: JSON.stringify(payload) });
-                if (res.ok) { 
-                    alert("Quotation berjaya direkodkan!"); 
+                const statusValue = document.getElementById('q_status').value;
+                
+                // Simpan setiap Work Order ID ke Supabase
+                let successCount = 0;
+                for(const workIdValue of currentWorkIds) {
+                    const payload = {
+                        work_id: workIdValue,
+                        contract_code: contractCode,
+                        status: statusValue,
+                        reject_reason: statusValue === 'Rejected' ? document.getElementById('q_reject_reason').value : null,
+                        pdf_url: document.getElementById('q_pdf_url').value.trim() || null,
+                        qpb_date: document.getElementById('q_qpb_date').value || null
+                    };
+
+                    const res = await fetch(`${SB_URL}/rest/v1/quotations`, { method: 'POST', headers, body: JSON.stringify(payload) });
+                    if(res.ok) successCount++;
+                }
+
+                if (successCount > 0) { 
+                    alert(`${successCount} Quotation berjaya direkodkan!`); 
                     location.reload(); 
                 } else { 
                     alert("Gagal menyimpan quotation."); 
@@ -915,17 +941,20 @@
             const wUnit = document.getElementById('w_unit_id');
             const iUnit = document.getElementById('i_unit_id');
             const voUnit = document.getElementById('vo_unit_id');
+            const qUnit = document.getElementById('q_unit_id');
 
             if(admin) admin.innerHTML = '<option value="">Choose Unit</option>';
             if(wUnit) wUnit.innerHTML = '<option value="">Choose Unit</option>';
             if(iUnit) iUnit.innerHTML = '<option value="">Choose Unit</option>';
             if(voUnit) voUnit.innerHTML = '<option value="">Choose Unit</option>';
+            if(qUnit) qUnit.innerHTML = '<option value="">Choose Unit</option>';
 
             units.forEach(u=>{
                 if(admin) admin.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
                 if(wUnit) wUnit.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
                 if(iUnit) iUnit.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
                 if(voUnit) voUnit.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
+                if(qUnit) qUnit.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
             });
         }catch(e){ console.error(e); }
     }
@@ -967,7 +996,7 @@
     }
 
     function onContractSelect(){
-        resetWorkIdRows();
+        resetWorkIdRows('w');
         document.getElementById('w_qpb_date').value = '';
         document.getElementById('total_display').innerText = 'RM 0.00';
         
@@ -1028,42 +1057,53 @@
         return `${match[1] || 'C'} ${match[2]}${match[3] || ''}`;
     }
 
-    function addWorkIdRow(prefix = 'C', num = ''){
-        const container = document.getElementById('w_id_rows_container');
-        workIdRowCounter++; const rowId = `w_id_row_${workIdRowCounter}`;
-        const row = document.createElement('div'); row.className = 'w-id-row'; row.id = rowId;
+    function addWorkIdRow(prefix, selectedVal = 'C', num = ''){
+        const container = document.getElementById(`${prefix}_id_rows_container`);
+        let counter;
+        if(prefix === 'w') { w_workIdRowCounter++; counter = w_workIdRowCounter; }
+        else { q_workIdRowCounter++; counter = q_workIdRowCounter; }
+
+        const rowId = `${prefix}_id_row_${counter}`;
+        const row = document.createElement('div'); row.className = `${prefix}-id-row`; row.id = rowId;
         row.style = "display:flex; gap:8px; align-items:center; margin-bottom:8px;";
         row.innerHTML = `
-            <select class="w_id_prefix" style="width:80px;flex-shrink:0;">
-                <option value="C" ${prefix === 'C' ? 'selected' : ''}>C</option>
-                <option value="K" ${prefix === 'K' ? 'selected' : ''}>K</option>
+            <select class="${prefix}_id_prefix" style="width:80px;flex-shrink:0;">
+                <option value="C" ${selectedVal === 'C' ? 'selected' : ''}>C</option>
+                <option value="K" ${selectedVal === 'K' ? 'selected' : ''}>K</option>
             </select>
-            <input type="text" class="w_id_num" placeholder="123456" value="${num}" oninput="this.value=this.value.replace(/[^0-9]/g,'');renderWorkIdCards();autoDetectWork()">
-            <div onclick="removeWorkIdRow('${rowId}')" style="color:red; cursor:pointer; flex-shrink:0; padding:0 6px;">✕</div>
+            <input type="text" class="${prefix}_id_num" placeholder="123456" value="${num}" oninput="this.value=this.value.replace(/[^0-9]/g,''); if('${prefix}'==='w'){ renderWorkIdCards(); autoDetectWork(); }">
+            <div onclick="removeWorkIdRow('${prefix}', '${rowId}')" style="color:red; cursor:pointer; flex-shrink:0; padding:0 6px;">✕</div>
         `;
-        row.querySelector('.w_id_prefix').addEventListener('change', () => { renderWorkIdCards(); autoDetectWork(); });
+        if(prefix === 'w') {
+            row.querySelector('.w_id_prefix').addEventListener('change', () => { renderWorkIdCards(); autoDetectWork(); });
+        }
         container.appendChild(row);
     }
 
-    function removeWorkIdRow(rowId){
+    function removeWorkIdRow(prefix, rowId){
         const row = document.getElementById(rowId); if(row) row.remove();
-        if(document.getElementById('w_id_rows_container').children.length === 0){ addWorkIdRow(); }
-        renderWorkIdCards(); autoDetectWork();
+        if(document.getElementById(`${prefix}_id_rows_container`).children.length === 0){ addWorkIdRow(prefix); }
+        if(prefix === 'w') { renderWorkIdCards(); autoDetectWork(); }
     }
 
-    function resetWorkIdRows(){
-        document.getElementById('w_id_rows_container').innerHTML = '';
-        workIdRowCounter = 0; originalLoadedWorkIds = []; currentWorkSequenceNo = null; workIdCardDataMap = {}; lastWorkIdNum = '';
-        addWorkIdRow(); renderWorkIdCards();
+    function resetWorkIdRows(prefix){
+        document.getElementById(`${prefix}_id_rows_container`).innerHTML = '';
+        if(prefix === 'w') {
+            w_workIdRowCounter = 0; originalLoadedWorkIds = []; currentWorkSequenceNo = null; workIdCardDataMap = {}; lastWorkIdNum = '';
+        } else {
+            q_workIdRowCounter = 0;
+        }
+        addWorkIdRow(prefix); 
+        if(prefix === 'w') { renderWorkIdCards(); }
     }
 
-    function getCurrentWorkIdsFromRows(){
+    function getCurrentWorkIdsFromRows(prefix){
         const ids = [];
-        document.querySelectorAll('#w_id_rows_container .w-id-row').forEach(row=>{
-            const prefix = row.querySelector('.w_id_prefix').value;
-            const num = row.querySelector('.w_id_num').value.trim();
+        document.querySelectorAll(`#${prefix}_id_rows_container .${prefix}-id-row`).forEach(row=>{
+            const selPrefix = row.querySelector(`.${prefix}_id_prefix`).value;
+            const num = row.querySelector(`.${prefix}_id_num`).value.trim();
             if(num.length > 0){
-                const normalized = `${prefix} ${num}`;
+                const normalized = `${selPrefix} ${num}`;
                 if(!ids.includes(normalized)){ ids.push(normalized); }
             }
         });
@@ -1092,7 +1132,7 @@
             });
         }
 
-        const currentIds=getCurrentWorkIdsFromRows(); container.innerHTML="";
+        const currentIds=getCurrentWorkIdsFromRows('w'); container.innerHTML="";
         currentIds.forEach(workId=>{
             const saved= workIdCardDataMap[workId] || {};
             const breakdown= saved.section_category || {};
@@ -1187,6 +1227,8 @@
             container.appendChild(span);
         });
     }
+
+    function removeID(id) { attachedWorkOrders = attachedWorkOrders.filter(item => item !== id); renderIDTags(); }
 
     function removeID(id) { attachedWorkOrders = attachedWorkOrders.filter(item => item !== id); renderIDTags(); }
 
@@ -1366,7 +1408,7 @@
 
     let detectTimer = null;
     function autoDetectWork(){
-        const currentIds = getCurrentWorkIdsFromRows(); const idsKey = currentIds.join("|");
+        const currentIds = getCurrentWorkIdsFromRows('w'); const idsKey = currentIds.join("|");
         if(idsKey === lastWorkIdNum || currentIds.length === 0) return;
         lastWorkIdNum = idsKey; clearTimeout(detectTimer);
 
@@ -1385,14 +1427,14 @@
                 originalLoadedWorkIds = group.map(x=>x.work_id);
                 group.forEach(w=>{ workIdCardDataMap[w.work_id]={ location: w.location || "", description: w.description || "", section_category: structuredClone(w.section_category || {}) }; });
 
-                document.getElementById("w_id_rows_container").innerHTML=""; workIdRowCounter=0;
-                group.forEach(w=>{ const split = (w.work_id || "").split(" "); addWorkIdRow(split[0] || "C", split[1] || ""); });
+                document.getElementById("w_id_rows_container").innerHTML=""; w_workIdRowCounter=0;
+                group.forEach(w=>{ const split = (w.work_id || "").split(" "); addWorkIdRow('w', split[0] || "C", split[1] || ""); });
 
                 document.getElementById("w_qpb_date").value = group[0].qpb_date || "";
                 const district = document.getElementById("w_dist"); if(!district.value) district.value = group[0].district || "";
                 district.dataset.originalDistrict = group[0].district || "";
 
-                renderWorkIdCards(true); lastWorkIdNum = getCurrentWorkIdsFromRows().join("|");
+                renderWorkIdCards(true); lastWorkIdNum = getCurrentWorkIdsFromRows('w').join("|");
             }catch(err){ console.error(err); }
         },400);
     }
