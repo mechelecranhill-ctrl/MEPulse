@@ -632,7 +632,7 @@ let formattedRef = seq ? ` - ${seq}` : '';
         font-size:11px; color:black; line-height:1.3;
         box-sizing:border-box; display:flex; flex-direction:column;
         overflow:hidden; box-shadow:0 4px 30px rgba(0,0,0,0.4);
-        page-break-after:always; page-break-inside:avoid; flex-shrink:0;">
+        page-break-inside:avoid; flex-shrink:0;">
         <img src="RSAJ.png" class="bf-logo" alt="RSAJ Logo"
             onerror="this.src='https://upload.wikimedia.org/wikipedia/en/thumb/3/3d/Ranhill_SAJ_logo.svg/1200px-Ranhill_SAJ_logo.svg.png'">
         <div id="bf_title" style="text-align:center;font-weight:bold;margin-top:0.7cm;margin-bottom:12px;padding:0 50px;font-size:10px;">
