@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="ms">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Eksekutif - Sistem Kelulusan Kontrak</title>
-    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+    <title>Executive Dashboard - Contract Approval System</title>
+    <link class="icon" href="data:;base64,iVBORw0KGgo=">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="blueform.css">
@@ -14,35 +14,24 @@
 
     <header class="bg-blue-700 text-white shadow-md p-5 mb-8">
         <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-2xl font-bold"><i class="fa-solid fa-file-signature mr-2"></i>Sistem Kelulusan Kontrak</h1>
+            <h1 class="text-2xl font-bold"><i class="fa-solid fa-file-signature mr-2"></i>Contract Approval System</h1>
             <span class="bg-amber-600 px-4 py-1.5 rounded-full text-sm font-semibold border border-amber-500">
-                Mod: Eksekutif
+                Mode: Executive
             </span>
         </div>
     </header>
 
     <div class="container mx-auto px-4">
         <section class="bg-white rounded-xl shadow-md p-6 border-t-4 border-amber-500">
-            <div class="flex justify-between items-center mb-4">
+            <div class="flex justify-between items-center mb-6">
                 <h2 class="text-xl font-bold text-gray-700">
-                    <i class="fa-solid fa-user-tie text-amber-500 mr-2"></i>Dashboard Executive
+                    <i class="fa-solid fa-user-tie text-amber-500 mr-2"></i>Executive Dashboard
                 </h2>
-                <span class="text-xs bg-amber-100 text-amber-800 font-bold px-2.5 py-1 rounded">Menapis: BLUEFORM</span>
+                <span class="text-xs bg-amber-100 text-amber-800 font-bold px-2.5 py-1 rounded">Filtering: BLUEFORM</span>
             </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Work ID</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Kontrak</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Tindakan</th>
-                        </tr>
-                    </thead>
-                    <tbody id="table-exec" class="bg-white divide-y divide-gray-200">
-                        <tr><td colspan="4" class="px-6 py-4 text-center text-gray-400">Memuatkan data...</td></tr>
-                    </tbody>
-                </table>
+            
+            <div id="contracts-container" class="space-y-8">
+                <div class="text-center text-gray-400 py-4">Loading data...</div>
             </div>
         </section>
     </div>
@@ -90,113 +79,165 @@
 
     <script src="blueform.js"></script>
     <script>
-        // SB_URL / SB_KEY sudah di-declare global oleh blueform-shared.js — guna terus, jangan declare semula.
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
         async function fetchDashboard() {
-    try {
-        // 1. Dapatkan maklumat user yang sedang log masuk
-        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-        
-        if (userError || !user) {
-            showEmptyRow('table-exec', 'Sila log masuk terlebih dahulu.');
-            return;
-        }
+            try {
+                const container = document.getElementById('contracts-container');
 
-        // 2. Dapatkan unit_id staff ini daripada table staff_unit_assignment
-        // (Nota: Sila pastikan nama kolum 'staff_id' atau 'user_id' sepadan dengan DB anda)
-        const { data: assignment, error: assignError } = await supabaseClient
-            .from('staff_unit_assignment')
-            .select('unit_id')
-            .eq('staff_id', user.id) // Tukar 'staff_id' mengikut nama kolum id staff anda
-            .maybeSingle();
+                // 1. Get logged-in user information
+                const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+                
+                if (userError || !user) {
+                    showEmptyState('Please log in first.');
+                    return;
+                }
 
-        if (assignError) throw assignError;
-        
-        if (!assignment || !assignment.unit_id) {
-            showEmptyRow('table-exec', 'Ralat: Akaun anda tidak ditugaskan kepada mana-mana unit.');
-            return;
-        }
+                // 2. Get unit_id for this staff member
+                const { data: assignment, error: assignError } = await supabaseClient
+                    .from('staff_unit_assignment')
+                    .select('unit_id')
+                    .eq('staff_id', user.id)
+                    .maybeSingle();
 
-        const userUnitId = assignment.unit_id;
+                if (assignError) throw assignError;
+                
+                if (!assignment || !assignment.unit_id) {
+                    showEmptyState('Error: Your account is not assigned to any unit.');
+                    return;
+                }
 
-        // 3. Tarik data work_orders dan tapis menggunakan unit_id staff tadi
-        const { data: workOrders, error: workError } = await supabaseClient
-            .from('work_orders')
-            .select(`
-                id,
-                work_id,
-                status,
-                sequence_no,
-                district,
-                contract!inner (contract_name, unit_id)
-            `)
-            .eq('status', 'BLUEFORM')
-            .eq('contract.unit_id', userUnitId); // 👈 Tapis secara automatik mengikut unit staff!
+                const userUnitId = assignment.unit_id;
 
-        if (workError) throw workError;
+                // 3. Fetch work_orders data
+                const { data: workOrders, error: workError } = await supabaseClient
+                    .from('work_orders')
+                    .select(`
+                        id,
+                        work_id,
+                        status,
+                        sequence_no,
+                        district,
+                        contract!inner (id, contract_name, unit_id)
+                    `)
+                    .eq('status', 'BLUEFORM')
+                    .eq('contract.unit_id', userUnitId);
 
-        // 4. Paparkan data ke dalam jadual HTML
-        const tbody = document.getElementById('table-exec');
-        tbody.innerHTML = '';
+                if (workError) throw workError;
 
-        if (workOrders.length === 0) {
-            showEmptyRow('table-exec', 'Tiada kontrak berstatus BLUEFORM untuk unit anda.');
-            return;
-        }
+                if (workOrders.length === 0) {
+                    showEmptyState('No contracts with BLUEFORM status found for your unit.');
+                    return;
+                }
 
-        // Grouping ikut sequence_no kini dikendalikan oleh blueform-shared.js
-        const seqGroups = buildSequenceGroups(workOrders);
-        const renderedBlueformSeqs = new Set();
+                // Grouping by sequence_no for blueform-shared.js
+                const seqGroups = buildSequenceGroups(workOrders);
 
-        workOrders.forEach(item => {
-            let contractName = 'Tiada Maklumat';
-            if (item.contract) {
-                contractName = Array.isArray(item.contract) ? item.contract[0]?.contract_name : item.contract.contract_name;
+                // 4. GROUP DATA BY CONTRACT
+                const contractsMap = {};
+                workOrders.forEach(item => {
+                    let cName = 'No Information';
+                    let cId = 'unknown';
+                    
+                    if (item.contract) {
+                        const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
+                        cName = contractData?.contract_name || 'No Name';
+                        cId = contractData?.id || 'unknown';
+                    }
+
+                    if (!contractsMap[cId]) {
+                        contractsMap[cId] = {
+                            name: cName,
+                            orders: []
+                        };
+                    }
+                    contractsMap[cId].orders.push(item);
+                });
+
+                // 5. RENDER CONTRACT SECTIONS
+                container.innerHTML = '';
+                const renderedBlueformSeqs = new Set();
+
+                for (const contractId in contractsMap) {
+                    const contract = contractsMap[contractId];
+                    
+                    // Create Section Wrapper for each contract
+                    const contractSection = document.createElement('div');
+                    contractSection.className = "bg-gray-50 rounded-lg p-4 border border-gray-200 shadow-sm mb-6";
+                    
+                    // Contract Header HTML
+                    let sectionHtml = `
+                        <div class="bg-gray-200 px-4 py-2.5 rounded-t-lg border-b border-gray-300 flex justify-between items-center mb-3">
+                            <h3 class="font-bold text-gray-800 text-sm md:text-base flex items-center">
+                                <i class="fa-solid fa-file-contract text-blue-700 mr-2"></i> ${contract.name}
+                            </h3>
+                            <span class="text-xs bg-blue-100 text-blue-800 font-semibold px-2 py-0.5 rounded-full">
+                                ${contract.orders.length} Work Order(s)
+                            </span>
+                        </div>
+                        <div class="overflow-x-auto bg-white rounded-b-lg border border-gray-200">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Work ID</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">Status</th>
+                                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                    `;
+
+                    // Rows for each Work Order under this contract
+                    contract.orders.forEach(item => {
+                        const seq = (item.sequence_no || '').trim();
+                        const blueformBtnHtml = renderBlueformButtonHtml(item, seqGroups, renderedBlueformSeqs);
+
+                        sectionHtml += `
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4 whitespace-nowrap font-mono text-sm text-gray-900">
+                                    ${item.work_id}${seq ? ` <span class="text-gray-400 text-xs">(${seq})</span>` : ''}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">
+                                        ${item.status}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                                    ${blueformBtnHtml}
+                                    <button onclick="approveContract('${item.work_id}', 'APP-EXEC')" 
+                                            class="text-white px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer bg-amber-600 hover:bg-amber-700 inline-block">
+                                        <i class="fa-solid fa-check mr-1"></i> Approve (Exec)
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+
+                    sectionHtml += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                    
+                    contractSection.innerHTML = sectionHtml;
+                    container.appendChild(contractSection);
+                }
+
+            } catch (err) {
+                console.error("Error fetching data:", err.message);
+                alert("Failed to load data: " + err.message);
             }
+        }
 
-            const seq = (item.sequence_no || '').trim();
-            const blueformBtnHtml = renderBlueformButtonHtml(item, seqGroups, renderedBlueformSeqs);
-
-            const row = `
-                <tr class="hover:bg-gray-50 transition-colors">
-                    <td class="px-6 py-4 whitespace-nowrap font-mono text-sm text-gray-900">${item.work_id}${seq ? ` <span class="text-gray-400 text-xs">(${seq})</span>` : ''}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${contractName || 'Tiada Nama'}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">
-                            ${item.status}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        ${blueformBtnHtml}
-                        <button onclick="approveContract('${item.work_id}', 'APP-EXEC')" 
-                                class="text-white px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer bg-amber-600 hover:bg-amber-700">
-                            <i class="fa-solid fa-check mr-1"></i> Approve (Exec)
-                        </button>
-                    </td>
-                </tr>
-            `;
-            tbody.insertAdjacentHTML('beforeend', row);
-        });
-
-    } catch (err) {
-        console.error("Ralat memuat data:", err.message);
-        alert("Gagal memuatkan data: " + err.message);
-    }
-}
-
-
-        function showEmptyRow(tableId, message) {
-            document.getElementById(tableId).innerHTML = `
-                <tr>
-                    <td colspan="4" class="px-6 py-8 text-center text-sm text-gray-400 italic">
-                        <i class="fa-solid fa-inbox block text-xl mb-1 text-gray-300"></i> ${message}
-                    </td>
-                </tr>`;
+        function showEmptyState(message) {
+            document.getElementById('contracts-container').innerHTML = `
+                <div class="text-center py-12 text-gray-400 italic bg-white rounded-lg border border-gray-200">
+                    <i class="fa-solid fa-inbox block text-3xl mb-2 text-gray-300"></i> ${message}
+                </div>`;
         }
 
         async function approveContract(workId, nextStatus) {
-            if (!confirm(`Adakah anda pasti untuk menukar status Work ID: ${workId} ke ${nextStatus}?`)) return;
+            if (!confirm(`Are you sure you want to change the status of Work ID: ${workId} to ${nextStatus}?`)) return;
 
             try {
                 const { error } = await supabaseClient
@@ -206,12 +247,12 @@
 
                 if (error) throw error;
 
-                alert(`Berjaya dikemaskini ke status ${nextStatus}!`);
+                alert(`Successfully updated to status ${nextStatus}!`);
                 fetchDashboard();
 
             } catch (err) {
-                console.error("Ralat semasa kelulusan:", err.message);
-                alert("Gagal mengemaskini status: " + err.message);
+                console.error("Error during approval:", err.message);
+                alert("Failed to update status: " + err.message);
             }
         }
 
