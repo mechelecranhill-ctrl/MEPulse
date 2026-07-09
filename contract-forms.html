@@ -596,7 +596,9 @@
                 <h3 style="margin-top:0;"><i class="fa-solid fa-file-lines"></i> Quotation</h3>
                 <form id="quotationForm">
                     <label>Units</label>
-                    <select id="q_unit_id" onchange="loadContractsByUnit('q')" required><option value="">Choose Unit</option></select>
+                    <select id="q_unit_id" onchange="loadContractsByUnit('q')" required>
+                        <option value="">Choose Unit</option>
+                    </select>
                     
                     <label>Contracts</label>
                     <select id="q_contract_id" required><option value="">Choose Unit First</option></select>
@@ -607,10 +609,9 @@
 
                     <div style="display: grid; grid-template-columns: 1fr; gap: 10px;">
                         <div>
-    <label>Quotation Date</label>
-    <input type="date" id="q_qpb_date" required>
-</div>
-
+                            <label>Quotation Date</label>
+                            <input type="date" id="q_qpb_date" required>
+                        </div>
                     </div>
 
                     <label>Status</label>
@@ -626,8 +627,12 @@
                         <textarea id="q_reject_reason" placeholder="Sila nyatakan sebab penolakan..."></textarea>
                     </div>
 
-                    <label>PDF URL Document</label>
-                    <input type="url" id="q_pdf_url" placeholder="https://example.com/storage/quotation.pdf">
+                    <label>Upload Document (OneDrive)</label>
+                    <input type="file" id="q_pdf_file" accept="application/pdf" required>
+
+                    <input type="hidden" id="q_pdf_url">
+
+                    <div id="q_upload_status" style="display: none; padding: 10px; border-radius: 8px; margin-top: 10px; font-size: 13px; font-weight: 600;"></div>
 
                     <button type="submit" class="btn-primary" style="background: var(--ios-blue); margin-top:20px;">Register Quotation</button>
                 </form>
@@ -894,7 +899,7 @@
             } catch (error) { console.error(error); alert("Gagal memproses nombor turutan."); }
         });
 
-        // Quotation Form Submit
+        // Quotation Form Submit (Saling bekerjasama dengan onedrive-uploader.js)
         const qForm = document.getElementById('quotationForm');
         if(qForm) {
             qForm.addEventListener('submit', async (e) => {
@@ -906,29 +911,43 @@
                 if(currentWorkIds.length === 0){ alert("Sila masukkan sekurang-kurangnya satu Work Order ID!"); return; }
 
                 const statusValue = document.getElementById('q_status').value;
+                const selectUnitElement = document.getElementById('q_unit_id');
+                const unitText = selectUnitElement.options[selectUnitElement.selectedIndex].text;
+
+                // 🚀 Panggil fungsi OneDrive Uploader untuk proses fail ke cloud
+                // Parameter: fileInputId, workId, unitText, statusDivId, hiddenUrlInputId
+                // Kita guna ID pertama dari barisan Work ID untuk penamaan fail OneDrive
+                const primaryWorkId = currentWorkIds[0];
+                await uploadQuotationToOneDrive('q_pdf_file', primaryWorkId, unitText, 'q_upload_status', 'q_pdf_url');
+
+                // Ambil nilai yang dijana oleh uploader dari hidden input
+                const generatedPdfUrl = document.getElementById('q_pdf_url').value;
+                if(!generatedPdfUrl) {
+                    alert("Proses upload OneDrive gagal. Data Supabase tidak disimpan.");
+                    return;
+                }
                 
-                // Simpan setiap Work Order ID ke Supabase
+                // Simpan setiap Work Order ID ke Supabase bersama rujukan nama fail OneDrive tadi
                 let successCount = 0;
                 for(const workIdValue of currentWorkIds) {
                     const payload = {
-    work_id: workIdValue,
-    contract_code: contractCode,
-    status: statusValue,
-    reject_reason: statusValue === 'Rejected' ? document.getElementById('q_reject_reason').value : null,
-    pdf_url: document.getElementById('q_pdf_url').value.trim() || null,
-    qpd_date: document.getElementById('q_qpb_date').value || null
-};
-
+                        work_id: workIdValue,
+                        contract_code: contractCode,
+                        status: statusValue,
+                        reject_reason: statusValue === 'Rejected' ? document.getElementById('q_reject_reason').value : null,
+                        pdf_url: generatedPdfUrl, // Menyimpan rujukan nama fail (cth: C 123456.pdf)
+                        qpd_date: document.getElementById('q_qpb_date').value || null
+                    };
 
                     const res = await fetch(`${SB_URL}/rest/v1/quotations`, { method: 'POST', headers, body: JSON.stringify(payload) });
                     if(res.ok) successCount++;
                 }
 
                 if (successCount > 0) { 
-                    alert(`${successCount} Quotation berjaya direkodkan!`); 
+                    alert(`${successCount} Quotation & Dokumen OneDrive berjaya direkodkan!`); 
                     location.reload(); 
                 } else { 
-                    alert("Gagal menyimpan quotation."); 
+                    alert("Gagal menyimpan quotation ke pangkalan data."); 
                 }
             });
         }
@@ -1229,8 +1248,6 @@
             container.appendChild(span);
         });
     }
-
-    function removeID(id) { attachedWorkOrders = attachedWorkOrders.filter(item => item !== id); renderIDTags(); }
 
     function removeID(id) { attachedWorkOrders = attachedWorkOrders.filter(item => item !== id); renderIDTags(); }
 
@@ -1562,5 +1579,8 @@
         }, { passive:true });
     });
 </script>
+
+<script src="onedrive-uploader.js"></script>
+
 </body>
 </html>
