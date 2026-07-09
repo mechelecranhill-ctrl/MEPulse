@@ -22,41 +22,37 @@
     </header>
 
     <div class="container mx-auto px-4">
-        <section class="bg-white rounded-xl shadow-md p-6 border-t-4 border-amber-500">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold text-gray-700">
-                    <i class="fa-solid fa-user-tie text-amber-500 mr-2"></i>Executive Dashboard
-                </h2>
-                <span class="text-xs bg-amber-100 text-amber-800 font-bold px-2.5 py-1 rounded">Filtering: BLUEFORM</span>
-            </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             
-            <div id="contracts-container" class="space-y-8">
-                <div class="text-center text-gray-400 py-4">Loading data...</div>
-            </div>
-        </section>
+            <section class="bg-white rounded-xl shadow-md p-6 border-t-4 border-blue-500">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold text-gray-700">
+                        <i class="fa-solid fa-file-invoice-dollar text-blue-500 mr-2"></i>1. Quotation Approvals
+                    </h2>
+                    <span class="text-xs bg-blue-100 text-blue-800 font-bold px-2.5 py-1 rounded">Status: QUOTATION</span>
+                </div>
+                <div id="quotations-container" class="space-y-6">
+                    <div class="text-center text-gray-400 py-4">Loading quotations...</div>
+                </div>
+            </section>
+
+            <section class="bg-white rounded-xl shadow-md p-6 border-t-4 border-amber-500">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold text-gray-700">
+                        <i class="fa-solid fa-file-lines text-amber-500 mr-2"></i>2. Blueform Approvals
+                    </h2>
+                    <span class="text-xs bg-amber-100 text-amber-800 font-bold px-2.5 py-1 rounded">Status: BLUEFORM</span>
+                </div>
+                <div id="blueforms-container" class="space-y-6">
+                    <div class="text-center text-gray-400 py-4">Loading blueforms...</div>
+                </div>
+            </section>
+
+        </div>
     </div>
 
-    <div id="bulkPreviewPage" style="
-        display:none;
-        position:fixed;
-        inset:0;
-        background:#525659;
-        z-index:9998;
-        overflow-y:auto;
-        padding:60px 0 60px 0;
-    ">
-        <div class="bulk-toolbar" style="
-            position:fixed;
-            top:0; left:0; right:0;
-            height:50px;
-            background:#323639;
-            display:flex;
-            align-items:center;
-            justify-content:space-between;
-            padding:0 30px;
-            z-index:9999;
-            box-shadow:0 2px 10px rgba(0,0,0,0.4);
-        ">
+    <div id="bulkPreviewPage" style="display:none; position:fixed; inset:0; background:#525659; z-index:9998; overflow-y:auto; padding:60px 0 60px 0;">
+        <div class="bulk-toolbar" style="position:fixed; top:0; left:0; right:0; height:50px; background:#323639; display:flex; align-items:center; justify-content:space-between; padding:0 30px; z-index:9999; box-shadow:0 2px 10px rgba(0,0,0,0.4);">
             <div style="color:white;font-size:13px;font-weight:600;" id="bulkPreviewCount"></div>
             <div style="display:flex;gap:10px;">
                 <button class="btn-action" style="background:#555;border:none;padding:10px 20px;border-radius:10px;color:white;font-weight:600;cursor:pointer;" onclick="closeBulkPreview()">
@@ -67,14 +63,7 @@
                 </button>
             </div>
         </div>
-
-        <div id="bulkPagesContainer" style="
-            display:flex;
-            flex-direction:column;
-            align-items:center;
-            gap:20px;
-            padding:10px 0;
-        "></div>
+        <div id="bulkPagesContainer" style="display:flex; flex-direction:column; align-items:center; gap:20px; padding:10px 0;"></div>
     </div>
 
     <script src="blueform.js"></script>
@@ -83,17 +72,13 @@
 
         async function fetchDashboard() {
             try {
-                const container = document.getElementById('contracts-container');
-
-                // 1. Get logged-in user information
                 const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-                
                 if (userError || !user) {
-                    showEmptyState('Please log in first.');
+                    showEmptyState('quotations-container', 'Please log in first.');
+                    showEmptyState('blueforms-container', 'Please log in first.');
                     return;
                 }
 
-                // 2. Get unit_id for this staff member
                 const { data: assignment, error: assignError } = await supabaseClient
                     .from('staff_unit_assignment')
                     .select('unit_id')
@@ -101,15 +86,15 @@
                     .maybeSingle();
 
                 if (assignError) throw assignError;
-                
                 if (!assignment || !assignment.unit_id) {
-                    showEmptyState('Error: Your account is not assigned to any unit.');
+                    showEmptyState('quotations-container', 'Account not assigned to any unit.');
+                    showEmptyState('blueforms-container', 'Account not assigned to any unit.');
                     return;
                 }
 
                 const userUnitId = assignment.unit_id;
 
-                // 3. Fetch work_orders data (Termasuk contract_code daripada relation)
+                // Kekalkan tarikan status asal: QUOTATION & BLUEFORM untuk dipaparkan pada dashboard eksekutif
                 const { data: workOrders, error: workError } = await supabaseClient
                     .from('work_orders')
                     .select(`
@@ -120,112 +105,16 @@
                         district,
                         contract!inner (id, contract_name, contract_code, unit_id)
                     `)
-                    .eq('status', 'BLUEFORM')
+                    .in('status', ['QUOTATION', 'BLUEFORM'])
                     .eq('contract.unit_id', userUnitId);
 
                 if (workError) throw workError;
 
-                if (workOrders.length === 0) {
-                    showEmptyState('No contracts with BLUEFORM status found for your unit.');
-                    return;
-                }
+                const quotationOrders = workOrders.filter(item => item.status === 'QUOTATION');
+                const blueformOrders = workOrders.filter(item => item.status === 'BLUEFORM');
 
-                // Grouping by sequence_no for blueform-shared.js
-                const seqGroups = buildSequenceGroups(workOrders);
-
-                // 4. GROUP DATA BY CONTRACT CODE
-                const contractsMap = {};
-                workOrders.forEach(item => {
-                    let cCode = 'No Code';
-                    let cName = 'No Name';
-                    
-                    if (item.contract) {
-                        const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
-                        cCode = contractData?.contract_code || 'No Code';
-                        cName = contractData?.contract_name || 'No Name';
-                    }
-
-                    // Gunakan cCode sebagai unique key kumpulan
-                    if (!contractsMap[cCode]) {
-                        contractsMap[cCode] = {
-                            code: cCode,
-                            name: cName,
-                            orders: []
-                        };
-                    }
-                    contractsMap[cCode].orders.push(item);
-                });
-
-                // 5. RENDER CONTRACT SECTIONS
-                container.innerHTML = '';
-                const renderedBlueformSeqs = new Set();
-
-                for (const contractCode in contractsMap) {
-                    const contract = contractsMap[contractCode];
-                    
-                    // Create Section Wrapper
-                    const contractSection = document.createElement('div');
-                    contractSection.className = "bg-gray-50 rounded-lg p-4 border border-gray-200 shadow-sm mb-6";
-                    
-                    // Header HTML kini memaparkan [Kod Kontrak - Nama Kontrak]
-                    let sectionHtml = `
-                        <div class="bg-gray-200 px-4 py-2.5 rounded-t-lg border-b border-gray-300 flex justify-between items-center mb-3">
-                            <h3 class="font-bold text-gray-800 text-sm md:text-base flex items-center">
-                                <i class="fa-solid fa-barcode text-blue-700 mr-2"></i> 
-                                <span class="bg-blue-700 text-white text-xs px-2 py-1 rounded font-mono mr-2">${contract.code}</span> 
-                                ${contract.name}
-                            </h3>
-                            <span class="text-xs bg-blue-100 text-blue-800 font-semibold px-2 py-0.5 rounded-full">
-                                ${contract.orders.length} Work Order(s)
-                            </span>
-                        </div>
-                        <div class="overflow-x-auto bg-white rounded-b-lg border border-gray-200">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Work ID</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">Status</th>
-                                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-                    `;
-
-                    // Rows for each Work Order under this contract
-                    contract.orders.forEach(item => {
-                        const seq = (item.sequence_no || '').trim();
-                        const blueformBtnHtml = renderBlueformButtonHtml(item, seqGroups, renderedBlueformSeqs);
-
-                        sectionHtml += `
-                            <tr class="hover:bg-gray-50 transition-colors">
-                                <td class="px-6 py-4 whitespace-nowrap font-mono text-sm text-gray-900">
-                                    ${item.work_id}${seq ? ` <span class="text-gray-400 text-xs">(${seq})</span>` : ''}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">
-                                        ${item.status}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                                    ${blueformBtnHtml}
-                                    <button onclick="approveContract('${item.work_id}', 'APP-EXEC')" 
-                                            class="text-white px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer bg-amber-600 hover:bg-amber-700 inline-block">
-                                        <i class="fa-solid fa-check mr-1"></i> Approve (Exec)
-                                    </button>
-                                </td>
-                            </tr>
-                        `;
-                    });
-
-                    sectionHtml += `
-                                </tbody>
-                            </table>
-                        </div>
-                    `;
-                    
-                    contractSection.innerHTML = sectionHtml;
-                    container.appendChild(contractSection);
-                }
+                renderSection('quotations-container', quotationOrders, 'QUOTATION');
+                renderSection('blueforms-container', blueformOrders, 'BLUEFORM');
 
             } catch (err) {
                 console.error("Error fetching data:", err.message);
@@ -233,15 +122,110 @@
             }
         }
 
-        function showEmptyState(message) {
-            document.getElementById('contracts-container').innerHTML = `
-                <div class="text-center py-12 text-gray-400 italic bg-white rounded-lg border border-gray-200">
-                    <i class="fa-solid fa-inbox block text-3xl mb-2 text-gray-300"></i> ${message}
+        function renderSection(containerId, orders, type) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+
+            if (orders.length === 0) {
+                showEmptyState(containerId, `No pending items for ${type}.`);
+                return;
+            }
+
+            const contractsMap = {};
+            orders.forEach(item => {
+                const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
+                const cCode = contractData?.contract_code || 'No Code';
+                const cName = contractData?.contract_name || 'No Name';
+
+                if (!contractsMap[cCode]) {
+                    contractsMap[cCode] = { code: cCode, name: cName, orders: [] };
+                }
+                contractsMap[cCode].orders.push(item);
+            });
+
+            const seqGroups = buildSequenceGroups(orders);
+            const renderedSeqs = new Set();
+
+            for (const contractCode in contractsMap) {
+                const contract = contractsMap[contractCode];
+                const contractSection = document.createElement('div');
+                contractSection.className = "bg-gray-50 rounded-lg p-3 border border-gray-200 shadow-sm";
+
+                let headerBg = type === 'QUOTATION' ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200';
+                let badgeBg = type === 'QUOTATION' ? 'bg-blue-600' : 'bg-amber-600';
+
+                let sectionHtml = `
+                    <div class="${headerBg} px-3 py-2 rounded-t-lg border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
+                        <h3 class="font-bold text-gray-800 text-xs flex items-center flex-wrap">
+                            <span class="${badgeBg} text-white text-[10px] px-1.5 py-0.5 rounded font-mono mr-1.5 shadow-xs">${contract.code}</span> 
+                            <span class="truncate max-w-[180px] sm:max-w-xs">${contract.name}</span>
+                        </h3>
+                        <span class="text-[11px] bg-white text-gray-600 border border-gray-300 font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+                            ${contract.orders.length} Row(s)
+                        </span>
+                    </div>
+                    <div class="overflow-x-auto bg-white rounded-b-lg border border-gray-100">
+                        <table class="min-w-full divide-y divide-gray-200 text-xs">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Work ID</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                `;
+
+                contract.orders.forEach(item => {
+                    const seq = (item.sequence_no || '').trim();
+                    let actionButtonsHtml = '';
+
+                    if (type === 'QUOTATION') {
+                        // 🌟 TUKAR DI SINI: Status ditukar ke 'PENDING-BLUEFORM' (bukan terus ke 'BLUEFORM')
+                        // Sila ubah string 'PENDING-BLUEFORM' mengikut nama status sebenar dalam DB anda jika berbeza
+                        actionButtonsHtml = `
+                            <button onclick="updateStatus('${item.work_id}', 'PENDING-BLUEFORM', 'Approve Quotation')" 
+                                    class="text-white px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 font-medium transition-all shadow-xs cursor-pointer">
+                                <i class="fa-solid fa-arrow-right mr-1"></i> Approve Quotation
+                            </button>
+                        `;
+                    } else {
+                        const blueformBtnHtml = renderBlueformButtonHtml(item, seqGroups, renderedSeqs);
+                        actionButtonsHtml = `
+                            ${blueformBtnHtml}
+                            <button onclick="updateStatus('${item.work_id}', 'APP-EXEC', 'Approve Blueform')" 
+                                    class="text-white px-3 py-1 rounded bg-amber-600 hover:bg-amber-700 font-medium transition-all shadow-xs cursor-pointer inline-block">
+                                <i class="fa-solid fa-check mr-1"></i> Approve (Exec)
+                            </button>
+                        `;
+                    }
+
+                    sectionHtml += `
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-3 py-3 whitespace-nowrap font-mono text-gray-900 font-medium">
+                                ${item.work_id}${seq ? ` <span class="text-gray-400 text-[11px]">(${seq})</span>` : ''}
+                            </td>
+                            <td class="px-3 py-3 whitespace-nowrap text-right space-x-1">
+                                ${actionButtonsHtml}
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                sectionHtml += `</tbody></table></div>`;
+                contractSection.innerHTML = sectionHtml;
+                container.appendChild(contractSection);
+            }
+        }
+
+        function showEmptyState(containerId, message) {
+            document.getElementById(containerId).innerHTML = `
+                <div class="text-center py-8 text-gray-400 text-xs italic bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                    <i class="fa-solid fa-inbox block text-xl mb-1 text-gray-300"></i> ${message}
                 </div>`;
         }
 
-        async function approveContract(workId, nextStatus) {
-            if (!confirm(`Are you sure you want to change the status of Work ID: ${workId} to ${nextStatus}?`)) return;
+        async function updateStatus(workId, nextStatus, label) {
+            if (!confirm(`Are you sure you want to proceed with [${label}] for Work ID: ${workId}?`)) return;
 
             try {
                 const { error } = await supabaseClient
@@ -251,11 +235,11 @@
 
                 if (error) throw error;
 
-                alert(`Successfully updated to status ${nextStatus}!`);
+                alert(`Success! Work ID ${workId} moved to status: ${nextStatus}`);
                 fetchDashboard();
 
             } catch (err) {
-                console.error("Error during approval:", err.message);
+                console.error(`Error during ${label}:`, err.message);
                 alert("Failed to update status: " + err.message);
             }
         }
