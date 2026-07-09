@@ -4,7 +4,6 @@
    Digunakan bersama oleh: contract-usage.html, app-exec.html,
    app-sect.html, app-dept.html
 
-
    CARA GUNA:
    1. Letak <link rel="stylesheet" href="blueform.css"> di <head>
    2. Letak <script src="blueform-shared.js"></script> SEBELUM
@@ -626,14 +625,12 @@ let formattedRef = seq ? ` - ${seq}` : '';
 
     return `
     <div class="a4-container" style="
-    width:210mm;
-    height:297mm;
-    margin:0; background:white;
-        padding:1.3cm 2cm 1.2cm 2cm; position:relative;
+        width:210mm; height:297mm; margin:0; background:white;
+        padding:1.5cm 2cm 1.6cm 2cm; position:relative;
         font-size:11px; color:black; line-height:1.3;
         box-sizing:border-box; display:flex; flex-direction:column;
         overflow:hidden; box-shadow:0 4px 30px rgba(0,0,0,0.4);
-        page-break-inside:avoid; flex-shrink:0;">
+        page-break-after:always; page-break-inside:avoid; flex-shrink:0;">
         <img src="RSAJ.png" class="bf-logo" alt="RSAJ Logo"
             onerror="this.src='https://upload.wikimedia.org/wikipedia/en/thumb/3/3d/Ranhill_SAJ_logo.svg/1200px-Ranhill_SAJ_logo.svg.png'">
         <div id="bf_title" style="text-align:center;font-weight:bold;margin-top:0.7cm;margin-bottom:12px;padding:0 50px;font-size:10px;">
