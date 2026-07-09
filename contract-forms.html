@@ -161,7 +161,7 @@
         .glass-header { 
             width: 100%; 
             height: calc(60px + env(safe-area-inset-top)); 
-            padding: env(safe-area-inset-top) 60px 0 60px; 
+            padding: env(safe-area-inset-top) 10px 0 10px; 
             background:
                 radial-gradient(circle at top, rgba(255,255,255,.15), transparent 35%),
                 linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%);
@@ -595,46 +595,29 @@
             <div class="glass-card">
                 <h3 style="margin-top:0;"><i class="fa-solid fa-file-lines"></i> Quotation</h3>
                 <form id="quotationForm">
-                    <label>Units</label>
-                    <select id="q_unit_id" required><option value="">Choose Unit</option></select>
+                    <label>Work ID</label>
+                    <input type="text" id="q_work_id" placeholder="Example: C 123456" required>
 
-                    <label>Quotation No / Reference</label>
-                    <input type="text" id="q_no" placeholder="Example: QT-2026-001" required>
+                    <label>Contract Code</label>
+                    <input type="text" id="q_contract_code" placeholder="Example: RSAJ/KP/T/57/2024" required>
 
-                    <label>Quotation Title / Project Name</label>
-                    <textarea id="q_title" placeholder="Enter quotation details/scope" required></textarea>
+                    <label>Status</label>
+                    <select id="q_status" required onchange="toggleRejectReason(this.value)">
+                        <option value="Draft">Draft</option>
+                        <option value="Pending Approval">Pending Approval</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Rejected">Rejected</option>
+                    </select>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div>
-                            <label>Quotation Date</label>
-                            <input type="date" id="q_date" required>
-                        </div>
-                        <div>
-                            <label>Validity Period</label>
-                            <input type="text" id="q_validity" placeholder="Example: 30 Days" required>
-                        </div>
+                    <div id="reject_reason_container" style="display: none;">
+                        <label style="color: var(--ios-red);">Reject Reason</label>
+                        <textarea id="q_reject_reason" placeholder="Sila nyatakan sebab penolakan..."></textarea>
                     </div>
 
-                    <label>Vendor / Contractor</label>
-                    <input type="text" id="q_vendor" placeholder="COMPANY NAME" required>
+                    <label>PDF URL Document</label>
+                    <input type="url" id="q_pdf_url" placeholder="https://example.com/storage/quotation.pdf">
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div>
-                            <label>Amount (Excl. Tax)</label>
-                            <input type="text" id="q_amount" data-raw-value="0" value="0.00" placeholder="0.00" oninput="formatCurrencyInput(this); calculateQuotationTotal();">
-                        </div>
-                        <div>
-                            <label>Tax Amount (RM)</label>
-                            <input type="text" id="q_tax" data-raw-value="0" value="0.00" placeholder="0.00" oninput="formatCurrencyInput(this); calculateQuotationTotal();">
-                        </div>
-                    </div>
-
-                    <div style="margin-top: 15px; padding: 12px; background: rgba(0,0,0,0.05); border-radius: 10px; border-left: 5px solid var(--ios-blue);">
-                        <label style="margin-top:0;">Total Quotation Value (Nett)</label>
-                        <div id="q_total_display" style="font-size: 18px; font-weight: 800; color: #333;">RM 0.00</div>
-                    </div>
-
-                    <button type="submit" class="btn-primary" style="background: var(--ios-blue);">Register Quotation</button>
+                    <button type="submit" class="btn-primary" style="background: var(--ios-blue); margin-top:20px;">Register Quotation</button>
                 </form>
             </div>
         </div>
@@ -760,12 +743,17 @@
         input.dataset.rawValue = val.toFixed(2);
     }
 
-    function calculateQuotationTotal() {
-        const amount = parseFloat(document.getElementById('q_amount').dataset.rawValue || 0);
-        const tax = parseFloat(document.getElementById('q_tax').dataset.rawValue || 0);
-        const total = amount + tax;
-        document.getElementById('q_total_display').innerText = `RM ${total.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        return total;
+    function toggleRejectReason(status) {
+        const container = document.getElementById('reject_reason_container');
+        const reasonInput = document.getElementById('q_reject_reason');
+        if (status === 'Rejected') {
+            container.style.display = 'block';
+            reasonInput.setAttribute('required', 'true');
+        } else {
+            container.style.display = 'none';
+            reasonInput.removeAttribute('required');
+            reasonInput.value = '';
+        }
     }
 
     function setupFormListeners() {
@@ -892,25 +880,28 @@
             } catch (error) { console.error(error); alert("Gagal memproses nombor turutan."); }
         });
 
-        // Quotation Form Submit (TAMBAHAN BARU)
+        // REVISED Quotation Form Submit (Mapped perfectly to your supabase schema)
         const qForm = document.getElementById('quotationForm');
         if(qForm) {
             qForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
+                
+                const statusValue = document.getElementById('q_status').value;
                 const payload = {
-                    unit_id: document.getElementById('q_unit_id').value,
-                    quotation_no: document.getElementById('q_no').value,
-                    quotation_title: document.getElementById('q_title').value,
-                    quotation_date: document.getElementById('q_date').value,
-                    validity_period: document.getElementById('q_validity').value,
-                    vendor_name: document.getElementById('q_vendor').value,
-                    amount_excl_tax: parseFloat(document.getElementById('q_amount').dataset.rawValue || 0),
-                    tax_amount: parseFloat(document.getElementById('q_tax').dataset.rawValue || 0),
-                    total_amount: calculateQuotationTotal()
+                    work_id: document.getElementById('q_work_id').value.trim().toUpperCase(),
+                    contract_code: document.getElementById('q_contract_code').value.trim().toUpperCase(),
+                    status: statusValue,
+                    reject_reason: statusValue === 'Rejected' ? document.getElementById('q_reject_reason').value : null,
+                    pdf_url: document.getElementById('q_pdf_url').value.trim() || null
                 };
 
                 const res = await fetch(`${SB_URL}/rest/v1/quotations`, { method: 'POST', headers, body: JSON.stringify(payload) });
-                if (res.ok) { alert("Quotation berjaya didaftarkan!"); location.reload(); } else { alert("Gagal menyimpan quotation."); }
+                if (res.ok) { 
+                    alert("Quotation berjaya direkodkan!"); 
+                    location.reload(); 
+                } else { 
+                    alert("Gagal menyimpan quotation."); 
+                }
             });
         }
     }
@@ -924,20 +915,17 @@
             const wUnit = document.getElementById('w_unit_id');
             const iUnit = document.getElementById('i_unit_id');
             const voUnit = document.getElementById('vo_unit_id');
-            const qUnit = document.getElementById('q_unit_id');
 
             if(admin) admin.innerHTML = '<option value="">Choose Unit</option>';
             if(wUnit) wUnit.innerHTML = '<option value="">Choose Unit</option>';
             if(iUnit) iUnit.innerHTML = '<option value="">Choose Unit</option>';
             if(voUnit) voUnit.innerHTML = '<option value="">Choose Unit</option>';
-            if(qUnit) qUnit.innerHTML = '<option value="">Choose Unit</option>';
 
             units.forEach(u=>{
                 if(admin) admin.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
                 if(wUnit) wUnit.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
                 if(iUnit) iUnit.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
                 if(voUnit) voUnit.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
-                if(qUnit) qUnit.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
             });
         }catch(e){ console.error(e); }
     }
