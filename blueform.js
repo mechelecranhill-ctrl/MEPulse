@@ -626,7 +626,7 @@ let formattedRef = seq ? ` - ${seq}` : '';
     return `
     <div class="a4-container" style="
     width:210mm;
-    min-height:297mm;
+    height:297mm;
     margin:0; background:white;
         padding:1.3cm 2cm 1.2cm 2cm; position:relative;
         font-size:11px; color:black; line-height:1.3;
