@@ -101,7 +101,7 @@
         <div id="bulkPagesContainer" style="display:flex; flex-direction:column; align-items:center; gap:20px; padding:10px 0;"></div>
     </div>
 
-    <script src="blueform.js"></script>
+        <script src="blueform.js"></script>
     <script>
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
@@ -109,11 +109,12 @@
             try {
                 const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
                 if (userError || !user) {
-                    showEmptyState('quotations-container', 'Please log in first.');
-                    showEmptyState('blueforms-container', 'Please log in first.');
+                    showEmptyState('quotations-container', 'Sila log masuk terlebih dahulu.');
+                    showEmptyState('blueforms-container', 'Sila log masuk terlebih dahulu.');
                     return;
                 }
 
+                // 1. Dapatkan unit_id untuk staf yang sedang log masuk
                 const { data: assignment, error: assignError } = await supabaseClient
                     .from('staff_unit_assignment')
                     .select('unit_id')
@@ -122,14 +123,14 @@
 
                 if (assignError) throw assignError;
                 if (!assignment || !assignment.unit_id) {
-                    showEmptyState('quotations-container', 'Account not assigned to any unit.');
-                    showEmptyState('blueforms-container', 'Account not assigned to any unit.');
+                    showEmptyState('quotations-container', 'Akaun anda belum dilesenkan/diuntukkan kepada mana-mana unit.');
+                    showEmptyState('blueforms-container', 'Akaun anda belum dilesenkan/diuntukkan kepada mana-mana unit.');
                     return;
                 }
 
                 const userUnitId = assignment.unit_id;
 
-                // 1. Ambil data dari jadual staging (quotation_stages) yang statusnya masih 'QUOTATION'
+                // 2. Ambil data Quotation mengikut Unit Pengguna (Gunakan struktur join yang betul)
                 const { data: quotationOrders, error: qError } = await supabaseClient
                     .from('quotations')
                     .select(`
@@ -145,7 +146,7 @@
 
                 if (qError) throw qError;
 
-                // 2. Ambil data Blueform dari jadual kekal (work_orders)
+                // 3. Ambil data Blueform mengikut Unit Pengguna
                 const { data: blueformOrders, error: wError } = await supabaseClient
                     .from('work_orders')
                     .select(`
@@ -161,12 +162,13 @@
 
                 if (wError) throw wError;
 
+                // 4. Render ke dalam UI Dashboard
                 renderSection('quotations-container', quotationOrders, 'QUOTATION');
                 renderSection('blueforms-container', blueformOrders, 'BLUEFORM');
 
             } catch (err) {
                 console.error("Error fetching data:", err.message);
-                alert("Failed to load data: " + err.message);
+                alert("Gagal memuatkan data dashboard: " + err.message);
             }
         }
 
@@ -174,15 +176,19 @@
             const container = document.getElementById(containerId);
             container.innerHTML = '';
 
-            if (orders.length === 0) {
-                showEmptyState(containerId, `No pending items for ${type}.`);
+            if (!orders || orders.length === 0) {
+                showEmptyState(containerId, `Tiada tugasan tertunda untuk ${type}.`);
                 return;
             }
 
+            // Grouping data mengikut Contract Code
             const contractsMap = {};
             orders.forEach(item => {
+                // Pembaikan bug rujukan objek contract daripada Supabase
                 const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
-                const cCode = contractData?.contract_code || 'No Code';
+                
+                // Jika Supabase pulangkan direct property atau fallback ke item
+                const cCode = contractData?.contract_code || item.contract_code || 'No Code';
                 const cName = contractData?.contract_name || 'No Name';
 
                 if (!contractsMap[cCode]) {
@@ -191,25 +197,25 @@
                 contractsMap[cCode].orders.push(item);
             });
 
-            const seqGroups = type === 'BLUEFORM' ? buildSequenceGroups(orders) : null;
+            const seqGroups = type === 'BLUEFORM' ? (typeof buildSequenceGroups === 'function' ? buildSequenceGroups(orders) : null) : null;
             const renderedSeqs = new Set();
 
             for (const contractCode in contractsMap) {
                 const contract = contractsMap[contractCode];
                 const contractSection = document.createElement('div');
-                contractSection.className = "bg-gray-50 rounded-lg p-3 border border-gray-200 shadow-sm";
+                contractSection.className = "bg-gray-50 rounded-lg p-3 border border-gray-200 shadow-sm mb-4";
 
                 let headerBg = type === 'QUOTATION' ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200';
                 let badgeBg = type === 'QUOTATION' ? 'bg-blue-600' : 'bg-amber-600';
 
                 let sectionHtml = `
-                    <div class="${headerBg} px-3 py-2 rounded-t-lg border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2 flex-shrink-0">
+                    <div class="${headerBg} px-3 py-2 rounded-t-lg border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
                         <h3 class="font-bold text-gray-800 text-xs flex items-center flex-wrap">
                             <span class="${badgeBg} text-white text-[10px] px-1.5 py-0.5 rounded font-mono mr-1.5 shadow-xs">${contract.code}</span> 
                             <span class="truncate max-w-[140px] sm:max-w-xs">${contract.name}</span>
                         </h3>
                         <span class="text-[11px] bg-white text-gray-600 border border-gray-300 font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
-                            ${contract.orders.length} Row(s)
+                            ${contract.orders.length} Baris
                         </span>
                     </div>
                     <div class="overflow-x-auto bg-white rounded-b-lg border border-gray-100">
@@ -217,7 +223,7 @@
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Work ID</th>
-                                    <th class="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    <th class="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Tindakan</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
@@ -228,13 +234,13 @@
                     let actionButtonsHtml = '';
 
                     if (type === 'QUOTATION') {
+                        // Butang PDF Sebut Harga
                         let pdfBtn = item.pdf_url ? `
-                            <a href="${item.pdf_url}" target="_blank" class="text-gray-700 bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded transition-all font-medium inline-block" title="Lihat PDF Sebut Harga">
+                            <a href="${item.pdf_url}" target="_blank" class="text-gray-700 bg-gray-200 hover:bg-gray-300 px-2.5 py-1 rounded transition-all font-medium inline-block" title="Lihat PDF Sebut Harga">
                                 <i class="fa-solid fa-file-pdf text-red-600"></i>
                             </a>
-                        ` : '';
+                        ` : '<span class="text-gray-400 text-[10px] italic px-1">Tiada PDF</span>';
 
-                        // Menghantar status 'QUO-APP' apabila Eksekutif meluluskan sebut harga
                         actionButtonsHtml = `
                             <div class="inline-flex items-center gap-1">
                                 ${pdfBtn}
@@ -249,7 +255,8 @@
                             </div>
                         `;
                     } else {
-                        const blueformBtnHtml = renderBlueformButtonHtml(item, seqGroups, renderedSeqs);
+                        // Untuk Blueform Section
+                        const blueformBtnHtml = typeof renderBlueformButtonHtml === 'function' ? renderBlueformButtonHtml(item, seqGroups, renderedSeqs) : '';
                         actionButtonsHtml = `
                             <div class="inline-flex items-center gap-1">
                                 ${blueformBtnHtml}
@@ -320,7 +327,7 @@
                 iconContainer.className = "w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md text-xl text-blue-600";
                 icon.className = "fa-solid fa-file-invoice-dollar";
                 title.innerText = "Luluskan Quotation";
-                msg.innerHTML = `Luluskan sebut harga <span class="font-mono font-bold text-gray-800">${workId}</span>? Status bertukar ke <span class="text-blue-600 font-bold">QUO-APP</span> untuk teknisi mula mengisi Blueform.`;
+                msg.innerHTML = `Luluskan sebut harga <span class="font-mono font-bold text-gray-800">${workId}</span>? Status bertukar ke <span class="text-blue-600 font-bold">QUO-APP</span>.`;
                 confirmBtn.className = "flex-1 px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-all shadow-md bg-blue-600 hover:bg-blue-700 cursor-pointer";
             } 
             else if (mode === 'BLUEFORM') {
@@ -336,7 +343,7 @@
                 iconContainer.className = "w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md text-xl text-red-600";
                 icon.className = "fa-solid fa-ban";
                 title.innerText = "Reject Quotation";
-                msg.innerHTML = `Sahkan penolakan sebut harga <span class="font-mono font-bold text-gray-800">${workId}</span>. Status staging bertukar ke <span class="text-red-600 font-bold">QUO-REJ</span>.`;
+                msg.innerHTML = `Sahkan penolakan sebut harga <span class="font-mono font-bold text-gray-800">${workId}</span>. Status bertukar ke <span class="text-red-600 font-bold">QUO-REJ</span>.`;
                 confirmBtn.className = "flex-1 px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-all shadow-md bg-red-600 hover:bg-red-700 cursor-pointer";
             } 
             else if (mode === 'REJECT-BF') {
@@ -383,14 +390,9 @@
         // ================= LOGIK KEMAS KINI STATUS IKUT JADUAL =================
         async function executeStatusUpdate(workId, nextStatus, reason = null) {
             try {
-                // KES 1: TENTANG QUOTATION (Sama ada Approve atau Reject, semuanya dikemaskini di dalam table quotation_stages sahaja!)
                 if (nextStatus === 'QUO-REJ' || nextStatus === 'QUO-APP') {
                     const updatePayload = { status: nextStatus };
-                    if (reason !== null) {
-                        updatePayload.reject_reason = reason;
-                    } else {
-                        updatePayload.reject_reason = null; // Reset semula jika tiada
-                    }
+                    if (reason !== null) updatePayload.reject_reason = reason;
 
                     const { error } = await supabaseClient
                         .from('quotations')
@@ -398,16 +400,9 @@
                         .eq('work_id', workId);
                         
                     if (error) throw error;
-                }
-                
-                // KES 2: TENTANG BLUEFORM (Kekal dikemaskini di dalam jadual rasmi work_orders)
-                else {
+                } else {
                     const updatePayload = { status: nextStatus };
-                    if (reason !== null) {
-                        updatePayload.reject_reason = reason;
-                    } else {
-                        updatePayload.reject_reason = null;
-                    }
+                    if (reason !== null) updatePayload.reject_reason = reason;
 
                     const { error } = await supabaseClient
                         .from('work_orders')
@@ -417,7 +412,7 @@
                     if (error) throw error;
                 }
 
-                // Muat semula dashboard untuk kemas kini paparan UI
+                // Refresh dashboard data semula
                 fetchDashboard();
 
             } catch (err) {
