@@ -24,6 +24,7 @@
     <div class="container mx-auto px-4 flex-1 my-6 overflow-hidden">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full pb-4">
             
+            <!-- ================= SIDE 1: QUOTATION ================= -->
             <section class="bg-white rounded-xl shadow-md p-5 border-t-4 border-blue-500 flex flex-col h-full overflow-hidden">
                 <div class="flex justify-between items-center mb-4 flex-shrink-0">
                     <h2 class="text-lg font-bold text-gray-700">
@@ -36,6 +37,7 @@
                 </div>
             </section>
 
+            <!-- ================= SIDE 2: BLUEFORM ================= -->
             <section class="bg-white rounded-xl shadow-md p-5 border-t-4 border-amber-500 flex flex-col h-full overflow-hidden">
                 <div class="flex justify-between items-center mb-4 flex-shrink-0">
                     <h2 class="text-lg font-bold text-gray-700">
@@ -51,17 +53,34 @@
         </div>
     </div>
 
+    <!-- ================= CUSTOM BEAUTIFUL MODAL CONFIRMATION ================= -->
     <div id="customConfirmModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[9999] p-4 transition-all duration-200">
         <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden transform scale-95 transition-transform duration-200 border border-gray-100">
+            <!-- Icon Header Banner -->
             <div id="modalBanner" class="p-6 flex justify-center items-center">
                 <div id="modalIconContainer" class="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-md text-2xl">
                     <i id="modalIcon" class="fa-solid"></i>
                 </div>
             </div>
-            <div class="p-6 text-center">
-                <h3 id="modalTitle" class="text-lg font-bold text-gray-900 mb-2">Sahkan Tindakan</h3>
-                <p id="modalMessage" class="text-sm text-gray-500 mb-6 leading-relaxed">Adakah anda pasti dengan keputusan ini?</p>
+            <!-- Content -->
+            <div class="p-6">
+                <div class="text-center">
+                    <h3 id="modalTitle" class="text-lg font-bold text-gray-900 mb-2">Sahkan Tindakan</h3>
+                    <p id="modalMessage" class="text-sm text-gray-500 mb-4 leading-relaxed">Adakah anda pasti dengan keputusan ini?</p>
+                </div>
+
+                <!-- Section Input Alasan (Akan dipaparkan/disembunyikan secara dinamik) -->
+                <div id="rejectReasonSection" class="hidden mb-5">
+                    <label for="rejectReasonInput" class="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1.5 text-left">
+                        Alasan Penolakan <span class="text-red-500">*</span>
+                    </label>
+                    <textarea id="rejectReasonInput" rows="3" 
+                              class="w-full text-xs p-3 border border-gray-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-red-500/20 focus:border-red-500 placeholder:text-gray-400 bg-gray-50 resize-none transition-all"
+                              placeholder="Sila nyatakan sebab penolakan di sini..."></textarea>
+                    <p id="rejectErrorMsg" class="hidden text-[11px] text-red-600 mt-1 font-medium"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Alasan penolakan wajib diisi.</p>
+                </div>
                 
+                <!-- Buttons -->
                 <div class="flex gap-3 justify-center">
                     <button onclick="closeConfirmModal()" class="flex-1 px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-sm transition-colors cursor-pointer">
                         Batal
@@ -74,6 +93,7 @@
         </div>
     </div>
 
+    <!-- Bulk Preview Modal Window -->
     <div id="bulkPreviewPage" style="display:none; position:fixed; inset:0; background:#525659; z-index:9998; overflow-y:auto; padding:60px 0 60px 0;">
         <div class="bulk-toolbar" style="position:fixed; top:0; left:0; right:0; height:50px; background:#323639; display:flex; align-items:center; justify-content:space-between; padding:0 30px; z-index:9999; box-shadow:0 2px 10px rgba(0,0,0,0.4);">
             <div style="color:white;font-size:13px;font-weight:600;" id="bulkPreviewCount"></div>
@@ -204,7 +224,7 @@
                     if (type === 'QUOTATION') {
                         actionButtonsHtml = `
                             <div class="inline-flex items-center gap-1">
-                                <button onclick="openConfirmModal('${item.work_id}', 'QUOTATION-REJECTED', 'REJECT-QUOTE')" 
+                                <button onclick="openConfirmModal('${item.work_id}', 'QUO-REJ', 'REJECT-QUOTE')" 
                                         class="text-white px-2 py-1 rounded bg-red-600 hover:bg-red-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Reject Quotation">
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
@@ -219,7 +239,7 @@
                         actionButtonsHtml = `
                             <div class="inline-flex items-center gap-1">
                                 ${blueformBtnHtml}
-                                <button onclick="openConfirmModal('${item.work_id}', 'BLUEFORM-REJECTED', 'REJECT-BF')" 
+                                <button onclick="openConfirmModal('${item.work_id}', 'EXEC-REJ', 'REJECT-BF')" 
                                         class="text-white px-2 py-1 rounded bg-red-600 hover:bg-red-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Reject Blueform">
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
@@ -256,7 +276,7 @@
                 </div>`;
         }
 
-        // ================= LOGIK MODAL CUSTOM DENGAN VARIASI REJECT =================
+        // ================= LOGIK MODAL CUSTOM DENGAN INPUT REASON =================
         function openConfirmModal(workId, nextStatus, mode) {
             const modal = document.getElementById('customConfirmModal');
             const banner = document.getElementById('modalBanner');
@@ -265,13 +285,30 @@
             const title = document.getElementById('modalTitle');
             const msg = document.getElementById('modalMessage');
             const confirmBtn = document.getElementById('modalConfirmBtn');
+            const reasonSection = document.getElementById('rejectReasonSection');
+            const reasonInput = document.getElementById('rejectReasonInput');
+            const errorMsg = document.getElementById('rejectErrorMsg');
+
+            // Reset input state & error alert setiap kali diklik
+            reasonInput.value = '';
+            errorMsg.classList.add('hidden');
+            reasonInput.classList.remove('border-red-500', 'focus:ring-red-500/20');
+
+            const isReject = mode.startsWith('REJECT-');
+
+            // Kawal paparan input alasan reject
+            if (isReject) {
+                reasonSection.classList.remove('hidden');
+            } else {
+                reasonSection.classList.add('hidden');
+            }
 
             if (mode === 'QUOTATION') {
                 banner.className = "p-5 bg-blue-50 text-blue-600 flex justify-center items-center border-b border-blue-100";
                 iconContainer.className = "w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md text-xl text-blue-600";
                 icon.className = "fa-solid fa-file-invoice-dollar";
                 title.innerText = "Luluskan Quotation";
-                msg.innerHTML = `Adakah anda pasti mahu meluluskan sebut harga untuk <span class="font-mono font-bold text-gray-800">${workId}</span>? Status akan dihantar kepada teknisi untuk penyediaan Blueform.`;
+                msg.innerHTML = `Adakah anda pasti mahu meluluskan sebut harga untuk <span class="font-mono font-bold text-gray-800">${workId}</span>?`;
                 confirmBtn.className = "flex-1 px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-all shadow-md bg-blue-600 hover:bg-blue-700 cursor-pointer";
             } 
             else if (mode === 'BLUEFORM') {
@@ -279,7 +316,7 @@
                 iconContainer.className = "w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md text-xl text-amber-600";
                 icon.className = "fa-solid fa-file-signature";
                 title.innerText = "Luluskan Blueform";
-                msg.innerHTML = `Adakah anda pasti mahu meluluskan Blueform untuk <span class="font-mono font-bold text-gray-800">${workId}</span>? Rekod akan ditukar terus ke status <span class="font-bold">APP-EXEC</span>.`;
+                msg.innerHTML = `Adakah anda pasti mahu meluluskan Blueform untuk <span class="font-mono font-bold text-gray-800">${workId}</span>?`;
                 confirmBtn.className = "flex-1 px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-all shadow-md bg-amber-600 hover:bg-amber-700 cursor-pointer";
             } 
             else if (mode === 'REJECT-QUOTE') {
@@ -287,7 +324,7 @@
                 iconContainer.className = "w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md text-xl text-red-600";
                 icon.className = "fa-solid fa-ban";
                 title.innerText = "Reject Quotation";
-                msg.innerHTML = `Adakah anda pasti mahu menolak sebut harga untuk <span class="font-mono font-bold text-gray-800">${workId}</span>? Rekod akan ditolak kembali ke teknisi dengan status <span class="text-red-600 font-bold">QUOTATION-REJECTED</span>.`;
+                msg.innerHTML = `Sahkan penolakan sebut harga <span class="font-mono font-bold text-gray-800">${workId}</span>. Status akan bertukar ke <span class="text-red-600 font-bold">QUO-REJ</span>.`;
                 confirmBtn.className = "flex-1 px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-all shadow-md bg-red-600 hover:bg-red-700 cursor-pointer";
             } 
             else if (mode === 'REJECT-BF') {
@@ -295,13 +332,26 @@
                 iconContainer.className = "w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md text-xl text-red-600";
                 icon.className = "fa-solid fa-file-circle-xmark";
                 title.innerText = "Reject Blueform";
-                msg.innerHTML = `Adakah anda pasti mahu menolak Blueform untuk <span class="font-mono font-bold text-gray-800">${workId}</span>? Rekod akan ditolak kembali dengan status <span class="text-red-600 font-bold">BLUEFORM-REJECTED</span>.`;
+                msg.innerHTML = `Sahkan penolakan Blueform <span class="font-mono font-bold text-gray-800">${workId}</span>. Status akan bertukar ke <span class="text-red-600 font-bold">EXEC-REJ</span>.`;
                 confirmBtn.className = "flex-1 px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-all shadow-md bg-red-600 hover:bg-red-700 cursor-pointer";
             }
 
             confirmBtn.onclick = async () => {
+                let reasonText = null;
+                
+                // Validasi jika ia adalah operasi Reject
+                if (isReject) {
+                    reasonText = reasonInput.value.trim();
+                    if (!reasonText) {
+                        errorMsg.classList.remove('hidden');
+                        reasonInput.classList.add('border-red-500');
+                        reasonInput.focus();
+                        return;
+                    }
+                }
+
                 closeConfirmModal();
-                await executeStatusUpdate(workId, nextStatus);
+                await executeStatusUpdate(workId, nextStatus, reasonText);
             };
 
             modal.classList.remove('hidden');
@@ -320,11 +370,21 @@
             }, 150);
         }
 
-        async function executeStatusUpdate(workId, nextStatus) {
+        async function executeStatusUpdate(workId, nextStatus, reason = null) {
             try {
+                // Sediakan data payload kemas kini
+                const updatePayload = { status: nextStatus };
+                
+                // Masukkan alasan jika ada (iaitu kes penolakan)
+                if (reason !== null) {
+                    updatePayload.reject_reason = reason; // Memadankan nama column database anda
+                } else {
+                    updatePayload.reject_reason = null; // Set null semula jika diluluskan kelak
+                }
+
                 const { error } = await supabaseClient
                     .from('work_orders')
-                    .update({ status: nextStatus })
+                    .update(updatePayload)
                     .eq('work_id', workId);
 
                 if (error) throw error;
