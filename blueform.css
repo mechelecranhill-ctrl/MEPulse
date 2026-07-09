@@ -1,11 +1,22 @@
 /* ============================================================
    BLUEFORM SHARED CSS
-   Extracted verbatim from contract-usage.html
    Digunakan bersama oleh: contract-usage.html, app-exec.html,
    app-sect.html, app-dept.html (mana-mana page yang render
    Blueform / bulk preview / print)
+
+   ------------------------------------------------------------
+   CHANGELOG (fix blank page semasa print):
+   1. #bulkPagesContainer .a4-container:last-child -> page-break-after:auto
+      (elak trailing blank page bila cuma 1 blueform)
+   2. #bulkPreviewPage > *:not(#bulkPagesContainer) -> display:none
+      (elak #bulkPreviewCount / toolbar residual visibility ambil ruang)
+   3. #bulkPagesContainer .a4-container -> overflow:hidden !important
+      (menang atas .a4-container{overflow:visible!important} generic rule)
+   4. height 297mm -> 296.5mm khusus print (elak floating-point rounding
+      buat browser anggap kandungan melebihi 1 halaman)
+   ------------------------------------------------------------
    ============================================================ */
- 
+
 .a4-container { 
     width: 210mm; 
     min-height: 297mm; 
@@ -85,22 +96,37 @@
 
 @media print {
 
-     html, body {
-    overflow: hidden !important;
-}
-    @page { 
-        size: A4;
-        margin: 0;
-    }
-
     html, body {
+        overflow: hidden !important;
         margin: 0;
         padding: 0;
         background: white;
     }
 
+    @page { 
+        size: A4;
+        margin: 0;
+    }
+
     body * {
         visibility: hidden;
+    }
+
+    /* FIX #5: matikan SEPENUHNYA elemen sibling #bulkPreviewPage
+       (header, dashboard table, dll). visibility:hidden sahaja tidak
+       cukup sebab ia kekalkan ruang layout elemen tu — header +
+       jadual dashboard tetap sumbang ketinggian "hantu" yang tolak
+       kandungan blueform melebihi 1 muka A4, hasilkan page kosong. */
+    body > *:not(#bulkPreviewPage) {
+        display: none !important;
+    }
+
+    /* Tailwind min-h-screen (min-height:100vh) pada <body> juga boleh
+       disamakan dengan tinggi 1 muka print — override terus */
+    body {
+        min-height: 0 !important;
+        height: auto !important;
+        padding: 0 !important;
     }
 
     #bulkPreviewPage, #bulkPreviewPage * {
@@ -120,7 +146,10 @@
         display: none !important;
     }
 
-#bulkPreviewPage > *:not(#bulkPagesContainer) {
+    /* FIX #2: sembunyikan apa-apa sibling lain #bulkPagesContainer
+       (cth: #bulkPreviewCount) supaya tak sumbang ruang/tinggi tambahan
+       yang boleh push kandungan lebih dari 1 page */
+    #bulkPreviewPage > *:not(#bulkPagesContainer) {
         display: none !important;
     }
 
@@ -131,16 +160,19 @@
         margin: 0 !important;
     }
 
+    /* FIX #1 + #3 + #4 */
     #bulkPagesContainer .a4-container {
-    page-break-after: always !important;
-    box-shadow: none !important;
-    margin: 0 auto !important;
-overflow: hidden !important;
-}
+        page-break-after: always !important;
+        box-shadow: none !important;
+        margin: 0 auto !important;
+        overflow: hidden !important;
+        height: 296.5mm !important;
+        min-height: 0 !important;
+    }
 
-#bulkPagesContainer .a4-container:last-child {
-    page-break-after: auto !important;
-}
+    #bulkPagesContainer .a4-container:last-child {
+        page-break-after: auto !important;
+    }
     /* ── END BULK PREVIEW PRINT ── */
 
     .a4-container {
@@ -156,14 +188,13 @@ overflow: hidden !important;
     }
 
     .a4-container::after {
-    content: "";
-    position: absolute;
-    top: 1cm; 
-    left: 1cm; 
-    right: 1cm; 
-    bottom: 1cm;
-    border: 4px double #000 !important;
-}
+        content: "";
+        position: absolute;
+        top: 1cm; 
+        left: 1cm; 
+        right: 1cm; 
+        bottom: 1cm;
+        border: 4px double #000 !important;
     }
 
     .bf-signature-grid {
@@ -181,7 +212,7 @@ overflow: hidden !important;
    JANGAN tukar rule ini kepada grid di luar media print.
    ------------------------------------------------------------ */
 .bf-signature-grid{
-        position: absolute;
+    position: absolute;
     bottom: 3cm; 
     left: 2cm;
     right: 2cm;
@@ -197,9 +228,9 @@ overflow: hidden !important;
     font-weight:normal;
 }
 .bf-signature-grid div{
-display:flex;
-flex-direction:column;
-justify-content:flex-end;
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-end;
 }
 .bf-signature-grid small{
     text-align:left;
@@ -213,7 +244,7 @@ justify-content:flex-end;
     margin-top:4px;
 }
 .bf-signature-grid > div{
-min-height: 130px; 
+    min-height: 130px; 
 }
 #bf_content{
     flex:1;
@@ -224,4 +255,4 @@ min-height: 130px;
 }
 #bf_content .bf-row{
     flex-shrink:0;
-} 
+}
