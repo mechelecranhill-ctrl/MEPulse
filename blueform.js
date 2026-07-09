@@ -4,6 +4,7 @@
    Digunakan bersama oleh: contract-usage.html, app-exec.html,
    app-sect.html, app-dept.html
 
+
    CARA GUNA:
    1. Letak <link rel="stylesheet" href="blueform.css"> di <head>
    2. Letak <script src="blueform-shared.js"></script> SEBELUM
