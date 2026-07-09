@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -101,7 +101,7 @@
         <div id="bulkPagesContainer" style="display:flex; flex-direction:column; align-items:center; gap:20px; padding:10px 0;"></div>
     </div>
 
-        <script src="blueform.js"></script>
+    <script src="blueform.js"></script>
     <script>
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
@@ -114,7 +114,6 @@
                     return;
                 }
 
-                // 1. Dapatkan unit_id untuk staf yang sedang log masuk
                 const { data: assignment, error: assignError } = await supabaseClient
                     .from('staff_unit_assignment')
                     .select('unit_id')
@@ -130,7 +129,7 @@
 
                 const userUnitId = assignment.unit_id;
 
-                // 2. Ambil data Quotation mengikut Unit Pengguna (Gunakan struktur join yang betul)
+                // 1. Ambil data Quotation mengikut Unit
                 const { data: quotationOrders, error: qError } = await supabaseClient
                     .from('quotations')
                     .select(`
@@ -146,7 +145,7 @@
 
                 if (qError) throw qError;
 
-                // 3. Ambil data Blueform mengikut Unit Pengguna
+                // 2. Ambil data Blueform mengikut Unit (Turut mengambil pdf_url dari quotations jika ada)
                 const { data: blueformOrders, error: wError } = await supabaseClient
                     .from('work_orders')
                     .select(`
@@ -155,6 +154,7 @@
                         status,
                         sequence_no,
                         district,
+                        pdf_url,
                         contract!inner (id, contract_name, contract_code, unit_id)
                     `)
                     .eq('status', 'BLUEFORM')
@@ -162,7 +162,6 @@
 
                 if (wError) throw wError;
 
-                // 4. Render ke dalam UI Dashboard
                 renderSection('quotations-container', quotationOrders, 'QUOTATION');
                 renderSection('blueforms-container', blueformOrders, 'BLUEFORM');
 
@@ -181,13 +180,9 @@
                 return;
             }
 
-            // Grouping data mengikut Contract Code
             const contractsMap = {};
             orders.forEach(item => {
-                // Pembaikan bug rujukan objek contract daripada Supabase
                 const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
-                
-                // Jika Supabase pulangkan direct property atau fallback ke item
                 const cCode = contractData?.contract_code || item.contract_code || 'No Code';
                 const cName = contractData?.contract_name || 'No Name';
 
@@ -223,6 +218,7 @@
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Work ID</th>
+                                    ${type === 'BLUEFORM' ? `<th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider w-20">Rujukan</th>` : ''}
                                     <th class="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Tindakan</th>
                                 </tr>
                             </thead>
@@ -232,20 +228,21 @@
                 contract.orders.forEach(item => {
                     const seq = (item.sequence_no || '').trim();
                     let actionButtonsHtml = '';
+                    let referenceTdHtml = '';
+
+                    // Butang Rujukan PDF (Sama ada dari jadual quotations atau work_orders)
+                    let pdfBtn = item.pdf_url ? `
+                        <a href="${item.pdf_url}" target="_blank" class="text-gray-700 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded border border-gray-300 transition-all font-medium inline-flex items-center gap-1 text-[11px]" title="Lihat PDF Sebut Harga">
+                            <i class="fa-solid fa-file-pdf text-red-600"></i> Quote
+                        </a>
+                    ` : '<span class="text-gray-400 text-[10px] italic">Tiada PDF</span>';
 
                     if (type === 'QUOTATION') {
-                        // Butang PDF Sebut Harga
-                        let pdfBtn = item.pdf_url ? `
-                            <a href="${item.pdf_url}" target="_blank" class="text-gray-700 bg-gray-200 hover:bg-gray-300 px-2.5 py-1 rounded transition-all font-medium inline-block" title="Lihat PDF Sebut Harga">
-                                <i class="fa-solid fa-file-pdf text-red-600"></i>
-                            </a>
-                        ` : '<span class="text-gray-400 text-[10px] italic px-1">Tiada PDF</span>';
-
                         actionButtonsHtml = `
                             <div class="inline-flex items-center gap-1">
-                                ${pdfBtn}
+                                ${item.pdf_url ? `<a href="${item.pdf_url}" target="_blank" class="text-gray-700 bg-gray-200 hover:bg-gray-300 px-2.5 py-1 rounded transition-all font-medium inline-block"><i class="fa-solid fa-file-pdf text-red-600"></i></a>` : ''}
                                 <button onclick="openConfirmModal('${item.work_id}', 'QUO-REJ', 'REJECT-QUOTE')" 
-                                        class="text-white px-2 py-1 rounded bg-red-600 hover:bg-red-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Reject Quotation">
+                                        class="text-white px-2 py-1 rounded bg-red-600 hover:bg-red-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap">
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
                                 <button onclick="openConfirmModal('${item.work_id}', 'QUO-APP', 'QUOTATION')" 
@@ -255,7 +252,9 @@
                             </div>
                         `;
                     } else {
-                        // Untuk Blueform Section
+                        // Untuk Lajur Sebelah (Rujukan Quotation di dalam Blueform View)
+                        referenceTdHtml = `<td class="px-3 py-2.5 whitespace-nowrap text-center">${pdfBtn}</td>`;
+
                         const blueformBtnHtml = typeof renderBlueformButtonHtml === 'function' ? renderBlueformButtonHtml(item, seqGroups, renderedSeqs) : '';
                         actionButtonsHtml = `
                             <div class="inline-flex items-center gap-1">
@@ -277,6 +276,7 @@
                             <td class="px-3 py-2.5 whitespace-nowrap font-mono text-gray-900 font-medium">
                                 ${item.work_id}${seq ? ` <span class="text-gray-400 text-[11px]">(${seq})</span>` : ''}
                             </td>
+                            ${referenceTdHtml}
                             <td class="px-3 py-2.5 whitespace-nowrap text-right">
                                 ${actionButtonsHtml}
                             </td>
@@ -412,7 +412,6 @@
                     if (error) throw error;
                 }
 
-                // Refresh dashboard data semula
                 fetchDashboard();
 
             } catch (err) {
