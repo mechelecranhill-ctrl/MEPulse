@@ -219,6 +219,21 @@
                 let headerBg = type === 'QUOTATION' ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200';
                 let badgeBg = type === 'QUOTATION' ? 'bg-blue-600' : 'bg-amber-600';
 
+                let headerRowHtml = '';
+                if (type === 'BLUEFORM') {
+                    headerRowHtml = `
+                        <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Work ID</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider w-24">Blueform</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider w-24">Rujukan</th>
+                        <th class="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Tindakan</th>
+                    `;
+                } else {
+                    headerRowHtml = `
+                        <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Work ID</th>
+                        <th class="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Tindakan</th>
+                    `;
+                }
+
                 let sectionHtml = `
                     <div class="${headerBg} px-3 py-2 rounded-t-lg border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
                         <h3 class="font-bold text-gray-800 text-xs flex items-center flex-wrap">
@@ -233,9 +248,7 @@
                         <table class="min-w-full divide-y divide-gray-200 text-xs">
                             <thead class="bg-gray-50">
                                 <tr>
-                                    <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Work ID</th>
-                                    ${type === 'BLUEFORM' ? `<th class="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider w-24">Rujukan</th>` : ''}
-                                    <th class="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Tindakan</th>
+                                    ${headerRowHtml}
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
@@ -243,8 +256,7 @@
 
                 contract.orders.forEach(item => {
                     const seq = (item.sequence_no || '').trim();
-                    let actionButtonsHtml = '';
-                    let referenceTdHtml = '';
+                    let rowDataHtml = '';
 
                     let finalPdfUrl = null;
                     if (type === 'QUOTATION') {
@@ -260,7 +272,7 @@
                     ` : '<span class="text-gray-400 text-[10px] italic">Tiada PDF</span>';
 
                     if (type === 'QUOTATION') {
-                        actionButtonsHtml = `
+                        let actionButtonsHtml = `
                             <div class="inline-flex items-center gap-1">
                                 ${finalPdfUrl ? `<a href="${finalPdfUrl}" target="_blank" class="text-gray-700 bg-gray-200 hover:bg-gray-300 px-2.5 py-1 rounded transition-all font-medium inline-block"><i class="fa-solid fa-file-pdf text-red-600"></i></a>` : ''}
                                 <button onclick="openConfirmModal('${item.work_id}', 'QUO-REJ', 'REJECT-QUOTE')" 
@@ -273,13 +285,20 @@
                                 </button>
                             </div>
                         `;
+                        
+                        rowDataHtml = `
+                            <td class="px-3 py-2.5 whitespace-nowrap font-mono text-gray-900 font-medium text-left">
+                                ${item.work_id}${seq ? ` <span class="text-gray-400 text-[11px]">(${seq})</span>` : ''}
+                            </td>
+                            <td class="px-3 py-2.5 whitespace-nowrap text-right">
+                                ${actionButtonsHtml}
+                            </td>
+                        `;
                     } else {
-                        referenceTdHtml = `<td class="px-3 py-2.5 whitespace-nowrap text-right">${pdfBtn}</td>`;
-
                         const blueformBtnHtml = typeof renderBlueformButtonHtml === 'function' ? renderBlueformButtonHtml(item, seqGroups, renderedSeqs) : '';
-                        actionButtonsHtml = `
+                        
+                        let actionButtonsHtml = `
                             <div class="inline-flex items-center gap-1">
-                                ${blueformBtnHtml}
                                 <button onclick="openConfirmModal('${item.work_id}', 'EXEC-REJ', 'REJECT-BF')" 
                                         class="text-white px-2 py-1 rounded bg-red-600 hover:bg-red-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Reject Blueform">
                                     <i class="fa-solid fa-xmark"></i>
@@ -290,17 +309,26 @@
                                 </button>
                             </div>
                         `;
+
+                        rowDataHtml = `
+                            <td class="px-3 py-2.5 whitespace-nowrap font-mono text-gray-900 font-medium text-left">
+                                ${item.work_id}${seq ? ` <span class="text-gray-400 text-[11px]">(${seq})</span>` : ''}
+                            </td>
+                            <td class="px-3 py-2.5 whitespace-nowrap text-center">
+                                ${blueformBtnHtml}
+                            </td>
+                            <td class="px-3 py-2.5 whitespace-nowrap text-center">
+                                ${pdfBtn}
+                            </td>
+                            <td class="px-3 py-2.5 whitespace-nowrap text-right">
+                                ${actionButtonsHtml}
+                            </td>
+                        `;
                     }
 
                     sectionHtml += `
                         <tr class="hover:bg-gray-50 transition-colors">
-                            <td class="px-3 py-2.5 whitespace-nowrap font-mono text-gray-900 font-medium">
-                                ${item.work_id}${seq ? ` <span class="text-gray-400 text-[11px]">(${seq})</span>` : ''}
-                            </td>
-                            ${referenceTdHtml}
-                            <td class="px-3 py-2.5 whitespace-nowrap text-right">
-                                ${actionButtonsHtml}
-                            </td>
+                            ${rowDataHtml}
                         </tr>
                     `;
                 });
