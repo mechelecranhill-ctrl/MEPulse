@@ -25,9 +25,8 @@ class AppSidebar extends HTMLElement {
 
                 <div class="menu-group">
                     <a href="#" class="menu-parent" id="dashboardBtn">
-                        Dashboard-Contracts  <span class="arrow">▼</span>
+                        Dashboard-Contracts <span class="arrow">▼</span>
                     </a>
-
                     <div class="submenu" id="dashboardMenu">
                         <a href="#" data-section="Seksyen Selenggara" class="menu-link">Seksyen Selenggara</a>
                         <a href="#" data-section="Seksyen Pematuhan Peraturan" class="menu-link">Seksyen Pematuhan Peraturan</a>
@@ -36,8 +35,18 @@ class AppSidebar extends HTMLElement {
                     </div>
                 </div>
 
-                <a href="contract-closing.html" class="menu-link">Contract Closing</a>
+                <div class="menu-group">
+                    <a href="#" class="menu-parent" id="quotationBtn">
+                        Quotations Approval <span class="arrow">▼</span>
+                    </a>
+                    <div class="submenu" id="quotationMenu">
+                        <a href="app-exec.html" class="menu-link">Executive</a>
+                        <a href="app-sect.html" class="menu-link">Section Head</a>
+                        <a href="app-dept.html" class="menu-link">Department Head</a>
+                    </div>
+                </div>
 
+                <a href="contract-closing.html" class="menu-link">Contract Closing</a>
                 <a href="#" id="logoutBtn" class="menu-link">Logout</a>
             </div>
 
@@ -45,14 +54,7 @@ class AppSidebar extends HTMLElement {
                 <button class="hamburger" id="hamburger">
                     <input type="checkbox" id="menuToggle">
                     <svg viewBox="0 0 32 32">
-                        <path class="line line-top-bottom"
-                            d="M27 10 13 10C10.8 10 9 8.2 9 6
-                            9 3.5 10.8 2 13 2
-                            15.2 2 17 3.8 17 6
-                            L17 26C17 28.2 18.8 30 21 30
-                            23.2 30 25 28.2 25 26
-                            25 23.8 23.2 22 21 22
-                            L7 22" />
+                        <path class="line line-top-bottom" d="M27 10 13 10C10.8 10 9 8.2 9 6 9 3.5 10.8 2 13 2 15.2 2 17 3.8 17 6 L17 26C17 28.2 18.8 30 21 30 23.2 30 25 28.2 25 26 25 23.8 23.2 22 21 22 L7 22" />
                         <path class="line" d="M7 16 27 16" />
                     </svg>
                 </button>
@@ -86,9 +88,15 @@ class AppSidebar extends HTMLElement {
         this.logoutBtn = this.querySelector("#logoutBtn");
         this.logoutModal = this.querySelector("#logoutModal");
 
+        // Dashboard Elements
         this.dashboardBtn = this.querySelector("#dashboardBtn");
         this.dashboardMenu = this.querySelector("#dashboardMenu");
-        this.arrowIndicator = this.querySelector("#dashboardBtn .arrow");
+        this.dashArrow = this.querySelector("#dashboardBtn .arrow");
+
+        // Quotation Elements
+        this.quotationBtn = this.querySelector("#quotationBtn");
+        this.quotationMenu = this.querySelector("#quotationMenu");
+        this.quoteArrow = this.querySelector("#quotationBtn .arrow");
 
         this.menuLinks = this.querySelectorAll(".menu-link");
         this.subLinks = this.querySelectorAll("#dashboardMenu a[data-section]");
@@ -98,102 +106,68 @@ class AppSidebar extends HTMLElement {
         this.btn.addEventListener("click", () => this.toggle());
         this.overlay.addEventListener("click", () => this.close());
 
-        // Logik Buka/Tutup Expandable Submenu
-        if (this.dashboardBtn && this.dashboardMenu) {
-            this.dashboardBtn.addEventListener("click", (e) => {
-                e.preventDefault();
-                const isOpen = this.dashboardMenu.classList.toggle("open");
-                
-                // Tukar arah anak panah secara dinamik
-                if (this.arrowIndicator) {
-                    this.arrowIndicator.innerText = isOpen ? "▲" : "▼";
-                }
-            });
-        }
+        // Toggle Dashboard Menu
+        this.dashboardBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            const isOpen = this.dashboardMenu.classList.toggle("open");
+            this.dashArrow.innerText = isOpen ? "▲" : "▼";
+        });
 
-        // Trigger Modal Logout
+        // Toggle Quotation Menu
+        this.quotationBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            const isOpen = this.quotationMenu.classList.toggle("open");
+            this.quoteArrow.innerText = isOpen ? "▲" : "▼";
+        });
+
+        // Logout
         this.logoutBtn.addEventListener("click", (e) => {
             e.preventDefault();
             this.logoutModal.classList.add("active");
         });
 
-        this.querySelector("#cancelLogout").onclick = () =>
-            this.logoutModal.classList.remove("active");
-
+        this.querySelector("#cancelLogout").onclick = () => this.logoutModal.classList.remove("active");
         this.querySelector("#confirmLogout").onclick = () => this.logout();
 
-        // Klik Submenu
+        // Section Links
         this.subLinks.forEach(link => {
             link.addEventListener("click", (e) => {
                 e.preventDefault();
-                const sectionId = link.dataset.sectionId;
-                if (sectionId) {
-                    window.location.href = `dashboard-contract.html?section=${sectionId}`;
-                } else {
-                    console.warn("ID Seksyen belum dimuatkan dari Supabase.");
+                if (link.dataset.sectionId) {
+                    window.location.href = `dashboard-contract.html?section=${link.dataset.sectionId}`;
                 }
             });
-        });
-
-        document.addEventListener("keydown", (e) => {
-            if (e.key === "Escape") this.close();
         });
     }
 
     async loadDashboardLinks() {
         try {
-            const res = await fetch(
-                `${SB_URL}/rest/v1/me_sections?select=id,section_name`,
-                {
-                    headers: {
-                        apikey: SB_KEY,
-                        Authorization: `Bearer ${SB_KEY}`
-                    }
-                }
-            );
-
-            if (!res.ok) return;
-
-            const sections = await res.json();
-            if (!Array.isArray(sections)) return;
-
-            this.subLinks.forEach(a => {
-                const match = sections.find(
-                    s => s.section_name === a.dataset.section
-                );
-                if (match) {
-                    a.dataset.sectionId = match.id;
-                }
+            const res = await fetch(`${SB_URL}/rest/v1/me_sections?select=id,section_name`, {
+                headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
             });
-
-            this.setActiveMenu();
-
-        } catch (e) {
-            console.error(e);
-        }
+            if (!res.ok) return;
+            const sections = await res.json();
+            this.subLinks.forEach(a => {
+                const match = sections.find(s => s.section_name === a.dataset.section);
+                if (match) a.dataset.sectionId = match.id;
+            });
+        } catch (e) { console.error(e); }
     }
 
     setActiveMenu() {
-        const url = new URL(window.location.href);
-        const currentSection = url.searchParams.get("section");
-
-        this.subLinks.forEach(link => {
-            link.classList.remove("active");
-
-            if (link.dataset.sectionId && link.dataset.sectionId === currentSection) {
-                link.classList.add("active");
-                this.dashboardMenu?.classList.add("open");
-                if (this.arrowIndicator) this.arrowIndicator.innerText = "▲";
-            }
-        });
-
         const path = window.location.pathname.split("/").pop();
-
+        
+        // Highlight active sub-page
         this.menuLinks.forEach(link => {
-            if (link.getAttribute("href") === path) {
-                link.classList.add("active");
-            }
+            if (link.getAttribute("href") === path) link.classList.add("active");
         });
+
+        // Keep Quotations Menu open if active
+        const quotePages = ['app-exec.html', 'app-sect.html', 'app-dept.html'];
+        if (quotePages.includes(path)) {
+            this.quotationMenu.classList.add("open");
+            this.quoteArrow.innerText = "▲";
+        }
     }
 
     toggle() {
