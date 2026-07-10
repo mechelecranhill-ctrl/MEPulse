@@ -106,70 +106,88 @@
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
         async function fetchDashboard() {
-            try {
-                const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-                if (userError || !user) {
-                    showEmptyState('quotations-container', 'Sila log masuk terlebih dahulu.');
-                    showEmptyState('blueforms-container', 'Sila log masuk terlebih dahulu.');
-                    return;
-                }
-
-                const { data: assignment, error: assignError } = await supabaseClient
-                    .from('staff_unit_assignment')
-                    .select('unit_id')
-                    .eq('staff_id', user.id)
-                    .maybeSingle();
-
-                if (assignError) throw assignError;
-                if (!assignment || !assignment.unit_id) {
-                    showEmptyState('quotations-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
-                    showEmptyState('blueforms-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
-                    return;
-                }
-
-                const userUnitId = assignment.unit_id;
-
-                // 1. Ambil data Quotation mengikut Unit
-                const { data: quotationOrders, error: qError } = await supabaseClient
-                    .from('quotations')
-                    .select(`
-                        id,
-                        work_id,
-                        status,
-                        contract_code,
-                        pdf_url,
-                        contract!inner (id, contract_name, contract_code, unit_id)
-                    `)
-                    .eq('status', 'QUOTATION')
-                    .eq('contract.unit_id', userUnitId);
-
-                if (qError) throw qError;
-
-                // 2. Ambil data Blueform + Dapatkan pdf_url menerusi link database 'quotations'
-                const { data: blueformOrders, error: wError } = await supabaseClient
-                    .from('work_orders')
-                    .select(`
-                        id,
-                        work_id,
-                        status,
-                        sequence_no,
-                        district,
-                        contract!inner (id, contract_name, contract_code, unit_id),
-                        quotations (pdf_url)
-                    `)
-                    .eq('status', 'BLUEFORM')
-                    .eq('contract.unit_id', userUnitId);
-
-                if (wError) throw wError;
-
-                renderSection('quotations-container', quotationOrders, 'QUOTATION');
-                renderSection('blueforms-container', blueformOrders, 'BLUEFORM');
-
-            } catch (err) {
-                console.error("Error fetching data:", err.message);
-                alert("Gagal memuatkan data dashboard: " + err.message);
-            }
+    try {
+        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+        if (userError || !user) {
+            showEmptyState('quotations-container', 'Sila log masuk terlebih dahulu.');
+            showEmptyState('blueforms-container', 'Sila log masuk terlebih dahulu.');
+            return;
         }
+
+        const { data: assignment, error: assignError } = await supabaseClient
+            .from('staff_unit_assignment')
+            .select('unit_id')
+            .eq('staff_id', user.id)
+            .maybeSingle();
+
+        if (assignError) throw assignError;
+        if (!assignment || !assignment.unit_id) {
+            showEmptyState('quotations-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
+            showEmptyState('blueforms-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
+            return;
+        }
+
+        const userUnitId = assignment.unit_id;
+
+        // 1. Ambil data Quotation mengikut Unit
+        const { data: quotationOrders, error: qError } = await supabaseClient
+            .from('quotations')
+            .select(`
+                id,
+                work_id,
+                status,
+                contract_code,
+                pdf_url,
+                contract!inner (id, contract_name, contract_code, unit_id)
+            `)
+            .eq('status', 'QUOTATION')
+            .eq('contract.unit_id', userUnitId);
+
+        if (qError) throw qError;
+
+        // 2. Ambil data Blueform secara berasingan (Tanpa Join quotations di peringkat database)
+        const { data: blueformOrders, error: wError } = await supabaseClient
+            .from('work_orders')
+            .select(`
+                id,
+                work_id,
+                status,
+                sequence_no,
+                district,
+                contract!inner (id, contract_name, contract_code, unit_id)
+            `)
+            .eq('status', 'BLUEFORM')
+            .eq('contract.unit_id', userUnitId);
+
+        if (wError) throw wError;
+
+        // 3. Ambil SEMUA pdf_url daripada jadual quotations untuk dipadankan nanti
+        const { data: allQuotes, error: allQError } = await supabaseClient
+            .from('quotations')
+            .select('work_id, pdf_url');
+            
+        if (!allQError && allQuotes) {
+            // Bina pemetaan (Map) mudah: work_id -> pdf_url
+            const quoteMap = {};
+            allQuotes.forEach(q => {
+                if (q.work_id) quoteMap[q.work_id] = q.pdf_url;
+            });
+
+            // Masukkan pdf_url ke dalam objek blueformOrders secara manual
+            blueformOrders.forEach(item => {
+                item.mapped_pdf_url = quoteMap[item.work_id] || null;
+            });
+        }
+
+        renderSection('quotations-container', quotationOrders, 'QUOTATION');
+        renderSection('blueforms-container', blueformOrders, 'BLUEFORM');
+
+    } catch (err) {
+        console.error("Error fetching data:", err.message);
+        alert("Gagal memuatkan data dashboard: " + err.message);
+    }
+}
+
 
         function renderSection(containerId, orders, type) {
             const container = document.getElementById(containerId);
