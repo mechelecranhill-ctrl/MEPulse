@@ -12,32 +12,28 @@ function fileToBase64(file) {
 
 /**
  * Fungsi Utama untuk Upload Fail ke Microsoft List -> OneDrive
- * @param {string} fileInputId - ID bagi input jenis file (input type="file")
- * @param {string} workIdInputId - ID bagi input teks Work ID
- * @param {string} unitInputId - ID bagi input dropdown/teks pilihan Unit
- * @param {string} statusDivId - ID bagi elemen untuk tunjuk status loading/sukses
+ * @param {string} fileInputId   - ID bagi input jenis file (input type="file")
+ * @param {string} workIdValue   - Nilai Work ID sebenar (cth: "C 123456"), BUKAN id elemen
+ * @param {string} unitValue     - Nilai/nama Unit sebenar (cth: "Unit Kejuruteraan"), BUKAN id elemen
+ * @param {string} statusDivId   - ID bagi elemen untuk tunjuk status loading/sukses
  * @param {string} hiddenUrlInputId - ID bagi hidden input untuk simpan nama fail ke DB (Supabase)
  */
-async function uploadQuotationToOneDrive(fileInputId, workIdInputId, unitInputId, statusDivId, hiddenUrlInputId) {
+async function uploadQuotationToOneDrive(fileInputId, workIdValue, unitValue, statusDivId, hiddenUrlInputId) {
     const fileInput = document.getElementById(fileInputId);
-    const workIdInput = document.getElementById(workIdInputId);
-    const unitInput = document.getElementById(unitInputId);
     const statusDiv = document.getElementById(statusDivId);
     const hiddenUrlInput = document.getElementById(hiddenUrlInputId);
 
     // Semak jika komponen borang wujud
-    if (!fileInput || !workIdInput || !unitInput) {
-        console.error("Ralat: ID input yang diberikan tidak wujud dalam HTML.");
+    if (!fileInput) {
+        console.error("Ralat: ID input fail yang diberikan tidak wujud dalam HTML.");
         return;
     }
 
-    const workIdValue = workIdInput.value.trim();
-    const unitValue = unitInput.value;
+    workIdValue = (workIdValue || '').trim();
 
     // Validasi input wajib
     if (!workIdValue) {
         alert("Sila pastikan Work ID sudah diisi sebelum muat naik fail!");
-        workIdInput.focus();
         return;
     }
 
@@ -56,10 +52,9 @@ async function uploadQuotationToOneDrive(fileInputId, workIdInputId, unitInputId
     }
 
     // ⚠️ GANTI URL INI dengan URL Power Automate "When an item is created" (SharePoint/Lists API) anda
-    // Format biasa akaun personal/kerja: 
+    // Format biasa akaun personal/kerja:
     // https://ranhill-my.sharepoint.com/personal/muhammad_iman_ranhill_com_my/_api/web/lists/getbytitle('Quotation Queue')/items
-    const sharePointApiUrl = "https://ranhill-my.sharepoint.com/personal/muhammad_iman_ranhill_com_my/_api/web/lists/getbytitle('Quotation Queue')/items
-";
+    const sharePointApiUrl = "https://ranhill-my.sharepoint.com/personal/muhammad_iman_ranhill_com_my/_api/web/lists/getbytitle('Quotation Queue')/items";
 
     try {
         // LANGKAH A: Cipta item baru di Microsoft List (Hantar Work ID & Unit)
@@ -72,10 +67,7 @@ async function uploadQuotationToOneDrive(fileInputId, workIdInputId, unitInputId
             body: JSON.stringify({
                 "__metadata": { "type": "SP.Data.Quotation_x0020_QueueListItem" }, // Pastikan nama internal list betul
                 "Title": workIdValue, // Menyimpan Work ID ke kolum Title
-                "Unit": {
-                    "__metadata": { "type": "SP. some choice metadata jika perlu" },
-                    "Value": unitValue // Menyimpan pilihan unit ke kolum Choice
-                }
+                "Unit": unitValue // Menyimpan pilihan unit ke kolum (Choice/Text)
             })
         });
 
@@ -88,7 +80,7 @@ async function uploadQuotationToOneDrive(fileInputId, workIdInputId, unitInputId
 
         // LANGKAH B: Lampirkan (Attach) fail PDF ke dalam item tadi
         const attachmentUrl = `${sharePointApiUrl}(${itemId})/AttachmentFiles/add(FileName='${workIdValue}.pdf')`;
-        
+
         const attachResponse = await fetch(attachmentUrl, {
             method: "POST",
             headers: {
@@ -105,7 +97,7 @@ async function uploadQuotationToOneDrive(fileInputId, workIdInputId, unitInputId
         if (hiddenUrlInput) {
             hiddenUrlInput.value = `${workIdValue}.pdf`;
         }
-        
+
         // Kemaskini status kejayaan
         if (statusDiv) {
             statusDiv.style.color = "#34C759";
