@@ -106,87 +106,85 @@
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
         async function fetchDashboard() {
-    try {
-        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-        if (userError || !user) {
-            showEmptyState('quotations-container', 'Sila log masuk terlebih dahulu.');
-            showEmptyState('blueforms-container', 'Sila log masuk terlebih dahulu.');
-            return;
+            try {
+                const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+                if (userError || !user) {
+                    showEmptyState('quotations-container', 'Sila log masuk terlebih dahulu.');
+                    showEmptyState('blueforms-container', 'Sila log masuk terlebih dahulu.');
+                    return;
+                }
+
+                const { data: assignment, error: assignError } = await supabaseClient
+                    .from('staff_unit_assignment')
+                    .select('unit_id')
+                    .eq('staff_id', user.id)
+                    .maybeSingle();
+
+                if (assignError) throw assignError;
+                if (!assignment || !assignment.unit_id) {
+                    showEmptyState('quotations-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
+                    showEmptyState('blueforms-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
+                    return;
+                }
+
+                const userUnitId = assignment.unit_id;
+
+                // 1. Ambil data Quotation mengikut Unit
+                const { data: quotationOrders, error: qError } = await supabaseClient
+                    .from('quotations')
+                    .select(`
+                        id,
+                        work_id,
+                        status,
+                        contract_code,
+                        pdf_url,
+                        contract!inner (id, contract_name, contract_code, unit_id)
+                    `)
+                    .eq('status', 'QUOTATION')
+                    .eq('contract.unit_id', userUnitId);
+
+                if (qError) throw qError;
+
+                // 2. Ambil data Blueform secara berasingan
+                const { data: blueformOrders, error: wError } = await supabaseClient
+                    .from('work_orders')
+                    .select(`
+                        id,
+                        work_id,
+                        status,
+                        sequence_no,
+                        district,
+                        contract!inner (id, contract_name, contract_code, unit_id)
+                    `)
+                    .eq('status', 'BLUEFORM')
+                    .eq('contract.unit_id', userUnitId);
+
+                if (wError) throw wError;
+
+                // 3. Ambil SEMUA pdf_url daripada jadual quotations untuk dipadankan nanti
+                const { data: allQuotes, error: allQError } = await supabaseClient
+                    .from('quotations')
+                    .select('work_id, pdf_url');
+                    
+                if (!allQError && allQuotes) {
+                    const quoteMap = {};
+                    allQuotes.forEach(q => {
+                        if (q.work_id) quoteMap[q.work_id] = q.pdf_url;
+                    });
+
+                    blueformOrders.forEach(item => {
+                        item.mapped_pdf_url = quoteMap[item.work_id] || null;
+                    });
+                }
+
+                renderSection('quotations-container', quotationOrders, 'QUOTATION');
+                renderSection('blueforms-container', blueformOrders, 'BLUEFORM');
+
+            } catch (err) {
+                console.error("Error fetching data:", err.message);
+                alert("Gagal memuatkan data dashboard: " + err.message);
+            }
         }
-
-        const { data: assignment, error: assignError } = await supabaseClient
-            .from('staff_unit_assignment')
-            .select('unit_id')
-            .eq('staff_id', user.id)
-            .maybeSingle();
-
-        if (assignError) throw assignError;
-        if (!assignment || !assignment.unit_id) {
-            showEmptyState('quotations-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
-            showEmptyState('blueforms-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
-            return;
-        }
-
-        const userUnitId = assignment.unit_id;
-
-        // 1. Ambil data Quotation mengikut Unit
-        const { data: quotationOrders, error: qError } = await supabaseClient
-            .from('quotations')
-            .select(`
-                id,
-                work_id,
-                status,
-                contract_code,
-                pdf_url,
-                contract!inner (id, contract_name, contract_code, unit_id)
-            `)
-            .eq('status', 'QUOTATION')
-            .eq('contract.unit_id', userUnitId);
-
-        if (qError) throw qError;
-
-        // 2. Ambil data Blueform secara berasingan (Tanpa Join quotations di peringkat database)
-        const { data: blueformOrders, error: wError } = await supabaseClient
-            .from('work_orders')
-            .select(`
-                id,
-                work_id,
-                status,
-                sequence_no,
-                district,
-                contract!inner (id, contract_name, contract_code, unit_id)
-            `)
-            .eq('status', 'BLUEFORM')
-            .eq('contract.unit_id', userUnitId);
-
-        if (wError) throw wError;
-
-        // 3. Ambil SEMUA pdf_url daripada jadual quotations untuk dipadankan nanti
-        const { data: allQuotes, error: allQError } = await supabaseClient
-            .from('quotations')
-            .select('work_id, pdf_url');
-            
-        if (!allQError && allQuotes) {
-            // Bina pemetaan (Map) mudah: work_id -> pdf_url
-            const quoteMap = {};
-            allQuotes.forEach(q => {
-                if (q.work_id) quoteMap[q.work_id] = q.pdf_url;
-            });
-
-            // Masukkan pdf_url ke dalam objek blueformOrders secara manual
-            blueformOrders.forEach(item => {
-                item.mapped_pdf_url = quoteMap[item.work_id] || null;
-            });
-        }
-
-        renderSection('quotations-container', quotationOrders, 'QUOTATION');
-        renderSection('blueforms-container', blueformOrders, 'BLUEFORM');
-
-    } catch (err) {
-        console.error("Error fetching data:", err.message);
-        alert("Gagal memuatkan data dashboard: " + err.message);
-    }
-}
 
 
         function renderSection(containerId, orders, type) {
@@ -248,14 +246,12 @@
                     let actionButtonsHtml = '';
                     let referenceTdHtml = '';
 
-                    // Dapatkan pdf_url secara dinamik berdasarkan jenis seksyen
-let finalPdfUrl = null;
-if (type === 'QUOTATION') {
-    finalPdfUrl = item.pdf_url;
-} else if (type === 'BLUEFORM') {
-    // Ambil data yang telah kita petakan (map) secara manual tadi
-    finalPdfUrl = item.mapped_pdf_url;
-}
+                    let finalPdfUrl = null;
+                    if (type === 'QUOTATION') {
+                        finalPdfUrl = item.pdf_url;
+                    } else if (type === 'BLUEFORM') {
+                        finalPdfUrl = item.mapped_pdf_url;
+                    }
 
                     let pdfBtn = finalPdfUrl ? `
                         <a href="${finalPdfUrl}" target="_blank" class="text-gray-700 bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded border border-gray-300 transition-all font-medium inline-flex items-center gap-1 text-[10px]" title="Lihat PDF Sebut Harga">
@@ -268,12 +264,12 @@ if (type === 'QUOTATION') {
                             <div class="inline-flex items-center gap-1">
                                 ${finalPdfUrl ? `<a href="${finalPdfUrl}" target="_blank" class="text-gray-700 bg-gray-200 hover:bg-gray-300 px-2.5 py-1 rounded transition-all font-medium inline-block"><i class="fa-solid fa-file-pdf text-red-600"></i></a>` : ''}
                                 <button onclick="openConfirmModal('${item.work_id}', 'QUO-REJ', 'REJECT-QUOTE')" 
-                                        class="text-white px-2 py-1 rounded bg-red-600 hover:bg-red-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap">
+                                        class="text-white px-2 py-1 rounded bg-red-600 hover:bg-red-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Reject Quotation">
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
                                 <button onclick="openConfirmModal('${item.work_id}', 'QUO-APP', 'QUOTATION')" 
-                                        class="text-white px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap">
-                                    <i class="fa-solid fa-arrow-right mr-1"></i> Approve
+                                        class="text-white px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Approve Quotation">
+                                    <i class="fa-solid fa-check"></i>
                                 </button>
                             </div>
                         `;
@@ -289,8 +285,8 @@ if (type === 'QUOTATION') {
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
                                 <button onclick="openConfirmModal('${item.work_id}', 'APP-EXEC', 'BLUEFORM')" 
-                                        class="text-white px-3 py-1 rounded bg-amber-600 hover:bg-amber-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap">
-                                    <i class="fa-solid fa-check mr-1"></i> Approve
+                                        class="text-white px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Approve Blueform">
+                                    <i class="fa-solid fa-check"></i>
                                 </button>
                             </div>
                         `;
