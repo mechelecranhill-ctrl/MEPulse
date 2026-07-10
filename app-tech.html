@@ -143,149 +143,151 @@
         }
 
         function renderTechnicianSection(containerId, orders, type) {
-            const container = document.getElementById(containerId);
-            container.innerHTML = '';
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
 
-            if (!orders || orders.length === 0) {
-                showEmptyState(containerId, `No processed logs found for ${type} documents.`);
-                return;
-            }
+    if (!orders || orders.length === 0) {
+        showEmptyState(containerId, `No processed logs found for ${type} documents.`);
+        return;
+    }
 
-            const contractsMap = {};
-            orders.forEach(item => {
-                const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
-                const cCode = contractData?.contract_code || item.contract_code || 'GENERAL-MNT';
-                const cName = contractData?.contract_name || 'General Maintenance Contract';
+    const contractsMap = {};
+    orders.forEach(item => {
+        const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
+        const cCode = contractData?.contract_code || item.contract_code || 'GENERAL-MNT';
+        const cName = contractData?.contract_name || 'General Maintenance Contract';
 
-                if (!contractsMap[cCode]) {
-                    contractsMap[cCode] = { code: cCode, name: cName, orders: [] };
-                }
-                contractsMap[cCode].orders.push(item);
-            });
-
-            const seqGroups = type === 'BLUEFORM' ? (typeof buildSequenceGroups === 'function' ? buildSequenceGroups(orders) : null) : null;
-            renderedBlueformSeqs = new Set();
-
-            for (const contractCode in contractsMap) {
-                const contract = contractsMap[contractCode];
-                const contractSection = document.createElement('div');
-                contractSection.className = "bg-gray-50 rounded-lg p-2 border border-gray-200 shadow-sm mb-4 w-full overflow-hidden";
-
-                let headerBg = type === 'QUOTATION' ? 'bg-blue-50 border-blue-200' : 'bg-emerald-50 border-emerald-200';
-                let badgeBg = type === 'QUOTATION' ? 'bg-blue-600' : 'bg-emerald-600';
-
-                // Kolum ditetapkan lebar statik menggunakan peratusan (%) bagi memastikan data muat tanpa mencetuskan skrol mendatar
-                let tableHeaderHtml = '';
-                if (type === 'BLUEFORM') {
-                    tableHeaderHtml = `
-                        <th class="px-2 py-1.5 text-left font-semibold text-gray-500 uppercase tracking-tight w-[28%]">Work ID</th>
-                        <th class="px-1 py-1.5 text-center font-semibold text-gray-500 uppercase tracking-tight w-[18%]">Status</th>
-                        <th class="px-1 py-1.5 text-center font-semibold text-gray-500 uppercase tracking-tight w-[16%]">Blueform</th>
-                        <th class="px-1 py-1.5 text-center font-semibold text-gray-500 uppercase tracking-tight w-[14%]">Ref</th>
-                        <th class="px-2 py-1.5 text-left font-semibold text-gray-500 uppercase tracking-tight w-[24%]">Remarks</th>
-                    `;
-                } else {
-                    tableHeaderHtml = `
-                        <th class="px-2 py-1.5 text-left font-semibold text-gray-500 uppercase tracking-tight w-[35%]">Work ID</th>
-                        <th class="px-1 py-1.5 text-center font-semibold text-gray-500 uppercase tracking-tight w-[20%]">Status</th>
-                        <th class="px-1 py-1.5 text-center font-semibold text-gray-500 uppercase tracking-tight w-[20%]">Ref</th>
-                        <th class="px-2 py-1.5 text-left font-semibold text-gray-500 uppercase tracking-tight w-[25%]">Remarks</th>
-                    `;
-                }
-
-                let sectionHtml = `
-                    <div class="${headerBg} px-2 py-1.5 rounded-t-lg border-b flex justify-between items-center gap-2 mb-1.5">
-                        <h3 class="font-bold text-gray-800 text-[11px] flex items-center min-w-0 flex-1">
-                            <span class="${badgeBg} text-white text-[9px] px-1 py-0.5 rounded font-mono mr-1 flex-shrink-0 shadow-xs">${contract.code}</span> 
-                            <span class="truncate pr-2">${contract.name}</span>
-                        </h3>
-                        <span class="text-[10px] bg-white text-gray-600 border border-gray-300 font-bold px-1.5 py-0.5 rounded-full flex-shrink-0">
-                            ${contract.orders.length} R
-                        </span>
-                    </div>
-                    <div class="bg-white rounded-b-lg border border-gray-100 w-full overflow-hidden">
-                        <table class="w-full text-[11px] table-fixed divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>${tableHeaderHtml}</tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                `;
-
-                contract.orders.forEach(item => {
-                    const seq = (item.sequence_no || '').trim();
-                    let statusBadge = '';
-                    let reasonText = item.reject_reason ? item.reject_reason : 'No notes.';
-
-                    if (item.status === 'QUO-APP' || item.status === 'APPROVED') {
-                        statusBadge = `<span class="bg-emerald-100 text-emerald-800 text-[9px] font-extrabold px-1.5 py-0.5 rounded border border-emerald-200 block text-center truncate"><i class="fa-solid fa-check mr-0.5"></i>App</span>`;
-                    } else {
-                        statusBadge = `<span class="bg-red-100 text-red-800 text-[9px] font-extrabold px-1.5 py-0.5 rounded border border-red-200 block text-center truncate" title="${item.status}"><i class="fa-solid fa-xmark mr-0.5"></i>Rej</span>`;
-                    }
-
-                    let finalPdfUrl = (type === 'QUOTATION') ? item.pdf_url : item.mapped_pdf_url;
-                    let pdfBtnHtml = finalPdfUrl ? `
-                        <a href="${finalPdfUrl}" target="_blank" class="text-gray-700 bg-gray-100 hover:bg-gray-200 px-1.5 py-0.5 rounded border border-gray-300 transition-all font-medium inline-flex items-center gap-0.5 text-[9px]" title="View Quotation PDF">
-                            <i class="fa-solid fa-file-pdf text-red-600"></i>Quote
-                        </a>
-                    ` : '<span class="text-gray-400 text-[9px] italic">None</span>';
-
-                    let remarkContent = '';
-                    if (item.status.includes('REJ') && item.reject_reason) {
-                        remarkContent = `
-                            <div class="text-red-700 font-medium text-[10px] truncate" title="[${item.status}] ${reasonText}">
-                                ${reasonText}
-                            </div>
-                        `;
-                    } else {
-                        remarkContent = `<span class="text-gray-400 italic text-[10px] truncate block">${type === 'QUOTATION' ? 'Ready for Blueform' : 'Completed'}</span>`;
-                    }
-
-                    if (type === 'QUOTATION') {
-                        sectionHtml += `
-                            <tr class="hover:bg-gray-50 transition-colors">
-                                <td class="px-2 py-2 font-mono text-gray-900 font-semibold truncate" title="${item.work_id}">
-                                    ${item.work_id}
-                                </td>
-                                <td class="px-1 py-2">
-                                    ${statusBadge}
-                                </td>
-                                <td class="px-1 py-2 text-center">
-                                    ${pdfBtnHtml}
-                                </td>
-                                <td class="px-2 py-2 min-w-0">
-                                    ${remarkContent}
-                                </td>
-                            </tr>
-                        `;
-                    } else {
-                        const blueformBtnHtml = typeof renderBlueformButtonHtml === 'function' ? renderBlueformButtonHtml(item, seqGroups, renderedBlueformSeqs) : '<span class="text-gray-400">-</span>';
-                        sectionHtml += `
-                            <tr class="hover:bg-gray-50 transition-colors">
-                                <td class="px-2 py-2 font-mono text-gray-900 font-semibold truncate" title="${item.work_id}${seq ? ` (${seq})` : ''}">
-                                    ${item.work_id}${seq ? `<span class="text-gray-400 font-normal">(${seq})</span>` : ''}
-                                </td>
-                                <td class="px-1 py-2">
-                                    ${statusBadge}
-                                </td>
-                                <td class="px-1 py-2 text-center truncate blueform-action-cell">
-                                    ${blueformBtnHtml}
-                                </td>
-                                <td class="px-1 py-2 text-center">
-                                    ${pdfBtnHtml}
-                                </td>
-                                <td class="px-2 py-2 min-w-0">
-                                    ${remarkContent}
-                                </td>
-                            </tr>
-                        `;
-                    }
-                });
-
-                sectionHtml += `</tbody></table></div>`;
-                contractSection.innerHTML = sectionHtml;
-                container.appendChild(contractSection);
-            }
+        if (!contractsMap[cCode]) {
+            contractsMap[cCode] = { code: cCode, name: cName, orders: [] };
         }
+        contractsMap[cCode].orders.push(item);
+    });
+
+    const seqGroups = type === 'BLUEFORM' ? (typeof buildSequenceGroups === 'function' ? buildSequenceGroups(orders) : null) : null;
+    renderedBlueformSeqs = new Set();
+
+    for (const contractCode in contractsMap) {
+        const contract = contractsMap[contractCode];
+        const contractSection = document.createElement('div');
+        contractSection.className = "bg-gray-50 rounded-lg p-2 border border-gray-200 shadow-sm mb-4 w-full overflow-hidden";
+
+        let headerBg = type === 'QUOTATION' ? 'bg-blue-50 border-blue-200' : 'bg-emerald-50 border-emerald-200';
+        let badgeBg = type === 'QUOTATION' ? 'bg-blue-600' : 'bg-emerald-600';
+
+        // DIUBAH: Pembahagian lebar (%) kolum diselaraskan semula supaya butang Blueform mendapat ruang yang cukup
+        let tableHeaderHtml = '';
+        if (type === 'BLUEFORM') {
+            tableHeaderHtml = `
+                <th class="px-2 py-1.5 text-left font-semibold text-gray-500 uppercase tracking-tight w-[30%]">Work ID</th>
+                <th class="px-1 py-1.5 text-center font-semibold text-gray-500 uppercase tracking-tight w-[15%]">Status</th>
+                <th class="px-1 py-1.5 text-center font-semibold text-gray-500 uppercase tracking-tight w-[24%]">Blueform</th>
+                <th class="px-1 py-1.5 text-center font-semibold text-gray-500 uppercase tracking-tight w-[13%]">Ref</th>
+                <th class="px-2 py-1.5 text-left font-semibold text-gray-500 uppercase tracking-tight w-[18%]">Remarks</th>
+            `;
+        } else {
+            tableHeaderHtml = `
+                <th class="px-2 py-1.5 text-left font-semibold text-gray-500 uppercase tracking-tight w-[40%]">Work ID</th>
+                <th class="px-1 py-1.5 text-center font-semibold text-gray-500 uppercase tracking-tight w-[18%]">Status</th>
+                <th class="px-1 py-1.5 text-center font-semibold text-gray-500 uppercase tracking-tight w-[18%]">Ref</th>
+                <th class="px-2 py-1.5 text-left font-semibold text-gray-500 uppercase tracking-tight w-[26%]">Remarks</th>
+            `;
+        }
+
+        let sectionHtml = `
+            <div class="${headerBg} px-2 py-1.5 rounded-t-lg border-b flex justify-between items-center gap-2 mb-1.5">
+                <h3 class="font-bold text-gray-800 text-[11px] flex items-center min-w-0 flex-1">
+                    <span class="${badgeBg} text-white text-[9px] px-1 py-0.5 rounded font-mono mr-1 flex-shrink-0 shadow-xs">${contract.code}</span> 
+                    <span class="truncate pr-2">${contract.name}</span>
+                </h3>
+                <span class="text-[10px] bg-white text-gray-600 border border-gray-300 font-bold px-1.5 py-0.5 rounded-full flex-shrink-0">
+                    ${contract.orders.length} R
+                </span>
+            </div>
+            <div class="bg-white rounded-b-lg border border-gray-100 w-full overflow-hidden">
+                <table class="w-full text-[11px] table-fixed divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>${tableHeaderHtml}</tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+        `;
+
+        contract.orders.forEach(item => {
+            const seq = (item.sequence_no || '').trim();
+            let statusBadge = '';
+            let reasonText = item.reject_reason ? item.reject_reason : 'No notes.';
+
+            if (item.status === 'QUO-APP' || item.status === 'APPROVED') {
+                statusBadge = `<span class="bg-emerald-100 text-emerald-800 text-[9px] font-extrabold px-1 py-0.5 rounded border border-emerald-200 block text-center truncate"><i class="fa-solid fa-check mr-0.5"></i>App</span>`;
+            } else {
+                statusBadge = `<span class="bg-red-100 text-red-800 text-[9px] font-extrabold px-1 py-0.5 rounded border border-red-200 block text-center truncate" title="${item.status}"><i class="fa-solid fa-xmark mr-0.5"></i>Rej</span>`;
+            }
+
+            let finalPdfUrl = (type === 'QUOTATION') ? item.pdf_url : item.mapped_pdf_url;
+            let pdfBtnHtml = finalPdfUrl ? `
+                <a href="${finalPdfUrl}" target="_blank" class="text-gray-700 bg-gray-100 hover:bg-gray-200 px-1 py-0.5 rounded border border-gray-300 transition-all font-medium inline-flex items-center gap-0.5 text-[9px]" title="View Quotation PDF">
+                    <i class="fa-solid fa-file-pdf text-red-600"></i>Quote
+                </a>
+            ` : '<span class="text-gray-400 text-[9px] italic">None</span>';
+
+            let remarkContent = '';
+            if (item.status.includes('REJ') && item.reject_reason) {
+                remarkContent = `
+                    <div class="text-red-700 font-medium text-[10px] truncate" title="[${item.status}] ${reasonText}">
+                        ${reasonText}
+                    </div>
+                `;
+            } else {
+                remarkContent = `<span class="text-gray-400 italic text-[10px] truncate block">${type === 'QUOTATION' ? 'Ready for Blueform' : 'Completed'}</span>`;
+            }
+
+            if (type === 'QUOTATION') {
+                sectionHtml += `
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-2 py-2 font-mono text-gray-900 font-semibold truncate" title="${item.work_id}">
+                            ${item.work_id}
+                        </td>
+                        <td class="px-1 py-2">
+                            ${statusBadge}
+                        </td>
+                        <td class="px-1 py-2 text-center">
+                            ${pdfBtnHtml}
+                        </td>
+                        <td class="px-2 py-2 min-w-0">
+                            ${remarkContent}
+                        </td>
+                    </tr>
+                `;
+            } else {
+                // DIUBAH: Elemen pembungkus fungsi butang dibuang kekunci 'truncate' lalai supaya butang tidak mengecil terpotong
+                const blueformBtnHtml = typeof renderBlueformButtonHtml === 'function' ? renderBlueformButtonHtml(item, seqGroups, renderedBlueformSeqs) : '<span class="text-gray-400">-</span>';
+                sectionHtml += `
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-2 py-2 font-mono text-gray-900 font-semibold truncate" title="${item.work_id}${seq ? ` (${seq})` : ''}">
+                            ${item.work_id}${seq ? `<span class="text-gray-400 font-normal">(${seq})</span>` : ''}
+                        </td>
+                        <td class="px-1 py-2">
+                            ${statusBadge}
+                        </td>
+                        <td class="px-1 py-2 text-center text-[10px]">
+                            ${blueformBtnHtml}
+                        </td>
+                        <td class="px-1 py-2 text-center">
+                            ${pdfBtnHtml}
+                        </td>
+                        <td class="px-2 py-2 min-w-0">
+                            ${remarkContent}
+                        </td>
+                    </tr>
+                `;
+            }
+        });
+
+        sectionHtml += `</tbody></table></div>`;
+        contractSection.innerHTML = sectionHtml;
+        container.appendChild(contractSection);
+    }
+}
+
 
         function showEmptyState(containerId, message) {
             document.getElementById(containerId).innerHTML = `
