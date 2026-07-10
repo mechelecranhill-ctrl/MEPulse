@@ -603,9 +603,8 @@
                     <label>Contracts</label>
                     <select id="q_contract_id" required><option value="">Choose Unit First</option></select>
 
-                    <label>Work Order Order Id(s)</label>
+                    <label>Work Order Id</label>
                     <div id="q_id_rows_container"></div>
-                    <button type="button" onclick="addWorkIdRow('q')" style="background:none; color:var(--ios-blue); border:1px dashed var(--ios-blue); font-size:12px; padding:10px; width:100%; border-radius:10px; cursor:pointer; margin-top:5px; margin-bottom: 10px;">+ Add Work ID</button>
 
                     <div style="display: grid; grid-template-columns: 1fr; gap: 10px;">
                         <div>
@@ -908,7 +907,8 @@
                 const contractOpt = document.getElementById('q_contract_id').selectedOptions[0];
                 const contractCode = contractOpt ? contractOpt.text : '';
                 const currentWorkIds = getCurrentWorkIdsFromRows('q');
-                if(currentWorkIds.length === 0){ alert("Sila masukkan sekurang-kurangnya satu Work Order ID!"); return; }
+                if(currentWorkIds.length === 0){ alert("Sila masukkan Work Order ID!"); return; }
+                if(currentWorkIds.length > 1){ alert("Satu quotation hanya boleh untuk 1 Work Order ID sahaja!"); return; }
 
                 const statusValue = document.getElementById('q_status').value;
                 const selectUnitElement = document.getElementById('q_unit_id');
@@ -916,7 +916,6 @@
 
                 // 🚀 Panggil fungsi OneDrive Uploader untuk proses fail ke cloud
                 // Parameter: fileInputId, workId, unitText, statusDivId, hiddenUrlInputId
-                // Kita guna ID pertama dari barisan Work ID untuk penamaan fail OneDrive
                 const primaryWorkId = currentWorkIds[0];
                 await uploadQuotationToOneDrive('q_pdf_file', primaryWorkId, unitText, 'q_upload_status', 'q_pdf_url');
 
@@ -927,24 +926,20 @@
                     return;
                 }
                 
-                // Simpan setiap Work Order ID ke Supabase bersama rujukan nama fail OneDrive tadi
-                let successCount = 0;
-                for(const workIdValue of currentWorkIds) {
-                    const payload = {
-                        work_id: workIdValue,
-                        contract_code: contractCode,
-                        status: statusValue,
-                        reject_reason: statusValue === 'Rejected' ? document.getElementById('q_reject_reason').value : null,
-                        pdf_url: generatedPdfUrl, // Menyimpan rujukan nama fail (cth: C 123456.pdf)
-                        qpd_date: document.getElementById('q_qpb_date').value || null
-                    };
+                // Simpan satu-satunya Work Order ID ke Supabase bersama rujukan nama fail OneDrive tadi
+                const payload = {
+                    work_id: primaryWorkId,
+                    contract_code: contractCode,
+                    status: statusValue,
+                    reject_reason: statusValue === 'Rejected' ? document.getElementById('q_reject_reason').value : null,
+                    pdf_url: generatedPdfUrl, // Menyimpan rujukan nama fail (cth: C 123456.pdf)
+                    qpd_date: document.getElementById('q_qpb_date').value || null
+                };
 
-                    const res = await fetch(`${SB_URL}/rest/v1/quotations`, { method: 'POST', headers, body: JSON.stringify(payload) });
-                    if(res.ok) successCount++;
-                }
+                const res = await fetch(`${SB_URL}/rest/v1/quotations`, { method: 'POST', headers, body: JSON.stringify(payload) });
 
-                if (successCount > 0) { 
-                    alert(`${successCount} Quotation & Dokumen OneDrive berjaya direkodkan!`); 
+                if (res.ok) { 
+                    alert(`Quotation & Dokumen OneDrive berjaya direkodkan!`); 
                     location.reload(); 
                 } else { 
                     alert("Gagal menyimpan quotation ke pangkalan data."); 
@@ -1085,6 +1080,7 @@
         else { q_workIdRowCounter++; counter = q_workIdRowCounter; }
 
         const rowId = `${prefix}_id_row_${counter}`;
+        const isSingleOnly = (prefix === 'q');
         const row = document.createElement('div'); row.className = `${prefix}-id-row`; row.id = rowId;
         row.style = "display:flex; gap:8px; align-items:center; margin-bottom:8px;";
         row.innerHTML = `
@@ -1093,7 +1089,7 @@
                 <option value="K" ${selectedVal === 'K' ? 'selected' : ''}>K</option>
             </select>
             <input type="text" class="${prefix}_id_num" placeholder="123456" value="${num}" oninput="this.value=this.value.replace(/[^0-9]/g,''); if('${prefix}'==='w'){ renderWorkIdCards(); autoDetectWork(); }">
-            <div onclick="removeWorkIdRow('${prefix}', '${rowId}')" style="color:red; cursor:pointer; flex-shrink:0; padding:0 6px;">✕</div>
+            ${isSingleOnly ? '' : `<div onclick="removeWorkIdRow('${prefix}', '${rowId}')" style="color:red; cursor:pointer; flex-shrink:0; padding:0 6px;">✕</div>`}
         `;
         if(prefix === 'w') {
             row.querySelector('.w_id_prefix').addEventListener('change', () => { renderWorkIdCards(); autoDetectWork(); });
