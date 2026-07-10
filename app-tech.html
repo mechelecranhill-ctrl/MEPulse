@@ -344,7 +344,7 @@
             }
         }
 
-        // Fungsi utama menjana Pakej Gabungan Dokumen (Halaman 1: Blueform, Halaman 2+: PDF Quotation)
+        // Fungsi utama menjana Pakej Gabungan Dokumen (Menyokong Single & Grouping Blueform)
 async function previewFullSet(escapedItemData) {
     const item = JSON.parse(decodeURIComponent(escapedItemData));
     const container = document.getElementById('bulkPagesContainer');
@@ -355,12 +355,57 @@ async function previewFullSet(escapedItemData) {
 
     try {
         let compositeHtml = '';
+        let payload;
+        let linkedPdfs = [];
 
-        // 1. Ambil data Blueform menggunakan fungsi asal dari blueform-shared.js
-        if (typeof buildBlueformData === 'function' && typeof buildBlueformHTML === 'function') {
-            const payload = await buildBlueformData(item.id);
-            
-            // 2. Halaman 1: Render Kod HTML Blueform
+        // 1. SEMAK GROUPING: Dapatkan semua work order se-kontrak untuk cross-check jujukan
+        const seq = (item.sequence_no || '').trim();
+        const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
+        const currentContractId = contractData?.id || item.contract_id;
+
+        if (seq && currentContractId && typeof buildBlueformDataGroup === 'function') {
+            // Ambil semua work orders di bawah kontrak ini untuk mencari ahli kumpulan yang sama
+            const { data: siblingWOs } = await supabaseClient
+                .from('work_orders')
+                .select('id, work_id, sequence_no, district')
+                .eq('contract_id', currentContractId);
+
+            // Tapis mengikut daerah dan sequence_no yang sama (Logik asal blueform-shared.js)
+            const currentDistrict = (item.district || '').trim().toUpperCase();
+            const groupMembers = (siblingWOs || []).filter(w => 
+                (w.sequence_no || '').trim() === seq && 
+                (w.district || '').trim().toUpperCase() === currentDistrict
+            );
+
+            if (groupMembers.length > 1) {
+                const groupIds = groupMembers.map(g => g.id);
+                // Bina data gabungan menggunakan helper dikongsi
+                payload = await buildBlueformDataGroup(groupIds);
+                document.getElementById('bulkPreviewCount').innerText = `Full Set Preview: Gabungan ${groupMembers.length} WO (Seq: ${seq})`;
+
+                // Ambil semua pdf sebut harga milik ahli-ahli kumpulan ini
+                const groupWorkIds = groupMembers.map(g => g.work_id);
+                const { data: quotes } = await supabaseClient
+                    .from('quotations')
+                    .select('work_id, pdf_url')
+                    .in('work_id', groupWorkIds);
+                
+                if (quotes) {
+                    linkedPdfs = quotes.map(q => q.pdf_url).filter(url => url);
+                }
+            }
+        }
+
+        // 2. RUN STANDALONE: Jika tiada jujukan kumpulan, jalankan proses tunggal seperti biasa
+        if (!payload) {
+            if (typeof buildBlueformData === 'function') {
+                payload = await buildBlueformData(item.id);
+                if (item.mapped_pdf_url) linkedPdfs.push(item.mapped_pdf_url);
+            }
+        }
+
+        // 3. RENDER HALAMAN 1: Kod HTML Blueform (Sama ada single/gabungan)
+        if (payload && typeof buildBlueformHTML === 'function') {
             compositeHtml += `
                 <div class="print-page bg-white p-8 shadow-lg w-[210mm] min-h-[297mm] box-sizing-border-box relative" style="color:black; background:white;">
                     ${buildBlueformHTML(payload)}
@@ -369,24 +414,28 @@ async function previewFullSet(escapedItemData) {
         } else {
             compositeHtml += `
                 <div class="print-page bg-white p-8 shadow-lg w-[210mm] min-h-[297mm] text-red-500 font-bold flex items-center justify-center">
-                    Error: buildBlueformData() or buildBlueformHTML() is missing from shared logic.
+                    Error: buildBlueformData or buildBlueformHTML logic failed.
                 </div>
             `;
         }
 
-        // 3. Halaman 2 dan seterusnya: Render Fail PDF Quotation (Menyokong pelbagai muka surat)
-        if (item.mapped_pdf_url) {
-            compositeHtml += `
-                <div class="print-page pdf-container bg-white shadow-lg w-[210mm] min-h-[297mm] box-sizing-border-box" style="background:white;">
-                    <object data="${item.mapped_pdf_url}#toolbar=0&navpanes=0" type="application/pdf" style="width:100%; min-height:297mm; height:100vh;">
-                        <div class="p-8 text-center text-gray-500">
-                            <i class="fa-solid fa-triangle-exclamation text-xl text-amber-500 block mb-2"></i>
-                            Your browser doesn't support direct embedding. 
-                            <a href="${item.mapped_pdf_url}" target="_blank" class="text-blue-500 underline">Click here to open PDF</a>.
-                        </div>
-                    </object>
-                </div>
-            `;
+        // 4. RENDER HALAMAN 2+: Gabungan Dokumen Quotation PDF
+        if (linkedPdfs.length > 0) {
+            // Buang pautan PDF yang bertindih/sama jika ada
+            const uniquePdfs = [...new Set(linkedPdfs)];
+            uniquePdfs.forEach(pdfUrl => {
+                compositeHtml += `
+                    <div class="print-page pdf-container bg-white shadow-lg w-[210mm] min-h-[297mm] box-sizing-border-box" style="background:white;">
+                        <object data="${pdfUrl}#toolbar=0&navpanes=0" type="application/pdf" style="width:100%; min-height:297mm; height:100vh;">
+                            <div class="p-8 text-center text-gray-500">
+                                <i class="fa-solid fa-triangle-exclamation text-xl text-amber-500 block mb-2"></i>
+                                Browser tidak menyokong paparan terus.
+                                <a href="${pdfUrl}" target="_blank" class="text-blue-500 underline">Klik untuk buka fail PDF</a>.
+                            </div>
+                        </object>
+                    </div>
+                `;
+            });
         } else {
             compositeHtml += `
                 <div class="print-page bg-white p-12 shadow-lg w-[210mm] min-h-[297mm] flex flex-col items-center justify-center text-center" style="color:gray; background:white;">
