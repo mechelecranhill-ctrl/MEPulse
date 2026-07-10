@@ -1,5 +1,5 @@
 class AppSidebar extends HTMLElement {
-    connectedCallback() {
+    connectedCallback() { 
         const staffName = localStorage.getItem("staff_name") || "USER";
         const staffRole = localStorage.getItem("role") || "STAFF";
         const staffAvatar = localStorage.getItem("staff_avatar") || "";
