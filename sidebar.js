@@ -37,7 +37,7 @@ class AppSidebar extends HTMLElement {
 
                 <div class="menu-group">
                     <a href="#" class="menu-parent" id="quotationBtn">
-                        Quotations Approval <span class="arrow">▼</span>
+                        Dashboard-Approvals <span class="arrow">▼</span>
                     </a>
                     <div class="submenu" id="quotationMenu">
                         <!-- Updated to app-tech.html -->
