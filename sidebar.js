@@ -41,7 +41,7 @@ class AppSidebar extends HTMLElement {
                     </a>
                     <div class="submenu" id="quotationMenu">
                         <!-- Updated to app-tech.html -->
-                        <a href="app-tech.html" class="menu-link">Technician Status</a>
+                        <a href="app-tech.html" class="menu-link">Technician</a>
                         <a href="app-exec.html" class="menu-link">Executive</a>
                         <a href="app-sect.html" class="menu-link">Section Head</a>
                         <a href="app-dept.html" class="menu-link">Department Head</a>
