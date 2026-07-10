@@ -122,8 +122,8 @@
 
                 if (assignError) throw assignError;
                 if (!assignment || !assignment.unit_id) {
-                    showEmptyState('quotations-container', 'Akaun anda belum dilesenkan/diuntukkan kepada mana-mana unit.');
-                    showEmptyState('blueforms-container', 'Akaun anda belum dilesenkan/diuntukkan kepada mana-mana unit.');
+                    showEmptyState('quotations-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
+                    showEmptyState('blueforms-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
                     return;
                 }
 
@@ -145,7 +145,7 @@
 
                 if (qError) throw qError;
 
-                // 2. Ambil data Blueform mengikut Unit (Turut mengambil pdf_url dari quotations jika ada)
+                // 2. Ambil data Blueform + Dapatkan pdf_url menerusi link database 'quotations'
                 const { data: blueformOrders, error: wError } = await supabaseClient
                     .from('work_orders')
                     .select(`
@@ -154,8 +154,8 @@
                         status,
                         sequence_no,
                         district,
-                        pdf_url,
-                        contract!inner (id, contract_name, contract_code, unit_id)
+                        contract!inner (id, contract_name, contract_code, unit_id),
+                        quotations (pdf_url)
                     `)
                     .eq('status', 'BLUEFORM')
                     .eq('contract.unit_id', userUnitId);
@@ -218,7 +218,7 @@
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Work ID</th>
-                                    ${type === 'BLUEFORM' ? `<th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider w-20">Rujukan</th>` : ''}
+                                    ${type === 'BLUEFORM' ? `<th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider w-24">Rujukan</th>` : ''}
                                     <th class="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Tindakan</th>
                                 </tr>
                             </thead>
@@ -230,9 +230,16 @@
                     let actionButtonsHtml = '';
                     let referenceTdHtml = '';
 
-                    // Butang Rujukan PDF (Sama ada dari jadual quotations atau work_orders)
-                    let pdfBtn = item.pdf_url ? `
-                        <a href="${item.pdf_url}" target="_blank" class="text-gray-700 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded border border-gray-300 transition-all font-medium inline-flex items-center gap-1 text-[11px]" title="Lihat PDF Sebut Harga">
+                    // Dapatkan pdf_url secara dinamik berdasarkan jenis seksyen
+                    let finalPdfUrl = null;
+                    if (type === 'QUOTATION') {
+                        finalPdfUrl = item.pdf_url;
+                    } else if (type === 'BLUEFORM' && item.quotations) {
+                        finalPdfUrl = Array.isArray(item.quotations) ? item.quotations[0]?.pdf_url : item.quotations?.pdf_url;
+                    }
+
+                    let pdfBtn = finalPdfUrl ? `
+                        <a href="${finalPdfUrl}" target="_blank" class="text-gray-700 bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded border border-gray-300 transition-all font-medium inline-flex items-center gap-1 text-[10px]" title="Lihat PDF Sebut Harga">
                             <i class="fa-solid fa-file-pdf text-red-600"></i> Quote
                         </a>
                     ` : '<span class="text-gray-400 text-[10px] italic">Tiada PDF</span>';
@@ -240,7 +247,7 @@
                     if (type === 'QUOTATION') {
                         actionButtonsHtml = `
                             <div class="inline-flex items-center gap-1">
-                                ${item.pdf_url ? `<a href="${item.pdf_url}" target="_blank" class="text-gray-700 bg-gray-200 hover:bg-gray-300 px-2.5 py-1 rounded transition-all font-medium inline-block"><i class="fa-solid fa-file-pdf text-red-600"></i></a>` : ''}
+                                ${finalPdfUrl ? `<a href="${finalPdfUrl}" target="_blank" class="text-gray-700 bg-gray-200 hover:bg-gray-300 px-2.5 py-1 rounded transition-all font-medium inline-block"><i class="fa-solid fa-file-pdf text-red-600"></i></a>` : ''}
                                 <button onclick="openConfirmModal('${item.work_id}', 'QUO-REJ', 'REJECT-QUOTE')" 
                                         class="text-white px-2 py-1 rounded bg-red-600 hover:bg-red-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap">
                                     <i class="fa-solid fa-xmark"></i>
@@ -252,7 +259,6 @@
                             </div>
                         `;
                     } else {
-                        // Untuk Lajur Sebelah (Rujukan Quotation di dalam Blueform View)
                         referenceTdHtml = `<td class="px-3 py-2.5 whitespace-nowrap text-center">${pdfBtn}</td>`;
 
                         const blueformBtnHtml = typeof renderBlueformButtonHtml === 'function' ? renderBlueformButtonHtml(item, seqGroups, renderedSeqs) : '';
@@ -297,7 +303,6 @@
                 </div>`;
         }
 
-        // ================= LOGIK MODAL CUSTOM DENGAN INPUT REASON =================
         function openConfirmModal(workId, nextStatus, mode) {
             const modal = document.getElementById('customConfirmModal');
             const banner = document.getElementById('modalBanner');
@@ -387,7 +392,6 @@
             }, 150);
         }
 
-        // ================= LOGIK KEMAS KINI STATUS IKUT JADUAL =================
         async function executeStatusUpdate(workId, nextStatus, reason = null) {
             try {
                 if (nextStatus === 'QUO-REJ' || nextStatus === 'QUO-APP') {
