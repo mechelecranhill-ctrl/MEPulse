@@ -100,29 +100,28 @@
 
         async function fetchTechnicianDashboard() {
             try {
-                // 1. Fetch Quotation logs
+                // DIUBAH: Dibuang contract_id yang tiada dalam database, guna contract_code semula
                 const { data: quotationData, error: qError } = await supabaseClient
                     .from('quotations')
                     .select(`
-                        id, work_id, status, contract_code, contract_id, pdf_url, reject_reason,
-                        contract (id, contract_name, contract_code)
+                        id, work_id, status, contract_code, pdf_url, reject_reason,
+                        contract (contract_name, contract_code)
                     `)
                     .in('status', ['QUO-APP', 'QUO-REJ']);
 
                 if (qError) throw qError;
 
-                // 2. Fetch Blueform logs
+                // DIUBAH: Dibuang contract_id yang tiada dalam database, guna contract_code semula
                 const { data: blueformData, error: bError } = await supabaseClient
                     .from('work_orders')
                     .select(`
-                        id, work_id, status, sequence_no, contract_id, district, reject_reason,
-                        contract (id, contract_name, contract_code)
+                        id, work_id, status, sequence_no, contract_code, district, reject_reason,
+                        contract (contract_name, contract_code)
                     `)
                     .in('status', ['APPROVED', 'EXEC-REJ', 'SECT-REJ', 'DEPT-REJ']);
 
                 if (bError) throw bError;
 
-                // 3. Cross-reference quotation PDFs inside the work_orders table structure
                 const { data: crossQuotes, error: crossQError } = await supabaseClient
                     .from('quotations')
                     .select('work_id, pdf_url');
@@ -151,31 +150,29 @@
                 return;
             }
 
-            // Grouping berdasarkan Contract ID asli
+            // KEMAS KINI: Grouping semula berasaskan contract_code yang sah
             const contractsMap = {};
             orders.forEach(item => {
                 const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
-                const cId = contractData?.id || item.contract_id || 'UNKNOWN-ID';
-                const cCode = contractData?.contract_code || item.contract_code || 'GEN-MNT';
+                const cCode = contractData?.contract_code || item.contract_code || 'GENERAL-MNT';
                 const cName = contractData?.contract_name || 'General Maintenance Contract';
 
-                if (!contractsMap[cId]) {
-                    contractsMap[cId] = { id: cId, code: cCode, name: cName, orders: [] };
+                if (!contractsMap[cCode]) {
+                    contractsMap[cCode] = { code: cCode, name: cName, orders: [] };
                 }
-                contractsMap[cId].orders.push(item);
+                contractsMap[cCode].orders.push(item);
             });
 
-            // KEMAS KINI UTAMA: Bina pemetaan sequence group tersendiri bagi memisahkan Sequence No mengikut Kontrak
+            // KEMAS KINI: Bina key gabungan unik `${cCode}_${seq}` supaya sequence no tidak tersalah gabung merentas kontrak
             let customSeqGroups = {};
             if (type === 'BLUEFORM') {
                 orders.forEach(item => {
                     const seq = (item.sequence_no || '').trim();
                     if (seq) {
                         const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
-                        const cId = contractData?.id || item.contract_id || 'UNKNOWN-ID';
+                        const cCode = contractData?.contract_code || item.contract_code || 'GENERAL-MNT';
                         
-                        // Kunci unik gabungan (Contract ID + Sequence No)
-                        const groupKey = `${cId}_${seq}`;
+                        const groupKey = `${cCode}_${seq}`;
                         if (!customSeqGroups[groupKey]) {
                             customSeqGroups[groupKey] = [];
                         }
@@ -186,8 +183,8 @@
 
             renderedBlueformSeqs = new Set();
 
-            for (const contractId in contractsMap) {
-                const contract = contractsMap[contractId];
+            for (const contractCode in contractsMap) {
+                const contract = contractsMap[contractCode];
                 const contractSection = document.createElement('div');
                 contractSection.className = "bg-gray-50 rounded-lg p-2 border border-gray-200 shadow-sm mb-4 w-full overflow-hidden";
 
@@ -277,8 +274,8 @@
                             </tr>
                         `;
                     } else {
-                        // KEMAS KINI UTAMA: Gunakan kunci gabungan unik apabila menghantar data ke renderBlueformButtonHtml
-                        const groupKey = seq ? `${contract.id}_${seq}` : '';
+                        // DIUBAH: Hantar struktur group palsu { [seq]: ... } yang diasingkan mengikut contractCode gabungan unik
+                        const groupKey = seq ? `${contract.code}_${seq}` : '';
                         const currentContractSeqGroups = seq ? { [seq]: customSeqGroups[groupKey] } : null;
 
                         const blueformBtnHtml = typeof renderBlueformButtonHtml === 'function' 
