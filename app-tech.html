@@ -345,62 +345,65 @@
         }
 
         // Fungsi utama menjana Pakej Gabungan Dokumen (Halaman 1: Blueform, Halaman 2+: PDF Quotation)
-        async function previewFullSet(escapedItemData) {
-            const item = JSON.parse(decodeURIComponent(escapedItemData));
-            const container = document.getElementById('bulkPagesContainer');
+async function previewFullSet(escapedItemData) {
+    const item = JSON.parse(decodeURIComponent(escapedItemData));
+    const container = document.getElementById('bulkPagesContainer');
+    
+    container.innerHTML = '<div class="text-white text-sm p-4 animate-pulse"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Bundling full set documents...</div>';
+    document.getElementById('bulkPreviewPage').style.display = 'block';
+    document.getElementById('bulkPreviewCount').innerText = `Full Set Preview: ${item.work_id}`;
+
+    try {
+        let compositeHtml = '';
+
+        // 1. Ambil data Blueform menggunakan fungsi asal dari blueform-shared.js
+        if (typeof buildBlueformData === 'function' && typeof buildBlueformHTML === 'function') {
+            const payload = await buildBlueformData(item.id);
             
-            container.innerHTML = '<div class="text-white text-sm p-4 animate-pulse"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Bundling full set documents...</div>';
-            document.getElementById('bulkPreviewPage').style.display = 'block';
-            document.getElementById('bulkPreviewCount').innerText = `Full Set Preview: ${item.work_id}`;
-
-            try {
-                let compositeHtml = '';
-
-                // Halaman 1: Render Kod HTML Blueform
-                if (typeof generateBlueformHtml === 'function') {
-                    compositeHtml += `
-                        <div class="print-page bg-white p-8 shadow-lg w-[210mm] min-h-[297mm] box-sizing-border-box relative" style="color:black; background:white;">
-                            ${generateBlueformHtml(item)}
-                        </div>
-                    `;
-                } else {
-                    compositeHtml += `
-                        <div class="print-page bg-white p-8 shadow-lg w-[210mm] min-h-[297mm] text-red-500 font-bold flex items-center justify-center">
-                            Error: generateBlueformHtml() is missing from blueform.js
-                        </div>
-                    `;
-                }
-
-                // Halaman 2 dan seterusnya: Render Fail PDF Quotation (Menyokong pelbagai muka surat)
-                if (item.mapped_pdf_url) {
-                    compositeHtml += `
-                        <div class="print-page pdf-container bg-white shadow-lg w-[210mm] min-h-[297mm] box-sizing-border-box" style="background:white;">
-                            <object data="${item.mapped_pdf_url}#toolbar=0&navpanes=0" type="application/pdf" style="width:100%; min-height:297mm; height:100vh;">
-                                <div class="p-8 text-center text-gray-500">
-                                    <i class="fa-solid fa-triangle-exclamation text-xl text-amber-500 block mb-2"></i>
-                                    Your browser doesn't support direct embedding. 
-                                    <a href="${item.mapped_pdf_url}" target="_blank" class="text-blue-500 underline">Click here to open PDF</a>.
-                                </div>
-                            </object>
-                        </div>
-                    `;
-                } else {
-                    compositeHtml += `
-                        <div class="print-page bg-white p-12 shadow-lg w-[210mm] min-h-[297mm] flex flex-col items-center justify-center text-center" style="color:gray; background:white;">
-                            <i class="fa-solid fa-file-pdf text-4xl text-gray-300 mb-2"></i>
-                            <p class="text-sm font-semibold text-gray-600">No Linked Quotation PDF Found</p>
-                            <p class="text-xs text-gray-400">Only the Blueform page will be printed for this record.</p>
-                        </div>
-                    `;
-                }
-
-                container.innerHTML = compositeHtml;
-
-            } catch (error) {
-                console.error("Error creating full set preview:", error);
-                container.innerHTML = `<div class="text-red-400 p-4 font-mono text-xs">Error bundling documents: ${error.message}</div>`;
-            }
+            // 2. Halaman 1: Render Kod HTML Blueform
+            compositeHtml += `
+                <div class="print-page bg-white p-8 shadow-lg w-[210mm] min-h-[297mm] box-sizing-border-box relative" style="color:black; background:white;">
+                    ${buildBlueformHTML(payload)}
+                </div>
+            `;
+        } else {
+            compositeHtml += `
+                <div class="print-page bg-white p-8 shadow-lg w-[210mm] min-h-[297mm] text-red-500 font-bold flex items-center justify-center">
+                    Error: buildBlueformData() or buildBlueformHTML() is missing from shared logic.
+                </div>
+            `;
         }
+
+        // 3. Halaman 2 dan seterusnya: Render Fail PDF Quotation (Menyokong pelbagai muka surat)
+        if (item.mapped_pdf_url) {
+            compositeHtml += `
+                <div class="print-page pdf-container bg-white shadow-lg w-[210mm] min-h-[297mm] box-sizing-border-box" style="background:white;">
+                    <object data="${item.mapped_pdf_url}#toolbar=0&navpanes=0" type="application/pdf" style="width:100%; min-height:297mm; height:100vh;">
+                        <div class="p-8 text-center text-gray-500">
+                            <i class="fa-solid fa-triangle-exclamation text-xl text-amber-500 block mb-2"></i>
+                            Your browser doesn't support direct embedding. 
+                            <a href="${item.mapped_pdf_url}" target="_blank" class="text-blue-500 underline">Click here to open PDF</a>.
+                        </div>
+                    </object>
+                </div>
+            `;
+        } else {
+            compositeHtml += `
+                <div class="print-page bg-white p-12 shadow-lg w-[210mm] min-h-[297mm] flex flex-col items-center justify-center text-center" style="color:gray; background:white;">
+                    <i class="fa-solid fa-file-pdf text-4xl text-gray-300 mb-2"></i>
+                    <p class="text-sm font-semibold text-gray-600">No Linked Quotation PDF Found</p>
+                    <p class="text-xs text-gray-400">Only the Blueform page will be printed for this record.</p>
+                </div>
+            `;
+        }
+
+        container.innerHTML = compositeHtml;
+
+    } catch (error) {
+        console.error("Error creating full set preview:", error);
+        container.innerHTML = `<div class="text-red-400 p-4 font-mono text-xs">Error bundling documents: ${error.message}</div>`;
+    }
+}
 
         function closeBulkPreview() {
             document.getElementById('bulkPreviewPage').style.display = 'none';
