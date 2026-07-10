@@ -136,49 +136,64 @@
         let renderedBlueformSeqs = new Set();
 
         async function fetchTechnicianDashboard() {
-            try {
-                // Ambil data quotations
-                const { data: quotationData, error: qError } = await supabaseClient
-                    .from('quotations')
-                    .select(`
-                        id, work_id, status, contract_id, pdf_url, reject_reason,
-                        contract (id, contract_name, contract_code)
-                    `)
-                    .in('status', ['QUO-APP', 'QUO-REJ']);
+    try {
+        // 1. DAPATKAN ID UNIT USER (Diambil dari session.js / localStorage)
+        // Nota: Sila pastikan nama variable/key ini sepadan dengan cara session.js anda menyimpan data user.
+        const currentUserUnitId = localStorage.getItem('user_unit_id') || (window.currentUser && window.currentUser.unit_id);
+        
+        // Sediakan query asas untuk quotations
+        let quotationsQuery = supabaseClient
+            .from('quotations')
+            .select(`
+                id, work_id, status, contract_id, pdf_url, reject_reason,
+                contract (id, contract_name, contract_code)
+            `)
+            .in('status', ['QUO-APP', 'QUO-REJ']);
 
-                if (qError) throw qError;
+        // Sediakan query asas untuk work_orders (Blueforms)
+        let blueformQuery = supabaseClient
+            .from('work_orders')
+            .select(`
+                id, work_id, status, sequence_no, contract_id, district, reject_reason, unit_id,
+                contract (id, contract_name, contract_code)
+            `)
+            .in('status', ['APPROVED', 'EXEC-REJ', 'SECT-REJ', 'DEPT-REJ']);
 
-                // Ambil data work_orders (Blueforms)
-                const { data: blueformData, error: bError } = await supabaseClient
-                    .from('work_orders')
-                    .select(`
-                        id, work_id, status, sequence_no, contract_id, district, reject_reason,
-                        contract (id, contract_name, contract_code)
-                    `)
-                    .in('status', ['APPROVED', 'EXEC-REJ', 'SECT-REJ', 'DEPT-REJ']);
-
-                if (bError) throw bError;
-
-                // Pemetaan silang fail PDF Quotation ke Work Orders berdasarkan work_id
-                const { data: crossQuotes, error: crossQError } = await supabaseClient
-                    .from('quotations')
-                    .select('work_id, pdf_url');
-                    
-                if (!crossQError && crossQuotes) {
-                    const quoteMap = {};
-                    crossQuotes.forEach(q => { if (q.work_id) quoteMap[q.work_id] = q.pdf_url; });
-                    blueformData.forEach(item => { item.mapped_pdf_url = quoteMap[item.work_id] || null; });
-                }
-
-                renderTechnicianSection('quotations-container', quotationData, 'QUOTATION');
-                renderTechnicianSection('blueforms-container', blueformData, 'BLUEFORM');
-
-            } catch (err) {
-                console.error("Error loading technician dashboard:", err.message);
-                alert("Failed to load dashboard data: " + err.message);
-            }
+        // 2. TAPIS SECARA DINAMIK: Jika user ada unit khusus, tambah filter .eq()
+        if (currentUserUnitId) {
+            // Kita tapis supaya data yang ditarik sepadan dengan unit_id milik staf
+            blueformQuery = blueformQuery.eq('unit_id', currentUserUnitId);
+            
+            // Jika jadual quotations anda juga mempunyai `unit_id`, buka komen di bawah:
+            // quotationsQuery = quotationsQuery.eq('unit_id', currentUserUnitId);
         }
 
+        // 3. JALANKAN QUERY YANG TELAH DITAPIS
+        const { data: quotationData, error: qError } = await quotationsQuery;
+        if (qError) throw qError;
+
+        const { data: blueformData, error: bError } = await blueformQuery;
+        if (bError) throw bError;
+
+        // Pemetaan silang fail PDF Quotation ke Work Orders berdasarkan work_id
+        const { data: crossQuotes, error: crossQError } = await supabaseClient
+            .from('quotations')
+            .select('work_id, pdf_url');
+            
+        if (!crossQError && crossQuotes) {
+            const quoteMap = {};
+            crossQuotes.forEach(q => { if (q.work_id) quoteMap[q.work_id] = q.pdf_url; });
+            blueformData.forEach(item => { item.mapped_pdf_url = quoteMap[item.work_id] || null; });
+        }
+
+        renderTechnicianSection('quotations-container', quotationData, 'QUOTATION');
+        renderTechnicianSection('blueforms-container', blueformData, 'BLUEFORM');
+
+    } catch (err) {
+        console.error("Error loading technician dashboard:", err.message);
+        alert("Failed to load dashboard data: " + err.message);
+    }
+}
         function renderTechnicianSection(containerId, orders, type) {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
