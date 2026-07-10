@@ -14,40 +14,39 @@
 
     <script src="session.js"></script>
     <script src="sidebar.js" defer></script>
-    
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans h-screen overflow-hidden flex flex-col relative">
 
-        <app-sidebar></app-sidebar>
+    <app-sidebar></app-sidebar>
 
-<div class="glass-header">
-    <div style="text-align:center;">
-        <h1 style="margin:0; font-size:22px; font-weight:800; color:#ffffff; letter-spacing:0.5px;">
-            <i class="fa-solid fa-file-signature" style="margin-right:8px;"></i>Contract Approval System
-        </h1>
-        <p style="margin:4px 0 0 0; color:rgba(255,255,255,0.8); font-size:15px;">
-            Mode: Technician
-        </p>
+    <div class="glass-header">
+        <div style="text-align:center;">
+            <h1 style="margin:0; font-size:22px; font-weight:800; color:#ffffff; letter-spacing:0.5px;">
+                <i class="fa-solid fa-file-signature" style="margin-right:8px;"></i>Contract Approval System
+            </h1>
+            <p style="margin:4px 0 0 0; color:rgba(255,255,255,0.8); font-size:15px;">
+                Mode: Technician
+            </p>
+        </div>
     </div>
-</div>
 
-<style>
-    .glass-header {
-        width: 100%;
-        height: calc(60px + env(safe-area-inset-top));
-        padding: env(safe-area-inset-top) 25px 0 25px;
-        background: radial-gradient(circle at top, rgba(255,255,255,.15), transparent 35%),
-                    linear-gradient(60deg, #1d4ed8 0%, #3b82f6 40%, #60a5fa 100%); /* Warna biru untuk Tech */
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        position: relative;
-        z-index: 1000;
-        flex-shrink: 0;
-        box-sizing: border-box;
-    }
-</style>
+    <style>
+        .glass-header {
+            width: 100%;
+            height: calc(60px + env(safe-area-inset-top));
+            padding: env(safe-area-inset-top) 25px 0 25px;
+            background: radial-gradient(circle at top, rgba(255,255,255,.15), transparent 35%),
+                        linear-gradient(60deg, #1d4ed8 0%, #3b82f6 40%, #60a5fa 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 1000;
+            flex-shrink: 0;
+            box-sizing: border-box;
+        }
+    </style>
 
     <div class="container mx-auto px-4 flex-1 my-6 overflow-hidden">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full pb-4">
@@ -101,7 +100,7 @@
 
         async function fetchTechnicianDashboard() {
             try {
-                // 1. Fetch Quotation Data (Filter for approved/rejected statuses)
+                // 1. Fetch Quotation logs
                 const { data: quotationData, error: qError } = await supabaseClient
                     .from('quotations')
                     .select(`
@@ -112,7 +111,7 @@
 
                 if (qError) throw qError;
 
-                // 2. Fetch Work Orders / Blueform Data (Filter for final approval and all rejection tiers)
+                // 2. Fetch Blueform logs
                 const { data: blueformData, error: bError } = await supabaseClient
                     .from('work_orders')
                     .select(`
@@ -123,7 +122,17 @@
 
                 if (bError) throw bError;
 
-                // 3. Render Dashboard Elements
+                // 3. Cross-reference quotation PDFs inside the work_orders table structure
+                const { data: crossQuotes, error: crossQError } = await supabaseClient
+                    .from('quotations')
+                    .select('work_id, pdf_url');
+                    
+                if (!crossQError && crossQuotes) {
+                    const quoteMap = {};
+                    crossQuotes.forEach(q => { if (q.work_id) quoteMap[q.work_id] = q.pdf_url; });
+                    blueformData.forEach(item => { item.mapped_pdf_url = quoteMap[item.work_id] || null; });
+                }
+
                 renderTechnicianSection('quotations-container', quotationData, 'QUOTATION');
                 renderTechnicianSection('blueforms-container', blueformData, 'BLUEFORM');
 
@@ -142,7 +151,6 @@
                 return;
             }
 
-            // Group logs cleanly by Contract Code
             const contractsMap = {};
             orders.forEach(item => {
                 const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
@@ -166,6 +174,25 @@
                 let headerBg = type === 'QUOTATION' ? 'bg-blue-50 border-blue-200' : 'bg-emerald-50 border-emerald-200';
                 let badgeBg = type === 'QUOTATION' ? 'bg-blue-600' : 'bg-emerald-600';
 
+                // Set headers based on Executive layout design specifications
+                let tableHeaderHtml = '';
+                if (type === 'BLUEFORM') {
+                    tableHeaderHtml = `
+                        <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase">Work ID</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase w-24">Status</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase w-24">Blueform</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase w-24">Reference</th>
+                        <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase">Remarks</th>
+                    `;
+                } else {
+                    tableHeaderHtml = `
+                        <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase">Work ID</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase w-24">Status</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase w-24">Reference</th>
+                        <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase">Remarks</th>
+                    `;
+                }
+
                 let sectionHtml = `
                     <div class="${headerBg} px-3 py-2 rounded-t-lg border-b flex justify-between items-center gap-2 mb-2">
                         <h3 class="font-bold text-gray-800 text-xs flex items-center flex-wrap">
@@ -179,12 +206,7 @@
                     <div class="overflow-x-auto bg-white rounded-b-lg border border-gray-100">
                         <table class="min-w-full divide-y divide-gray-200 text-xs">
                             <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase">Work ID</th>
-                                    <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase w-28">Status</th>
-                                    ${type === 'BLUEFORM' ? '<th class="px-3 py-2 text-center font-medium text-gray-500 uppercase w-24">Action</th>' : ''}
-                                    <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase">Remarks / Rejection Reason</th>
-                                </tr>
+                                <tr>${tableHeaderHtml}</tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                 `;
@@ -192,13 +214,31 @@
                 contract.orders.forEach(item => {
                     const seq = (item.sequence_no || '').trim();
                     let statusBadge = '';
-                    let reasonText = item.reject_reason ? item.reject_reason : '<span class="text-gray-400 italic">No notes provided.</span>';
+                    let reasonText = item.reject_reason ? item.reject_reason : '<span class="text-gray-400 italic">No notes.</span>';
 
-                    // Determine Badge Theme
                     if (item.status === 'QUO-APP' || item.status === 'APPROVED') {
                         statusBadge = `<span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200"><i class="fa-solid fa-circle-check mr-1"></i>Approved</span>`;
                     } else {
                         statusBadge = `<span class="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200" title="${item.status}"><i class="fa-solid fa-circle-xmark mr-1"></i>Rejected</span>`;
+                    }
+
+                    // Render Quotation PDF links safely across tables
+                    let finalPdfUrl = (type === 'QUOTATION') ? item.pdf_url : item.mapped_pdf_url;
+                    let pdfBtnHtml = finalPdfUrl ? `
+                        <a href="${finalPdfUrl}" target="_blank" class="text-gray-700 bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded border border-gray-300 transition-all font-medium inline-flex items-center gap-1 text-[10px]" title="View Quotation PDF">
+                            <i class="fa-solid fa-file-pdf text-red-600"></i> Quote
+                        </a>
+                    ` : '<span class="text-gray-400 text-[10px] italic">No PDF</span>';
+
+                    let remarkContent = '';
+                    if (item.status.includes('REJ') && item.reject_reason) {
+                        remarkContent = `
+                            <div class="bg-red-50 text-red-700 p-1.5 rounded border border-red-100 text-[11px] max-w-xs break-words">
+                                <strong class="block mb-0.5">[${item.status}] Reason:</strong> ${reasonText}
+                            </div>
+                        `;
+                    } else {
+                        remarkContent = `<span class="text-gray-400 italic text-[11px]">${item.status === 'QUO-APP' ? 'Awaiting Blueform generation.' : 'Fully completed.'}</span>`;
                     }
 
                     sectionHtml += `
@@ -213,16 +253,11 @@
                             <td class="px-3 py-2.5 whitespace-nowrap text-center">
                                 ${typeof renderBlueformButtonHtml === 'function' ? renderBlueformButtonHtml(item, seqGroups, renderedBlueformSeqs) : '<span class="text-gray-400">-</span>'}
                             </td>` : ''}
-                            <td class="px-3 py-2.5 text-left max-w-xs break-words text-gray-600">
-                                ${item.status.includes('REJ') && item.reject_reason ? `
-                                    <div class="bg-red-50 text-red-700 p-2 rounded border border-red-100 text-[11px]">
-                                        <strong class="block mb-0.5">[${item.status}] Rejection Log:</strong> ${reasonText}
-                                    </div>
-                                ` : `
-                                    <div class="text-gray-500 text-[11px] italic">
-                                        ${item.status === 'QUO-APP' ? 'Quotation approved. Ready for Blueform submission.' : 'Contract finalized successfully.'}
-                                    </div>
-                                `}
+                            <td class="px-3 py-2.5 whitespace-nowrap text-center">
+                                ${pdfBtnHtml}
+                            </td>
+                            <td class="px-3 py-2.5 text-left max-w-xs">
+                                ${remarkContent}
                             </td>
                         </tr>
                     `;
