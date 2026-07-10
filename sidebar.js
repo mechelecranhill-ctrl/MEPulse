@@ -40,6 +40,8 @@ class AppSidebar extends HTMLElement {
                         Quotations Approval <span class="arrow">▼</span>
                     </a>
                     <div class="submenu" id="quotationMenu">
+                        <!-- Updated to app-tech.html -->
+                        <a href="app-tech.html" class="menu-link">Technician Status</a>
                         <a href="app-exec.html" class="menu-link">Executive</a>
                         <a href="app-sect.html" class="menu-link">Section Head</a>
                         <a href="app-dept.html" class="menu-link">Department Head</a>
@@ -162,8 +164,8 @@ class AppSidebar extends HTMLElement {
             if (link.getAttribute("href") === path) link.classList.add("active");
         });
 
-        // Keep Quotations Menu open if active
-        const quotePages = ['app-exec.html', 'app-sect.html', 'app-dept.html'];
+        // Included app-tech.html to auto-expand the dropdown when active
+        const quotePages = ['app-tech.html', 'app-exec.html', 'app-sect.html', 'app-dept.html'];
         if (quotePages.includes(path)) {
             this.quotationMenu.classList.add("open");
             this.quoteArrow.innerText = "▲";
