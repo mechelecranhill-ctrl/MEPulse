@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<head> 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Technician Dashboard - Contract Approval System</title>
@@ -100,23 +100,23 @@
 
         async function fetchTechnicianDashboard() {
             try {
-                // DIUBAH: Dibuang contract_id yang tiada dalam database, guna contract_code semula
+                // SERAGAM: Menggunakan relation contract_id yang baharu untuk quotations
                 const { data: quotationData, error: qError } = await supabaseClient
                     .from('quotations')
                     .select(`
-                        id, work_id, status, contract_code, pdf_url, reject_reason,
-                        contract (contract_name, contract_code)
+                        id, work_id, status, contract_id, pdf_url, reject_reason,
+                        contract (id, contract_name, contract_code)
                     `)
                     .in('status', ['QUO-APP', 'QUO-REJ']);
 
                 if (qError) throw qError;
 
-                // DIUBAH: Dibuang contract_id yang tiada dalam database, guna contract_code semula
+                // SERAGAM: Menggunakan relation contract_id untuk work_orders
                 const { data: blueformData, error: bError } = await supabaseClient
                     .from('work_orders')
                     .select(`
-                        id, work_id, status, sequence_no, contract_code, district, reject_reason,
-                        contract (contract_name, contract_code)
+                        id, work_id, status, sequence_no, contract_id, district, reject_reason,
+                        contract (id, contract_name, contract_code)
                     `)
                     .in('status', ['APPROVED', 'EXEC-REJ', 'SECT-REJ', 'DEPT-REJ']);
 
@@ -150,29 +150,30 @@
                 return;
             }
 
-            // KEMAS KINI: Grouping semula berasaskan contract_code yang sah
+            // SERAGAM: Pengelompokan jadual dikunci sepenuhnya menggunakan contract_id
             const contractsMap = {};
             orders.forEach(item => {
                 const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
-                const cCode = contractData?.contract_code || item.contract_code || 'GENERAL-MNT';
+                const cId = contractData?.id || item.contract_id || 'UNKNOWN-ID';
+                const cCode = contractData?.contract_code || 'GEN-MNT';
                 const cName = contractData?.contract_name || 'General Maintenance Contract';
 
-                if (!contractsMap[cCode]) {
-                    contractsMap[cCode] = { code: cCode, name: cName, orders: [] };
+                if (!contractsMap[cId]) {
+                    contractsMap[cId] = { id: cId, code: cCode, name: cName, orders: [] };
                 }
-                contractsMap[cCode].orders.push(item);
+                contractsMap[cId].orders.push(item);
             });
 
-            // KEMAS KINI: Bina key gabungan unik `${cCode}_${seq}` supaya sequence no tidak tersalah gabung merentas kontrak
+            // SERAGAM: Rujukan unik kekunci gabungan dijana melalui `${contractId}_${seq}`
             let customSeqGroups = {};
             if (type === 'BLUEFORM') {
                 orders.forEach(item => {
                     const seq = (item.sequence_no || '').trim();
                     if (seq) {
                         const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
-                        const cCode = contractData?.contract_code || item.contract_code || 'GENERAL-MNT';
+                        const cId = contractData?.id || item.contract_id || 'UNKNOWN-ID';
                         
-                        const groupKey = `${cCode}_${seq}`;
+                        const groupKey = `${cId}_${seq}`;
                         if (!customSeqGroups[groupKey]) {
                             customSeqGroups[groupKey] = [];
                         }
@@ -183,8 +184,8 @@
 
             renderedBlueformSeqs = new Set();
 
-            for (const contractCode in contractsMap) {
-                const contract = contractsMap[contractCode];
+            for (const contractId in contractsMap) {
+                const contract = contractsMap[contractId];
                 const contractSection = document.createElement('div');
                 contractSection.className = "bg-gray-50 rounded-lg p-2 border border-gray-200 shadow-sm mb-4 w-full overflow-hidden";
 
@@ -274,8 +275,8 @@
                             </tr>
                         `;
                     } else {
-                        // DIUBAH: Hantar struktur group palsu { [seq]: ... } yang diasingkan mengikut contractCode gabungan unik
-                        const groupKey = seq ? `${contract.code}_${seq}` : '';
+                        // SERAGAM: Menghantar data ke renderBlueformButtonHtml berasaskan ID unik kontrak
+                        const groupKey = seq ? `${contract.id}_${seq}` : '';
                         const currentContractSeqGroups = seq ? { [seq]: customSeqGroups[groupKey] } : null;
 
                         const blueformBtnHtml = typeof renderBlueformButtonHtml === 'function' 
