@@ -39,7 +39,6 @@
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans h-screen overflow-hidden flex flex-col relative">
 
-    
     <app-sidebar></app-sidebar>
 
     <div class="glass-header">
@@ -120,44 +119,21 @@
 
     <div id="bulkPreviewPage" style="display:none; position:fixed; inset:0; background:#525659; z-index:9998; overflow-y:auto; padding:60px 0 60px 0;">
        <div class="bulk-toolbar"
-     style="position:fixed;
-            top:0;
-            left:0;
-            right:0;
-            height:50px;
-            background:#323639;
-            display:flex;
-            align-items:center;
-            justify-content:flex-end;
-            padding:0 30px;
-            z-index:9999;
-            box-shadow:0 2px 10px rgba(0,0,0,0.4);">
+            style="position:fixed; top:0; left:0; right:0; height:50px; background:#323639; display:flex; align-items:center; justify-content:flex-end; padding:0 30px; z-index:9999; box-shadow:0 2px 10px rgba(0,0,0,0.4);">
 
-    <div id="bulkPreviewCount"
-         style="
-            position:absolute;
-            left:50%;
-            transform:translateX(-50%);
-            color:white;
-            font-size:16px;
-            font-weight:700;
-            white-space:nowrap;">
-    </div>
+            <div id="bulkPreviewCount"
+                 style="position:absolute; left:50%; transform:translateX(-50%); color:white; font-size:16px; font-weight:700; white-space:nowrap;">
+            </div>
 
-    <div style="display:flex;gap:10px;">
-        <button class="btn-action"
-                style="background:#555;border:none;padding:10px 20px;border-radius:10px;color:white;font-weight:600;cursor:pointer;"
-                onclick="closeBulkPreview()">
-            <i class="fa fa-times"></i> Close
-        </button>
-
-        <button class="btn-action"
-                style="background:var(--ios-green,#34C759);border:none;padding:10px 20px;border-radius:10px;color:white;font-weight:600;cursor:pointer;"
-                onclick="window.print()">
-            <i class="fa fa-print"></i> Print / Save PDF
-        </button>
-    </div>
-</div>
+            <div style="display:flex;gap:10px;">
+                <button class="btn-action" style="background:#555;border:none;padding:10px 20px;border-radius:10px;color:white;font-weight:600;cursor:pointer;" onclick="closeBulkPreview()">
+                    <i class="fa fa-times"></i> Close
+                </button>
+                <button class="btn-action" style="background:var(--ios-green,#34C759);border:none;padding:10px 20px;border-radius:10px;color:white;font-weight:600;cursor:pointer;" onclick="window.print()">
+                    <i class="fa fa-print"></i> Print / Save PDF
+                </button>
+            </div>
+        </div>
         <div id="bulkPagesContainer" style="display:flex; flex-direction:column; align-items:center; gap:20px; padding:10px 0;"></div>
     </div>
 
@@ -189,14 +165,14 @@
 
                 const userUnitId = assignment.unit_id;
 
-                // 1. Ambil data Quotation mengikut Unit
+                // SERAGAM: Menggunakan relation contract_id yang telah dikemaskini
                 const { data: quotationOrders, error: qError } = await supabaseClient
                     .from('quotations')
                     .select(`
                         id,
                         work_id,
                         status,
-                        contract_code,
+                        contract_id,
                         pdf_url,
                         contract!inner (id, contract_name, contract_code, unit_id)
                     `)
@@ -205,7 +181,7 @@
 
                 if (qError) throw qError;
 
-                // 2. Ambil data Blueform secara berasingan
+                // SERAGAM: Menggunakan relation contract_id untuk work_orders
                 const { data: blueformOrders, error: wError } = await supabaseClient
                     .from('work_orders')
                     .select(`
@@ -213,6 +189,7 @@
                         work_id,
                         status,
                         sequence_no,
+                        contract_id,
                         district,
                         contract!inner (id, contract_name, contract_code, unit_id)
                     `)
@@ -221,7 +198,6 @@
 
                 if (wError) throw wError;
 
-                // 3. Ambil SEMUA pdf_url daripada jadual quotations untuk dipadankan nanti
                 const { data: allQuotes, error: allQError } = await supabaseClient
                     .from('quotations')
                     .select('work_id, pdf_url');
@@ -246,7 +222,6 @@
             }
         }
 
-
         function renderSection(containerId, orders, type) {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
@@ -256,23 +231,42 @@
                 return;
             }
 
+            // SERAGAM: Tukar pemetaan kontrak untuk menggunakan contract_id sepenuhnya
             const contractsMap = {};
             orders.forEach(item => {
                 const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
-                const cCode = contractData?.contract_code || item.contract_code || 'No Code';
+                const cId = contractData?.id || item.contract_id || 'UNKNOWN-ID';
+                const cCode = contractData?.contract_code || 'No Code';
                 const cName = contractData?.contract_name || 'No Name';
 
-                if (!contractsMap[cCode]) {
-                    contractsMap[cCode] = { code: cCode, name: cName, orders: [] };
+                if (!contractsMap[cId]) {
+                    contractsMap[cId] = { id: cId, code: cCode, name: cName, orders: [] };
                 }
-                contractsMap[cCode].orders.push(item);
+                contractsMap[cId].orders.push(item);
             });
 
-            const seqGroups = type === 'BLUEFORM' ? (typeof buildSequenceGroups === 'function' ? buildSequenceGroups(orders) : null) : null;
+            // SERAGAM & OVERRIDE: Bina sequence group asing berasaskan kunci gabungan unik `${cId}_${seq}`
+            let customSeqGroups = {};
+            if (type === 'BLUEFORM') {
+                orders.forEach(item => {
+                    const seq = (item.sequence_no || '').trim();
+                    if (seq) {
+                        const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
+                        const cId = contractData?.id || item.contract_id || 'UNKNOWN-ID';
+                        
+                        const groupKey = `${cId}_${seq}`;
+                        if (!customSeqGroups[groupKey]) {
+                            customSeqGroups[groupKey] = [];
+                        }
+                        customSeqGroups[groupKey].push(item);
+                    }
+                });
+            }
+
             const renderedSeqs = new Set();
 
-            for (const contractCode in contractsMap) {
-                const contract = contractsMap[contractCode];
+            for (const contractId in contractsMap) {
+                const contract = contractsMap[contractId];
                 const contractSection = document.createElement('div');
                 contractSection.className = "bg-gray-50 rounded-lg p-3 border border-gray-200 shadow-sm mb-4";
 
@@ -355,7 +349,13 @@
                             </td>
                         `;
                     } else {
-                        const blueformBtnHtml = typeof renderBlueformButtonHtml === 'function' ? renderBlueformButtonHtml(item, seqGroups, renderedSeqs) : '';
+                        // SERAGAM: Hantar subset group palsu { [seq]: ... } berasaskan gabungan contract id unik
+                        const groupKey = seq ? `${contract.id}_${seq}` : '';
+                        const currentContractSeqGroups = seq ? { [seq]: customSeqGroups[groupKey] } : null;
+
+                        const blueformBtnHtml = typeof renderBlueformButtonHtml === 'function' 
+                            ? renderBlueformButtonHtml(item, currentContractSeqGroups, renderedSeqs) 
+                            : '';
                         
                         let actionButtonsHtml = `
                             <div class="inline-flex items-center gap-1">
