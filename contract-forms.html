@@ -613,19 +613,6 @@
                         </div>
                     </div>
 
-                    <label>Status</label>
-                    <select id="q_status" required onchange="toggleRejectReason(this.value)">
-                        <option value="Draft">Draft</option>
-                        <option value="Pending Approval">Pending Approval</option>
-                        <option value="Approved">Approved</option>
-                        <option value="Rejected">Rejected</option>
-                    </select>
-
-                    <div id="reject_reason_container" style="display: none;">
-                        <label style="color: var(--ios-red);">Reject Reason</label>
-                        <textarea id="q_reject_reason" placeholder="Sila nyatakan sebab penolakan..."></textarea>
-                    </div>
-
                     <label>Upload Document (OneDrive)</label>
                     <input type="file" id="q_pdf_file" accept="application/pdf" required>
 
@@ -759,19 +746,6 @@
         let val = parseInt(digits) / 100;
         input.value = val.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         input.dataset.rawValue = val.toFixed(2);
-    }
-
-    function toggleRejectReason(status) {
-        const container = document.getElementById('reject_reason_container');
-        const reasonInput = document.getElementById('q_reject_reason');
-        if (status === 'Rejected') {
-            container.style.display = 'block';
-            reasonInput.setAttribute('required', 'true');
-        } else {
-            container.style.display = 'none';
-            reasonInput.removeAttribute('required');
-            reasonInput.value = '';
-        }
     }
 
     function setupFormListeners() {
@@ -910,7 +884,6 @@
                 if(currentWorkIds.length === 0){ alert("Sila masukkan Work Order ID!"); return; }
                 if(currentWorkIds.length > 1){ alert("Satu quotation hanya boleh untuk 1 Work Order ID sahaja!"); return; }
 
-                const statusValue = document.getElementById('q_status').value;
                 const selectUnitElement = document.getElementById('q_unit_id');
                 const unitText = selectUnitElement.options[selectUnitElement.selectedIndex].text;
 
@@ -928,13 +901,12 @@
                 
                 // Simpan satu-satunya Work Order ID ke Supabase bersama rujukan nama fail OneDrive tadi
                 const payload = {
-                    work_id: primaryWorkId,
-                    contract_code: contractCode,
-                    status: statusValue,
-                    reject_reason: statusValue === 'Rejected' ? document.getElementById('q_reject_reason').value : null,
-                    pdf_url: generatedPdfUrl, // Menyimpan rujukan nama fail (cth: C 123456.pdf)
-                    qpd_date: document.getElementById('q_qpb_date').value || null
-                };
+    work_id: primaryWorkId,
+    contract_code: contractCode,
+    status: 'QUOTATION',
+    pdf_url: generatedPdfUrl,
+    qpd_date: document.getElementById('q_qpb_date').value || null
+};
 
                 const res = await fetch(`${SB_URL}/rest/v1/quotations`, { method: 'POST', headers, body: JSON.stringify(payload) });
 
