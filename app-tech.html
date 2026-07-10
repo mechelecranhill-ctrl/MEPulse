@@ -137,42 +137,59 @@
 
         async function fetchTechnicianDashboard() {
     try {
-        // 1. DAPATKAN ID UNIT USER (Diambil dari session.js / localStorage)
-        // Nota: Sila pastikan nama variable/key ini sepadan dengan cara session.js anda menyimpan data user.
-        const currentUserUnitId = localStorage.getItem('user_unit_id') || (window.currentUser && window.currentUser.unit_id);
-        
-        // Sediakan query asas untuk quotations
+        // 1. Dapatkan Session Staff ID (UUID) yang sedang log masuk
+        // session.js sepatutnya menyimpan data user. Ganti fallback jika perlu.
+        const currentStaffId = localStorage.getItem('user_id') || 
+                               (window.currentUser && window.currentUser.id);
+
+        if (!currentStaffId) {
+            console.warn("Staff session ID tidak dijumpai. Memaparkan semua data tanpa tapisan.");
+        }
+
+        let activeUnitIds = [];
+
+        // 2. Jika ada Staff ID, cari unit_id mereka yang berstatus aktif
+        if (currentStaffId) {
+            const { data: assignments, error: assError } = await supabaseClient
+                .from('staff_unit_assignment')
+                .select('unit_id')
+                .eq('staff_id', currentStaffId)
+                .eq('active', true);
+
+            if (!assError && assignments) {
+                activeUnitIds = assignments.map(a => a.unit_id);
+            }
+        }
+
+        // 3. QUERY QUOTATIONS dengan tapisan Unit melalui Kontrak
         let quotationsQuery = supabaseClient
             .from('quotations')
             .select(`
                 id, work_id, status, contract_id, pdf_url, reject_reason,
-                contract (id, contract_name, contract_code)
+                contract!inner (id, contract_name, contract_code, unit_id)
             `)
             .in('status', ['QUO-APP', 'QUO-REJ']);
 
-        // Sediakan query asas untuk work_orders (Blueforms)
+        // 4. QUERY WORK ORDERS dengan tapisan Unit melalui Kontrak
         let blueformQuery = supabaseClient
             .from('work_orders')
             .select(`
-                id, work_id, status, sequence_no, contract_id, district, reject_reason, unit_id,
-                contract (id, contract_name, contract_code)
+                id, work_id, status, sequence_no, contract_id, district, reject_reason,
+                contract!inner (id, contract_name, contract_code, unit_id)
             `)
             .in('status', ['APPROVED', 'EXEC-REJ', 'SECT-REJ', 'DEPT-REJ']);
 
-        // 2. TAPIS SECARA DINAMIK: Jika user ada unit khusus, tambah filter .eq()
-        if (currentUserUnitId) {
-            // Kita tapis supaya data yang ditarik sepadan dengan unit_id milik staf
-            blueformQuery = blueformQuery.eq('unit_id', currentUserUnitId);
-            
-            // Jika jadual quotations anda juga mempunyai `unit_id`, buka komen di bawah:
-            // quotationsQuery = quotationsQuery.eq('unit_id', currentUserUnitId);
+        // 5. Applikasikan filter .in() sekiranya unit_id dijumpai
+        if (activeUnitIds.length > 0) {
+            quotationsQuery = quotationsQuery.in('contract.unit_id', activeUnitIds);
+            blueformQuery = blueformQuery.in('contract.unit_id', activeUnitIds);
         }
 
-        // 3. JALANKAN QUERY YANG TELAH DITAPIS
-        const { data: quotationData, error: qError } = await quotationsQuery;
-        if (qError) throw qError;
+        // Jalankan kedua-dua query secara serentak
+        const [ { data: quotationData, error: qError }, { data: blueformData, error: bError } ] = 
+            await Promise.all([quotationsQuery, blueformQuery]);
 
-        const { data: blueformData, error: bError } = await blueformQuery;
+        if (qError) throw qError;
         if (bError) throw bError;
 
         // Pemetaan silang fail PDF Quotation ke Work Orders berdasarkan work_id
@@ -194,6 +211,8 @@
         alert("Failed to load dashboard data: " + err.message);
     }
 }
+
+
         function renderTechnicianSection(containerId, orders, type) {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
