@@ -245,28 +245,21 @@
                 contractsMap[cId].orders.push(item);
             });
 
-            // SERAGAM & OVERRIDE: Bina sequence group asing berasaskan kunci gabungan unik `${cId}_${seq}`
-            let customSeqGroups = {};
-            if (type === 'BLUEFORM') {
-                orders.forEach(item => {
-                    const seq = (item.sequence_no || '').trim();
-                    if (seq) {
-                        const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
-                        const cId = contractData?.id || item.contract_id || 'UNKNOWN-ID';
-                        
-                        const groupKey = `${cId}_${seq}`;
-                        if (!customSeqGroups[groupKey]) {
-                            customSeqGroups[groupKey] = [];
-                        }
-                        customSeqGroups[groupKey].push(item);
-                    }
-                });
-            }
-
             const renderedSeqs = new Set();
 
             for (const contractId in contractsMap) {
                 const contract = contractsMap[contractId];
+
+                // FIX: Bina sequence group SCOPED ikut kontrak semasa, guna helper
+                // buildSequenceGroups() dari blueform-shared.js supaya format key
+                // ("DISTRICT||SEQ") sepadan dengan yang dicari oleh
+                // renderBlueformButtonHtml() / getBlueformGroupKey(). Key lama
+                // `${contract.id}_${seq}` tak pernah match, jadi group sentiasa
+                // jatuh balik ke [item] tunggal (blueform group asal papar 1 je).
+                const contractSeqGroups = type === 'BLUEFORM'
+                    ? buildSequenceGroups(contract.orders)
+                    : null;
+
                 const contractSection = document.createElement('div');
                 contractSection.className = "bg-gray-50 rounded-lg p-3 border border-gray-200 shadow-sm mb-4";
 
@@ -349,12 +342,10 @@
                             </td>
                         `;
                     } else {
-                        // SERAGAM: Hantar subset group palsu { [seq]: ... } berasaskan gabungan contract id unik
-                        const groupKey = seq ? `${contract.id}_${seq}` : '';
-                        const currentContractSeqGroups = seq ? { [seq]: customSeqGroups[groupKey] } : null;
-
+                        // FIX: guna contractSeqGroups (format key "DISTRICT||SEQ" dari
+                        // buildSequenceGroups) terus, bukan objek { [seq]: [...] } lama.
                         const blueformBtnHtml = typeof renderBlueformButtonHtml === 'function' 
-                            ? renderBlueformButtonHtml(item, currentContractSeqGroups, renderedSeqs) 
+                            ? renderBlueformButtonHtml(item, contractSeqGroups, renderedSeqs) 
                             : '';
                         
                         let actionButtonsHtml = `
