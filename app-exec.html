@@ -35,6 +35,26 @@
         @media (max-width:768px){
             .glass-header{ padding-left:10px; padding-right:10px; }
         }
+
+        /* FIX: rule print untuk .print-page / .pdf-container -- diperlukan oleh
+           previewFullSet() untuk gabungan Blueform + PDF Quotation (sama
+           seperti app-tech.html). blueform.css sudah kendalikan visibility
+           #bulkPreviewPage/.a4-container, jadi di sini cuma tambah rule
+           khusus untuk dua class ni sahaja supaya tak bertindih. */
+        @media print {
+            .print-page {
+                box-shadow: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 210mm;
+                page-break-after: always !important;
+                break-after: page !important;
+            }
+            .pdf-container {
+                height: auto !important;
+                min-height: 297mm !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans h-screen overflow-hidden flex flex-col relative">
@@ -270,8 +290,7 @@
                 if (type === 'BLUEFORM') {
                     headerRowHtml = `
                         <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Work ID</th>
-                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider w-24">Blueform</th>
-                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider w-24">Rujukan</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider w-40">Full Set (BF+Quote)</th>
                         <th class="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Tindakan</th>
                     `;
                 } else {
@@ -308,15 +327,7 @@
                     let finalPdfUrl = null;
                     if (type === 'QUOTATION') {
                         finalPdfUrl = item.pdf_url;
-                    } else if (type === 'BLUEFORM') {
-                        finalPdfUrl = item.mapped_pdf_url;
                     }
-
-                    let pdfBtn = finalPdfUrl ? `
-                        <a href="${finalPdfUrl}" target="_blank" class="text-gray-700 bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded border border-gray-300 transition-all font-medium inline-flex items-center gap-1 text-[10px]" title="Lihat PDF Sebut Harga">
-                            <i class="fa-solid fa-file-pdf text-red-600"></i> Quote
-                        </a>
-                    ` : '<span class="text-gray-400 text-[10px] italic">Tiada PDF</span>';
 
                     if (type === 'QUOTATION') {
                         let actionButtonsHtml = `
@@ -342,12 +353,32 @@
                             </td>
                         `;
                     } else {
-                        // FIX: guna contractSeqGroups (format key "DISTRICT||SEQ" dari
-                        // buildSequenceGroups) terus, bukan objek { [seq]: [...] } lama.
-                        const blueformBtnHtml = typeof renderBlueformButtonHtml === 'function' 
-                            ? renderBlueformButtonHtml(item, contractSeqGroups, renderedSeqs) 
-                            : '';
-                        
+                        // FIX: gantikan butang "Lihat Blueform" + link "Quote" berasingan
+                        // dengan SATU butang "Full Set (BF+Quote)" yang bundle blueform +
+                        // PDF sebut harga sekali untuk preview/print (sama seperti
+                        // app-tech.html). Dedupe guna contractSeqGroups + renderedSeqs
+                        // supaya WO dalam sequence group sama cuma papar satu butang.
+                        // Compound key (contract.id + groupKey) elak clash silang kontrak.
+                        const groupKey = seq ? getBlueformGroupKey(item) : null;
+                        const dedupeKey = groupKey ? `${contract.id}::${groupKey}` : null;
+                        const isFirstInGroup = !dedupeKey || !renderedSeqs.has(dedupeKey);
+
+                        let fullSetBtnHtml;
+                        if (isFirstInGroup) {
+                            if (dedupeKey) renderedSeqs.add(dedupeKey);
+                            const groupItems = groupKey ? (contractSeqGroups[groupKey] || [item]) : [item];
+                            const countLabel = groupItems.length > 1 ? ` (${groupItems.length})` : '';
+                            const serializedGroup = encodeURIComponent(JSON.stringify(groupItems));
+
+                            fullSetBtnHtml = `
+                                <button onclick="previewFullSet('${serializedGroup}')" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-2.5 py-1 rounded-lg text-[11px] shadow-xs cursor-pointer inline-flex items-center gap-1 transition-all">
+                                    <i class="fa-solid fa-print"></i> Full Set${countLabel}
+                                </button>
+                            `;
+                        } else {
+                            fullSetBtnHtml = `<span class="text-[10px] text-gray-400 italic">Rujuk row pertama seq ${seq}</span>`;
+                        }
+
                         let actionButtonsHtml = `
                             <div class="inline-flex items-center gap-1">
                                 <button onclick="openConfirmModal('${item.work_id}', 'EXEC-REJ', 'REJECT-BF')" 
@@ -366,10 +397,7 @@
                                 ${item.work_id}${seq ? ` <span class="text-gray-400 text-[11px]">(${seq})</span>` : ''}
                             </td>
                             <td class="px-3 py-2.5 whitespace-nowrap text-center">
-                                ${blueformBtnHtml}
-                            </td>
-                            <td class="px-3 py-2.5 whitespace-nowrap text-center">
-                                ${pdfBtn}
+                                ${fullSetBtnHtml}
                             </td>
                             <td class="px-3 py-2.5 whitespace-nowrap text-right">
                                 ${actionButtonsHtml}
@@ -396,6 +424,82 @@
                     <i class="fa-solid fa-inbox block text-xl mb-1 text-gray-300"></i> ${message}
                 </div>`;
         }
+
+        // FIX: Fungsi gabung Blueform + PDF Quotation ke satu preview/print,
+        // sama seperti previewFullSet() dalam app-tech.html. Bezanya di sini
+        // group items sudah tersedia terus dari contractSeqGroups (data dah
+        // ada di memori semasa render), jadi TIDAK perlu re-query Supabase
+        // untuk cari sibling WO seperti versi technician.
+        async function previewFullSet(escapedGroupData) {
+            const groupItems = JSON.parse(decodeURIComponent(escapedGroupData));
+            const container = document.getElementById('bulkPagesContainer');
+
+            container.innerHTML = '<div class="text-white text-sm p-4 animate-pulse"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Bundling full set documents...</div>';
+            document.getElementById('bulkPreviewPage').style.display = 'block';
+            document.getElementById('bulkPreviewCount').innerText = `Full Set Preview: ${groupItems.map(g => g.work_id).join(', ')}`;
+
+            try {
+                let compositeHtml = '';
+                const ids = groupItems.map(g => g.id);
+
+                const payload = ids.length > 1
+                    ? await buildBlueformDataGroup(ids)
+                    : await buildBlueformData(ids[0]);
+
+                if (ids.length > 1) {
+                    document.getElementById('bulkPreviewCount').innerText = `Full Set Preview: Gabungan ${ids.length} WO`;
+                }
+
+                // HALAMAN 1: Blueform. buildBlueformHTML() sudah ada .a4-container
+                // + page-break sendiri, jadi TIDAK dibalut dalam .print-page lagi
+                // (elak double page-break, sama seperti fix di app-tech.html).
+                if (payload && typeof buildBlueformHTML === 'function') {
+                    compositeHtml += buildBlueformHTML(payload);
+                } else {
+                    compositeHtml += `
+                        <div class="print-page bg-white p-8 shadow-lg w-[210mm] min-h-[297mm] text-red-500 font-bold flex items-center justify-center">
+                            Error: buildBlueformData or buildBlueformHTML logic failed.
+                        </div>
+                    `;
+                }
+
+                // HALAMAN 2+: PDF Quotation yang terkait dengan ahli group ini
+                // (guna mapped_pdf_url yang dah ada pada setiap item).
+                const linkedPdfs = [...new Set(groupItems.map(g => g.mapped_pdf_url).filter(Boolean))];
+
+                if (linkedPdfs.length > 0) {
+                    linkedPdfs.forEach(pdfUrl => {
+                        compositeHtml += `
+                            <div class="print-page pdf-container bg-white shadow-lg w-[210mm] min-h-[297mm] box-sizing-border-box" style="background:white;">
+                                <object data="${pdfUrl}#toolbar=0&navpanes=0" type="application/pdf" style="width:100%; min-height:297mm; height:100vh;">
+                                    <div class="p-8 text-center text-gray-500">
+                                        <i class="fa-solid fa-triangle-exclamation text-xl text-amber-500 block mb-2"></i>
+                                        Browser tidak menyokong paparan terus.
+                                        <a href="${pdfUrl}" target="_blank" class="text-blue-500 underline">Klik untuk buka fail PDF</a>.
+                                    </div>
+                                </object>
+                            </div>
+                        `;
+                    });
+                } else {
+                    compositeHtml += `
+                        <div class="print-page bg-white p-12 shadow-lg w-[210mm] min-h-[297mm] flex flex-col items-center justify-center text-center" style="color:gray; background:white;">
+                            <i class="fa-solid fa-file-pdf text-4xl text-gray-300 mb-2"></i>
+                            <p class="text-sm font-semibold text-gray-600">No Linked Quotation PDF Found</p>
+                            <p class="text-xs text-gray-400">Only the Blueform page will be printed for this record.</p>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML = compositeHtml;
+
+            } catch (error) {
+                console.error("Error creating full set preview:", error);
+                container.innerHTML = `<div class="text-red-400 p-4 font-mono text-xs">Error bundling documents: ${error.message}</div>`;
+            }
+        }
+        // Nota: closeBulkPreview() sudah disediakan secara global dalam
+        // blueform-shared.js, jadi tidak perlu didefinisikan semula di sini.
 
         function openConfirmModal(workId, nextStatus, mode) {
             const modal = document.getElementById('customConfirmModal');
