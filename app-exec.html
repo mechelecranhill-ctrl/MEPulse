@@ -137,12 +137,13 @@
         <div id="bulkPagesContainer" style="display:flex; flex-direction:column; align-items:center; gap:20px; padding:10px 0;"></div>
     </div>
 
-    <script src="blueform.js"></script>
+        <script src="blueform.js"></script>
     <script>
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
         async function fetchDashboard() {
             try {
+                // 1. DADAATKAN SESSION USER & UNIT ASSIGNMENT
                 const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
                 if (userError || !user) {
                     showEmptyState('quotations-container', 'Sila log masuk terlebih dahulu.');
@@ -154,6 +155,7 @@
                     .from('staff_unit_assignment')
                     .select('unit_id')
                     .eq('staff_id', user.id)
+                    .eq('active', true) // Pastikan assignment masih aktif
                     .maybeSingle();
 
                 if (assignError) throw assignError;
@@ -165,7 +167,7 @@
 
                 const userUnitId = assignment.unit_id;
 
-                // SERAGAM: Menggunakan relation contract_id yang telah dikemaskini
+                // 2. QUERY QUOTATIONS TERTUNDA (Ditapis berasaskan Unit Kontrak)
                 const { data: quotationOrders, error: qError } = await supabaseClient
                     .from('quotations')
                     .select(`
@@ -181,7 +183,7 @@
 
                 if (qError) throw qError;
 
-                // SERAGAM: Menggunakan relation contract_id untuk work_orders
+                // 3. QUERY WORK ORDERS TERTUNDA (Ditapis berasaskan Unit Kontrak)
                 const { data: blueformOrders, error: wError } = await supabaseClient
                     .from('work_orders')
                     .select(`
@@ -198,9 +200,15 @@
 
                 if (wError) throw wError;
 
+                // 4. PEMETAAN SILANG PDF & PENGURUSAN GROUPING (Hanya ambil data unit yang sama)
                 const { data: allQuotes, error: allQError } = await supabaseClient
                     .from('quotations')
-                    .select('work_id, pdf_url');
+                    .select(`
+                        work_id, 
+                        pdf_url,
+                        contract!inner (unit_id)
+                    `)
+                    .eq('contract.unit_id', userUnitId);
                     
                 if (!allQError && allQuotes) {
                     const quoteMap = {};
@@ -208,11 +216,13 @@
                         if (q.work_id) quoteMap[q.work_id] = q.pdf_url;
                     });
 
+                    // Pautkan PDF sebut harga ke dalam objek Work Order
                     blueformOrders.forEach(item => {
                         item.mapped_pdf_url = quoteMap[item.work_id] || null;
                     });
                 }
 
+                // Render komponen ke antaramuka
                 renderSection('quotations-container', quotationOrders, 'QUOTATION');
                 renderSection('blueforms-container', blueformOrders, 'BLUEFORM');
 
@@ -231,7 +241,7 @@
                 return;
             }
 
-            // SERAGAM: Tukar pemetaan kontrak untuk menggunakan contract_id sepenuhnya
+            // Susun data mengikut kelompok Kontrak
             const contractsMap = {};
             orders.forEach(item => {
                 const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
@@ -245,7 +255,7 @@
                 contractsMap[cId].orders.push(item);
             });
 
-            // SERAGAM & OVERRIDE: Bina sequence group asing berasaskan kunci gabungan unik `${cId}_${seq}`
+            // Sediakan storan pemecahan kumpulan jujukan (Sequence Grouping)
             let customSeqGroups = {};
             if (type === 'BLUEFORM') {
                 orders.forEach(item => {
@@ -301,9 +311,7 @@
                     <div class="overflow-x-auto bg-white rounded-b-lg border border-gray-100">
                         <table class="min-w-full divide-y divide-gray-200 text-xs">
                             <thead class="bg-gray-50">
-                                <tr>
-                                    ${headerRowHtml}
-                                </tr>
+                                <tr>${headerRowHtml}</tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                 `;
@@ -312,12 +320,7 @@
                     const seq = (item.sequence_no || '').trim();
                     let rowDataHtml = '';
 
-                    let finalPdfUrl = null;
-                    if (type === 'QUOTATION') {
-                        finalPdfUrl = item.pdf_url;
-                    } else if (type === 'BLUEFORM') {
-                        finalPdfUrl = item.mapped_pdf_url;
-                    }
+                    let finalPdfUrl = (type === 'QUOTATION') ? item.pdf_url : item.mapped_pdf_url;
 
                     let pdfBtn = finalPdfUrl ? `
                         <a href="${finalPdfUrl}" target="_blank" class="text-gray-700 bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded border border-gray-300 transition-all font-medium inline-flex items-center gap-1 text-[10px]" title="Lihat PDF Sebut Harga">
@@ -349,21 +352,28 @@
                             </td>
                         `;
                     } else {
-                        // SERAGAM: Hantar subset group palsu { [seq]: ... } berasaskan gabungan contract id unik
                         const groupKey = seq ? `${contract.id}_${seq}` : '';
                         const currentContractSeqGroups = seq ? { [seq]: customSeqGroups[groupKey] } : null;
+
+                        // PENTING: Mencegah butang dipaparkan berulang kali jika sequence_no yang sama diproses
+                        if (seq && renderedSeqs.has(seq)) {
+                            return; 
+                        }
 
                         const blueformBtnHtml = typeof renderBlueformButtonHtml === 'function' 
                             ? renderBlueformButtonHtml(item, currentContractSeqGroups, renderedSeqs) 
                             : '';
                         
+                        // Parameter tindakan disesuaikan jika bertindak sebagai satu kumpulan (Bulk action key)
+                        const actionTarget = seq ? `SEQ:${seq}:${contract.id}` : item.work_id;
+
                         let actionButtonsHtml = `
                             <div class="inline-flex items-center gap-1">
-                                <button onclick="openConfirmModal('${item.work_id}', 'EXEC-REJ', 'REJECT-BF')" 
+                                <button onclick="openConfirmModal('${actionTarget}', 'EXEC-REJ', 'REJECT-BF')" 
                                         class="text-white px-2 py-1 rounded bg-red-600 hover:bg-red-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Reject Blueform">
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
-                                <button onclick="openConfirmModal('${item.work_id}', 'APP-EXEC', 'BLUEFORM')" 
+                                <button onclick="openConfirmModal('${actionTarget}', 'APPROVED', 'BLUEFORM')" 
                                         class="text-white px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Approve Blueform">
                                     <i class="fa-solid fa-check"></i>
                                 </button>
@@ -372,7 +382,7 @@
 
                         rowDataHtml = `
                             <td class="px-3 py-2.5 whitespace-nowrap font-mono text-gray-900 font-medium text-left">
-                                ${item.work_id}${seq ? ` <span class="text-gray-400 text-[11px]">(${seq})</span>` : ''}
+                                ${seq ? `<span class="bg-purple-100 text-purple-800 font-bold px-1.5 py-0.5 rounded text-[10px] mr-1">GRP</span> Jujukan: ${seq}` : item.work_id}
                             </td>
                             <td class="px-3 py-2.5 whitespace-nowrap text-center">
                                 ${blueformBtnHtml}
@@ -406,7 +416,7 @@
                 </div>`;
         }
 
-        function openConfirmModal(workId, nextStatus, mode) {
+        function openConfirmModal(targetKey, nextStatus, mode) {
             const modal = document.getElementById('customConfirmModal');
             const banner = document.getElementById('modalBanner');
             const iconContainer = document.getElementById('modalIconContainer');
@@ -423,6 +433,13 @@
             reasonInput.classList.remove('border-red-500', 'focus:ring-red-500/20');
 
             const isReject = mode.startsWith('REJECT-');
+            const isGroup = targetKey.startsWith('SEQ:');
+            let displayId = targetKey;
+
+            if (isGroup) {
+                const parts = targetKey.split(':');
+                displayId = `Kumpulan Jujukan (${parts[1]})`;
+            }
 
             if (isReject) {
                 reasonSection.classList.remove('hidden');
@@ -435,7 +452,7 @@
                 iconContainer.className = "w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md text-xl text-blue-600";
                 icon.className = "fa-solid fa-file-invoice-dollar";
                 title.innerText = "Luluskan Quotation";
-                msg.innerHTML = `Luluskan sebut harga <span class="font-mono font-bold text-gray-800">${workId}</span>? Status bertukar ke <span class="text-blue-600 font-bold">QUO-APP</span>.`;
+                msg.innerHTML = `Luluskan sebut harga <span class="font-mono font-bold text-gray-800">${displayId}</span>? Status bertukar ke <span class="text-blue-600 font-bold">QUO-APP</span>.`;
                 confirmBtn.className = "flex-1 px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-all shadow-md bg-blue-600 hover:bg-blue-700 cursor-pointer";
             } 
             else if (mode === 'BLUEFORM') {
@@ -443,7 +460,7 @@
                 iconContainer.className = "w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md text-xl text-amber-600";
                 icon.className = "fa-solid fa-file-signature";
                 title.innerText = "Luluskan Blueform";
-                msg.innerHTML = `Adakah anda pasti mahu meluluskan Blueform untuk <span class="font-mono font-bold text-gray-800">${workId}</span>?`;
+                msg.innerHTML = `Adakah anda pasti mahu meluluskan Blueform untuk <span class="font-mono font-bold text-gray-800">${displayId}</span>? Status bertukar ke <span class="text-emerald-600 font-bold">APPROVED</span>.`;
                 confirmBtn.className = "flex-1 px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-all shadow-md bg-amber-600 hover:bg-amber-700 cursor-pointer";
             } 
             else if (mode === 'REJECT-QUOTE') {
@@ -451,7 +468,7 @@
                 iconContainer.className = "w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md text-xl text-red-600";
                 icon.className = "fa-solid fa-ban";
                 title.innerText = "Reject Quotation";
-                msg.innerHTML = `Sahkan penolakan sebut harga <span class="font-mono font-bold text-gray-800">${workId}</span>. Status bertukar ke <span class="text-red-600 font-bold">QUO-REJ</span>.`;
+                msg.innerHTML = `Sahkan penolakan sebut harga <span class="font-mono font-bold text-gray-800">${displayId}</span>. Status bertukar ke <span class="text-red-600 font-bold">QUO-REJ</span>.`;
                 confirmBtn.className = "flex-1 px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-all shadow-md bg-red-600 hover:bg-red-700 cursor-pointer";
             } 
             else if (mode === 'REJECT-BF') {
@@ -459,7 +476,7 @@
                 iconContainer.className = "w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md text-xl text-red-600";
                 icon.className = "fa-solid fa-file-circle-xmark";
                 title.innerText = "Reject Blueform";
-                msg.innerHTML = `Sahkan penolakan Blueform <span class="font-mono font-bold text-gray-800">${workId}</span>. Status bertukar ke <span class="text-red-600 font-bold">EXEC-REJ</span>.`;
+                msg.innerHTML = `Sahkan penolakan Blueform <span class="font-mono font-bold text-gray-800">${displayId}</span>. Status bertukar ke <span class="text-red-600 font-bold">EXEC-REJ</span>.`;
                 confirmBtn.className = "flex-1 px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-all shadow-md bg-red-600 hover:bg-red-700 cursor-pointer";
             }
 
@@ -476,7 +493,7 @@
                 }
 
                 closeConfirmModal();
-                await executeStatusUpdate(workId, nextStatus, reasonText);
+                await executeStatusUpdate(targetKey, nextStatus, reasonText);
             };
 
             modal.classList.remove('hidden');
@@ -495,28 +512,45 @@
             }, 150);
         }
 
-        async function executeStatusUpdate(workId, nextStatus, reason = null) {
+        async function executeStatusUpdate(targetKey, nextStatus, reason = null) {
             try {
-                if (nextStatus === 'QUO-REJ' || nextStatus === 'QUO-APP') {
-                    const updatePayload = { status: nextStatus };
-                    if (reason !== null) updatePayload.reject_reason = reason;
+                const isGroup = targetKey.startsWith('SEQ:');
+                const updatePayload = { status: nextStatus };
+                if (reason !== null) updatePayload.reject_reason = reason;
 
+                // Jika status berkaitan Quotation
+                if (nextStatus === 'QUO-REJ' || nextStatus === 'QUO-APP') {
                     const { error } = await supabaseClient
                         .from('quotations')
                         .update(updatePayload)
-                        .eq('work_id', workId);
+                        .eq('work_id', targetKey);
                         
                     if (error) throw error;
-                } else {
-                    const updatePayload = { status: nextStatus };
-                    if (reason !== null) updatePayload.reject_reason = reason;
+                } 
+                // Jika status berkaitan Blueform / Work Order
+                else {
+                    if (isGroup) {
+                        const parts = targetKey.split(':');
+                        const targetSeq = parts[1];
+                        const targetContractId = parts[2];
 
-                    const { error } = await supabaseClient
-                        .from('work_orders')
-                        .update(updatePayload)
-                        .eq('work_id', workId);
-                        
-                    if (error) throw error;
+                        // Kemaskini satu kumpulan sekaligus berdasarkan sequence_no & contract_id
+                        const { error } = await supabaseClient
+                            .from('work_orders')
+                            .update(updatePayload)
+                            .eq('sequence_no', targetSeq)
+                            .eq('contract_id', targetContractId);
+
+                        if (error) throw error;
+                    } else {
+                        // Kemaskini data tunggal biasa
+                        const { error } = await supabaseClient
+                            .from('work_orders')
+                            .update(updatePayload)
+                            .eq('work_id', targetKey);
+                            
+                        if (error) throw error;
+                    }
                 }
 
                 fetchDashboard();
@@ -529,5 +563,6 @@
 
         window.onload = fetchDashboard;
     </script>
+
 </body>
 </html>
