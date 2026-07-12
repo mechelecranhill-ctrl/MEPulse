@@ -887,9 +887,27 @@
                 const selectUnitElement = document.getElementById('q_unit_id');
                 const unitText = selectUnitElement.options[selectUnitElement.selectedIndex].text;
 
+                const primaryWorkId = currentWorkIds[0];
+
+                // === Semak & arkibkan quotation QUO-REJ sedia ada untuk work_id ini ===
+                // Kalau work_id ini ada rekod QUO-REJ lama, arkibkan fail lama (rename jadi
+                // {work_id}_REJECTEDn_{tarikh}) dan padam rekod lama tu (List + Supabase)
+                // supaya tak bertindih dengan quotation baru yang akan didaftarkan di bawah.
+                try {
+                    const rejCheckRes = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(primaryWorkId)}&status=eq.QUO-REJ&select=*`, { headers });
+                    const rejRows = await rejCheckRes.json();
+                    for (const rejRow of rejRows) {
+                        const actionDate = rejRow.action_date || new Date().toISOString();
+                        await archiveRejectedQuotation(primaryWorkId, actionDate);
+                        await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${rejRow.id}`, { method: 'DELETE', headers });
+                    }
+                } catch (archiveErr) {
+                    console.error("Gagal arkibkan quotation rejected lama:", archiveErr);
+                    // Teruskan proses upload baru walaupun arkib gagal, supaya technician tidak terhalang.
+                }
+
                 // 🚀 Panggil fungsi OneDrive Uploader untuk proses fail ke cloud
                 // Parameter: fileInputId, workId, unitText, statusDivId, hiddenUrlInputId
-                const primaryWorkId = currentWorkIds[0];
                 await uploadQuotationToOneDrive('q_pdf_file', primaryWorkId, unitText, 'q_upload_status', 'q_pdf_url');
 
                 // Ambil nilai yang dijana oleh uploader dari hidden input
