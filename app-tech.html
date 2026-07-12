@@ -137,21 +137,21 @@
 
         async function fetchTechnicianDashboard() {
     try {
-        // 1. Dapatkan Session Staff ID (UUID) yang sedang log masuk
-        // session.js sepatutnya menyimpan data user. Ganti fallback jika perlu.
-        const currentStaffId = localStorage.getItem('user_id') || 
-                               (window.currentUser && window.currentUser.id);
+        // FIX: localStorage.getItem('user_id') / window.currentUser.id tidak
+        // reliable -- kalau session.js tak simpan key tu, currentStaffId jadi
+        // undefined walaupun staff dah login & ada unit assignment sah dalam
+        // DB, lalu terus block dengan "Sila log masuk terlebih dahulu".
+        // Tukar guna supabaseClient.auth.getUser() (session Supabase sebenar),
+        // sama seperti kaedah yang digunakan dalam app-exec.html.
+        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
 
-        if (!currentStaffId) {
-            // FIX (keselamatan): dahulu ini cuma "warn" lepas tu terus papar
-            // SEMUA data tanpa tapisan unit. Sekarang block terus macam
-            // app-exec.html supaya technician tanpa sesi sah tak nampak
-            // kontrak unit lain.
-            console.warn("Staff session ID tidak dijumpai.");
+        if (userError || !user) {
             showEmptyState('quotations-container', 'Sila log masuk terlebih dahulu.');
             showEmptyState('blueforms-container', 'Sila log masuk terlebih dahulu.');
             return;
         }
+
+        const currentStaffId = user.id;
 
         let activeUnitIds = [];
 
