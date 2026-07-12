@@ -163,30 +163,43 @@
 
         async function fetchDashboard() {
             try {
-                const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-                if (userError || !user) {
-                    showEmptyState('quotations-container', 'Sila log masuk terlebih dahulu.');
-                    showEmptyState('blueforms-container', 'Sila log masuk terlebih dahulu.');
-                    return;
+                // ADMIN BYPASS: akaun "@dm1n" login TERUS guna localStorage sahaja
+                // (rujuk login.html -- admin tidak pernah panggil
+                // signInWithPassword(), jadi tiada session Supabase sebenar).
+                // Detect dari localStorage DAHULU sebelum cuba
+                // supabaseClient.auth.getUser(), atau admin sentiasa gagal
+                // "Sila log masuk terlebih dahulu".
+                const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
+
+                let userUnitId = null;
+
+                if (!isAdmin) {
+                    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+                    if (userError || !user) {
+                        showEmptyState('quotations-container', 'Sila log masuk terlebih dahulu.');
+                        showEmptyState('blueforms-container', 'Sila log masuk terlebih dahulu.');
+                        return;
+                    }
+
+                    const { data: assignment, error: assignError } = await supabaseClient
+                        .from('staff_unit_assignment')
+                        .select('unit_id')
+                        .eq('staff_id', user.id)
+                        .maybeSingle();
+
+                    if (assignError) throw assignError;
+                    if (!assignment || !assignment.unit_id) {
+                        showEmptyState('quotations-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
+                        showEmptyState('blueforms-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
+                        return;
+                    }
+
+                    userUnitId = assignment.unit_id;
                 }
-
-                const { data: assignment, error: assignError } = await supabaseClient
-                    .from('staff_unit_assignment')
-                    .select('unit_id')
-                    .eq('staff_id', user.id)
-                    .maybeSingle();
-
-                if (assignError) throw assignError;
-                if (!assignment || !assignment.unit_id) {
-                    showEmptyState('quotations-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
-                    showEmptyState('blueforms-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
-                    return;
-                }
-
-                const userUnitId = assignment.unit_id;
 
                 // SERAGAM: Menggunakan relation contract_id yang telah dikemaskini
-                const { data: quotationOrders, error: qError } = await supabaseClient
+                // -- admin: tiada tapisan unit; staff biasa: tapis ikut unit
+                let quotationsQueryBuilder = supabaseClient
                     .from('quotations')
                     .select(`
                         id,
@@ -196,13 +209,15 @@
                         pdf_url,
                         contract!inner (id, contract_name, contract_code, unit_id)
                     `)
-                    .eq('status', 'QUOTATION')
-                    .eq('contract.unit_id', userUnitId);
+                    .eq('status', 'QUOTATION');
+                if (!isAdmin) quotationsQueryBuilder = quotationsQueryBuilder.eq('contract.unit_id', userUnitId);
+
+                const { data: quotationOrders, error: qError } = await quotationsQueryBuilder;
 
                 if (qError) throw qError;
 
                 // SERAGAM: Menggunakan relation contract_id untuk work_orders
-                const { data: blueformOrders, error: wError } = await supabaseClient
+                let blueformQueryBuilder = supabaseClient
                     .from('work_orders')
                     .select(`
                         id,
@@ -213,8 +228,10 @@
                         district,
                         contract!inner (id, contract_name, contract_code, unit_id)
                     `)
-                    .eq('status', 'BLUEFORM')
-                    .eq('contract.unit_id', userUnitId);
+                    .eq('status', 'BLUEFORM');
+                if (!isAdmin) blueformQueryBuilder = blueformQueryBuilder.eq('contract.unit_id', userUnitId);
+
+                const { data: blueformOrders, error: wError } = await blueformQueryBuilder;
 
                 if (wError) throw wError;
 
@@ -271,7 +288,7 @@
                 const contract = contractsMap[contractId];
 
                 // FIX: Bina sequence group SCOPED ikut kontrak semasa, guna helper
-                // buildSequenceGroups() dari blueform-shared.js supaya format key
+                // buildSequenceGroups() dari blueform.js supaya format key
                 // ("DISTRICT||SEQ") sepadan dengan yang dicari oleh
                 // renderBlueformButtonHtml() / getBlueformGroupKey(). Key lama
                 // `${contract.id}_${seq}` tak pernah match, jadi group sentiasa
@@ -499,7 +516,7 @@
             }
         }
         // Nota: closeBulkPreview() sudah disediakan secara global dalam
-        // blueform-shared.js, jadi tidak perlu didefinisikan semula di sini.
+        // blueform.js, jadi tidak perlu didefinisikan semula di sini.
 
         function openConfirmModal(workId, nextStatus, mode) {
             const modal = document.getElementById('customConfirmModal');
