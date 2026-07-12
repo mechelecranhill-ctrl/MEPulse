@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ms">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,34 +9,84 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="blueform.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <link rel="stylesheet" href="style.css">
+
+    <script src="session.js"></script>
+    <script src="sidebar.js" defer></script>
+
+    <style>
+        .glass-header {
+            width: 100%;
+            height: calc(60px + env(safe-area-inset-top));
+            padding: env(safe-area-inset-top) 25px 0 25px;
+            background: radial-gradient(circle at top, rgba(255,255,255,.15), transparent 35%),
+                        linear-gradient(60deg, #4338ca 0%, #6366f1 40%, #818cf8 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 1000;
+            flex-shrink: 0;
+            box-sizing: border-box;
+        }
+        @media (max-width:768px){
+            .glass-header{ padding-left:10px; padding-right:10px; }
+        }
+
+        /* Rule print untuk .print-page / .pdf-container -- diperlukan oleh
+           previewFullSet() untuk gabungan Blueform + PDF Quotation (sama
+           seperti app-tech.html / app-exec.html). blueform.css sudah kendalikan
+           visibility #bulkPreviewPage/.a4-container, jadi di sini cuma tambah
+           rule khusus untuk dua class ni sahaja supaya tak bertindih. */
+        @media print {
+            .print-page {
+                box-shadow: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 210mm;
+                page-break-after: always !important;
+                break-after: page !important;
+            }
+            .pdf-container {
+                height: auto !important;
+                min-height: 297mm !important;
+            }
+        }
+    </style>
 </head>
-<body class="bg-gray-100 text-gray-800 font-sans min-h-screen pb-12">
+<body class="bg-gray-100 text-gray-800 font-sans h-screen overflow-hidden flex flex-col relative">
 
-    <header class="bg-blue-700 text-white shadow-md p-5 mb-8">
-        <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-2xl font-bold"><i class="fa-solid fa-file-signature mr-2"></i>Sistem Kelulusan Kontrak</h1>
-            <span class="bg-indigo-600 px-4 py-1.5 rounded-full text-sm font-semibold border border-indigo-500">
-                Mod: Ketua Seksyen
-            </span>
+    <app-sidebar></app-sidebar>
+
+    <div class="glass-header">
+        <div style="text-align:center;">
+            <h1 style="margin:0; font-size:22px; font-weight:800; color:#ffffff; letter-spacing:0.5px;">
+                <i class="fa-solid fa-file-signature" style="margin-right:8px;"></i>Contract Approvals
+            </h1>
+            <p style="margin:4px 0 0 0; color:rgba(255,255,255,0.8); font-size:15px;">
+                Mode: Ketua Seksyen
+            </p>
         </div>
-    </header>
+    </div>
 
-    <div class="container mx-auto px-4">
-        <section class="bg-white rounded-xl shadow-md p-6 border-t-4 border-indigo-500">
-            <div class="flex justify-between items-center mb-4">
+    <div class="container mx-auto px-4 flex-1 my-6 overflow-hidden w-full">
+        <section class="bg-white rounded-xl shadow-md p-6 border-t-4 border-indigo-500 flex flex-col h-full overflow-hidden">
+            <div class="flex justify-between items-center mb-4 flex-shrink-0">
                 <h2 class="text-xl font-bold text-gray-700">
                     <i class="fa-solid fa-users-gear text-indigo-500 mr-2"></i>Dashboard Ketua Seksyen
                 </h2>
                 <span class="text-xs bg-indigo-100 text-indigo-800 font-bold px-2.5 py-1 rounded">Menapis: APP-EXEC</span>
             </div>
-            <div class="overflow-x-auto">
+            <div class="flex-1 overflow-y-auto">
                 <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                    <thead class="bg-gray-50 sticky top-0 z-10">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Work ID</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Kontrak</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Blueform</th>
+                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Full Set (BF+Quote)</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Tindakan</th>
                         </tr>
                     </thead>
@@ -91,16 +141,42 @@
         "></div>
     </div>
 
-    <script src="blueform-shared.js"></script>
+    <script src="blueform.js"></script>
     <script>
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
-        // Set untuk track sequence group yang butang Blueformnya dah dipaparkan.
+        // Set untuk track sequence group yang butang Full Set-nya dah dipaparkan.
         // Direset setiap kali fetchDashboard() dipanggil semula.
         let renderedBlueformSeqs = new Set();
 
         async function fetchDashboard() {
             try {
+                // 1. Sahkan sesi staff & dapatkan section assignment aktif dia
+                //    (Ketua Seksyen ditapis ikut SEKSYEN, bukan unit -- guna
+                //    staff_section_assignment, bukan staff_unit_assignment
+                //    seperti app-exec.html / app-tech.html).
+                const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+                if (userError || !user) {
+                    showEmptyRow('table-sect', 'Sila log masuk terlebih dahulu.');
+                    return;
+                }
+
+                const { data: assignments, error: assError } = await supabaseClient
+                    .from('staff_section_assignment')
+                    .select('section_id')
+                    .eq('staff_id', user.id)
+                    .eq('active', true);
+
+                if (assError) throw assError;
+
+                const activeSectionIds = (assignments || []).map(a => a.section_id);
+
+                if (activeSectionIds.length === 0) {
+                    showEmptyRow('table-sect', 'Akaun anda belum dilesenkan kepada mana-mana seksyen.');
+                    return;
+                }
+
+                // 2. QUERY work_orders APP-EXEC, tapis ikut seksyen melalui kontrak
                 const { data: workOrders, error } = await supabaseClient
                     .from('work_orders')
                     .select(`
@@ -109,9 +185,10 @@
                         status,
                         sequence_no,
                         district,
-                        contract (contract_name)
+                        contract!inner (id, contract_name, contract_code, section_id)
                     `)
-                    .eq('status', 'APP-EXEC');
+                    .eq('status', 'APP-EXEC')
+                    .in('contract.section_id', activeSectionIds);
 
                 if (error) throw error;
 
@@ -123,6 +200,18 @@
                     return;
                 }
 
+                // 3. Pemetaan silang PDF Quotation ke Work Orders (ikut work_id),
+                //    diperlukan untuk gabungan "Full Set (BF+Quote)".
+                const { data: allQuotes, error: quoteError } = await supabaseClient
+                    .from('quotations')
+                    .select('work_id, pdf_url');
+
+                if (!quoteError && allQuotes) {
+                    const quoteMap = {};
+                    allQuotes.forEach(q => { if (q.work_id) quoteMap[q.work_id] = q.pdf_url; });
+                    workOrders.forEach(item => { item.mapped_pdf_url = quoteMap[item.work_id] || null; });
+                }
+
                 renderedBlueformSeqs = new Set();
                 const seqGroups = buildSequenceGroups(workOrders);
 
@@ -132,11 +221,29 @@
                         contractName = Array.isArray(item.contract) ? item.contract[0]?.contract_name : item.contract.contract_name;
                     }
 
-                    const blueformHtml = renderBlueformButtonHtml(item, seqGroups, renderedBlueformSeqs, {
-                        btnClass: 'text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer bg-orange-500 hover:bg-orange-600',
-                        groupLabel: count => `<i class="fa-solid fa-layer-group mr-1"></i> Blueform (${count})`,
-                        singleLabel: `<i class="fa-solid fa-print mr-1"></i> Blueform`
-                    });
+                    // Dedupe ikut sequence group (district+sequence_no), papar
+                    // SATU butang "Full Set" per group, bundle blueform + semua
+                    // PDF quotation ahli group tu sekali (sama seperti
+                    // app-tech.html / app-exec.html).
+                    const seq = (item.sequence_no || '').trim();
+                    const groupKey = seq ? getBlueformGroupKey(item) : null;
+                    const isFirstInGroup = !groupKey || !renderedBlueformSeqs.has(groupKey);
+
+                    let fullSetBtnHtml;
+                    if (isFirstInGroup) {
+                        if (groupKey) renderedBlueformSeqs.add(groupKey);
+                        const groupItems = groupKey ? (seqGroups[groupKey] || [item]) : [item];
+                        const countLabel = groupItems.length > 1 ? ` (${groupItems.length})` : '';
+                        const serializedGroup = encodeURIComponent(JSON.stringify(groupItems));
+
+                        fullSetBtnHtml = `
+                            <button onclick="previewFullSet('${serializedGroup}')" class="text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer bg-orange-500 hover:bg-orange-600">
+                                <i class="fa-solid fa-print mr-1"></i> Full Set${countLabel}
+                            </button>
+                        `;
+                    } else {
+                        fullSetBtnHtml = `<span class="text-xs text-gray-400 italic">Rujuk row pertama seq ${seq}</span>`;
+                    }
 
                     const row = `
                         <tr class="hover:bg-gray-50 transition-colors">
@@ -147,8 +254,8 @@
                                     ${item.status}
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                ${blueformHtml}
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                                ${fullSetBtnHtml}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <button onclick="approveContract('${item.work_id}', 'APP-SECT')" 
@@ -175,6 +282,80 @@
                     </td>
                 </tr>`;
         }
+
+        // Gabung Blueform + PDF Quotation ke satu preview/print (sama seperti
+        // previewFullSet() dalam app-tech.html / app-exec.html). Group items
+        // sudah tersedia dari seqGroups (data dah ada di memori semasa
+        // render), jadi tidak perlu re-query Supabase untuk cari sibling WO.
+        async function previewFullSet(escapedGroupData) {
+            const groupItems = JSON.parse(decodeURIComponent(escapedGroupData));
+            const container = document.getElementById('bulkPagesContainer');
+
+            container.innerHTML = '<div class="text-white text-sm p-4 animate-pulse"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Bundling full set documents...</div>';
+            document.getElementById('bulkPreviewPage').style.display = 'block';
+            document.getElementById('bulkPreviewCount').innerText = `Full Set Preview: ${groupItems.map(g => g.work_id).join(', ')}`;
+
+            try {
+                let compositeHtml = '';
+                const ids = groupItems.map(g => g.id);
+
+                const payload = ids.length > 1
+                    ? await buildBlueformDataGroup(ids)
+                    : await buildBlueformData(ids[0]);
+
+                if (ids.length > 1) {
+                    document.getElementById('bulkPreviewCount').innerText = `Full Set Preview: Gabungan ${ids.length} WO`;
+                }
+
+                // HALAMAN 1: Blueform. buildBlueformHTML() sudah ada .a4-container
+                // + page-break sendiri, jadi TIDAK dibalut dalam .print-page lagi
+                // (elak double page-break).
+                if (payload && typeof buildBlueformHTML === 'function') {
+                    compositeHtml += buildBlueformHTML(payload);
+                } else {
+                    compositeHtml += `
+                        <div class="print-page bg-white p-8 shadow-lg w-[210mm] min-h-[297mm] text-red-500 font-bold flex items-center justify-center">
+                            Error: buildBlueformData or buildBlueformHTML logic failed.
+                        </div>
+                    `;
+                }
+
+                // HALAMAN 2+: PDF Quotation yang terkait dengan ahli group ini
+                const linkedPdfs = [...new Set(groupItems.map(g => g.mapped_pdf_url).filter(Boolean))];
+
+                if (linkedPdfs.length > 0) {
+                    linkedPdfs.forEach(pdfUrl => {
+                        compositeHtml += `
+                            <div class="print-page pdf-container bg-white shadow-lg w-[210mm] min-h-[297mm] box-sizing-border-box" style="background:white;">
+                                <object data="${pdfUrl}#toolbar=0&navpanes=0" type="application/pdf" style="width:100%; min-height:297mm; height:100vh;">
+                                    <div class="p-8 text-center text-gray-500">
+                                        <i class="fa-solid fa-triangle-exclamation text-xl text-amber-500 block mb-2"></i>
+                                        Browser tidak menyokong paparan terus.
+                                        <a href="${pdfUrl}" target="_blank" class="text-blue-500 underline">Klik untuk buka fail PDF</a>.
+                                    </div>
+                                </object>
+                            </div>
+                        `;
+                    });
+                } else {
+                    compositeHtml += `
+                        <div class="print-page bg-white p-12 shadow-lg w-[210mm] min-h-[297mm] flex flex-col items-center justify-center text-center" style="color:gray; background:white;">
+                            <i class="fa-solid fa-file-pdf text-4xl text-gray-300 mb-2"></i>
+                            <p class="text-sm font-semibold text-gray-600">No Linked Quotation PDF Found</p>
+                            <p class="text-xs text-gray-400">Only the Blueform page will be printed for this record.</p>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML = compositeHtml;
+
+            } catch (error) {
+                console.error("Error creating full set preview:", error);
+                container.innerHTML = `<div class="text-red-400 p-4 font-mono text-xs">Error bundling documents: ${error.message}</div>`;
+            }
+        }
+        // Nota: closeBulkPreview() sudah disediakan secara global dalam
+        // blueform.js, jadi tidak perlu didefinisikan semula di sini.
 
         async function approveContract(workId, nextStatus) {
             if (!confirm(`Adakah anda pasti untuk menukar status Work ID: ${workId} ke ${nextStatus}?`)) return;
