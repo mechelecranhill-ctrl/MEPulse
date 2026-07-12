@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en"> 
+<html lang="ms">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Ketua Jabatan - Sistem Kelulusan Kontrak</title>
+    <title>Contract Approvals-Department Head</title>
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -152,34 +152,46 @@
 
         async function fetchDashboard() {
             try {
-                // 1. Sahkan sesi staff & sahkan dia Ketua Jabatan yang aktif.
-                //    Table department_head TIDAK ada scoping (tiada
-                //    department_id) -- ia cuma peranan tahap atasan, jadi
-                //    kalau lulus semakan ni, staff nampak SEMUA kontrak
-                //    (tiada filter unit/section macam app-exec.html /
-                //    app-tech.html / app-sect.html).
-                const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-                if (userError || !user) {
-                    showEmptyRow('table-dept', 'Sila log masuk terlebih dahulu.');
-                    return;
-                }
+                // ADMIN BYPASS: akaun "@dm1n" login TERUS guna localStorage
+                // sahaja (rujuk login.html -- admin tidak pernah panggil
+                // signInWithPassword(), jadi tiada session Supabase sebenar
+                // wujud). Detect dari localStorage DAHULU sebelum cuba
+                // supabaseClient.auth.getUser(), atau admin sentiasa gagal
+                // "Sila log masuk terlebih dahulu". Kalau admin, skip terus
+                // semakan department_head (dashboard ni memang tiada
+                // unit/section filter pun, jadi admin automatik nampak semua).
+                const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
 
-                const { data: deptHead, error: dhError } = await supabaseClient
-                    .from('department_head')
-                    .select('staff_id')
-                    .eq('staff_id', user.id)
-                    .eq('active', true)
-                    .maybeSingle();
+                if (!isAdmin) {
+                    // Sahkan sesi staff & sahkan dia Ketua Jabatan yang aktif.
+                    //    Table department_head TIDAK ada scoping (tiada
+                    //    department_id) -- ia cuma peranan tahap atasan, jadi
+                    //    kalau lulus semakan ni, staff nampak SEMUA kontrak
+                    //    (tiada filter unit/section macam app-exec.html /
+                    //    app-tech.html / app-sect.html).
+                    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+                    if (userError || !user) {
+                        showEmptyRow('table-dept', 'Sila log masuk terlebih dahulu.');
+                        return;
+                    }
 
-                if (dhError) throw dhError;
+                    const { data: deptHead, error: dhError } = await supabaseClient
+                        .from('department_head')
+                        .select('staff_id')
+                        .eq('staff_id', user.id)
+                        .eq('active', true)
+                        .maybeSingle();
 
-                if (!deptHead) {
-                    showEmptyRow('table-dept', 'Akaun anda bukan Ketua Jabatan yang dilesenkan.');
-                    return;
+                    if (dhError) throw dhError;
+
+                    if (!deptHead) {
+                        showEmptyRow('table-dept', 'Akaun anda bukan Ketua Jabatan yang dilesenkan.');
+                        return;
+                    }
                 }
 
                 // 2. QUERY work_orders APP-SECT -- tiada tapisan unit/section
-                //    sebab Ketua Jabatan sepatutnya lihat semua kontrak.
+                //    sebab Ketua Jabatan (dan admin) sepatutnya lihat semua kontrak.
                 const { data: workOrders, error } = await supabaseClient
                     .from('work_orders')
                     .select(`
