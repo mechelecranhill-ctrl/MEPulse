@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Ketua Seksyen - Sistem Kelulusan Kontrak</title>
+    <title>Contract Approvals-Section Head</title>
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -151,33 +151,46 @@
 
         async function fetchDashboard() {
             try {
-                // 1. Sahkan sesi staff & dapatkan section assignment aktif dia
-                //    (Ketua Seksyen ditapis ikut SEKSYEN, bukan unit -- guna
-                //    staff_section_assignment, bukan staff_unit_assignment
-                //    seperti app-exec.html / app-tech.html).
-                const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-                if (userError || !user) {
-                    showEmptyRow('table-sect', 'Sila log masuk terlebih dahulu.');
-                    return;
+                // ADMIN BYPASS: akaun "@dm1n" login TERUS guna localStorage
+                // sahaja (rujuk login.html -- admin tidak pernah panggil
+                // signInWithPassword(), jadi tiada session Supabase sebenar
+                // wujud). Detect dari localStorage DAHULU sebelum cuba
+                // supabaseClient.auth.getUser(), atau admin sentiasa gagal
+                // "Sila log masuk terlebih dahulu".
+                const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
+
+                let activeSectionIds = [];
+
+                if (!isAdmin) {
+                    // Sahkan sesi staff & dapatkan section assignment aktif dia
+                    // (Ketua Seksyen ditapis ikut SEKSYEN, bukan unit -- guna
+                    // staff_section_assignment, bukan staff_unit_assignment
+                    // seperti app-exec.html / app-tech.html).
+                    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+                    if (userError || !user) {
+                        showEmptyRow('table-sect', 'Sila log masuk terlebih dahulu.');
+                        return;
+                    }
+
+                    const { data: assignments, error: assError } = await supabaseClient
+                        .from('staff_section_assignment')
+                        .select('section_id')
+                        .eq('staff_id', user.id)
+                        .eq('active', true);
+
+                    if (assError) throw assError;
+
+                    activeSectionIds = (assignments || []).map(a => a.section_id);
+
+                    if (activeSectionIds.length === 0) {
+                        showEmptyRow('table-sect', 'Akaun anda belum dilesenkan kepada mana-mana seksyen.');
+                        return;
+                    }
                 }
 
-                const { data: assignments, error: assError } = await supabaseClient
-                    .from('staff_section_assignment')
-                    .select('section_id')
-                    .eq('staff_id', user.id)
-                    .eq('active', true);
-
-                if (assError) throw assError;
-
-                const activeSectionIds = (assignments || []).map(a => a.section_id);
-
-                if (activeSectionIds.length === 0) {
-                    showEmptyRow('table-sect', 'Akaun anda belum dilesenkan kepada mana-mana seksyen.');
-                    return;
-                }
-
-                // 2. QUERY work_orders APP-EXEC, tapis ikut seksyen melalui kontrak
-                const { data: workOrders, error } = await supabaseClient
+                // 2. QUERY work_orders APP-EXEC -- admin: tiada tapisan seksyen;
+                //    staff biasa: tapis ikut seksyen melalui kontrak
+                let workOrdersQuery = supabaseClient
                     .from('work_orders')
                     .select(`
                         id,
@@ -187,8 +200,10 @@
                         district,
                         contract!inner (id, contract_name, contract_code, section_id)
                     `)
-                    .eq('status', 'APP-EXEC')
-                    .in('contract.section_id', activeSectionIds);
+                    .eq('status', 'APP-EXEC');
+                if (!isAdmin) workOrdersQuery = workOrdersQuery.in('contract.section_id', activeSectionIds);
+
+                const { data: workOrders, error } = await workOrdersQuery;
 
                 if (error) throw error;
 
