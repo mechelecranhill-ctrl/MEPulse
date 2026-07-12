@@ -137,63 +137,73 @@
 
         async function fetchTechnicianDashboard() {
     try {
-        // FIX: localStorage.getItem('user_id') / window.currentUser.id tidak
-        // reliable -- kalau session.js tak simpan key tu, currentStaffId jadi
-        // undefined walaupun staff dah login & ada unit assignment sah dalam
-        // DB, lalu terus block dengan "Sila log masuk terlebih dahulu".
-        // Tukar guna supabaseClient.auth.getUser() (session Supabase sebenar),
-        // sama seperti kaedah yang digunakan dalam app-exec.html.
-        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-
-        if (userError || !user) {
-            showEmptyState('quotations-container', 'Sila log masuk terlebih dahulu.');
-            showEmptyState('blueforms-container', 'Sila log masuk terlebih dahulu.');
-            return;
-        }
-
-        const currentStaffId = user.id;
+        // ADMIN BYPASS: akaun "@dm1n" login TERUS guna localStorage sahaja
+        // (rujuk login.html -- admin TIDAK pernah panggil
+        // sbClient.auth.signInWithPassword(), jadi tiada session Supabase
+        // sebenar wujud untuknya). Kalau admin, kena detect dari localStorage
+        // DAHULU sebelum cuba supabaseClient.auth.getUser(), atau ia akan
+        // sentiasa gagal "Sila log masuk terlebih dahulu" untuk admin.
+        const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
 
         let activeUnitIds = [];
 
-        // 2. Cari unit_id staff yang berstatus aktif
-        const { data: assignments, error: assError } = await supabaseClient
-            .from('staff_unit_assignment')
-            .select('unit_id')
-            .eq('staff_id', currentStaffId)
-            .eq('active', true);
+        if (!isAdmin) {
+            // FIX: localStorage.getItem('user_id') / window.currentUser.id tidak
+            // reliable -- kalau session.js tak simpan key tu, currentStaffId jadi
+            // undefined walaupun staff dah login & ada unit assignment sah dalam
+            // DB, lalu terus block dengan "Sila log masuk terlebih dahulu".
+            // Tukar guna supabaseClient.auth.getUser() (session Supabase sebenar),
+            // sama seperti kaedah yang digunakan dalam app-exec.html.
+            const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
 
-        if (assError) throw assError;
+            if (userError || !user) {
+                showEmptyState('quotations-container', 'Sila log masuk terlebih dahulu.');
+                showEmptyState('blueforms-container', 'Sila log masuk terlebih dahulu.');
+                return;
+            }
 
-        activeUnitIds = (assignments || []).map(a => a.unit_id);
+            const currentStaffId = user.id;
 
-        // FIX (keselamatan): kalau staff tiada unit assignment aktif langsung,
-        // JANGAN fallback papar semua kontrak semua unit. Block dan papar
-        // empty state, sama seperti app-exec.html.
-        if (activeUnitIds.length === 0) {
-            showEmptyState('quotations-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
-            showEmptyState('blueforms-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
-            return;
+            // 2. Cari unit_id staff yang berstatus aktif
+            const { data: assignments, error: assError } = await supabaseClient
+                .from('staff_unit_assignment')
+                .select('unit_id')
+                .eq('staff_id', currentStaffId)
+                .eq('active', true);
+
+            if (assError) throw assError;
+
+            activeUnitIds = (assignments || []).map(a => a.unit_id);
+
+            // FIX (keselamatan): kalau staff tiada unit assignment aktif langsung,
+            // JANGAN fallback papar semua kontrak semua unit. Block dan papar
+            // empty state, sama seperti app-exec.html.
+            if (activeUnitIds.length === 0) {
+                showEmptyState('quotations-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
+                showEmptyState('blueforms-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
+                return;
+            }
         }
 
-        // 3. QUERY QUOTATIONS dengan tapisan Unit melalui Kontrak
+        // 3. QUERY QUOTATIONS -- admin: tiada tapisan unit; staff biasa: tapis ikut unit
         let quotationsQuery = supabaseClient
             .from('quotations')
             .select(`
                 id, work_id, status, contract_id, pdf_url, reject_reason,
                 contract!inner (id, contract_name, contract_code, unit_id)
             `)
-            .in('status', ['QUO-APP', 'QUO-REJ'])
-            .in('contract.unit_id', activeUnitIds);
+            .in('status', ['QUO-APP', 'QUO-REJ']);
+        if (!isAdmin) quotationsQuery = quotationsQuery.in('contract.unit_id', activeUnitIds);
 
-        // 4. QUERY WORK ORDERS dengan tapisan Unit melalui Kontrak
+        // 4. QUERY WORK ORDERS -- admin: tiada tapisan unit; staff biasa: tapis ikut unit
         let blueformQuery = supabaseClient
             .from('work_orders')
             .select(`
                 id, work_id, status, sequence_no, contract_id, district, reject_reason,
                 contract!inner (id, contract_name, contract_code, unit_id)
             `)
-            .in('status', ['APPROVED', 'EXEC-REJ', 'SECT-REJ', 'DEPT-REJ'])
-            .in('contract.unit_id', activeUnitIds);
+            .in('status', ['APPROVED', 'EXEC-REJ', 'SECT-REJ', 'DEPT-REJ']);
+        if (!isAdmin) blueformQuery = blueformQuery.in('contract.unit_id', activeUnitIds);
 
         // Jalankan kedua-dua query secara serentak
         const [ { data: quotationData, error: qError }, { data: blueformData, error: bError } ] = 
@@ -251,7 +261,7 @@
                 const contract = contractsMap[contractId];
 
                 // FIX: bina sequence group SCOPED ikut kontrak semasa guna helper
-                // buildSequenceGroups() dari blueform-shared.js (key format
+                // buildSequenceGroups() dari blueform.js (key format
                 // "DISTRICT||SEQ"), supaya WO dalam sequence sama cuma papar
                 // SATU butang "Full Set" (bukan satu butang per row). Ini
                 // menggantikan `customSeqGroups` lama yang dibina tapi tak
@@ -350,7 +360,7 @@
                     } else {
                         // FIX: dedupe "Full Set" button ikut group district+sequence_no
                         // (guna renderedBlueformSeqs + getBlueformGroupKey dari
-                        // blueform-shared.js). Baris seterusnya dalam group sama
+                        // blueform.js). Baris seterusnya dalam group sama
                         // cuma papar teks rujukan, bukan butang berulang.
                         const groupKey = seq ? getBlueformGroupKey(item) : null;
                         const isFirstInGroup = !groupKey || !renderedBlueformSeqs.has(groupKey);
@@ -424,7 +434,7 @@ async function previewFullSet(escapedItemData) {
                 .select('id, work_id, sequence_no, district')
                 .eq('contract_id', currentContractId);
 
-            // Tapis mengikut daerah dan sequence_no yang sama (Logik asal blueform-shared.js)
+            // Tapis mengikut daerah dan sequence_no yang sama (Logik asal blueform.js)
             const currentDistrict = (item.district || '').trim().toUpperCase();
             const groupMembers = (siblingWOs || []).filter(w => 
                 (w.sequence_no || '').trim() === seq && 
