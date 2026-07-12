@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Contract Approvals-Section Head</title>
+    <title>Dashboard Ketua Seksyen - Sistem Kelulusan Kontrak</title>
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -159,13 +159,11 @@
                 // "Sila log masuk terlebih dahulu".
                 const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
 
-                let activeSectionIds = [];
+                let activeUnitIds = [];
 
                 if (!isAdmin) {
-                    // Sahkan sesi staff & dapatkan section assignment aktif dia
-                    // (Ketua Seksyen ditapis ikut SEKSYEN, bukan unit -- guna
-                    // staff_section_assignment, bukan staff_unit_assignment
-                    // seperti app-exec.html / app-tech.html).
+                    // 1. Sahkan sesi staff & dapatkan section assignment aktif dia
+                    //    (Ketua Seksyen ditapis ikut SEKSYEN -- staff_section_assignment).
                     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
                     if (userError || !user) {
                         showEmptyRow('table-sect', 'Sila log masuk terlebih dahulu.');
@@ -180,16 +178,38 @@
 
                     if (assError) throw assError;
 
-                    activeSectionIds = (assignments || []).map(a => a.section_id);
+                    const activeSectionIds = (assignments || []).map(a => a.section_id);
 
                     if (activeSectionIds.length === 0) {
                         showEmptyRow('table-sect', 'Akaun anda belum dilesenkan kepada mana-mana seksyen.');
                         return;
                     }
+
+                    // 2. PENTING: contract.unit_id rujuk ke UNIT (bukan terus ke
+                    //    seksyen) -- satu seksyen ada banyak unit
+                    //    (units.section_id -> me_sections.id). Jadi kena cari
+                    //    dulu semua unit_id yang berada di bawah seksyen aktif
+                    //    staff ni, baru boleh filter kontrak.
+                    //    staff_section_assignment TIADA column unit_id.
+                    const { data: unitsInSection, error: unitsError } = await supabaseClient
+                        .from('units')
+                        .select('id')
+                        .in('section_id', activeSectionIds);
+
+                    if (unitsError) throw unitsError;
+
+                    activeUnitIds = (unitsInSection || []).map(u => u.id);
+
+                    if (activeUnitIds.length === 0) {
+                        showEmptyRow('table-sect', 'Tiada unit didaftarkan di bawah seksyen anda.');
+                        return;
+                    }
                 }
 
-                // 2. QUERY work_orders APP-EXEC -- admin: tiada tapisan seksyen;
-                //    staff biasa: tapis ikut seksyen melalui kontrak
+                // 3. QUERY work_orders APP-EXEC -- admin: tiada tapisan seksyen;
+                //    staff biasa: tapis ikut unit-unit di bawah seksyen dia
+                //    (activeUnitIds), sebab contract.unit_id rujuk unit, bukan
+                //    seksyen secara terus.
                 let workOrdersQuery = supabaseClient
                     .from('work_orders')
                     .select(`
@@ -198,10 +218,10 @@
                         status,
                         sequence_no,
                         district,
-                        contract!inner (id, contract_name, contract_code, section_id)
+                        contract!inner (id, contract_name, contract_code, unit_id)
                     `)
                     .eq('status', 'APP-EXEC');
-                if (!isAdmin) workOrdersQuery = workOrdersQuery.in('contract.section_id', activeSectionIds);
+                if (!isAdmin) workOrdersQuery = workOrdersQuery.in('contract.unit_id', activeUnitIds);
 
                 const { data: workOrders, error } = await workOrdersQuery;
 
