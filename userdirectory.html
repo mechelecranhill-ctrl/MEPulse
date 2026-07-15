@@ -1137,13 +1137,11 @@ function editStaff(id){
 function closeModal(){ document.getElementById("staffModal").style.display="none"; }
 
 async function saveStaff(){
-    // Bersihkan input teks (buang space depan/belakang)
     let trimmedName = fName.value ? fName.value.trim() : "";
     let trimmedEmail = fEmail.value ? fEmail.value.trim() : "";
     let trimmedPhone = fPhone.value ? fPhone.value.trim() : "";
     let trimmedEmployee = fEmployee.value ? fEmployee.value.trim() : "";
 
-    // JIKA emel kosong, set sebagai NULL. Ini sangat penting untuk kolum UNIQUE + NULLABLE
     let emailValue = trimmedEmail !== "" ? trimmedEmail : null;
     let phoneValue = trimmedPhone !== "" ? trimmedPhone : null;
     let employeeValue = trimmedEmployee !== "" ? trimmedEmployee : null;
@@ -1156,7 +1154,6 @@ async function saveStaff(){
         email: emailValue 
     };
     
-    // Semakan wajib di peringkat frontend
     if(!body.name || !body.position){ alert("Nama dan Jawatan wajib diisi."); return; }
 
     let res;
@@ -1164,44 +1161,89 @@ async function saveStaff(){
     let hasEmailInput = emailValue !== null;
 
     if(treatAsNew){
-        // 1. SITUASI: Staff Baharu
+        // ==========================================
+        // SITUASI 1: PENDAFTARAN STAFF BARU
+        // ==========================================
         if (hasEmailInput) {
             let auth = await fetch(`${SB_URL}/auth/v1/signup`, {
                 method:"POST", headers, body:JSON.stringify({ email:body.email, password:"StaffPassword123!" })
             });
+            let authData = await auth.json().catch(() => ({}));
             if(!auth.ok){ 
-                let authErr = await auth.json().catch(() => ({}));
-                alert("Gagal mendaftar Supabase Auth: " + (authErr.msg || authErr.message || "Ralat tidak diketahui")); 
+                alert("Gagal mendaftar Supabase Auth: " + (authData.msg || authData.message)); 
                 return; 
             }
+            body.id = authData.id || authData.user?.id;
+        } else {
+            // Tiada emel? Guna UUID Rawak dahulu
+            body.id = crypto.randomUUID();
         }
+
         res = await fetch(`${SB_URL}/rest/v1/staff`, { method:"POST", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(body) });
+    
     } else {
-        // 2. SITUASI: Kemas Kini Staff Sedia Ada (Edit)
-        // Cek jika profil asal tiada emel, tetapi sekarang user baru masukkan emel
+        // ==========================================
+        // SITUASI 2: EDIT STAFF (KEMAS KINI)
+        // ==========================================
         let isEmailNewlyAdded = (!editingStaff.email || editingStaff.email.trim() === "") && hasEmailInput;
 
         if (isEmailNewlyAdded) {
+            // A. Daftar akaun di Supabase Auth untuk dapatkan UUID rasmi
             let auth = await fetch(`${SB_URL}/auth/v1/signup`, {
                 method:"POST", headers, body:JSON.stringify({ email:body.email, password:"StaffPassword123!" })
             });
-            if(!auth.ok){
-                let authErr = await auth.json().catch(() => ({}));
-                alert("Nota: Profil dikemaskini, tetapi GAGAL mendaftar akaun Supabase Auth (Mungkin emel tidak sah atau telah digunakan): " + (authErr.msg || authErr.message));
-            }
-        }
+            let authData = await auth.json().catch(() => ({}));
 
-        res = await fetch(`${SB_URL}/rest/v1/staff?id=eq.${editingStaff.id}`, { method:"PATCH", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(body) });
+            if(!auth.ok){
+                alert("Gagal mendaftar Supabase Auth untuk emel baru: " + (authData.msg || authData.message));
+                return;
+            }
+
+            let newAuthId = authData.id || authData.user?.id;
+            let oldRawId = editingStaff.id;
+
+            // B. Backup tugasan/penempatan lama staf ini dari frontend state data
+            let oldSecAss = staffSectionAssignments.filter(a => a.staff_id === oldRawId);
+            let oldUnitAss = staffUnitAssignments.filter(a => a.staff_id === oldRawId);
+
+            // C. Padam penempatan lama (Untuk elakkan isu foreign key semasa padam staff lama)
+            await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${oldRawId}`, { method:"DELETE", headers });
+            await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${oldRawId}`, { method:"DELETE", headers });
+
+            // D. Padam rekod staf dengan ID RAWAK lama
+            await fetch(`${SB_URL}/rest/v1/staff?id=eq.${oldRawId}`, { method:"DELETE", headers });
+
+            // E. Cipta semula profil staf menggunakan UUID-AUTH baru
+            body.id = newAuthId;
+            res = await fetch(`${SB_URL}/rest/v1/staff`, { method:"POST", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(body) });
+
+            if(res.ok) {
+                // F. Masukkan semula data penempatan (jika ada) menggunakan ID baru
+                if(oldSecAss.length) {
+                    let newSec = oldSecAss.map(a => ({ staff_id: newAuthId, section_id: a.section_id, is_acting: a.is_acting }));
+                    await fetch(`${SB_URL}/rest/v1/staff_section_assignment`, { method:"POST", headers, body:JSON.stringify(newSec) });
+                }
+                if(oldUnitAss.length) {
+                    let newUnit = oldUnitAss.map(a => ({ staff_id: newAuthId, unit_id: a.unit_id, is_acting: a.is_acting }));
+                    await fetch(`${SB_URL}/rest/v1/staff_unit_assignment`, { method:"POST", headers, body:JSON.stringify(newUnit) });
+                }
+            }
+        } else {
+            // Jika edit biasa (bukan kes tambah emel baru pada akaun kosong)
+            res = await fetch(`${SB_URL}/rest/v1/staff?id=eq.${editingStaff.id}`, { method:"PATCH", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(body) });
+        }
     }
 
-    if(!res.ok){ 
-        let dbErr = await res.json().catch(() => ({}));
-        alert("Gagal menyimpan data ke database (Status 400): " + (dbErr.message || "Sila periksa kekunci unik profil staf.")); 
+    if(!res || !res.ok){ 
+        let dbErr = res ? await res.json().catch(() => ({})) : {};
+        alert("Gagal menyimpan data ke database: " + (dbErr.message || "Ralat tidak diketahui.")); 
         return; 
     }
     
     closeModal();
-    loadStaff();
+    // Memastikan data aplikasi disinkronkan semula selepas rombakan ID
+    await loadAssignments(); 
+    await loadStaff();
 }
 
 async function deleteStaff(id,name){
