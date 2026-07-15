@@ -1137,14 +1137,31 @@ function editStaff(id){
 function closeModal(){ document.getElementById("staffModal").style.display="none"; }
 
 async function saveStaff(){
-    let body={ name:fName.value, position:fPosition.value, employee_id:fEmployee.value, phone_no:fPhone.value, email:fEmail.value };
+    // Bersihkan input teks (buang space depan/belakang)
+    let trimmedName = fName.value ? fName.value.trim() : "";
+    let trimmedEmail = fEmail.value ? fEmail.value.trim() : "";
+    let trimmedPhone = fPhone.value ? fPhone.value.trim() : "";
+    let trimmedEmployee = fEmployee.value ? fEmployee.value.trim() : "";
+
+    // JIKA emel kosong, set sebagai NULL. Ini sangat penting untuk kolum UNIQUE + NULLABLE
+    let emailValue = trimmedEmail !== "" ? trimmedEmail : null;
+    let phoneValue = trimmedPhone !== "" ? trimmedPhone : null;
+    let employeeValue = trimmedEmployee !== "" ? trimmedEmployee : null;
+
+    let body={ 
+        name: trimmedName, 
+        position: fPosition.value, 
+        employee_id: employeeValue, 
+        phone_no: phoneValue, 
+        email: emailValue 
+    };
+    
+    // Semakan wajib di peringkat frontend
     if(!body.name || !body.position){ alert("Nama dan Jawatan wajib diisi."); return; }
 
     let res;
     let treatAsNew = !editingStaff;
-
-    // Masukkan emel ke dalam pembolehubah ringkas untuk disemak
-    let hasEmailInput = body.email && body.email.trim() !== "";
+    let hasEmailInput = emailValue !== null;
 
     if(treatAsNew){
         // 1. SITUASI: Staff Baharu
@@ -1154,14 +1171,14 @@ async function saveStaff(){
             });
             if(!auth.ok){ 
                 let authErr = await auth.json().catch(() => ({}));
-                alert("Gagal create Auth: " + (authErr.msg || authErr.message || "Ralat tidak diketahui")); 
+                alert("Gagal mendaftar Supabase Auth: " + (authErr.msg || authErr.message || "Ralat tidak diketahui")); 
                 return; 
             }
         }
         res = await fetch(`${SB_URL}/rest/v1/staff`, { method:"POST", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(body) });
     } else {
         // 2. SITUASI: Kemas Kini Staff Sedia Ada (Edit)
-        // Semak jika sebelum ini tiada emel (atau emel kosong), tetapi SEKARANG user masukkan emel baharu
+        // Cek jika profil asal tiada emel, tetapi sekarang user baru masukkan emel
         let isEmailNewlyAdded = (!editingStaff.email || editingStaff.email.trim() === "") && hasEmailInput;
 
         if (isEmailNewlyAdded) {
@@ -1170,15 +1187,19 @@ async function saveStaff(){
             });
             if(!auth.ok){
                 let authErr = await auth.json().catch(() => ({}));
-                // Kita beri amaran tapi jangan sekat update database kalau pendaftaran auth bermasalah (cth: emel format salah/dah wujud)
-                alert("Nota: Data profil dikemaskini, tetapi GAGAL mendaftar akaun Supabase Auth: " + (authErr.msg || authErr.message));
+                alert("Nota: Profil dikemaskini, tetapi GAGAL mendaftar akaun Supabase Auth (Mungkin emel tidak sah atau telah digunakan): " + (authErr.msg || authErr.message));
             }
         }
 
         res = await fetch(`${SB_URL}/rest/v1/staff?id=eq.${editingStaff.id}`, { method:"PATCH", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(body) });
     }
 
-    if(!res.ok){ alert("Gagal simpan staff"); return; }
+    if(!res.ok){ 
+        let dbErr = await res.json().catch(() => ({}));
+        alert("Gagal menyimpan data ke database (Status 400): " + (dbErr.message || "Sila periksa kekunci unik profil staf.")); 
+        return; 
+    }
+    
     closeModal();
     loadStaff();
 }
