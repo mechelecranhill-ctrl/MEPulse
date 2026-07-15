@@ -1138,18 +1138,43 @@ function closeModal(){ document.getElementById("staffModal").style.display="none
 
 async function saveStaff(){
     let body={ name:fName.value, position:fPosition.value, employee_id:fEmployee.value, phone_no:fPhone.value, email:fEmail.value };
-    if(!body.name || !body.email || !body.position){ alert("Nama, Jawatan dan Email wajib diisi."); return; }
+    if(!body.name || !body.position){ alert("Nama dan Jawatan wajib diisi."); return; }
 
     let res;
-    let treatAsNew = !editingStaff || (editingStaff.name !== body.name || editingStaff.email !== body.email);
+    let treatAsNew = !editingStaff;
+
+    // Masukkan emel ke dalam pembolehubah ringkas untuk disemak
+    let hasEmailInput = body.email && body.email.trim() !== "";
 
     if(treatAsNew){
-        let auth = await fetch(`${SB_URL}/auth/v1/signup`, {
-            method:"POST", headers, body:JSON.stringify({ email:body.email, password:"StaffPassword123!" })
-        });
-        if(!auth.ok){ alert("Gagal create Auth"); return; }
+        // 1. SITUASI: Staff Baharu
+        if (hasEmailInput) {
+            let auth = await fetch(`${SB_URL}/auth/v1/signup`, {
+                method:"POST", headers, body:JSON.stringify({ email:body.email, password:"StaffPassword123!" })
+            });
+            if(!auth.ok){ 
+                let authErr = await auth.json().catch(() => ({}));
+                alert("Gagal create Auth: " + (authErr.msg || authErr.message || "Ralat tidak diketahui")); 
+                return; 
+            }
+        }
         res = await fetch(`${SB_URL}/rest/v1/staff`, { method:"POST", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(body) });
     } else {
+        // 2. SITUASI: Kemas Kini Staff Sedia Ada (Edit)
+        // Semak jika sebelum ini tiada emel (atau emel kosong), tetapi SEKARANG user masukkan emel baharu
+        let isEmailNewlyAdded = (!editingStaff.email || editingStaff.email.trim() === "") && hasEmailInput;
+
+        if (isEmailNewlyAdded) {
+            let auth = await fetch(`${SB_URL}/auth/v1/signup`, {
+                method:"POST", headers, body:JSON.stringify({ email:body.email, password:"StaffPassword123!" })
+            });
+            if(!auth.ok){
+                let authErr = await auth.json().catch(() => ({}));
+                // Kita beri amaran tapi jangan sekat update database kalau pendaftaran auth bermasalah (cth: emel format salah/dah wujud)
+                alert("Nota: Data profil dikemaskini, tetapi GAGAL mendaftar akaun Supabase Auth: " + (authErr.msg || authErr.message));
+            }
+        }
+
         res = await fetch(`${SB_URL}/rest/v1/staff?id=eq.${editingStaff.id}`, { method:"PATCH", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(body) });
     }
 
