@@ -1175,7 +1175,6 @@ async function saveStaff(){
             }
             body.id = authData.id || authData.user?.id;
         } else {
-            // Tiada emel? Guna UUID Rawak dahulu
             body.id = crypto.randomUUID();
         }
 
@@ -1199,39 +1198,17 @@ async function saveStaff(){
                 return;
             }
 
-            let newAuthId = authData.id || authData.user?.id;
-            let oldRawId = editingStaff.id;
-
-            // B. Backup tugasan/penempatan lama staf ini dari frontend state data
-            let oldSecAss = staffSectionAssignments.filter(a => a.staff_id === oldRawId);
-            let oldUnitAss = staffUnitAssignments.filter(a => a.staff_id === oldRawId);
-
-            // C. Padam penempatan lama (Untuk elakkan isu foreign key semasa padam staff lama)
-            await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${oldRawId}`, { method:"DELETE", headers });
-            await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${oldRawId}`, { method:"DELETE", headers });
-
-            // D. Padam rekod staf dengan ID RAWAK lama
-            await fetch(`${SB_URL}/rest/v1/staff?id=eq.${oldRawId}`, { method:"DELETE", headers });
-
-            // E. Cipta semula profil staf menggunakan UUID-AUTH baru
-            body.id = newAuthId;
-            res = await fetch(`${SB_URL}/rest/v1/staff`, { method:"POST", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(body) });
-
-            if(res.ok) {
-                // F. Masukkan semula data penempatan (jika ada) menggunakan ID baru
-                if(oldSecAss.length) {
-                    let newSec = oldSecAss.map(a => ({ staff_id: newAuthId, section_id: a.section_id, is_acting: a.is_acting }));
-                    await fetch(`${SB_URL}/rest/v1/staff_section_assignment`, { method:"POST", headers, body:JSON.stringify(newSec) });
-                }
-                if(oldUnitAss.length) {
-                    let newUnit = oldUnitAss.map(a => ({ staff_id: newAuthId, unit_id: a.unit_id, is_acting: a.is_acting }));
-                    await fetch(`${SB_URL}/rest/v1/staff_unit_assignment`, { method:"POST", headers, body:JSON.stringify(newUnit) });
-                }
-            }
-        } else {
-            // Jika edit biasa (bukan kes tambah emel baru pada akaun kosong)
-            res = await fetch(`${SB_URL}/rest/v1/staff?id=eq.${editingStaff.id}`, { method:"PATCH", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(body) });
+            // B. Masukkan UUID baharu ke dalam body untuk menggantikan UUID rawak lama
+            body.id = authData.id || authData.user?.id;
         }
+
+        // C. Terus hantar PATCH. Jika body.id ada (kes emel baru), ID lama akan dikemaskini. 
+        //    Disebabkan kita dah set CASCADE UPDATE di SQL, data penempatan unit/seksyen akan bertukar secara automatik!
+        res = await fetch(`${SB_URL}/rest/v1/staff?id=eq.${editingStaff.id}`, { 
+            method:"PATCH", 
+            headers:{...headers, "Prefer":"return=minimal"}, 
+            body:JSON.stringify(body) 
+        });
     }
 
     if(!res || !res.ok){ 
@@ -1241,7 +1218,6 @@ async function saveStaff(){
     }
     
     closeModal();
-    // Memastikan data aplikasi disinkronkan semula selepas rombakan ID
     await loadAssignments(); 
     await loadStaff();
 }
