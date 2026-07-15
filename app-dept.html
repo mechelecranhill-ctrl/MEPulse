@@ -35,12 +35,7 @@
             .glass-header{ padding-left:10px; padding-right:10px; }
         }
 
-        /* Rule print untuk .print-page / .pdf-container -- diperlukan oleh
-           previewFullSet() untuk gabungan Blueform + PDF Quotation (sama
-           seperti app-tech.html / app-exec.html / app-sect.html). blueform.css
-           sudah kendalikan visibility #bulkPreviewPage/.a4-container, jadi di
-           sini cuma tambah rule khusus untuk dua class ni sahaja supaya tak
-           bertindih. */
+        /* Rule print untuk .print-page / .pdf-container */
         @media print {
             .print-page {
                 box-shadow: none !important;
@@ -78,7 +73,7 @@
                 <h2 class="text-xl font-bold text-gray-700">
                     <i class="fa-solid fa-user-shield text-emerald-500 mr-2"></i>Blueform Approvals
                 </h2>
-                <span class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded">Filter: APP-SECT</span>
+                <span class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded">Filter: APP-HOS</span>
             </div>
             <div class="flex-1 overflow-y-auto">
                 <table class="min-w-full divide-y divide-gray-200">
@@ -145,30 +140,13 @@
     <script src="blueform.js"></script>
     <script>
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-
-        // Set untuk track sequence group yang butang Full Set-nya dah dipaparkan.
-        // Direset setiap kali fetchDashboard() dipanggil semula.
         let renderedBlueformSeqs = new Set();
 
         async function fetchDashboard() {
             try {
-                // ADMIN BYPASS: akaun "@dm1n" login TERUS guna localStorage
-                // sahaja (rujuk login.html -- admin tidak pernah panggil
-                // signInWithPassword(), jadi tiada session Supabase sebenar
-                // wujud). Detect dari localStorage DAHULU sebelum cuba
-                // supabaseClient.auth.getUser(), atau admin sentiasa gagal
-                // "Sila log masuk terlebih dahulu". Kalau admin, skip terus
-                // semakan department_head (dashboard ni memang tiada
-                // unit/section filter pun, jadi admin automatik nampak semua).
                 const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
 
                 if (!isAdmin) {
-                    // Sahkan sesi staff & sahkan dia Ketua Jabatan yang aktif.
-                    //    Table department_head TIDAK ada scoping (tiada
-                    //    department_id) -- ia cuma peranan tahap atasan, jadi
-                    //    kalau lulus semakan ni, staff nampak SEMUA kontrak
-                    //    (tiada filter unit/section macam app-exec.html /
-                    //    app-tech.html / app-sect.html).
                     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
                     if (userError || !user) {
                         showEmptyRow('table-dept', 'Sila log masuk terlebih dahulu.');
@@ -190,8 +168,7 @@
                     }
                 }
 
-                // 2. QUERY work_orders APP-SECT -- tiada tapisan unit/section
-                //    sebab Ketua Jabatan (dan admin) sepatutnya lihat semua kontrak.
+                // KEMASKINI: Menukar penapisan query untuk mengambil status kelulusan peringkat HOS
                 const { data: workOrders, error } = await supabaseClient
                     .from('work_orders')
                     .select(`
@@ -202,7 +179,7 @@
                         district,
                         contract (contract_name)
                     `)
-                    .eq('status', 'APP-SECT');
+                    .eq('status', 'APP-HOS');
 
                 if (error) throw error;
 
@@ -210,12 +187,10 @@
                 tbody.innerHTML = '';
 
                 if (workOrders.length === 0) {
-                    showEmptyRow('table-dept', 'Menunggu kelulusan Ketua Seksyen.');
+                    showEmptyRow('table-dept', 'Menunggu kelulusan Ketua Seksyen / HOS.');
                     return;
                 }
 
-                // 3. Pemetaan silang PDF Quotation ke Work Orders (ikut work_id),
-                //    diperlukan untuk gabungan "Full Set (BF+Quote)".
                 const { data: allQuotes, error: quoteError } = await supabaseClient
                     .from('quotations')
                     .select('work_id, pdf_url');
@@ -235,10 +210,6 @@
                         contractName = Array.isArray(item.contract) ? item.contract[0]?.contract_name : item.contract.contract_name;
                     }
 
-                    // Dedupe ikut sequence group (district+sequence_no), papar
-                    // SATU butang "Full Set" per group, bundle blueform + semua
-                    // PDF quotation ahli group tu sekali (sama seperti
-                    // app-tech.html / app-exec.html / app-sect.html).
                     const seq = (item.sequence_no || '').trim();
                     const groupKey = seq ? getBlueformGroupKey(item) : null;
                     const isFirstInGroup = !groupKey || !renderedBlueformSeqs.has(groupKey);
@@ -259,6 +230,7 @@
                         fullSetBtnHtml = `<span class="text-xs text-gray-400 italic">Refer first row seq ${seq}</span>`;
                     }
 
+                    // KEMASKINI: Mengubah suai parameter butang ke APP-HOD dan menambah butang Reject (HOD-REJ)
                     const row = `
                         <tr class="hover:bg-gray-50 transition-colors">
                             <td class="px-6 py-4 whitespace-nowrap font-mono text-sm text-gray-900">${item.work_id}</td>
@@ -271,10 +243,14 @@
                             <td class="px-6 py-4 whitespace-nowrap text-center">
                                 ${fullSetBtnHtml}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <button onclick="approveContract('${item.work_id}', 'APPROVED')" 
-                                        class="text-white px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-700">
-                                    <i class="fa-solid fa-check mr-1"></i> Final Approval
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                                <button onclick="processAction('${item.work_id}', 'APP-HOD')" 
+                                        class="text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-700">
+                                    <i class="fa-solid fa-check mr-1"></i> Approve
+                                </button>
+                                <button onclick="processAction('${item.work_id}', 'HOD-REJ')" 
+                                        class="text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer bg-red-600 hover:bg-red-700">
+                                    <i class="fa-solid fa-xmark mr-1"></i> Reject
                                 </button>
                             </td>
                         </tr>
@@ -297,11 +273,6 @@
                 </tr>`;
         }
 
-        // Gabung Blueform + PDF Quotation ke satu preview/print (sama seperti
-        // previewFullSet() dalam app-tech.html / app-exec.html / app-sect.html).
-        // Group items sudah tersedia dari seqGroups (data dah ada di memori
-        // semasa render), jadi tidak perlu re-query Supabase untuk cari
-        // sibling WO.
         async function previewFullSet(escapedGroupData) {
             const groupItems = JSON.parse(decodeURIComponent(escapedGroupData));
             const container = document.getElementById('bulkPagesContainer');
@@ -322,9 +293,6 @@
                     document.getElementById('bulkPreviewCount').innerText = `Full Set Preview: Gabungan ${ids.length} WO`;
                 }
 
-                // HALAMAN 1: Blueform. buildBlueformHTML() sudah ada .a4-container
-                // + page-break sendiri, jadi TIDAK dibalut dalam .print-page lagi
-                // (elak double page-break).
                 if (payload && typeof buildBlueformHTML === 'function') {
                     compositeHtml += buildBlueformHTML(payload);
                 } else {
@@ -335,7 +303,6 @@
                     `;
                 }
 
-                // HALAMAN 2+: PDF Quotation yang terkait dengan ahli group ini
                 const linkedPdfs = [...new Set(groupItems.map(g => g.mapped_pdf_url).filter(Boolean))];
 
                 if (linkedPdfs.length > 0) {
@@ -369,16 +336,28 @@
                 container.innerHTML = `<div class="text-red-400 p-4 font-mono text-xs">Error bundling documents: ${error.message}</div>`;
             }
         }
-        // Nota: closeBulkPreview() sudah disediakan secara global dalam
-        // blueform.js, jadi tidak perlu didefinisikan semula di sini.
 
-        async function approveContract(workId, nextStatus) {
-            if (!confirm(`Adakah anda pasti untuk menukar status Work ID: ${workId} ke ${nextStatus}?`)) return;
+        // KEMASKINI: Mengganti fungsi lama dengan `processAction` untuk kendali `APP-HOD` & `HOD-REJ` beserta ulasan
+        async function processAction(workId, nextStatus) {
+            let updatePayload = { status: nextStatus };
+            
+            if (nextStatus === 'HOD-REJ') {
+                const reason = prompt("Sila masukkan sebab penolakan (Reject Reason):");
+                if (reason === null) return; 
+                if (!reason.trim()) {
+                    alert("Sebab penolakan wajib diisi!");
+                    return;
+                }
+                updatePayload.reject_reason = reason.trim();
+            } else {
+                if (!confirm(`Adakah anda pasti untuk menukar status Work ID: ${workId} ke ${nextStatus}?`)) return;
+                updatePayload.reject_reason = null; 
+            }
 
             try {
                 const { error } = await supabaseClient
                     .from('work_orders')
-                    .update({ status: nextStatus })
+                    .update(updatePayload)
                     .eq('work_id', workId);
 
                 if (error) throw error;
@@ -387,7 +366,7 @@
                 fetchDashboard();
 
             } catch (err) {
-                console.error("Ralat semasa kelulusan:", err.message);
+                console.error("Ralat semasa pemprosesan:", err.message);
                 alert("Gagal mengemaskini status: " + err.message);
             }
         }
