@@ -85,7 +85,6 @@
     <div class="container mx-auto px-4 flex-1 my-6 overflow-hidden w-full">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full pb-4">
             
-            <!-- SECTION 1: QUOTATION STATUS -->
             <section class="bg-white rounded-xl shadow-md p-4 border-t-4 border-blue-500 flex flex-col h-full overflow-hidden w-full">
                 <div class="flex justify-between items-center mb-4 flex-shrink-0">
                     <h2 class="text-sm font-bold text-gray-700">
@@ -98,13 +97,12 @@
                 </div>
             </section>
 
-            <!-- SECTION 2: BLUEFORM STATUS -->
             <section class="bg-white rounded-xl shadow-md p-4 border-t-4 border-emerald-500 flex flex-col h-full overflow-hidden w-full">
                 <div class="flex justify-between items-center mb-4 flex-shrink-0">
                     <h2 class="text-sm font-bold text-gray-700">
                         <i class="fa-solid fa-file-lines text-emerald-500 mr-1"></i>2. Blueform Status
                     </h2>
-                    <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">Filter: APPROVED / REJECTED</span>
+                    <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">Filter: APP-HOD / REJECTED</span>
                 </div>
                 <div id="blueforms-container" class="flex-1 overflow-y-auto space-y-4 pr-1">
                     <div class="text-center text-gray-400 py-4 text-xs">Loading blueform data...</div>
@@ -114,7 +112,6 @@
         </div>
     </div>
 
-    <!-- BULK PREVIEW / PRINT WINDOW -->
     <div id="bulkPreviewPage" style="display:none; position:fixed; inset:0; background:#525659; z-index:9998; overflow-y:auto; padding:60px 0 60px 0;">
         <div class="bulk-toolbar" style="position:fixed; top:0; left:0; right:0; height:50px; background:#323639; display:flex; align-items:center; justify-content:space-between; padding:0 30px; z-index:9999; box-shadow:0 2px 10px rgba(0,0,0,0.4);">
             <div style="color:white;font-size:13px;font-weight:600;" id="bulkPreviewCount"></div>
@@ -136,127 +133,101 @@
         let renderedBlueformSeqs = new Set();
 
         async function fetchTechnicianDashboard() {
-    try {
-        // ADMIN BYPASS: akaun "@dm1n" login TERUS guna localStorage sahaja
-        // (rujuk login.html -- admin TIDAK pernah panggil
-        // sbClient.auth.signInWithPassword(), jadi tiada session Supabase
-        // sebenar wujud untuknya). Kalau admin, kena detect dari localStorage
-        // DAHULU sebelum cuba supabaseClient.auth.getUser(), atau ia akan
-        // sentiasa gagal "Sila log masuk terlebih dahulu" untuk admin.
-        const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
+            try {
+                const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
+                let activeUnitIds = [];
 
-        let activeUnitIds = [];
+                if (!isAdmin) {
+                    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
 
-        if (!isAdmin) {
-            // FIX: localStorage.getItem('user_id') / window.currentUser.id tidak
-            // reliable -- kalau session.js tak simpan key tu, currentStaffId jadi
-            // undefined walaupun staff dah login & ada unit assignment sah dalam
-            // DB, lalu terus block dengan "Sila log masuk terlebih dahulu".
-            // Tukar guna supabaseClient.auth.getUser() (session Supabase sebenar),
-            // sama seperti kaedah yang digunakan dalam app-exec.html.
-            const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+                    if (userError || !user) {
+                        showEmptyState('quotations-container', 'Sila log masuk terlebih dahulu.');
+                        showEmptyState('blueforms-container', 'Sila log masuk terlebih dahulu.');
+                        return;
+                    }
 
-            if (userError || !user) {
-                showEmptyState('quotations-container', 'Sila log masuk terlebih dahulu.');
-                showEmptyState('blueforms-container', 'Sila log masuk terlebih dahulu.');
-                return;
-            }
+                    const currentStaffId = user.id;
 
-            const currentStaffId = user.id;
+                    const { data: assignments, error: assError } = await supabaseClient
+                        .from('staff_unit_assignment')
+                        .select('unit_id')
+                        .eq('staff_id', currentStaffId)
+                        .eq('active', true);
 
-            // 2. Cari unit_id staff yang berstatus aktif
-            const { data: assignments, error: assError } = await supabaseClient
-                .from('staff_unit_assignment')
-                .select('unit_id')
-                .eq('staff_id', currentStaffId)
-                .eq('active', true);
+                    if (assError) throw assError;
 
-            if (assError) throw assError;
+                    activeUnitIds = (assignments || []).map(a => a.unit_id);
 
-            activeUnitIds = (assignments || []).map(a => a.unit_id);
+                    if (activeUnitIds.length === 0) {
+                        showEmptyState('quotations-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
+                        showEmptyState('blueforms-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
+                        return;
+                    }
+                }
 
-            // FIX (keselamatan): kalau staff tiada unit assignment aktif langsung,
-            // JANGAN fallback papar semua kontrak semua unit. Block dan papar
-            // empty state, sama seperti app-exec.html.
-            if (activeUnitIds.length === 0) {
-                showEmptyState('quotations-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
-                showEmptyState('blueforms-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
-                return;
-            }
-        }
+                // 3. QUERY QUOTATIONS
+                let quotationsQuery = supabaseClient
+                    .from('quotations')
+                    .select(`
+                        id, work_id, status, contract_id, pdf_url, reject_reason,
+                        contract!inner (id, contract_name, contract_code, unit_id)
+                    `)
+                    .in('status', ['QUO-APP', 'QUO-REJ']);
+                if (!isAdmin) quotationsQuery = quotationsQuery.in('contract.unit_id', activeUnitIds);
 
-        // 3. QUERY QUOTATIONS -- admin: tiada tapisan unit; staff biasa: tapis ikut unit
-        let quotationsQuery = supabaseClient
-            .from('quotations')
-            .select(`
-                id, work_id, status, contract_id, pdf_url, reject_reason,
-                contract!inner (id, contract_name, contract_code, unit_id)
-            `)
-            .in('status', ['QUO-APP', 'QUO-REJ']);
-        if (!isAdmin) quotationsQuery = quotationsQuery.in('contract.unit_id', activeUnitIds);
+                // 4. QUERY WORK ORDERS (BLUEFORM)
+                // KEMASKINI DI SINI: Menukar filter status mengikut permintaan anda
+                let blueformQuery = supabaseClient
+                    .from('work_orders')
+                    .select(`
+                        id, work_id, status, sequence_no, contract_id, district, reject_reason,
+                        contract!inner (id, contract_name, contract_code, unit_id)
+                    `)
+                    .in('status', ['APP-HOD', 'EXEC-REJ', 'HOS-REJ', 'HOD-REJ']); 
+                if (!isAdmin) blueformQuery = blueformQuery.in('contract.unit_id', activeUnitIds);
 
-        // 4. QUERY WORK ORDERS -- admin: tiada tapisan unit; staff biasa: tapis ikut unit
-        let blueformQuery = supabaseClient
-            .from('work_orders')
-            .select(`
-                id, work_id, status, sequence_no, contract_id, district, reject_reason,
-                contract!inner (id, contract_name, contract_code, unit_id)
-            `)
-            .in('status', ['APPROVED', 'EXEC-REJ', 'SECT-REJ', 'DEPT-REJ']);
-        if (!isAdmin) blueformQuery = blueformQuery.in('contract.unit_id', activeUnitIds);
+                const [ { data: quotationData, error: qError }, { data: blueformData, error: bError } ] = 
+                    await Promise.all([quotationsQuery, blueformQuery]);
 
-        // Jalankan kedua-dua query secara serentak
-        const [ { data: quotationData, error: qError }, { data: blueformData, error: bError } ] = 
-            await Promise.all([quotationsQuery, blueformQuery]);
+                if (qError) throw qError;
+                if (bError) throw bError;
 
-        if (qError) throw qError;
-        if (bError) throw bError;
+                const { data: crossQuotes, error: crossQError } = await supabaseClient
+                    .from('quotations')
+                    .select('work_id, pdf_url');
+                    
+                if (!crossQError && crossQuotes) {
+                    const quoteMap = {};
+                    crossQuotes.forEach(q => { if (q.work_id) quoteMap[q.work_id] = q.pdf_url; });
+                    blueformData.forEach(item => { item.mapped_pdf_url = quoteMap[item.work_id] || null; });
+                }
 
-        // Pemetaan silang fail PDF Quotation ke Work Orders berdasarkan work_id
-        const { data: crossQuotes, error: crossQError } = await supabaseClient
-            .from('quotations')
-            .select('work_id, pdf_url');
-            
-        if (!crossQError && crossQuotes) {
-            const quoteMap = {};
-            crossQuotes.forEach(q => { if (q.work_id) quoteMap[q.work_id] = q.pdf_url; });
-            blueformData.forEach(item => { item.mapped_pdf_url = quoteMap[item.work_id] || null; });
-        }
+                const quotationWorkIds = (quotationData || []).map(q => q.work_id).filter(Boolean);
+                let workOrderWorkIdSet = new Set();
+                if (quotationWorkIds.length > 0) {
+                    const { data: matchingWOs, error: matchError } = await supabaseClient
+                        .from('work_orders')
+                        .select('work_id')
+                        .in('work_id', quotationWorkIds);
 
-        // Buang QUO-APP yang dah ada matching blueform (work_orders) dari
-        // paparan Seksyen 1 -- semak WUJUD ke tidak work_order untuk work_id
-        // tu, APA-APA status pun (BLUEFORM/APP-EXEC/APP-SECT/APPROVED/dll),
-        // bukan hanya yang dah settle (4 status yang di-fetch untuk
-        // blueformData). Sebaik proses beralih ke thread blueform, quotation
-        // tu tak perlu lagi ditunjuk sebagai "pending" di sini. QUO-REJ
-        // dikekalkan (tak ditapis) sebab tak relevan dengan blueform.
-        const quotationWorkIds = (quotationData || []).map(q => q.work_id).filter(Boolean);
-        let workOrderWorkIdSet = new Set();
-        if (quotationWorkIds.length > 0) {
-            const { data: matchingWOs, error: matchError } = await supabaseClient
-                .from('work_orders')
-                .select('work_id')
-                .in('work_id', quotationWorkIds);
+                    if (!matchError && matchingWOs) {
+                        workOrderWorkIdSet = new Set(matchingWOs.map(w => w.work_id));
+                    }
+                }
 
-            if (!matchError && matchingWOs) {
-                workOrderWorkIdSet = new Set(matchingWOs.map(w => w.work_id));
+                const filteredQuotationData = (quotationData || []).filter(q => {
+                    if (q.status === 'QUO-APP' && workOrderWorkIdSet.has(q.work_id)) return false;
+                    return true;
+                });
+
+                renderTechnicianSection('quotations-container', filteredQuotationData, 'QUOTATION');
+                renderTechnicianSection('blueforms-container', blueformData, 'BLUEFORM');
+
+            } catch (err) {
+                console.error("Error loading technician dashboard:", err.message);
+                alert("Failed to load dashboard data: " + err.message);
             }
         }
-
-        const filteredQuotationData = (quotationData || []).filter(q => {
-            if (q.status === 'QUO-APP' && workOrderWorkIdSet.has(q.work_id)) return false;
-            return true;
-        });
-
-        renderTechnicianSection('quotations-container', filteredQuotationData, 'QUOTATION');
-        renderTechnicianSection('blueforms-container', blueformData, 'BLUEFORM');
-
-    } catch (err) {
-        console.error("Error loading technician dashboard:", err.message);
-        alert("Failed to load dashboard data: " + err.message);
-    }
-}
-
 
         function renderTechnicianSection(containerId, orders, type) {
             const container = document.getElementById(containerId);
@@ -284,16 +255,7 @@
 
             for (const contractId in contractsMap) {
                 const contract = contractsMap[contractId];
-
-                // FIX: bina sequence group SCOPED ikut kontrak semasa guna helper
-                // buildSequenceGroups() dari blueform.js (key format
-                // "DISTRICT||SEQ"), supaya WO dalam sequence sama cuma papar
-                // SATU butang "Full Set" (bukan satu butang per row). Ini
-                // menggantikan `customSeqGroups` lama yang dibina tapi tak
-                // pernah digunakan.
-                const contractSeqGroups = type === 'BLUEFORM'
-                    ? buildSequenceGroups(contract.orders)
-                    : null;
+                const contractSeqGroups = type === 'BLUEFORM' ? buildSequenceGroups(contract.orders) : null;
 
                 const contractSection = document.createElement('div');
                 contractSection.className = "bg-gray-50 rounded-lg p-2 border border-gray-200 shadow-sm mb-4 w-full overflow-hidden";
@@ -341,8 +303,9 @@
                     let statusBadge = '';
                     let reasonText = item.reject_reason ? item.reject_reason : 'No notes.';
 
-                    if (item.status === 'QUO-APP' || item.status === 'APPROVED') {
-                        statusBadge = `<span class="bg-emerald-100 text-emerald-800 text-[9px] font-extrabold px-1 py-0.5 rounded border border-emerald-200 block text-center truncate"><i class="fa-solid fa-check mr-0.5"></i>App</span>`;
+                    // KEMASKINI DI SINI: Logik semakan badge status disesuaikan dengan status baru
+                    if (item.status === 'QUO-APP' || item.status === 'APP-HOD') {
+                        statusBadge = `<span class="bg-emerald-100 text-emerald-800 text-[9px] font-extrabold px-1 py-0.5 rounded border border-emerald-200 block text-center truncate" title="${item.status}"><i class="fa-solid fa-check mr-0.5"></i>App</span>`;
                     } else {
                         statusBadge = `<span class="bg-red-100 text-red-800 text-[9px] font-extrabold px-1 py-0.5 rounded border border-red-200 block text-center truncate" title="${item.status}"><i class="fa-solid fa-xmark mr-0.5"></i>Rej</span>`;
                     }
@@ -383,10 +346,6 @@
                             </tr>
                         `;
                     } else {
-                        // FIX: dedupe "Full Set" button ikut group district+sequence_no
-                        // (guna renderedBlueformSeqs + getBlueformGroupKey dari
-                        // blueform.js). Baris seterusnya dalam group sama
-                        // cuma papar teks rujukan, bukan butang berulang.
                         const groupKey = seq ? getBlueformGroupKey(item) : null;
                         const isFirstInGroup = !groupKey || !renderedBlueformSeqs.has(groupKey);
 
@@ -395,8 +354,6 @@
                             if (groupKey) renderedBlueformSeqs.add(groupKey);
                             const groupCount = groupKey ? (contractSeqGroups[groupKey] || [item]).length : 1;
                             const countLabel = groupCount > 1 ? ` (${groupCount})` : '';
-
-                            // Menukar data objek item kepada bentuk string URL-safe untuk dihantar terus ke fungsi preview
                             const serializedItem = encodeURIComponent(JSON.stringify(item));
 
                             actionBtnHtml = `
@@ -433,122 +390,101 @@
             }
         }
 
-        // Fungsi utama menjana Pakej Gabungan Dokumen (Menyokong Single & Grouping Blueform)
-async function previewFullSet(escapedItemData) {
-    const item = JSON.parse(decodeURIComponent(escapedItemData));
-    const container = document.getElementById('bulkPagesContainer');
-    
-    container.innerHTML = '<div class="text-white text-sm p-4 animate-pulse"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Bundling full set documents...</div>';
-    document.getElementById('bulkPreviewPage').style.display = 'block';
-    document.getElementById('bulkPreviewCount').innerText = `Full Set Preview: ${item.work_id}`;
+        async function previewFullSet(escapedItemData) {
+            const item = JSON.parse(decodeURIComponent(escapedItemData));
+            const container = document.getElementById('bulkPagesContainer');
+            
+            container.innerHTML = '<div class="text-white text-sm p-4 animate-pulse"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Bundling full set documents...</div>';
+            document.getElementById('bulkPreviewPage').style.display = 'block';
+            document.getElementById('bulkPreviewCount').innerText = `Full Set Preview: ${item.work_id}`;
 
-    try {
-        let compositeHtml = '';
-        let payload;
-        let linkedPdfs = [];
+            try {
+                let compositeHtml = '';
+                let payload;
+                let linkedPdfs = [];
 
-        // 1. SEMAK GROUPING: Dapatkan semua work order se-kontrak untuk cross-check jujukan
-        const seq = (item.sequence_no || '').trim();
-        const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
-        const currentContractId = contractData?.id || item.contract_id;
+                const seq = (item.sequence_no || '').trim();
+                const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
+                const currentContractId = contractData?.id || item.contract_id;
 
-        if (seq && currentContractId && typeof buildBlueformDataGroup === 'function') {
-            // Ambil semua work orders di bawah kontrak ini untuk mencari ahli kumpulan yang sama
-            const { data: siblingWOs } = await supabaseClient
-                .from('work_orders')
-                .select('id, work_id, sequence_no, district')
-                .eq('contract_id', currentContractId);
+                if (seq && currentContractId && typeof buildBlueformDataGroup === 'function') {
+                    const { data: siblingWOs } = await supabaseClient
+                        .from('work_orders')
+                        .select('id, work_id, sequence_no, district')
+                        .eq('contract_id', currentContractId);
 
-            // Tapis mengikut daerah dan sequence_no yang sama (Logik asal blueform.js)
-            const currentDistrict = (item.district || '').trim().toUpperCase();
-            const groupMembers = (siblingWOs || []).filter(w => 
-                (w.sequence_no || '').trim() === seq && 
-                (w.district || '').trim().toUpperCase() === currentDistrict
-            );
+                    const currentDistrict = (item.district || '').trim().toUpperCase();
+                    const groupMembers = (siblingWOs || []).filter(w => 
+                        (w.sequence_no || '').trim() === seq && 
+                        (w.district || '').trim().toUpperCase() === currentDistrict
+                    );
 
-            if (groupMembers.length > 1) {
-                const groupIds = groupMembers.map(g => g.id);
-                // Bina data gabungan menggunakan helper dikongsi
-                payload = await buildBlueformDataGroup(groupIds);
-                document.getElementById('bulkPreviewCount').innerText = `Full Set Preview: Gabungan ${groupMembers.length} WO (Seq: ${seq})`;
+                    if (groupMembers.length > 1) {
+                        const groupIds = groupMembers.map(g => g.id);
+                        payload = await buildBlueformDataGroup(groupIds);
+                        document.getElementById('bulkPreviewCount').innerText = `Full Set Preview: Gabungan ${groupMembers.length} WO (Seq: ${seq})`;
 
-                // Ambil semua pdf sebut harga milik ahli-ahli kumpulan ini
-                const groupWorkIds = groupMembers.map(g => g.work_id);
-                const { data: quotes } = await supabaseClient
-                    .from('quotations')
-                    .select('work_id, pdf_url')
-                    .in('work_id', groupWorkIds);
-                
-                if (quotes) {
-                    linkedPdfs = quotes.map(q => q.pdf_url).filter(url => url);
+                        const groupWorkIds = groupMembers.map(g => g.work_id);
+                        const { data: quotes } = await supabaseClient
+                            .from('quotations')
+                            .select('work_id, pdf_url')
+                            .in('work_id', groupWorkIds);
+                        
+                        if (quotes) {
+                            linkedPdfs = quotes.map(q => q.pdf_url).filter(url => url);
+                        }
+                    }
                 }
-            }
-        }
 
-        // 2. RUN STANDALONE: Jika tiada jujukan kumpulan, jalankan proses tunggal seperti biasa
-        if (!payload) {
-            if (typeof buildBlueformData === 'function') {
-                payload = await buildBlueformData(item.id);
-                if (item.mapped_pdf_url) linkedPdfs.push(item.mapped_pdf_url);
-            }
-        }
+                if (!payload) {
+                    if (typeof buildBlueformData === 'function') {
+                        payload = await buildBlueformData(item.id);
+                        if (item.mapped_pdf_url) linkedPdfs.push(item.mapped_pdf_url);
+                    }
+                }
 
-        // 3. RENDER HALAMAN 1: Kod HTML Blueform (Sama ada single/gabungan)
-        // FIX (print): buildBlueformHTML() sudah menghasilkan elemen
-        // `.a4-container` lengkap dengan saiz A4, padding, DAN
-        // `page-break-after:always` sendiri. Membalutnya lagi dalam
-        // `.print-page` (yang juga ada rule `page-break-after:always` dari
-        // blueform.css) menyebabkan dua lapisan page-break bertindih dan
-        // berisiko muka surat kosong tambahan / saiz A4 berganda semasa
-        // cetak. Guna output buildBlueformHTML() terus tanpa wrapper
-        // `.print-page` untuk halaman blueform ini.
-        if (payload && typeof buildBlueformHTML === 'function') {
-            compositeHtml += buildBlueformHTML(payload);
-        } else {
-            compositeHtml += `
-                <div class="print-page bg-white p-8 shadow-lg w-[210mm] min-h-[297mm] text-red-500 font-bold flex items-center justify-center">
-                    Error: buildBlueformData or buildBlueformHTML logic failed.
-                </div>
-            `;
-        }
+                if (payload && typeof buildBlueformHTML === 'function') {
+                    compositeHtml += buildBlueformHTML(payload);
+                } else {
+                    compositeHtml += `
+                        <div class="print-page bg-white p-8 shadow-lg w-[210mm] min-h-[297mm] text-red-500 font-bold flex items-center justify-center">
+                            Error: buildBlueformData or buildBlueformHTML logic failed.
+                        </div>
+                    `;
+                }
 
-        // 4. RENDER HALAMAN 2+: Gabungan Dokumen Quotation PDF
-        // (Wrapper `.print-page` / `.pdf-container` DIKEKALKAN di sini sebab
-        // halaman PDF quotation tidak ada page-break sendiri seperti
-        // buildBlueformHTML() — ia perlukan wrapper ini.)
-        if (linkedPdfs.length > 0) {
-            // Buang pautan PDF yang bertindih/sama jika ada
-            const uniquePdfs = [...new Set(linkedPdfs)];
-            uniquePdfs.forEach(pdfUrl => {
-                compositeHtml += `
-                    <div class="print-page pdf-container bg-white shadow-lg w-[210mm] min-h-[297mm] box-sizing-border-box" style="background:white;">
-                        <object data="${pdfUrl}#toolbar=0&navpanes=0" type="application/pdf" style="width:100%; min-height:297mm; height:100vh;">
-                            <div class="p-8 text-center text-gray-500">
-                                <i class="fa-solid fa-triangle-exclamation text-xl text-amber-500 block mb-2"></i>
-                                Browser tidak menyokong paparan terus.
-                                <a href="${pdfUrl}" target="_blank" class="text-blue-500 underline">Klik untuk buka fail PDF</a>.
+                if (linkedPdfs.length > 0) {
+                    const uniquePdfs = [...new Set(linkedPdfs)];
+                    uniquePdfs.forEach(pdfUrl => {
+                        compositeHtml += `
+                            <div class="print-page pdf-container bg-white shadow-lg w-[210mm] min-h-[297mm] box-sizing-border-box" style="background:white;">
+                                <object data="${pdfUrl}#toolbar=0&navpanes=0" type="application/pdf" style="width:100%; min-height:297mm; height:100vh;">
+                                    <div class="p-8 text-center text-gray-500">
+                                        <i class="fa-solid fa-triangle-exclamation text-xl text-amber-500 block mb-2"></i>
+                                        Browser tidak menyokong paparan terus.
+                                        <a href="${pdfUrl}" target="_blank" class="text-blue-500 underline">Klik untuk buka fail PDF</a>.
+                                    </div>
+                                </object>
                             </div>
-                        </object>
-                    </div>
-                `;
-            });
-        } else {
-            compositeHtml += `
-                <div class="print-page bg-white p-12 shadow-lg w-[210mm] min-h-[297mm] flex flex-col items-center justify-center text-center" style="color:gray; background:white;">
-                    <i class="fa-solid fa-file-pdf text-4xl text-gray-300 mb-2"></i>
-                    <p class="text-sm font-semibold text-gray-600">No Linked Quotation PDF Found</p>
-                    <p class="text-xs text-gray-400">Only the Blueform page will be printed for this record.</p>
-                </div>
-            `;
+                        `;
+                    });
+                } else {
+                    compositeHtml += `
+                        <div class="print-page bg-white p-12 shadow-lg w-[210mm] min-h-[297mm] flex flex-col items-center justify-center text-center" style="color:gray; background:white;">
+                            <i class="fa-solid fa-file-pdf text-4xl text-gray-300 mb-2"></i>
+                            <p class="text-sm font-semibold text-gray-600">No Linked Quotation PDF Found</p>
+                            <p class="text-xs text-gray-400">Only the Blueform page will be printed for this record.</p>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML = compositeHtml;
+
+            } catch (error) {
+                console.error("Error creating full set preview:", error);
+                container.innerHTML = `<div class="text-red-400 p-4 font-mono text-xs">Error bundling documents: ${error.message}</div>`;
+            }
         }
-
-        container.innerHTML = compositeHtml;
-
-    } catch (error) {
-        console.error("Error creating full set preview:", error);
-        container.innerHTML = `<div class="text-red-400 p-4 font-mono text-xs">Error bundling documents: ${error.message}</div>`;
-    }
-}
 
         function closeBulkPreview() {
             document.getElementById('bulkPreviewPage').style.display = 'none';
