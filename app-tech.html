@@ -179,7 +179,10 @@
     <script src="blueform.js"></script>
     <script>
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-        const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+        // NOTA: dinamakan qHeaders (bukan "headers") sebab blueform.js sudah
+        // declare `const headers` secara global — redeclare guna nama sama
+        // akan cetuskan SyntaxError dan pecahkan seluruh script.
+        const qHeaders = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
         let renderedBlueformSeqs = new Set();
 
         function escapeJs(str) {
@@ -230,7 +233,7 @@
 
         async function tqFetchUnits() {
             try {
-                const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers });
+                const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers: qHeaders });
                 const units = await res.json();
                 const sel = document.getElementById('tq_unit_id');
                 sel.innerHTML = '<option value="">Choose Unit</option>';
@@ -244,7 +247,7 @@
             if(!unitId){ contractSelect.innerHTML = '<option value="">Choose Unit First</option>'; return; }
             contractSelect.innerHTML = '<option value="">Loading...</option>';
             try {
-                const res = await fetch(`${SB_URL}/rest/v1/contract?select=id,contract_code&unit_id=eq.${unitId}`, { headers });
+                const res = await fetch(`${SB_URL}/rest/v1/contract?select=id,contract_code&unit_id=eq.${unitId}`, { headers: qHeaders });
                 const data = await res.json();
                 contractSelect.innerHTML = '<option value="">Choose Contract</option>';
                 data.forEach(c => {
@@ -331,12 +334,12 @@
 
                 try {
                     try {
-                        const rejCheckRes = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(primaryWorkId)}&status=eq.QUO-REJ&select=*`, { headers });
+                        const rejCheckRes = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(primaryWorkId)}&status=eq.QUO-REJ&select=*`, { headers: qHeaders });
                         const rejRows = await rejCheckRes.json();
                         for (const rejRow of rejRows) {
                             const actionDate = rejRow.action_date || new Date().toISOString();
                             await archiveRejectedQuotation(primaryWorkId, actionDate);
-                            await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${rejRow.id}`, { method: 'DELETE', headers });
+                            await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${rejRow.id}`, { method: 'DELETE', headers: qHeaders });
                         }
                     } catch (archiveErr) {
                         console.error("Gagal arkibkan quotation rejected lama:", archiveErr);
@@ -358,7 +361,7 @@
                         qpd_date: document.getElementById('tq_qpb_date').value || null
                     };
 
-                    const res = await fetch(`${SB_URL}/rest/v1/quotations`, { method: 'POST', headers, body: JSON.stringify(payload) });
+                    const res = await fetch(`${SB_URL}/rest/v1/quotations`, { method: 'POST', headers: qHeaders, body: JSON.stringify(payload) });
 
                     if (res.ok) {
                         alert(`Quotation & Dokumen OneDrive berjaya direkodkan!`);
