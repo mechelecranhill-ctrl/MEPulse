@@ -848,20 +848,53 @@
                         totalAmount += base; additionalTotal += extra;
                     });
 
-                    perWorkIdPayload[workId] = { ...sharedFields, work_id: workId, location: location, description: description, section_category: breakdown, additional: additionalTotal, amount_spent: totalAmount + additionalTotal };
+                    perWorkIdPayload[workId] = { 
+                        ...sharedFields, 
+                        work_id: workId, 
+                        status: 'BLUEFORM',
+                        location: location, 
+                        description: description, 
+                        section_category: breakdown, 
+                        additional: additionalTotal, 
+                        amount_spent: totalAmount + additionalTotal 
+                    };
                 });
 
                 for(const workIdValue of currentWorkIds){
-                    const payload = perWorkIdPayload[workIdValue]; if(!payload) continue;
-                    const checkRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}`, { headers });
-                    const existing = await checkRes.json();
+    const payload = perWorkIdPayload[workIdValue]; if(!payload) continue;
+    const checkRes = await fetch(${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}, { headers });
+    const existing = await checkRes.json();
 
-                    if(existing.length > 0){
-                        await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`, { method: 'PATCH', headers, body: JSON.stringify({ ...payload, sequence_no: sequenceToUse, district: districtSelected }) });
-                    }else{
-                        await fetch(`${SB_URL}/rest/v1/work_orders`, { method: 'POST', headers, body: JSON.stringify(payload) });
-                    }
-                }
+    if(existing.length > 0){
+        // Kalau blueform ni pernah kena reject di mana-mana peringkat
+        // (EXEC-REJ / HOS-REJ / HOD-REJ), bila technician edit & submit
+        // semula, status KENA reset ke 'BLUEFORM' supaya ia masuk balik
+        // queue Executive untuk review dari awal. Kalau tak reset,
+        // rekod ni stuck selama-lamanya sebab tiada dashboard yang
+        // filter status *-REJ untuk technician submit balik.
+        const existingStatus = existing[0].status || '';
+        const isRejected = existingStatus.includes('REJ');
+
+        const patchPayload = { 
+            ...payload, 
+            sequence_no: sequenceToUse, 
+            district: districtSelected 
+        };
+
+        if(isRejected){
+            patchPayload.status = 'BLUEFORM';
+            patchPayload.reject_reason = null; // clear reject reason lama
+        }
+
+        await fetch(${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}, { 
+            method: 'PATCH', headers, body: JSON.stringify(patchPayload) 
+        });
+    }else{
+        await fetch(${SB_URL}/rest/v1/work_orders, { 
+            method: 'POST', headers, body: JSON.stringify(payload) 
+        });
+    }
+}
 
                 originalLoadedWorkIds.filter(id => !currentWorkIds.includes(id)).forEach(async (removedId) => {
                     await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(removedId)}`, { method: 'DELETE', headers });
