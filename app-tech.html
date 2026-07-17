@@ -132,6 +132,25 @@
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
         let renderedBlueformSeqs = new Set();
 
+        function escapeJs(str) {
+            return String(str).replace(/'/g, "\\'");
+        }
+        
+        async function startRevision(type, workId) {
+            const table = type === 'QUOTATION' ? 'quotations' : 'work_orders';
+            try {
+                const { error } = await supabaseClient   
+                    .from(table)
+                    .update({ revision_in_progress: true })
+                    .eq('work_id', workId);
+              if (error) throw error;
+                fetchTechnicianDashboard();
+            } catch (err) {
+                console.error('Gagal tanda revision:', err.message);
+                alert('Gagal menandakan status semakan semula: ' + err.message);
+            }
+        }
+
         async function fetchTechnicianDashboard() {
             try {
                 const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
@@ -169,8 +188,8 @@
                 let quotationsQuery = supabaseClient
                     .from('quotations')
                     .select(`
-                        id, work_id, status, contract_id, pdf_url, reject_reason,
-                        contract!inner (id, contract_name, contract_code, unit_id)
+                            id, work_id, status, contract_id, pdf_url, reject_reason, revision_in_progress,
+                            contract!inner (id, contract_name, contract_code, unit_id)
                     `)
                     .in('status', ['QUO-APP', 'QUO-REJ']);
                 if (!isAdmin) quotationsQuery = quotationsQuery.in('contract.unit_id', activeUnitIds);
@@ -180,8 +199,8 @@
                 let blueformQuery = supabaseClient
                     .from('work_orders')
                     .select(`
-                        id, work_id, status, sequence_no, contract_id, district, reject_reason,
-                        contract!inner (id, contract_name, contract_code, unit_id)
+                            id, work_id, status, sequence_no, contract_id, district, reject_reason, revision_in_progress,
+                            contract!inner (id, contract_name, contract_code, unit_id)
                     `)
                     .in('status', ['APP-HOD', 'EXEC-REJ', 'HOS-REJ', 'HOD-REJ']); 
                 if (!isAdmin) blueformQuery = blueformQuery.in('contract.unit_id', activeUnitIds);
@@ -313,13 +332,17 @@
                     let finalPdfUrl = (type === 'QUOTATION') ? item.pdf_url : item.mapped_pdf_url;
                     let remarkContent = '';
                     if (item.status.includes('REJ') && item.reject_reason) {
+                        const revisionBadge = item.revision_in_progress
+                            ? <span class="text-amber-600 text-[9px] font-bold inline-flex items-center gap-0.5 mt-0.5"><i class="fa-solid fa-pen"></i> Sedang disediakan semula...</span>
+                            : <button onclick="startRevision('${type}','${escapeJs(item.work_id)}')" class="text-[9px] text-blue-600 underline mt-0.5 cursor-pointer bg-transparent border-none p-0">Mula sediakan semula</button>;
                         remarkContent = `
-                            <div class="text-red-700 font-medium text-[10px] truncate" title="[${item.status}] ${reasonText}">
-                                ${reasonText}
-                            </div>
-                        `;
+        <div class="text-red-700 font-medium text-[10px] truncate" title="[${item.status}] ${reasonText}">
+            ${reasonText}
+        </div>
+        ${revisionBadge}
+    `;
                     } else {
-                        remarkContent = `<span class="text-gray-400 italic text-[10px] truncate block">${type === 'QUOTATION' ? 'Ready for Blueform' : 'Completed'}</span>`;
+                        remarkContent = <span class="text-gray-400 italic text-[10px] truncate block">${type === 'QUOTATION' ? 'Ready for Blueform' : 'Completed'}</span>;
                     }
 
                     if (type === 'QUOTATION') {
