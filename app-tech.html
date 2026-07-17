@@ -163,11 +163,30 @@
                 <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Quotation Date</label>
                 <input type="date" id="tq_qpb_date" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5">
             </div>
-            <div id="tq_dropzone" class="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center transition-all">
-                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1 text-left">Upload Document (PDF)</label>
-                <input type="file" id="tq_pdf_file" accept="application/pdf" required class="w-full text-xs">
-                <p class="text-[10px] text-gray-400 mt-1">Atau seret & lepas fail PDF ke card Quotation Status</p>
-                <div id="tq_file_preview" class="hidden mt-2 text-xs text-blue-700 font-semibold"><i class="fa-solid fa-file-pdf text-red-500 mr-1"></i><span id="tq_file_name"></span></div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Upload Document (PDF)</label>
+                <div id="tq_dropzone" onclick="document.getElementById('tq_pdf_file').click()" class="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center transition-all cursor-pointer hover:border-blue-400 hover:bg-blue-50/30">
+                    <input type="file" id="tq_pdf_file" accept="application/pdf" required class="hidden">
+
+                    <div id="tq_file_empty_state">
+                        <i class="fa-solid fa-file-arrow-up text-2xl text-gray-300 mb-1.5 block"></i>
+                        <p class="text-xs font-bold text-blue-600">Klik untuk pilih fail PDF</p>
+                        <p class="text-[10px] text-gray-400 mt-0.5">atau seret & lepas fail ke card Quotation Status</p>
+                    </div>
+
+                    <div id="tq_file_preview" class="hidden items-center justify-between gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-left">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <i class="fa-solid fa-file-pdf text-red-500 text-lg flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p id="tq_file_name" class="text-xs font-bold text-gray-800 truncate"></p>
+                                <p id="tq_file_size" class="text-[10px] text-gray-400"></p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="event.stopPropagation(); clearSelectedFile()" class="text-gray-400 hover:text-red-500 flex-shrink-0 cursor-pointer" title="Buang fail">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
             </div>
             <input type="hidden" id="tq_pdf_url">
             <div id="tq_upload_status" class="hidden p-2.5 rounded-lg text-xs font-semibold"></div>
@@ -227,7 +246,7 @@
             document.getElementById('techQuotationForm').reset();
             document.getElementById('tq_contract_id').innerHTML = '<option value="">Choose Unit First</option>';
             document.getElementById('tq_pdf_url').value = '';
-            document.getElementById('tq_file_preview').classList.add('hidden');
+            clearSelectedFile();
             document.getElementById('tq_upload_status').classList.add('hidden');
         }
 
@@ -264,9 +283,27 @@
             inputEl.files = dt.files;
         }
 
+        function formatFileSize(bytes) {
+            if(bytes < 1024) return bytes + ' B';
+            if(bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+
         function showFilePreview(file) {
             document.getElementById('tq_file_name').textContent = file.name;
-            document.getElementById('tq_file_preview').classList.remove('hidden');
+            document.getElementById('tq_file_size').textContent = formatFileSize(file.size);
+            document.getElementById('tq_file_empty_state').classList.add('hidden');
+            const preview = document.getElementById('tq_file_preview');
+            preview.classList.remove('hidden');
+            preview.classList.add('flex');
+        }
+
+        function clearSelectedFile() {
+            document.getElementById('tq_pdf_file').value = '';
+            document.getElementById('tq_file_empty_state').classList.remove('hidden');
+            const preview = document.getElementById('tq_file_preview');
+            preview.classList.add('hidden');
+            preview.classList.remove('flex');
         }
 
         document.addEventListener('DOMContentLoaded', () => {
