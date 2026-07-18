@@ -745,8 +745,15 @@
             document.getElementById('wo_id_rows_container').innerHTML = '';
             wo_workIdRowCounter = 0;
             group.forEach(w => {
-                const split = (w.work_id || '').split(' ');
-                woAddWorkIdRow(split[0] || 'C', split[1] || '');
+                // Guna regex (bukan split(' ')) supaya Work ID yang sudah ada huruf
+                // sambungan (cth "C 123456A" dari Save as New sebelum ini) turut
+                // dihuraikan dengan betul — huruf A/B/C tidak tersalah masuk ke
+                // dalam kotak nombor yang sepatutnya digit sahaja.
+                const m = (w.work_id || '').trim().match(/^([CK])?\s*(\d+)\s*([A-Z]?)$/i);
+                const prefix = (m && m[1]) ? m[1].toUpperCase() : 'C';
+                const num = m ? m[2] : '';
+                const suffix = m ? (m[3] || '').toUpperCase() : '';
+                woAddWorkIdRow(prefix, num, suffix);
             });
 
             const dateInput = document.getElementById('wo_qpb_date');
@@ -879,11 +886,18 @@
         }
 
         async function woDoSubmit(e) {
+            // PENTING: baca & reset flag ini SEKALI SAHAJA di sini, di awal fungsi.
+            // Jika ia dibiarkan hidup dan submit gagal/berhenti awal (cth: validasi
+            // lain gagal), percubaan submit seterusnya akan "mewarisi" flag lama dan
+            // terus membatalkan rekod lama TANPA menunjukkan popup pengesahan semula.
+            const shouldCancelForDateChange = woDateChangeConfirmed;
+            woDateChangeConfirmed = false;
+
             const contractId = document.getElementById('wo_contract_id').value;
             const districtSelected = document.getElementById('wo_dist').value;
             const contractOpt = document.getElementById('wo_contract_id').selectedOptions[0];
 
-            if(!contractId || !districtSelected || !contractOpt){ alert('Sila lengkapkan kontrak dan district!'); woDateChangeConfirmed = false; return; }
+            if(!contractId || !districtSelected || !contractOpt){ alert('Sila lengkapkan kontrak dan district!'); return; }
 
             const submitBtn = e.target.querySelector('button[type="submit"]');
             const originalBtnText = submitBtn.innerHTML;
@@ -909,11 +923,10 @@
                 // Jika pengesahan "tukar tarikh" telah diterima: batalkan rekod lama
                 // (Work ID -CNX, status CANCEL, section value 0) dan paksa sequence
                 // baru dijana untuk rekod baharu di bawah.
-                if(woDateChangeConfirmed){
+                if(shouldCancelForDateChange){
                     await woCancelOldRecordsForDateChange(contractId);
                     woCurrentWorkSequenceNo = null; sequenceToUse = null;
                     woOriginalLoadedWorkIds = [];
-                    woDateChangeConfirmed = false;
                 }
 
                 if(!sequenceToUse){
