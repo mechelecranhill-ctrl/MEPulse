@@ -105,12 +105,17 @@
                 </div>
             </section>
 
-            <section class="bg-white rounded-xl shadow-md p-4 border-t-4 border-emerald-500 flex flex-col h-full overflow-hidden w-full">
+            <section id="blueform-section" class="bg-white rounded-xl shadow-md p-4 border-t-4 border-emerald-500 flex flex-col h-full overflow-hidden w-full">
                 <div class="flex justify-between items-center mb-4 flex-shrink-0">
                     <h2 class="text-sm font-bold text-gray-700">
                         <i class="fa-solid fa-file-lines text-emerald-500 mr-1"></i>2. Blueform Status
                     </h2>
-                    <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">Filter: APP-HOD / REJECTED</span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">Filter: APP-HOD / REJECTED</span>
+                        <button onclick="openBlueformModal()" class="w-6 h-6 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shadow-sm cursor-pointer transition-all" title="Tambah Blueform Baru">
+                            <i class="fa-solid fa-plus text-[10px]"></i>
+                        </button>
+                    </div>
                 </div>
                 <div id="blueforms-container" class="flex-1 overflow-y-auto space-y-4 pr-1">
                     <div class="text-center text-gray-400 py-4 text-xs">Loading blueform data...</div>
@@ -191,6 +196,55 @@
             <input type="hidden" id="tq_pdf_url">
             <div id="tq_upload_status" class="hidden p-2.5 rounded-lg text-xs font-semibold"></div>
             <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">Register Quotation</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="blueformModalOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[9999] p-4">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center p-5 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10">
+            <h3 class="text-base font-bold text-gray-800"><i class="fa-solid fa-file-pen text-emerald-500 mr-2"></i>Blue Form Baru</h3>
+            <button type="button" onclick="closeBlueformModal()" class="text-gray-400 hover:text-gray-600 cursor-pointer"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <form id="techBlueformForm" class="p-5 space-y-3">
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Unit</label>
+                <select id="wo_unit_id" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5"><option value="">Choose Unit</option></select>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Contract</label>
+                <select id="wo_contract_id" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5"><option value="">Choose Unit First</option></select>
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Work Order Id(s)</label>
+                <div id="wo_id_rows_container"></div>
+                <button type="button" onclick="woAddWorkIdRow()" class="w-full text-xs text-emerald-600 border border-dashed border-emerald-400 rounded-lg py-2 mt-1 cursor-pointer hover:bg-emerald-50 transition-all">+ Add Work ID</button>
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Blueform Date</label>
+                <input type="date" id="wo_qpb_date" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5">
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">District</label>
+                <select id="wo_dist" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5">
+                    <option value="">Pilih Kontrak Dahulu</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Location & Cost Breakdown</label>
+                <div id="wo_id_cards_container" class="grid grid-cols-1 gap-3 mt-1"></div>
+            </div>
+
+            <div class="flex justify-between items-center bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
+                <strong class="text-sm text-gray-700">Total:</strong>
+                <span id="wo_total_display" class="text-emerald-600 font-extrabold text-sm">RM 0.00</span>
+            </div>
+
+            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">Submit Blueform</button>
         </form>
       </div>
     </div>
@@ -305,6 +359,401 @@
             preview.classList.add('hidden');
             preview.classList.remove('flex');
         }
+
+        // ============ BLUEFORM MODAL LOGIC ============
+        // Semua identifier di bawah diberi prefix "wo" (Work Order) supaya
+        // tidak berlanggar dengan apa-apa yang mungkin sudah wujud dalam
+        // blueform.js (contoh: kejadian "headers" tadi).
+        let blueformModalInitialized = false;
+        let wo_workIdRowCounter = 0;
+        let woOriginalLoadedWorkIds = [];
+        let woCurrentWorkSequenceNo = null;
+        let woCurrentContractSections = {};
+        let woWorkIdCardDataMap = {};
+        let woLastWorkIdNum = '';
+        let woDetectTimer = null;
+
+        function openBlueformModal() {
+            if(!blueformModalInitialized){
+                woFetchUnits();
+                woResetWorkIdRows();
+                blueformModalInitialized = true;
+            }
+            document.getElementById('blueformModalOverlay').classList.remove('hidden');
+        }
+
+        function closeBlueformModal() {
+            document.getElementById('blueformModalOverlay').classList.add('hidden');
+        }
+
+        function resetBlueformModalForm() {
+            document.getElementById('techBlueformForm').reset();
+            document.getElementById('wo_contract_id').innerHTML = '<option value="">Choose Unit First</option>';
+            document.getElementById('wo_dist').innerHTML = '<option value="">Pilih Kontrak Dahulu</option>';
+            woCurrentContractSections = {};
+            woResetWorkIdRows();
+        }
+
+        async function woFetchUnits() {
+            try {
+                const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers: qHeaders });
+                const units = await res.json();
+                const sel = document.getElementById('wo_unit_id');
+                sel.innerHTML = '<option value="">Choose Unit</option>';
+                units.forEach(u => { sel.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`; });
+            } catch(e) { console.error(e); }
+        }
+
+        async function woLoadContractsByUnit() {
+            const unitId = document.getElementById('wo_unit_id').value;
+            const contractSelect = document.getElementById('wo_contract_id');
+            if(!unitId){ contractSelect.innerHTML = '<option value="">Choose Unit First</option>'; return; }
+            contractSelect.innerHTML = '<option value="">Loading...</option>';
+            try {
+                const res = await fetch(`${SB_URL}/rest/v1/contract?select=*&unit_id=eq.${unitId}`, { headers: qHeaders });
+                const data = await res.json();
+
+                data.sort((a, b) => {
+                    const dateA = a.contract_start ? new Date(a.contract_start).getTime() : 0;
+                    const dateB = b.contract_start ? new Date(b.contract_start).getTime() : 0;
+                    return dateA - dateB;
+                });
+
+                contractSelect.innerHTML = '<option value="">Choose Contract</option>';
+                data.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id; opt.text = c.contract_code;
+                    opt.dataset.b = JSON.stringify(c.contract_sections_breakdown);
+                    opt.dataset.dist = (c.district || '').toUpperCase();
+                    opt.dataset.area = c.area_code;
+                    contractSelect.appendChild(opt);
+                });
+            } catch(e) { console.error(e); }
+        }
+
+        function woOnContractSelect() {
+            woResetWorkIdRows();
+            document.getElementById('wo_qpb_date').value = '';
+            document.getElementById('wo_total_display').innerText = 'RM 0.00';
+
+            const opt = document.getElementById('wo_contract_id').selectedOptions[0];
+            const dSel = document.getElementById('wo_dist');
+            dSel.innerHTML = '<option value="">Choose District</option>';
+
+            if(opt && opt.dataset.dist){
+                opt.dataset.dist.split(',').forEach(d => {
+                    const district = d.trim();
+                    if(district) dSel.innerHTML += `<option value="${district}">${district}</option>`;
+                });
+            }
+            woCurrentContractSections = (opt && opt.dataset.b) ? JSON.parse(opt.dataset.b) : {};
+            woRenderWorkIdCards();
+            document.getElementById('wo_dist').dataset.originalDistrict = '';
+        }
+
+        function woEscapeAttr(str){ return String(str).replace(/"/g, '&quot;'); }
+
+        function woFormatCurrencyInput(input) {
+            let digits = input.value.replace(/\D/g, '');
+            if (!digits) digits = '0';
+            let val = parseInt(digits) / 100;
+            input.value = val.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            input.dataset.rawValue = val.toFixed(2);
+        }
+
+        function woAddWorkIdRow(selectedVal = 'C', num = '') {
+            const container = document.getElementById('wo_id_rows_container');
+            wo_workIdRowCounter++;
+            const rowId = `wo_id_row_${wo_workIdRowCounter}`;
+            const row = document.createElement('div');
+            row.className = 'wo-id-row';
+            row.id = rowId;
+            row.style = 'display:flex; gap:8px; align-items:center; margin-bottom:8px;';
+            row.innerHTML = `
+                <select class="wo_id_prefix text-sm border border-gray-300 rounded-lg p-2" style="width:70px;flex-shrink:0;">
+                    <option value="C" ${selectedVal === 'C' ? 'selected' : ''}>C</option>
+                    <option value="K" ${selectedVal === 'K' ? 'selected' : ''}>K</option>
+                </select>
+                <input type="text" class="wo_id_num text-sm border border-gray-300 rounded-lg p-2 w-full" placeholder="123456" value="${num}" oninput="this.value=this.value.replace(/[^0-9]/g,''); woRenderWorkIdCards(); woAutoDetectWork();">
+                <div onclick="woRemoveWorkIdRow('${rowId}')" class="text-red-500 cursor-pointer flex-shrink-0 px-1" title="Buang"><i class="fa-solid fa-xmark"></i></div>
+            `;
+            row.querySelector('.wo_id_prefix').addEventListener('change', () => { woRenderWorkIdCards(); woAutoDetectWork(); });
+            container.appendChild(row);
+        }
+
+        function woRemoveWorkIdRow(rowId) {
+            const row = document.getElementById(rowId);
+            if(row) row.remove();
+            if(document.getElementById('wo_id_rows_container').children.length === 0){ woAddWorkIdRow(); }
+            woRenderWorkIdCards();
+            woAutoDetectWork();
+        }
+
+        function woResetWorkIdRows() {
+            document.getElementById('wo_id_rows_container').innerHTML = '';
+            wo_workIdRowCounter = 0;
+            woOriginalLoadedWorkIds = [];
+            woCurrentWorkSequenceNo = null;
+            woWorkIdCardDataMap = {};
+            woLastWorkIdNum = '';
+            woAddWorkIdRow();
+            woRenderWorkIdCards();
+        }
+
+        function woGetCurrentWorkIdsFromRows() {
+            const ids = [];
+            document.querySelectorAll('#wo_id_rows_container .wo-id-row').forEach(row => {
+                const selPrefix = row.querySelector('.wo_id_prefix').value;
+                const num = row.querySelector('.wo_id_num').value.trim();
+                if(num.length > 0){
+                    const normalized = `${selPrefix} ${num}`;
+                    if(!ids.includes(normalized)) ids.push(normalized);
+                }
+            });
+            return ids;
+        }
+
+        function woRenderWorkIdCards(skipSave = false) {
+            const container = document.getElementById('wo_id_cards_container');
+            if(!container) return;
+
+            if(!skipSave){
+                document.querySelectorAll('.wo-id-card').forEach(card => {
+                    const workId = card.dataset.workId; if(!workId) return;
+                    if(!woWorkIdCardDataMap[workId]) woWorkIdCardDataMap[workId] = {};
+                    woWorkIdCardDataMap[workId].location = card.querySelector('.wo_card_location')?.value || '';
+                    woWorkIdCardDataMap[workId].description = card.querySelector('.wo_card_desc')?.value || '';
+                    if(!woWorkIdCardDataMap[workId].section_category) woWorkIdCardDataMap[workId].section_category = {};
+
+                    card.querySelectorAll('.wo_sec_amt').forEach(input => {
+                        const sec = input.dataset.sec;
+                        if(!woWorkIdCardDataMap[workId].section_category[sec]) woWorkIdCardDataMap[workId].section_category[sec] = {};
+                        woWorkIdCardDataMap[workId].section_category[sec].amt = parseFloat(input.dataset.rawValue || 0);
+                    });
+                    card.querySelectorAll('.wo_sec_extra').forEach(input => {
+                        const sec = input.dataset.sec;
+                        if(!woWorkIdCardDataMap[workId].section_category[sec]) woWorkIdCardDataMap[workId].section_category[sec] = {};
+                        woWorkIdCardDataMap[workId].section_category[sec].extra = parseFloat(input.dataset.rawValue || 0);
+                    });
+                });
+            }
+
+            const currentIds = woGetCurrentWorkIdsFromRows();
+            container.innerHTML = '';
+            currentIds.forEach(workId => {
+                const saved = woWorkIdCardDataMap[workId] || {};
+                const breakdown = saved.section_category || {};
+                const card = document.createElement('div');
+                card.className = 'wo-id-card bg-gray-50 border border-gray-200 rounded-xl p-3';
+                card.dataset.workId = workId;
+
+                let html = `
+                    <span class="inline-block bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2 py-0.5 rounded-full mb-2">${workId}</span>
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Location</label>
+                    <input type="text" class="wo_card_location w-full text-sm border border-gray-300 rounded-lg p-2 mb-2" value="${woEscapeAttr(saved.location || '')}" placeholder="Location">
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Work Description</label>
+                    <textarea class="wo_card_desc w-full text-sm border border-gray-300 rounded-lg p-2 mb-2" rows="2" placeholder="Description bagi ${workId}">${woEscapeAttr(saved.description || '')}</textarea>
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cost Breakdown</label>
+                    <div class="grid grid-cols-1 gap-2">
+                `;
+
+                Object.keys(woCurrentContractSections).sort().forEach(sec => {
+                    const desc = woCurrentContractSections[sec].desc || '';
+                    const data = breakdown[sec] || {};
+                    const amt = Number(data.amt || 0);
+                    const extra = Number(data.extra || 0);
+                    html += `
+                        <div class="bg-white border border-gray-200 rounded-lg p-2">
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase">${sec}</label>
+                            <span class="block text-[9px] text-gray-400 mb-1">${desc}</span>
+                            <input type="text" class="wo_sec_amt w-full text-sm border border-gray-300 rounded-lg p-2" data-sec="${woEscapeAttr(sec)}" data-work-id="${woEscapeAttr(workId)}" data-raw-value="${amt}" value="${amt.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}" oninput="woFormatCurrencyInput(this); woCalcTotalWork();">
+                            ${desc.toUpperCase().includes('PROVISIONAL') ? `<input type="text" class="wo_sec_extra w-full text-sm border border-gray-300 rounded-lg p-2 mt-1" data-sec="${woEscapeAttr(sec)}" data-work-id="${woEscapeAttr(workId)}" data-raw-value="${extra}" value="${extra.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}" oninput="woFormatCurrencyInput(this); woCalcTotalWork();">` : ''}
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+                card.innerHTML = html;
+                container.appendChild(card);
+            });
+            woCalcTotalWork();
+        }
+
+        function woCalcTotalWork() {
+            let total = 0;
+            document.querySelectorAll('.wo_sec_amt').forEach(i => { total += parseFloat(i.dataset.rawValue || 0); });
+            document.querySelectorAll('.wo_sec_extra').forEach(i => { total += parseFloat(i.dataset.rawValue || 0); });
+            document.getElementById('wo_total_display').innerText = `RM ${total.toLocaleString(undefined,{minimumFractionDigits:2})}`;
+        }
+
+        function woAutoDetectWork() {
+            const currentIds = woGetCurrentWorkIdsFromRows();
+            const idsKey = currentIds.join('|');
+            if(idsKey === woLastWorkIdNum || currentIds.length === 0) return;
+            woLastWorkIdNum = idsKey;
+            clearTimeout(woDetectTimer);
+
+            woDetectTimer = setTimeout(async () => {
+                const contractId = document.getElementById('wo_contract_id').value;
+                if(!contractId) return;
+                try {
+                    const filter = currentIds.map(id => `work_id.eq.${encodeURIComponent(id)}`).join(',');
+                    const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&or=(${filter})&select=*`, { headers: qHeaders });
+                    const matches = await res.json();
+                    if(!Array.isArray(matches) || matches.length === 0) return;
+
+                    const sequenceNo = matches[0].sequence_no;
+                    woCurrentWorkSequenceNo = sequenceNo;
+                    const groupRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&sequence_no=eq.${encodeURIComponent(sequenceNo)}&select=*`, { headers: qHeaders });
+                    const group = await groupRes.json();
+
+                    woOriginalLoadedWorkIds = group.map(x => x.work_id);
+                    group.forEach(w => {
+                        woWorkIdCardDataMap[w.work_id] = {
+                            location: w.location || '',
+                            description: w.description || '',
+                            section_category: structuredClone(w.section_category || {})
+                        };
+                    });
+
+                    document.getElementById('wo_id_rows_container').innerHTML = '';
+                    wo_workIdRowCounter = 0;
+                    group.forEach(w => {
+                        const split = (w.work_id || '').split(' ');
+                        woAddWorkIdRow(split[0] || 'C', split[1] || '');
+                    });
+
+                    document.getElementById('wo_qpb_date').value = group[0].qpb_date || '';
+                    const districtSel = document.getElementById('wo_dist');
+                    if(!districtSel.value) districtSel.value = group[0].district || '';
+                    districtSel.dataset.originalDistrict = group[0].district || '';
+
+                    woRenderWorkIdCards(true);
+                    woLastWorkIdNum = woGetCurrentWorkIdsFromRows().join('|');
+                } catch(err) { console.error(err); }
+            }, 400);
+        }
+
+        async function woSubmitBlueform(e) {
+            e.preventDefault();
+            const contractId = document.getElementById('wo_contract_id').value;
+            const districtSelected = document.getElementById('wo_dist').value;
+            const contractOpt = document.getElementById('wo_contract_id').selectedOptions[0];
+
+            if(!contractId || !districtSelected || !contractOpt){ alert('Sila lengkapkan kontrak dan district!'); return; }
+
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.innerHTML;
+            submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memproses...';
+
+            try {
+                const areaMapping = contractOpt.dataset.area || '';
+                const districtsMapping = contractOpt.dataset.dist || '';
+                const areaCodes = areaMapping.split(',').map(s => s.trim().toUpperCase());
+                const districts = districtsMapping.split(',').map(s => s.trim().toUpperCase());
+                const index = districts.indexOf(districtSelected.trim().toUpperCase());
+                let areaCode = (index !== -1 && areaCodes[index]) ? areaCodes[index] : 'WO';
+
+                const currentWorkIds = woGetCurrentWorkIdsFromRows();
+                if(currentWorkIds.length === 0){ alert('Sila masukkan sekurang-kurangnya satu Work Order ID!'); return; }
+
+                let sequenceToUse = woCurrentWorkSequenceNo;
+                const originalDistrict = document.getElementById('wo_dist').dataset.originalDistrict || '';
+                if(originalDistrict && originalDistrict.trim().toUpperCase() !== districtSelected.trim().toUpperCase()){
+                    woCurrentWorkSequenceNo = null; sequenceToUse = null;
+                }
+
+                if(!sequenceToUse){
+                    const seqRes = await fetch(`${SB_URL}/rest/v1/work_orders?select=sequence_no&contract_id=eq.${contractId}`, { headers: qHeaders });
+                    const seqData = await seqRes.json();
+                    let max = 0;
+                    seqData.forEach(r => {
+                        if(!r.sequence_no || !r.sequence_no.startsWith(areaCode)) return;
+                        const num = parseInt(r.sequence_no.replace(areaCode, ''));
+                        if(num > max) max = num;
+                    });
+                    sequenceToUse = areaCode + String(max + 1).padStart(3, '0');
+                    woCurrentWorkSequenceNo = sequenceToUse;
+                }
+
+                const sharedFields = { contract_id: contractId, sequence_no: sequenceToUse, qpb_date: document.getElementById('wo_qpb_date').value, district: districtSelected };
+                const perWorkIdPayload = {};
+
+                document.querySelectorAll('#wo_id_cards_container .wo-id-card').forEach(card => {
+                    const workId = card.dataset.workId; if(!workId) return;
+                    const location = card.querySelector('.wo_card_location')?.value || '';
+                    const description = card.querySelector('.wo_card_desc')?.value || '';
+
+                    const breakdown = {};
+                    let totalAmount = 0, additionalTotal = 0;
+
+                    card.querySelectorAll('.wo_sec_amt').forEach(i => {
+                        const sec = i.dataset.sec;
+                        const base = parseFloat(i.dataset.rawValue || 0);
+                        const extra = parseFloat(card.querySelector(`.wo_sec_extra[data-sec="${woEscapeAttr(sec)}"]`)?.dataset.rawValue || 0);
+                        breakdown[sec] = { amt: base, extra: extra };
+                        totalAmount += base; additionalTotal += extra;
+                    });
+
+                    perWorkIdPayload[workId] = {
+                        ...sharedFields,
+                        work_id: workId,
+                        status: 'BLUEFORM',
+                        location: location,
+                        description: description,
+                        section_category: breakdown,
+                        additional: additionalTotal,
+                        amount_spent: totalAmount + additionalTotal
+                    };
+                });
+
+                for(const workIdValue of currentWorkIds){
+                    const payload = perWorkIdPayload[workIdValue]; if(!payload) continue;
+                    const checkRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}`, { headers: qHeaders });
+                    const existing = await checkRes.json();
+
+                    if(existing.length > 0){
+                        const existingStatus = existing[0].status || '';
+                        const isRejected = existingStatus.includes('REJ');
+
+                        const patchPayload = { ...payload, sequence_no: sequenceToUse, district: districtSelected };
+
+                        if(isRejected){
+                            patchPayload.status = 'BLUEFORM';
+                            patchPayload.reject_reason = null;
+                            patchPayload.revision_in_progress = false;
+                        }
+
+                        await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`, {
+                            method: 'PATCH', headers: qHeaders, body: JSON.stringify(patchPayload)
+                        });
+                    } else {
+                        await fetch(`${SB_URL}/rest/v1/work_orders`, {
+                            method: 'POST', headers: qHeaders, body: JSON.stringify(payload)
+                        });
+                    }
+                }
+
+                for(const removedId of woOriginalLoadedWorkIds.filter(id => !currentWorkIds.includes(id))){
+                    await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(removedId)}`, { method: 'DELETE', headers: qHeaders });
+                }
+
+                alert(`Berjaya didaftar! No. Rujukan: ${sequenceToUse}`);
+                closeBlueformModal();
+                resetBlueformModalForm();
+                fetchTechnicianDashboard();
+            } catch (error) {
+                console.error(error);
+                alert('Gagal memproses nombor turutan.');
+            } finally {
+                submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('wo_unit_id')?.addEventListener('change', woLoadContractsByUnit);
+            document.getElementById('wo_contract_id')?.addEventListener('change', woOnContractSelect);
+            document.getElementById('techBlueformForm')?.addEventListener('submit', woSubmitBlueform);
+        });
 
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('tq_unit_id')?.addEventListener('change', tqLoadContracts);
