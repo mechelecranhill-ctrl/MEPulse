@@ -273,6 +273,29 @@
       </div>
     </div>
 
+    <div id="woDateChangeModalOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[9999] p-4">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full">
+        <div class="p-5 border-b border-gray-100">
+            <h3 class="text-base font-bold text-gray-800"><i class="fa-solid fa-triangle-exclamation text-amber-500 mr-2"></i>Changing Date Will Cancel Existing Blueform</h3>
+        </div>
+        <div class="p-5">
+            <p class="text-xs text-gray-500">
+                Blueform Date telah ditukar. Meneruskan akan membatalkan rekod Work Order sedia ada
+                (status jadi <strong>CANCEL</strong>, Work ID ditanda <strong>-CNX</strong>, semua nilai section jadi RM 0.00)
+                dan mendaftarkan rekod baru di bawah nombor rujukan (sequence) yang baharu.
+            </p>
+        </div>
+        <div class="p-5 border-t border-gray-100 flex flex-col gap-2">
+            <button type="button" onclick="woProceedDateChange()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-check mr-1"></i>Proceed (Cancel Old & Create New)
+            </button>
+            <button type="button" onclick="woCancelDateChange()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                Cancel
+            </button>
+        </div>
+      </div>
+    </div>
+
     <script src="blueform.js"></script>
     <script>
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
@@ -397,6 +420,8 @@
         let woLastWorkIdNum = '';
         let woDetectTimer = null;
         let woPendingDetect = null; // { group, sequenceNo } — data menunggu keputusan popup detect
+        let woPendingSubmitEvent = null; // simpan event submit semasa menunggu keputusan popup "date change"
+        let woDateChangeConfirmed = false; // true bila user pilih "Proceed" pada popup tukar tarikh
 
         function openBlueformModal() {
             if(!blueformModalInitialized){
@@ -486,13 +511,14 @@
             input.dataset.rawValue = val.toFixed(2);
         }
 
-        function woAddWorkIdRow(selectedVal = 'C', num = '') {
+        function woAddWorkIdRow(selectedVal = 'C', num = '', suffix = '') {
             const container = document.getElementById('wo_id_rows_container');
             wo_workIdRowCounter++;
             const rowId = `wo_id_row_${wo_workIdRowCounter}`;
             const row = document.createElement('div');
             row.className = 'wo-id-row';
             row.id = rowId;
+            row.dataset.suffix = suffix || '';
             row.style = 'display:flex; gap:8px; align-items:center; margin-bottom:8px;';
             row.innerHTML = `
                 <select class="wo_id_prefix text-sm border border-gray-300 rounded-lg p-2" style="width:70px;flex-shrink:0;">
@@ -500,6 +526,7 @@
                     <option value="K" ${selectedVal === 'K' ? 'selected' : ''}>K</option>
                 </select>
                 <input type="text" class="wo_id_num text-sm border border-gray-300 rounded-lg p-2 w-full" placeholder="123456" value="${num}" oninput="this.value=this.value.replace(/[^0-9]/g,''); woRenderWorkIdCards(); woAutoDetectWork();">
+                <span class="wo_id_suffix_badge ${suffix ? '' : 'hidden'} text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded px-1.5 py-1 flex-shrink-0" title="Save as New suffix">${suffix}</span>
                 <div onclick="woRemoveWorkIdRow('${rowId}')" class="text-red-500 cursor-pointer flex-shrink-0 px-1" title="Buang"><i class="fa-solid fa-xmark"></i></div>
             `;
             row.querySelector('.wo_id_prefix').addEventListener('change', () => { woRenderWorkIdCards(); woAutoDetectWork(); });
@@ -530,12 +557,40 @@
             document.querySelectorAll('#wo_id_rows_container .wo-id-row').forEach(row => {
                 const selPrefix = row.querySelector('.wo_id_prefix').value;
                 const num = row.querySelector('.wo_id_num').value.trim();
+                const suffix = row.dataset.suffix || '';
                 if(num.length > 0){
-                    const normalized = `${selPrefix} ${num}`;
+                    const normalized = `${selPrefix} ${num}${suffix}`;
                     if(!ids.includes(normalized)) ids.push(normalized);
                 }
             });
             return ids;
+        }
+
+        // Cari huruf sambungan (A/B/C...) seterusnya yang belum digunakan bagi
+        // Work ID asas (contoh: "C 123456") dalam kontrak yang sama. Digunakan
+        // oleh "Save as New" supaya rekod asal ("C 123456") dikekalkan dan
+        // rekod baru didaftar sebagai "C 123456A", "C 123456B", dan seterusnya.
+        async function woGetNextSuffixLetter(contractId, prefix, num) {
+            try {
+                const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&select=work_id`, { headers: qHeaders });
+                const rows = await res.json();
+                const base = `${prefix} ${num}`;
+                const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const pattern = new RegExp(`^${escapedBase}([A-Z])$`);
+                let usedLetters = [];
+                (rows || []).forEach(r => {
+                    const m = (r.work_id || '').trim().toUpperCase().match(pattern);
+                    if(m) usedLetters.push(m[1]);
+                });
+                for(let i = 0; i < 26; i++){
+                    const letter = String.fromCharCode(65 + i);
+                    if(!usedLetters.includes(letter)) return letter;
+                }
+                return 'Z';
+            } catch(e) {
+                console.error('Gagal tentukan suffix seterusnya:', e);
+                return 'A';
+            }
         }
 
         function woRenderWorkIdCards(skipSave = false) {
@@ -694,7 +749,9 @@
                 woAddWorkIdRow(split[0] || 'C', split[1] || '');
             });
 
-            document.getElementById('wo_qpb_date').value = group[0].qpb_date || '';
+            const dateInput = document.getElementById('wo_qpb_date');
+            dateInput.value = group[0].qpb_date || '';
+            dateInput.dataset.originalDate = group[0].qpb_date || '';
             const districtSel = document.getElementById('wo_dist');
             if(!districtSel.value) districtSel.value = group[0].district || '';
             districtSel.dataset.originalDistrict = group[0].district || '';
@@ -705,9 +762,32 @@
             woCloseDetectModal();
         }
 
-        function woConfirmSaveAsNew() {
-            // Form dikekalkan seperti input semasa user (tidak load data lama).
-            // woCurrentWorkSequenceNo tidak diset, jadi sequence baru akan dijana semasa submit.
+        async function woConfirmSaveAsNew() {
+            // Work ID yang dikesan (cth: "C 123456") akan diberi huruf sambungan
+            // seterusnya yang belum digunakan (cth: "C 123456A") supaya rekod asal
+            // ("C 123456") kekal tidak berubah. woCurrentWorkSequenceNo tidak diset,
+            // jadi sequence baru akan dijana semasa submit.
+            if(!woPendingDetect){ woCloseDetectModal(); return; }
+
+            const detectedIds = woPendingDetect.group.map(w => w.work_id);
+            const contractId = document.getElementById('wo_contract_id').value;
+
+            const rows = document.querySelectorAll('#wo_id_rows_container .wo-id-row');
+            for(const row of rows){
+                const prefix = row.querySelector('.wo_id_prefix').value;
+                const numInput = row.querySelector('.wo_id_num');
+                const num = numInput.value.trim();
+                const fullId = `${prefix} ${num}`;
+                if(detectedIds.includes(fullId)){
+                    const letter = await woGetNextSuffixLetter(contractId, prefix, num);
+                    row.dataset.suffix = letter;
+                    const badge = row.querySelector('.wo_id_suffix_badge');
+                    if(badge){ badge.textContent = letter; badge.classList.remove('hidden'); }
+                }
+            }
+
+            woRenderWorkIdCards();
+            woLastWorkIdNum = woGetCurrentWorkIdsFromRows().join('|');
             woCloseDetectModal();
         }
 
@@ -732,13 +812,78 @@
             woPendingDetect = null;
         }
 
+        // Tandakan rekod lama (sebelum tukar tarikh semasa mod Overwrite) sebagai
+        // dibatalkan: Work ID ditambah "-CNX", status jadi CANCEL, dan semua
+        // nilai section_category/additional/amount_spent dijadikan 0.
+        async function woCancelOldRecordsForDateChange(contractId) {
+            for(const oldWorkId of woOriginalLoadedWorkIds){
+                try {
+                    const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(oldWorkId)}`, { headers: qHeaders });
+                    const rows = await res.json();
+                    if(!rows || rows.length === 0) continue;
+                    const rec = rows[0];
+
+                    const zeroedBreakdown = {};
+                    Object.keys(rec.section_category || {}).forEach(sec => {
+                        zeroedBreakdown[sec] = { amt: 0, extra: 0 };
+                    });
+
+                    await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${rec.id}`, {
+                        method: 'PATCH',
+                        headers: qHeaders,
+                        body: JSON.stringify({
+                            work_id: `${oldWorkId}-CNX`,
+                            status: 'CANCEL',
+                            section_category: zeroedBreakdown,
+                            additional: 0,
+                            amount_spent: 0
+                        })
+                    });
+                } catch(err) {
+                    console.error('Gagal batalkan rekod lama:', oldWorkId, err);
+                }
+            }
+        }
+
         async function woSubmitBlueform(e) {
             e.preventDefault();
+
+            // Semak sama ada ini mod Overwrite dan tarikh telah ditukar berbanding
+            // tarikh asal yang dimuatkan — jika ya, tunjuk popup pengesahan dahulu.
+            const isOverwriteMode = woOriginalLoadedWorkIds.length > 0 && !!woCurrentWorkSequenceNo;
+            const dateInput = document.getElementById('wo_qpb_date');
+            const originalDate = dateInput.dataset.originalDate || '';
+            const currentDateVal = dateInput.value;
+
+            if(isOverwriteMode && originalDate && originalDate !== currentDateVal && !woDateChangeConfirmed){
+                woPendingSubmitEvent = e;
+                document.getElementById('woDateChangeModalOverlay').classList.remove('hidden');
+                return;
+            }
+
+            await woDoSubmit(e);
+        }
+
+        function woCancelDateChange() {
+            document.getElementById('woDateChangeModalOverlay').classList.add('hidden');
+            woPendingSubmitEvent = null;
+            woDateChangeConfirmed = false;
+        }
+
+        async function woProceedDateChange() {
+            document.getElementById('woDateChangeModalOverlay').classList.add('hidden');
+            woDateChangeConfirmed = true;
+            const e = woPendingSubmitEvent;
+            woPendingSubmitEvent = null;
+            if(e) await woDoSubmit(e);
+        }
+
+        async function woDoSubmit(e) {
             const contractId = document.getElementById('wo_contract_id').value;
             const districtSelected = document.getElementById('wo_dist').value;
             const contractOpt = document.getElementById('wo_contract_id').selectedOptions[0];
 
-            if(!contractId || !districtSelected || !contractOpt){ alert('Sila lengkapkan kontrak dan district!'); return; }
+            if(!contractId || !districtSelected || !contractOpt){ alert('Sila lengkapkan kontrak dan district!'); woDateChangeConfirmed = false; return; }
 
             const submitBtn = e.target.querySelector('button[type="submit"]');
             const originalBtnText = submitBtn.innerHTML;
@@ -759,6 +904,16 @@
                 const originalDistrict = document.getElementById('wo_dist').dataset.originalDistrict || '';
                 if(originalDistrict && originalDistrict.trim().toUpperCase() !== districtSelected.trim().toUpperCase()){
                     woCurrentWorkSequenceNo = null; sequenceToUse = null;
+                }
+
+                // Jika pengesahan "tukar tarikh" telah diterima: batalkan rekod lama
+                // (Work ID -CNX, status CANCEL, section value 0) dan paksa sequence
+                // baru dijana untuk rekod baharu di bawah.
+                if(woDateChangeConfirmed){
+                    await woCancelOldRecordsForDateChange(contractId);
+                    woCurrentWorkSequenceNo = null; sequenceToUse = null;
+                    woOriginalLoadedWorkIds = [];
+                    woDateChangeConfirmed = false;
                 }
 
                 if(!sequenceToUse){
