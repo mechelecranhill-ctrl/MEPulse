@@ -249,6 +249,30 @@
       </div>
     </div>
 
+    <div id="woDetectModalOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[9999] p-4">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center p-5 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10">
+            <h3 class="text-base font-bold text-gray-800"><i class="fa-solid fa-triangle-exclamation text-amber-500 mr-2"></i>Existing Work Order Detected</h3>
+            <button type="button" onclick="woCancelDetectModal()" class="text-gray-400 hover:text-gray-600 cursor-pointer"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <div class="p-5">
+            <p class="text-xs text-gray-500 mb-3">Work Order ID berikut sudah wujud dengan data sedia ada:</p>
+            <div id="woDetectModalBody" class="space-y-3"></div>
+        </div>
+        <div class="p-5 border-t border-gray-100 flex flex-col gap-2 sticky bottom-0 bg-white rounded-b-2xl">
+            <button type="button" onclick="woConfirmOverwrite()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-rotate mr-1"></i>Overwrite (Load Existing Data)
+            </button>
+            <button type="button" onclick="woConfirmSaveAsNew()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-plus mr-1"></i>Save as New (Keep Blank Form)
+            </button>
+            <button type="button" onclick="woCancelDetectModal()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                Cancel
+            </button>
+        </div>
+      </div>
+    </div>
+
     <script src="blueform.js"></script>
     <script>
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
@@ -372,6 +396,7 @@
         let woWorkIdCardDataMap = {};
         let woLastWorkIdNum = '';
         let woDetectTimer = null;
+        let woPendingDetect = null; // { group, sequenceNo } — data menunggu keputusan popup detect
 
         function openBlueformModal() {
             if(!blueformModalInitialized){
@@ -602,35 +627,109 @@
                     if(!Array.isArray(matches) || matches.length === 0) return;
 
                     const sequenceNo = matches[0].sequence_no;
-                    woCurrentWorkSequenceNo = sequenceNo;
                     const groupRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&sequence_no=eq.${encodeURIComponent(sequenceNo)}&select=*`, { headers: qHeaders });
                     const group = await groupRes.json();
+                    if(!Array.isArray(group) || group.length === 0) return;
 
-                    woOriginalLoadedWorkIds = group.map(x => x.work_id);
-                    group.forEach(w => {
-                        woWorkIdCardDataMap[w.work_id] = {
-                            location: w.location || '',
-                            description: w.description || '',
-                            section_category: structuredClone(w.section_category || {})
-                        };
-                    });
-
-                    document.getElementById('wo_id_rows_container').innerHTML = '';
-                    wo_workIdRowCounter = 0;
-                    group.forEach(w => {
-                        const split = (w.work_id || '').split(' ');
-                        woAddWorkIdRow(split[0] || 'C', split[1] || '');
-                    });
-
-                    document.getElementById('wo_qpb_date').value = group[0].qpb_date || '';
-                    const districtSel = document.getElementById('wo_dist');
-                    if(!districtSel.value) districtSel.value = group[0].district || '';
-                    districtSel.dataset.originalDistrict = group[0].district || '';
-
-                    woRenderWorkIdCards(true);
-                    woLastWorkIdNum = woGetCurrentWorkIdsFromRows().join('|');
+                    woPendingDetect = { group, sequenceNo };
+                    woShowDetectModal(group);
                 } catch(err) { console.error(err); }
             }, 400);
+        }
+
+        function woShowDetectModal(group) {
+            const body = document.getElementById('woDetectModalBody');
+            let html = '';
+            group.forEach(w => {
+                const breakdown = w.section_category || {};
+                html += `
+                    <div class="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="inline-block bg-amber-100 text-amber-800 text-[11px] font-bold px-2 py-0.5 rounded-full">${w.work_id}</span>
+                            <span class="text-[10px] text-gray-400">${w.location || ''}</span>
+                        </div>
+                        <div class="space-y-1">
+                `;
+                Object.keys(breakdown).sort().forEach(sec => {
+                    const desc = (woCurrentContractSections[sec] && woCurrentContractSections[sec].desc) || '';
+                    const amt = Number(breakdown[sec].amt || 0);
+                    const extra = Number(breakdown[sec].extra || 0);
+                    html += `
+                        <div class="flex justify-between items-start text-[11px] border-b border-gray-100 pb-1">
+                            <div class="pr-2">
+                                <span class="font-bold text-gray-600">${sec}</span>
+                                <span class="block text-[9px] text-gray-400">${desc}</span>
+                            </div>
+                            <div class="text-right flex-shrink-0">
+                                <span class="block font-semibold text-gray-800">RM ${amt.toLocaleString('en-MY',{minimumFractionDigits:2})}</span>
+                                ${extra ? `<span class="block text-[9px] text-gray-400">+RM ${extra.toLocaleString('en-MY',{minimumFractionDigits:2})} prov.</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                html += `</div></div>`;
+            });
+            body.innerHTML = html;
+            document.getElementById('woDetectModalOverlay').classList.remove('hidden');
+        }
+
+        function woConfirmOverwrite() {
+            if(!woPendingDetect) return;
+            const { group, sequenceNo } = woPendingDetect;
+
+            woCurrentWorkSequenceNo = sequenceNo;
+            woOriginalLoadedWorkIds = group.map(x => x.work_id);
+            group.forEach(w => {
+                woWorkIdCardDataMap[w.work_id] = {
+                    location: w.location || '',
+                    description: w.description || '',
+                    section_category: structuredClone(w.section_category || {})
+                };
+            });
+
+            document.getElementById('wo_id_rows_container').innerHTML = '';
+            wo_workIdRowCounter = 0;
+            group.forEach(w => {
+                const split = (w.work_id || '').split(' ');
+                woAddWorkIdRow(split[0] || 'C', split[1] || '');
+            });
+
+            document.getElementById('wo_qpb_date').value = group[0].qpb_date || '';
+            const districtSel = document.getElementById('wo_dist');
+            if(!districtSel.value) districtSel.value = group[0].district || '';
+            districtSel.dataset.originalDistrict = group[0].district || '';
+
+            woRenderWorkIdCards(true);
+            woLastWorkIdNum = woGetCurrentWorkIdsFromRows().join('|');
+
+            woCloseDetectModal();
+        }
+
+        function woConfirmSaveAsNew() {
+            // Form dikekalkan seperti input semasa user (tidak load data lama).
+            // woCurrentWorkSequenceNo tidak diset, jadi sequence baru akan dijana semasa submit.
+            woCloseDetectModal();
+        }
+
+        function woCancelDetectModal() {
+            // Buang Work ID yang trigger detect ni supaya user boleh tukar ID lain.
+            if(woPendingDetect){
+                const detectedIds = woPendingDetect.group.map(w => w.work_id);
+                document.querySelectorAll('#wo_id_rows_container .wo-id-row').forEach(row => {
+                    const prefix = row.querySelector('.wo_id_prefix').value;
+                    const numInput = row.querySelector('.wo_id_num');
+                    const fullId = `${prefix} ${numInput.value.trim()}`;
+                    if(detectedIds.includes(fullId)) numInput.value = '';
+                });
+                woRenderWorkIdCards();
+                woLastWorkIdNum = woGetCurrentWorkIdsFromRows().join('|');
+            }
+            woCloseDetectModal();
+        }
+
+        function woCloseDetectModal() {
+            document.getElementById('woDetectModalOverlay').classList.add('hidden');
+            woPendingDetect = null;
         }
 
         async function woSubmitBlueform(e) {
