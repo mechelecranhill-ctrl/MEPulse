@@ -1113,14 +1113,18 @@
                     }
 
                     // FIX: contract_id must be included — the "quotations" table
-                    // has a NOT NULL / foreign-key column referencing "contract",
-                    // and the dashboard query joins via contract!inner(...).
-                    // Without this the insert was silently rejected by
-                    // PostgREST/Postgres, causing "Failed to save quotation to database."
+                    // has a foreign-key column referencing "contract", and the
+                    // dashboard query joins via contract!inner(...). Without this
+                    // the insert was silently rejected by PostgREST/Postgres.
+                    //
+                    // FIX 2: "contract_code" is NOT a real column on "quotations"
+                    // (confirmed by the PostgREST error: "Could not find the
+                    // 'contract_code' column of 'quotations' in the schema cache").
+                    // The contract code is already derivable through the
+                    // contract_id -> contract join, so it must not be sent here.
                     const payload = {
                         work_id: primaryWorkId,
                         contract_id: contractId,
-                        contract_code: contractCode,
                         status: 'QUOTATION',
                         pdf_url: generatedPdfUrl,
                         qpd_date: document.getElementById('tq_qpb_date').value || null
