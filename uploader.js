@@ -4,13 +4,13 @@ async function uploadQuotationToR2(fileInputId, workIdValue, unitValue, statusDi
     const hiddenUrlInput = document.getElementById(hiddenUrlInputId);
 
     if (!fileInput || !fileInput.files.length) {
-        alert("Sila pilih fail PDF terlebih dahulu!");
+        alert("Please select a PDF file first!");
         return;
     }
 
     workIdValue = (workIdValue || '').trim();
     if (!workIdValue) {
-        alert("Sila pastikan Work ID sudah diisi!");
+        alert("Please make sure the Work ID is filled in!");
         return;
     }
 
@@ -20,14 +20,14 @@ async function uploadQuotationToR2(fileInputId, workIdValue, unitValue, statusDi
     if (statusDiv) {
         statusDiv.style.display = "block";
         statusDiv.style.color = "#0078d4";
-        statusDiv.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Memuat naik ${filename} ke Cloudflare R2...`;
+        statusDiv.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Uploading ${filename} to Cloudflare R2...`;
     }
 
-    // URL Worker anda yang baru siap!
+    // Your ready-to-use Worker URL!
     const workerBaseUrl = "https://uploader.mech-elec-ranhill.workers.dev"; 
 
     try {
-        // Hantar fail terus ke Worker R2
+        // Send the file directly to the Worker R2
         const response = await fetch(`${workerBaseUrl}/upload?filename=${encodeURIComponent(filename)}`, {
             method: "PUT",
             headers: {
@@ -39,26 +39,30 @@ async function uploadQuotationToR2(fileInputId, workIdValue, unitValue, statusDi
         const result = await response.json();
 
         if (!response.ok) {
-            throw new Error(result.error || "Gagal muat naik fail.");
+            throw new Error(result.error || "Failed to upload file.");
         }
 
-        // Simpan path fail (cth: quotations/WORK123.pdf) ke input tersembunyi
+        // FIX: save a full, directly-openable URL instead of the bare R2
+        // object key (e.g. "quotations/WORK123.pdf"). Storing just the key
+        // meant <a href="..."> links resolved relative to whatever page
+        // opened them (e.g. the GitHub Pages dashboard), producing a 404
+        // there instead of loading the actual PDF from the Worker.
         if (hiddenUrlInput) {
-            hiddenUrlInput.value = result.objectKey; 
+            hiddenUrlInput.value = `${workerBaseUrl}/${result.objectKey}`;
         }
 
         if (statusDiv) {
             statusDiv.style.color = "#34C759";
-            statusDiv.innerHTML = `<i class="fa-solid fa-circle-check"></i> Berjaya! Fail disimpan di Cloudflare R2.`;
+            statusDiv.innerHTML = `<i class="fa-solid fa-circle-check"></i> Success! File saved to Cloudflare R2.`;
         }
-        alert(`Fail bagi ${workIdValue} berjaya disimpan di Cloudflare R2!`);
+        alert(`File for ${workIdValue} was successfully saved to Cloudflare R2!`);
 
     } catch (error) {
         console.error("R2 Upload Error:", error);
         if (statusDiv) {
             statusDiv.style.color = "#FF3B30";
-            statusDiv.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> Ralat semasa muat naik.`;
+            statusDiv.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> Error during upload.`;
         }
-        alert(`Gagal muat naik: ${error.message}`);
+        alert(`Upload failed: ${error.message}`);
     }
 }
