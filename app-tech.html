@@ -32,7 +32,7 @@
             box-sizing: border-box;
         }
 
-        /* Mengawal kecantikan cetakan berbilang halaman */
+        /* Controls the appearance of multi-page printing */
         @media print {
             body * {
                 visibility: hidden;
@@ -92,13 +92,13 @@
                     </h2>
                     <div class="flex items-center gap-2">
                         <span class="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded">Filter: QUO-APP / QUO-REJ</span>
-                        <button onclick="openQuotationModal()" class="w-6 h-6 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-sm cursor-pointer transition-all" title="Tambah Quotation Baru">
+                        <button onclick="openQuotationModal()" class="w-6 h-6 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-sm cursor-pointer transition-all" title="Add New Quotation">
                             <i class="fa-solid fa-plus text-[10px]"></i>
                         </button>
                     </div>
                 </div>
                 <div id="quotation-dropzone-hint" class="hidden mb-2 text-[10px] text-blue-600 font-bold text-center bg-blue-50 border border-dashed border-blue-300 rounded-lg py-2">
-                    <i class="fa-solid fa-file-arrow-up mr-1"></i>Lepaskan fail PDF di sini untuk mula quotation baru
+                    <i class="fa-solid fa-file-arrow-up mr-1"></i>Drop a PDF file here to start a new quotation
                 </div>
                 <div id="quotations-container" class="flex-1 overflow-y-auto space-y-4 pr-1">
                     <div class="text-center text-gray-400 py-4 text-xs">Loading quotation data...</div>
@@ -112,7 +112,7 @@
                     </h2>
                     <div class="flex items-center gap-2">
                         <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">Filter: APP-HOD / REJECTED</span>
-                        <button onclick="openBlueformModal()" class="w-6 h-6 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shadow-sm cursor-pointer transition-all" title="Tambah Blueform Baru">
+                        <button onclick="openBlueformModal()" class="w-6 h-6 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shadow-sm cursor-pointer transition-all" title="Add New Blueform">
                             <i class="fa-solid fa-plus text-[10px]"></i>
                         </button>
                     </div>
@@ -187,7 +187,7 @@
                                 <p id="tq_file_size" class="text-[10px] text-gray-400"></p>
                             </div>
                         </div>
-                        <button type="button" onclick="event.stopPropagation(); clearSelectedFile()" class="text-gray-400 hover:text-red-500 flex-shrink-0 cursor-pointer" title="Buang fail">
+                        <button type="button" onclick="event.stopPropagation(); clearSelectedFile()" class="text-gray-400 hover:text-red-500 flex-shrink-0 cursor-pointer" title="Remove file">
                             <i class="fa-solid fa-xmark"></i>
                         </button>
                     </div>
@@ -256,7 +256,7 @@
             <button type="button" onclick="woCancelDetectModal()" class="text-gray-400 hover:text-gray-600 cursor-pointer"><i class="fa-solid fa-xmark text-lg"></i></button>
         </div>
         <div class="p-5">
-            <p class="text-xs text-gray-500 mb-3">Work Order ID berikut sudah wujud dengan data sedia ada:</p>
+            <p class="text-xs text-gray-500 mb-3">The following Work Order ID(s) already exist with existing data:</p>
             <div id="woDetectModalBody" class="space-y-3"></div>
         </div>
         <div class="p-5 border-t border-gray-100 flex flex-col gap-2 sticky bottom-0 bg-white rounded-b-2xl">
@@ -299,9 +299,9 @@
     <script src="blueform.js"></script>
     <script>
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-        // NOTA: dinamakan qHeaders (bukan "headers") sebab blueform.js sudah
-        // declare `const headers` secara global — redeclare guna nama sama
-        // akan cetuskan SyntaxError dan pecahkan seluruh script.
+        // NOTE: named qHeaders (not "headers") because blueform.js already
+        // declares `const headers` globally — redeclaring the same name
+        // would trigger a SyntaxError and break the entire script.
         const qHeaders = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
         let renderedBlueformSeqs = new Set();
 
@@ -319,8 +319,8 @@
                 if (error) throw error;
                 fetchTechnicianDashboard();
             } catch (err) {
-                console.error('Gagal tanda revision:', err.message);
-                alert('Gagal menandakan status semakan semula: ' + err.message);
+                console.error('Failed to mark revision:', err.message);
+                alert('Failed to mark revision status: ' + err.message);
             }
         }
 
@@ -408,9 +408,9 @@
         }
 
         // ============ BLUEFORM MODAL LOGIC ============
-        // Semua identifier di bawah diberi prefix "wo" (Work Order) supaya
-        // tidak berlanggar dengan apa-apa yang mungkin sudah wujud dalam
-        // blueform.js (contoh: kejadian "headers" tadi).
+        // All identifiers below are prefixed "wo" (Work Order) so they
+        // don't collide with anything that might already exist in
+        // blueform.js (e.g. the "headers" incident above).
         let blueformModalInitialized = false;
         let wo_workIdRowCounter = 0;
         let woOriginalLoadedWorkIds = [];
@@ -419,9 +419,9 @@
         let woWorkIdCardDataMap = {};
         let woLastWorkIdNum = '';
         let woDetectTimer = null;
-        let woPendingDetect = null; // { group, sequenceNo } — data menunggu keputusan popup detect
-        let woPendingSubmitEvent = null; // simpan event submit semasa menunggu keputusan popup "date change"
-        let woDateChangeConfirmed = false; // true bila user pilih "Proceed" pada popup tukar tarikh
+        let woPendingDetect = null; // { group, sequenceNo } — data waiting on the detect popup decision
+        let woPendingSubmitEvent = null; // store the submit event while waiting for the "date change" popup decision
+        let woDateChangeConfirmed = false; // true once the user picks "Proceed" on the date-change popup
 
         function openBlueformModal() {
             if(!blueformModalInitialized){
@@ -439,7 +439,7 @@
         function resetBlueformModalForm() {
             document.getElementById('techBlueformForm').reset();
             document.getElementById('wo_contract_id').innerHTML = '<option value="">Choose Unit First</option>';
-            document.getElementById('wo_dist').innerHTML = '<option value="">Pilih Kontrak Dahulu</option>';
+            document.getElementById('wo_dist').innerHTML = '<option value="">Choose Contract First</option>';
             woCurrentContractSections = {};
             woResetWorkIdRows();
         }
@@ -527,7 +527,7 @@
                 </select>
                 <input type="text" class="wo_id_num text-sm border border-gray-300 rounded-lg p-2 w-full" placeholder="123456" value="${num}" oninput="this.value=this.value.replace(/[^0-9]/g,''); woRenderWorkIdCards(); woAutoDetectWork();">
                 <span class="wo_id_suffix_badge ${suffix ? '' : 'hidden'} text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded px-1.5 py-1 flex-shrink-0" title="Save as New suffix">${suffix}</span>
-                <div onclick="woRemoveWorkIdRow('${rowId}')" class="text-red-500 cursor-pointer flex-shrink-0 px-1" title="Buang"><i class="fa-solid fa-xmark"></i></div>
+                <div onclick="woRemoveWorkIdRow('${rowId}')" class="text-red-500 cursor-pointer flex-shrink-0 px-1" title="Remove"><i class="fa-solid fa-xmark"></i></div>
             `;
             row.querySelector('.wo_id_prefix').addEventListener('change', () => { woRenderWorkIdCards(); woAutoDetectWork(); });
             container.appendChild(row);
@@ -566,10 +566,10 @@
             return ids;
         }
 
-        // Cari huruf sambungan (A/B/C...) seterusnya yang belum digunakan bagi
-        // Work ID asas (contoh: "C 123456") dalam kontrak yang sama. Digunakan
-        // oleh "Save as New" supaya rekod asal ("C 123456") dikekalkan dan
-        // rekod baru didaftar sebagai "C 123456A", "C 123456B", dan seterusnya.
+        // Find the next unused suffix letter (A/B/C...) for a base Work ID
+        // (e.g. "C 123456") within the same contract. Used by "Save as New"
+        // so the original record ("C 123456") stays untouched while the new
+        // record is registered as "C 123456A", "C 123456B", and so on.
         async function woGetNextSuffixLetter(contractId, prefix, num) {
             try {
                 const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&select=work_id`, { headers: qHeaders });
@@ -588,7 +588,7 @@
                 }
                 return 'Z';
             } catch(e) {
-                console.error('Gagal tentukan suffix seterusnya:', e);
+                console.error('Failed to determine next suffix:', e);
                 return 'A';
             }
         }
@@ -632,7 +632,7 @@
                     <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Location</label>
                     <input type="text" class="wo_card_location w-full text-sm border border-gray-300 rounded-lg p-2 mb-2" value="${woEscapeAttr(saved.location || '')}" placeholder="Location">
                     <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Work Description</label>
-                    <textarea class="wo_card_desc w-full text-sm border border-gray-300 rounded-lg p-2 mb-2" rows="2" placeholder="Description bagi ${workId}">${woEscapeAttr(saved.description || '')}</textarea>
+                    <textarea class="wo_card_desc w-full text-sm border border-gray-300 rounded-lg p-2 mb-2" rows="2" placeholder="Description for ${workId}">${woEscapeAttr(saved.description || '')}</textarea>
                     <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cost Breakdown</label>
                     <div class="grid grid-cols-1 gap-2">
                 `;
@@ -745,10 +745,10 @@
             document.getElementById('wo_id_rows_container').innerHTML = '';
             wo_workIdRowCounter = 0;
             group.forEach(w => {
-                // Guna regex (bukan split(' ')) supaya Work ID yang sudah ada huruf
-                // sambungan (cth "C 123456A" dari Save as New sebelum ini) turut
-                // dihuraikan dengan betul — huruf A/B/C tidak tersalah masuk ke
-                // dalam kotak nombor yang sepatutnya digit sahaja.
+                // Use regex (not split(' ')) so a Work ID that already has a
+                // suffix letter (e.g. "C 123456A" from a previous "Save as New")
+                // is parsed correctly — the A/B/C letter doesn't accidentally
+                // end up in the numeric-only box.
                 const m = (w.work_id || '').trim().match(/^([CK])?\s*(\d+)\s*([A-Z]?)$/i);
                 const prefix = (m && m[1]) ? m[1].toUpperCase() : 'C';
                 const num = m ? m[2] : '';
@@ -770,10 +770,10 @@
         }
 
         async function woConfirmSaveAsNew() {
-            // Work ID yang dikesan (cth: "C 123456") akan diberi huruf sambungan
-            // seterusnya yang belum digunakan (cth: "C 123456A") supaya rekod asal
-            // ("C 123456") kekal tidak berubah. woCurrentWorkSequenceNo tidak diset,
-            // jadi sequence baru akan dijana semasa submit.
+            // The detected Work ID (e.g. "C 123456") will be given the next
+            // unused suffix letter (e.g. "C 123456A") so the original record
+            // ("C 123456") remains unchanged. woCurrentWorkSequenceNo is not
+            // set, so a new sequence will be generated on submit.
             if(!woPendingDetect){ woCloseDetectModal(); return; }
 
             const detectedIds = woPendingDetect.group.map(w => w.work_id);
@@ -799,7 +799,7 @@
         }
 
         function woCancelDetectModal() {
-            // Buang Work ID yang trigger detect ni supaya user boleh tukar ID lain.
+            // Remove the Work ID(s) that triggered detection so the user can enter a different ID.
             if(woPendingDetect){
                 const detectedIds = woPendingDetect.group.map(w => w.work_id);
                 document.querySelectorAll('#wo_id_rows_container .wo-id-row').forEach(row => {
@@ -819,9 +819,9 @@
             woPendingDetect = null;
         }
 
-        // Tandakan rekod lama (sebelum tukar tarikh semasa mod Overwrite) sebagai
-        // dibatalkan: Work ID ditambah "-CNX", status jadi CANCEL, dan semua
-        // nilai section_category/additional/amount_spent dijadikan 0.
+        // Mark old records (before the date change, in Overwrite mode) as
+        // cancelled: Work ID gets "-CNX" appended, status becomes CANCEL,
+        // and all section_category/additional/amount_spent values are zeroed out.
         async function woCancelOldRecordsForDateChange(contractId) {
             for(const oldWorkId of woOriginalLoadedWorkIds){
                 try {
@@ -847,7 +847,7 @@
                         })
                     });
                 } catch(err) {
-                    console.error('Gagal batalkan rekod lama:', oldWorkId, err);
+                    console.error('Failed to cancel old record:', oldWorkId, err);
                 }
             }
         }
@@ -855,8 +855,9 @@
         async function woSubmitBlueform(e) {
             e.preventDefault();
 
-            // Semak sama ada ini mod Overwrite dan tarikh telah ditukar berbanding
-            // tarikh asal yang dimuatkan — jika ya, tunjuk popup pengesahan dahulu.
+            // Check whether this is Overwrite mode and the date has changed
+            // compared to the originally loaded date — if so, show the
+            // confirmation popup first.
             const isOverwriteMode = woOriginalLoadedWorkIds.length > 0 && !!woCurrentWorkSequenceNo;
             const dateInput = document.getElementById('wo_qpb_date');
             const originalDate = dateInput.dataset.originalDate || '';
@@ -886,10 +887,11 @@
         }
 
         async function woDoSubmit(e) {
-            // PENTING: baca & reset flag ini SEKALI SAHAJA di sini, di awal fungsi.
-            // Jika ia dibiarkan hidup dan submit gagal/berhenti awal (cth: validasi
-            // lain gagal), percubaan submit seterusnya akan "mewarisi" flag lama dan
-            // terus membatalkan rekod lama TANPA menunjukkan popup pengesahan semula.
+            // IMPORTANT: read & reset this flag ONLY ONCE, right here at the
+            // top of the function. If it were left alive and submission
+            // failed/stopped early (e.g. some other validation failed), the
+            // next submit attempt would "inherit" the old flag and silently
+            // cancel the old records WITHOUT showing the confirmation popup again.
             const shouldCancelForDateChange = woDateChangeConfirmed;
             woDateChangeConfirmed = false;
 
@@ -897,11 +899,11 @@
             const districtSelected = document.getElementById('wo_dist').value;
             const contractOpt = document.getElementById('wo_contract_id').selectedOptions[0];
 
-            if(!contractId || !districtSelected || !contractOpt){ alert('Sila lengkapkan kontrak dan district!'); return; }
+            if(!contractId || !districtSelected || !contractOpt){ alert('Please complete the contract and district!'); return; }
 
             const submitBtn = e.target.querySelector('button[type="submit"]');
             const originalBtnText = submitBtn.innerHTML;
-            submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memproses...';
+            submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
 
             try {
                 const areaMapping = contractOpt.dataset.area || '';
@@ -912,7 +914,7 @@
                 let areaCode = (index !== -1 && areaCodes[index]) ? areaCodes[index] : 'WO';
 
                 const currentWorkIds = woGetCurrentWorkIdsFromRows();
-                if(currentWorkIds.length === 0){ alert('Sila masukkan sekurang-kurangnya satu Work Order ID!'); return; }
+                if(currentWorkIds.length === 0){ alert('Please enter at least one Work Order ID!'); return; }
 
                 let sequenceToUse = woCurrentWorkSequenceNo;
                 const originalDistrict = document.getElementById('wo_dist').dataset.originalDistrict || '';
@@ -920,9 +922,10 @@
                     woCurrentWorkSequenceNo = null; sequenceToUse = null;
                 }
 
-                // Jika pengesahan "tukar tarikh" telah diterima: batalkan rekod lama
-                // (Work ID -CNX, status CANCEL, section value 0) dan paksa sequence
-                // baru dijana untuk rekod baharu di bawah.
+                // If the "date change" confirmation has been accepted: cancel
+                // the old records (Work ID -CNX, status CANCEL, section
+                // values zeroed) and force a new sequence to be generated
+                // for the new records below.
                 if(shouldCancelForDateChange){
                     await woCancelOldRecordsForDateChange(contractId);
                     woCurrentWorkSequenceNo = null; sequenceToUse = null;
@@ -1004,13 +1007,13 @@
                     await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(removedId)}`, { method: 'DELETE', headers: qHeaders });
                 }
 
-                alert(`Berjaya didaftar! No. Rujukan: ${sequenceToUse}`);
+                alert(`Successfully registered! Reference No: ${sequenceToUse}`);
                 closeBlueformModal();
                 resetBlueformModalForm();
                 fetchTechnicianDashboard();
             } catch (error) {
                 console.error(error);
-                alert('Gagal memproses nombor turutan.');
+                alert('Failed to process sequence number.');
             } finally {
                 submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText;
             }
@@ -1028,7 +1031,7 @@
                 if(e.target.files[0]) showFilePreview(e.target.files[0]);
             });
 
-            // ===== Drag & Drop PDF terus ke card Quotation Status =====
+            // ===== Drag & Drop PDF directly onto the Quotation Status card =====
             const qSection = document.getElementById('quotation-section');
             const dropHint = document.getElementById('quotation-dropzone-hint');
             if(qSection){
@@ -1057,7 +1060,7 @@
                     const files = e.dataTransfer.files;
                     if(!files || files.length === 0) return;
                     const file = files[0];
-                    if(file.type !== 'application/pdf'){ alert('Sila seret fail PDF sahaja.'); return; }
+                    if(file.type !== 'application/pdf'){ alert('Please drop PDF files only.'); return; }
 
                     openQuotationModal();
                     setTimeout(() => {
@@ -1072,18 +1075,21 @@
                 e.preventDefault();
 
                 const contractOpt = document.getElementById('tq_contract_id').selectedOptions[0];
+                const contractId = document.getElementById('tq_contract_id').value;
                 const contractCode = contractOpt ? contractOpt.text : '';
                 const prefix = document.getElementById('tq_id_prefix').value;
                 const num = document.getElementById('tq_id_num').value.trim();
-                if(!num){ alert('Sila masukkan Work Order ID!'); return; }
+                if(!num){ alert('Please enter a Work Order ID!'); return; }
                 const primaryWorkId = normalizeWorkId(`${prefix} ${num}`);
+
+                if(!contractId){ alert('Please select a Contract!'); return; }
 
                 const unitSelect = document.getElementById('tq_unit_id');
                 const unitText = unitSelect.options[unitSelect.selectedIndex]?.text || '';
 
                 const submitBtn = e.target.querySelector('button[type="submit"]');
                 const originalBtnText = submitBtn.innerHTML;
-                submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memproses...';
+                submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
 
                 try {
                     try {
@@ -1095,19 +1101,25 @@
                             await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${rejRow.id}`, { method: 'DELETE', headers: qHeaders });
                         }
                     } catch (archiveErr) {
-                        console.error("Gagal arkibkan quotation rejected lama:", archiveErr);
+                        console.error("Failed to archive old rejected quotation:", archiveErr);
                     }
 
                     await uploadQuotationToR2('tq_pdf_file', primaryWorkId, unitText, 'tq_upload_status', 'tq_pdf_url');
 
                     const generatedPdfUrl = document.getElementById('tq_pdf_url').value;
                     if(!generatedPdfUrl) {
-                        alert("Proses upload OneDrive gagal. Data Supabase tidak disimpan.");
+                        alert("Cloud upload process failed. Supabase data was not saved.");
                         return;
                     }
 
+                    // FIX: contract_id must be included — the "quotations" table
+                    // has a NOT NULL / foreign-key column referencing "contract",
+                    // and the dashboard query joins via contract!inner(...).
+                    // Without this the insert was silently rejected by
+                    // PostgREST/Postgres, causing "Failed to save quotation to database."
                     const payload = {
                         work_id: primaryWorkId,
+                        contract_id: contractId,
                         contract_code: contractCode,
                         status: 'QUOTATION',
                         pdf_url: generatedPdfUrl,
@@ -1117,16 +1129,22 @@
                     const res = await fetch(`${SB_URL}/rest/v1/quotations`, { method: 'POST', headers: qHeaders, body: JSON.stringify(payload) });
 
                     if (res.ok) {
-                        alert(`Quotation & Dokumen OneDrive berjaya direkodkan!`);
+                        alert(`Quotation & document successfully recorded!`);
                         closeQuotationModal();
                         resetQuotationModalForm();
                         fetchTechnicianDashboard();
                     } else {
-                        alert("Gagal menyimpan quotation ke pangkalan data.");
+                        // FIX: surface the actual Supabase/PostgREST error instead
+                        // of a generic message, so future failures are diagnosable
+                        // directly from the alert/console instead of guessing.
+                        let errBody = null;
+                        try { errBody = await res.json(); } catch(_) { /* no JSON body */ }
+                        console.error("Supabase insert error:", errBody);
+                        alert("Failed to save quotation to database: " + (errBody?.message || errBody?.hint || `HTTP ${res.status}`));
                     }
                 } catch (err) {
                     console.error(err);
-                    alert("Ralat semasa memproses quotation: " + err.message);
+                    alert("Error while processing quotation: " + err.message);
                 } finally {
                     submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText;
                 }
@@ -1142,8 +1160,8 @@
                     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
 
                     if (userError || !user) {
-                        showEmptyState('quotations-container', 'Sila log masuk terlebih dahulu.');
-                        showEmptyState('blueforms-container', 'Sila log masuk terlebih dahulu.');
+                        showEmptyState('quotations-container', 'Please log in first.');
+                        showEmptyState('blueforms-container', 'Please log in first.');
                         return;
                     }
 
@@ -1160,8 +1178,8 @@
                     activeUnitIds = (assignments || []).map(a => a.unit_id);
 
                     if (activeUnitIds.length === 0) {
-                        showEmptyState('quotations-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
-                        showEmptyState('blueforms-container', 'Akaun anda belum dilesenkan kepada mana-mana unit.');
+                        showEmptyState('quotations-container', 'Your account has not been assigned to any unit.');
+                        showEmptyState('blueforms-container', 'Your account has not been assigned to any unit.');
                         return;
                     }
                 }
@@ -1177,7 +1195,6 @@
                 if (!isAdmin) quotationsQuery = quotationsQuery.in('contract.unit_id', activeUnitIds);
 
                 // 4. QUERY WORK ORDERS (BLUEFORM)
-                // KEMASKINI DI SINI: Menukar filter status mengikut permintaan anda
                 let blueformQuery = supabaseClient
                     .from('work_orders')
                     .select(`
@@ -1304,7 +1321,6 @@
                     let statusBadge = '';
                     let reasonText = item.reject_reason ? item.reject_reason : 'No notes.';
 
-                    // KEMASKINI DI SINI: Logik semakan badge status disesuaikan dengan status baru
                     if (item.status === 'QUO-APP' || item.status === 'APP-HOD') {
                         statusBadge = `<span class="bg-emerald-100 text-emerald-800 text-[9px] font-extrabold px-1 py-0.5 rounded border border-emerald-200 block text-center truncate" title="${item.status}"><i class="fa-solid fa-check mr-0.5"></i>App</span>`;
                     } else {
@@ -1315,8 +1331,8 @@
                     let remarkContent = '';
                     if (item.status.includes('REJ') && item.reject_reason) {
                         const revisionBadge = item.revision_in_progress
-                            ? `<span class="text-amber-600 text-[9px] font-bold inline-flex items-center gap-0.5 mt-0.5"><i class="fa-solid fa-pen"></i> Sedang disediakan semula...</span>`
-                            : `<button onclick="startRevision('${type}','${escapeJs(item.work_id)}')" class="text-[9px] text-blue-600 underline mt-0.5 cursor-pointer bg-transparent border-none p-0">Mula sediakan semula</button>`;
+                            ? `<span class="text-amber-600 text-[9px] font-bold inline-flex items-center gap-0.5 mt-0.5"><i class="fa-solid fa-pen"></i> Resubmission in progress...</span>`
+                            : `<button onclick="startRevision('${type}','${escapeJs(item.work_id)}')" class="text-[9px] text-blue-600 underline mt-0.5 cursor-pointer bg-transparent border-none p-0">Start resubmission</button>`;
                         remarkContent = `
                             <div class="text-red-700 font-medium text-[10px] truncate" title="[${item.status}] ${reasonText}">
                                 ${reasonText}
@@ -1367,7 +1383,7 @@
                                 </button>
                             `;
                         } else {
-                            actionBtnHtml = `<span class="text-[9px] text-gray-400 italic">Rujuk row pertama seq ${seq}</span>`;
+                            actionBtnHtml = `<span class="text-[9px] text-gray-400 italic">Refer to first row of seq ${seq}</span>`;
                         }
 
                         sectionHtml += `
@@ -1427,7 +1443,7 @@
                     if (groupMembers.length > 1) {
                         const groupIds = groupMembers.map(g => g.id);
                         payload = await buildBlueformDataGroup(groupIds);
-                        document.getElementById('bulkPreviewCount').innerText = `Full Set Preview: Gabungan ${groupMembers.length} WO (Seq: ${seq})`;
+                        document.getElementById('bulkPreviewCount').innerText = `Full Set Preview: Combined ${groupMembers.length} WO (Seq: ${seq})`;
 
                         const groupWorkIds = groupMembers.map(g => g.work_id);
                         const { data: quotes } = await supabaseClient
@@ -1466,8 +1482,8 @@
                                 <object data="${pdfUrl}#toolbar=0&navpanes=0" type="application/pdf" style="width:100%; min-height:297mm; height:100vh;">
                                     <div class="p-8 text-center text-gray-500">
                                         <i class="fa-solid fa-triangle-exclamation text-xl text-amber-500 block mb-2"></i>
-                                        Browser tidak menyokong paparan terus.
-                                        <a href="${pdfUrl}" target="_blank" class="text-blue-500 underline">Klik untuk buka fail PDF</a>.
+                                        The browser does not support inline viewing.
+                                        <a href="${pdfUrl}" target="_blank" class="text-blue-500 underline">Click to open the PDF file</a>.
                                     </div>
                                 </object>
                             </div>
