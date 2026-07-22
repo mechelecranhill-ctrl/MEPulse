@@ -6,7 +6,7 @@
 
    CARA GUNA:
    1. Letak <link rel="stylesheet" href="blueform.css"> di <head>
-   2. Letak <script src="blueform-shared.js"></script> SEBELUM
+   2. Letak <script src="blueform.js"></script> SEBELUM
       script page (supaya SB_URL/SB_KEY/headers tersedia dulu)
    3. Pastikan page TIDAK declare semula `const SB_URL`,
       `const SB_KEY`, atau `const headers` — sebab dah di-declare
