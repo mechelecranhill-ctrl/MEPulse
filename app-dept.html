@@ -9,6 +9,13 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="blueform.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        if (window['pdfjsLib']) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc =
+                'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+    </script>
 
     <link rel="stylesheet" href="style.css">
 
@@ -35,8 +42,50 @@
             .glass-header{ padding-left:10px; padding-right:10px; }
         }
 
-        /* Rule print untuk .print-page / .pdf-container */
+        /* Controls the appearance of multi-page printing */
         @media print {
+            @page {
+                size: A4;
+                margin: 0;
+            }
+            html, body {
+                height: auto !important;
+                min-height: 0 !important;
+                max-height: none !important;
+                overflow: visible !important;
+                display: block !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+            body * {
+                visibility: hidden;
+            }
+            body > *:not(#bulkPreviewPage) {
+                display: none !important;
+            }
+            #bulkPreviewPage, #bulkPreviewPage * {
+                visibility: visible;
+            }
+            #bulkPreviewPage {
+                position: static !important;
+                inset: auto !important;
+                width: 100% !important;
+                height: auto !important;
+                max-height: none !important;
+                background: white !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: visible !important;
+            }
+            #bulkPagesContainer {
+                overflow: visible !important;
+                height: auto !important;
+                max-height: none !important;
+            }
+            .bulk-toolbar {
+                display: none !important;
+            }
             .print-page {
                 box-shadow: none !important;
                 margin: 0 !important;
@@ -44,10 +93,14 @@
                 width: 210mm;
                 page-break-after: always !important;
                 break-after: page !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
             }
-            .pdf-container {
-                height: auto !important;
-                min-height: 297mm !important;
+            .print-page img, .print-page canvas {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                width: 100% !important;
+                display: block !important;
             }
         }
     </style>
@@ -87,54 +140,26 @@
                         </tr>
                     </thead>
                     <tbody id="table-dept" class="bg-white divide-y divide-gray-200">
-                        <tr><td colspan="5" class="px-6 py-4 text-center text-gray-400">Memuatkan data...</td></tr>
+                        <tr><td colspan="5" class="px-6 py-4 text-center text-gray-400">Loading data...</td></tr>
                     </tbody>
                 </table>
             </div>
         </section>
     </div>
 
-    <div id="bulkPreviewPage" style="
-        display:none;
-        position:fixed;
-        inset:0;
-        background:#525659;
-        z-index:9998;
-        overflow-y:auto;
-        padding:60px 0 60px 0;
-    ">
-        <div class="bulk-toolbar" style="
-            position:fixed;
-            top:0; left:0; right:0;
-            height:50px;
-            background:#323639;
-            display:flex;
-            align-items:center;
-            justify-content:space-between;
-            padding:0 30px;
-            z-index:9999;
-            box-shadow:0 2px 10px rgba(0,0,0,0.4);
-        ">
+    <div id="bulkPreviewPage" style="display:none; position:fixed; inset:0; background:#525659; z-index:9998; overflow-y:auto; padding:60px 0 60px 0;">
+        <div class="bulk-toolbar" style="position:fixed; top:0; left:0; right:0; height:50px; background:#323639; display:flex; align-items:center; justify-content:space-between; padding:0 30px; z-index:9999; box-shadow:0 2px 10px rgba(0,0,0,0.4);">
             <div style="color:white;font-size:13px;font-weight:600;" id="bulkPreviewCount"></div>
             <div style="display:flex;gap:10px;">
-                <button onclick="closeBulkPreview()"
-                    class="text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-sm cursor-pointer" style="background:#555;">
+                <button class="text-white px-4 py-2 rounded-lg text-xs font-semibold bg-zinc-600 hover:bg-zinc-700 cursor-pointer transition-colors" onclick="closeBulkPreview()">
                     <i class="fa fa-times"></i> Close
                 </button>
-                <button onclick="window.print()"
-                    class="text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-sm cursor-pointer" style="background:#34C759;">
+                <button class="text-white px-4 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 cursor-pointer transition-colors" onclick="window.print()">
                     <i class="fa fa-print"></i> Print / Save PDF
                 </button>
             </div>
         </div>
-
-        <div id="bulkPagesContainer" style="
-            display:flex;
-            flex-direction:column;
-            align-items:center;
-            gap:20px;
-            padding:10px 0;
-        "></div>
+        <div id="bulkPagesContainer" style="display:flex; flex-direction:column; align-items:center; gap:20px; padding:10px 0;"></div>
     </div>
 
     <script src="blueform.js"></script>
@@ -149,7 +174,7 @@
                 if (!isAdmin) {
                     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
                     if (userError || !user) {
-                        showEmptyRow('table-dept', 'Sila log masuk terlebih dahulu.');
+                        showEmptyRow('table-dept', 'Please log in first.');
                         return;
                     }
 
@@ -163,12 +188,12 @@
                     if (dhError) throw dhError;
 
                     if (!deptHead) {
-                        showEmptyRow('table-dept', 'Akaun anda bukan Ketua Jabatan yang dilesenkan.');
+                        showEmptyRow('table-dept', 'Your account is not a licensed Department Head.');
                         return;
                     }
                 }
 
-                // KEMASKINI: Menukar penapisan query untuk mengambil status kelulusan peringkat HOS
+                // Query filtered for HOS-level approval status
                 const { data: workOrders, error } = await supabaseClient
                     .from('work_orders')
                     .select(`
@@ -187,7 +212,7 @@
                 tbody.innerHTML = '';
 
                 if (workOrders.length === 0) {
-                    showEmptyRow('table-dept', 'Menunggu kelulusan Ketua Seksyen / HOS.');
+                    showEmptyRow('table-dept', 'Awaiting Section Head / HOS approval.');
                     return;
                 }
 
@@ -205,7 +230,7 @@
                 const seqGroups = buildSequenceGroups(workOrders);
 
                 workOrders.forEach(item => {
-                    let contractName = 'Tiada Maklumat';
+                    let contractName = 'No Information';
                     if (item.contract) {
                         contractName = Array.isArray(item.contract) ? item.contract[0]?.contract_name : item.contract.contract_name;
                     }
@@ -227,14 +252,14 @@
                             </button>
                         `;
                     } else {
-                        fullSetBtnHtml = `<span class="text-xs text-gray-400 italic">Refer first row seq ${seq}</span>`;
+                        fullSetBtnHtml = `<span class="text-xs text-gray-400 italic">Refer to first row seq ${seq}</span>`;
                     }
 
-                    // KEMASKINI: Mengubah suai parameter butang ke APP-HOD dan menambah butang Reject (HOD-REJ)
+                    // Approve button uses APP-HOD, plus a Reject button (HOD-REJ)
                     const row = `
                         <tr class="hover:bg-gray-50 transition-colors">
                             <td class="px-6 py-4 whitespace-nowrap font-mono text-sm text-gray-900">${item.work_id}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${contractName || 'Tiada Nama'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${contractName || 'No Name'}</td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
                                     ${item.status}
@@ -259,8 +284,8 @@
                 });
 
             } catch (err) {
-                console.error("Ralat memuat data:", err.message);
-                alert("Gagal memuatkan data: " + err.message);
+                console.error("Error loading data:", err.message);
+                alert("Failed to load data: " + err.message);
             }
         }
 
@@ -271,6 +296,55 @@
                         <i class="fa-solid fa-inbox block text-xl mb-1 text-gray-300"></i> ${message}
                     </td>
                 </tr>`;
+        }
+
+        // ============ PDF -> IMAGE PAGE RENDERING (matches Technician view) ============
+        async function renderPdfPagesAsElements(pdfUrl) {
+            const pages = [];
+            try {
+                const pdf = await pdfjsLib.getDocument(pdfUrl).promise;
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const baseViewport = page.getViewport({ scale: 1 });
+                    const scale = (794 * 2) / baseViewport.width;
+                    const viewport = page.getViewport({ scale });
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+
+                    const img = document.createElement('img');
+                    img.src = dataUrl;
+                    img.style.width = '100%';
+                    img.style.display = 'block';
+                    img.alt = `Quotation page ${i}`;
+
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'print-page bg-white shadow-lg';
+                    pageDiv.style.width = '210mm';
+                    pageDiv.style.boxSizing = 'border-box';
+                    pageDiv.appendChild(img);
+                    pages.push(pageDiv);
+
+                    canvas.width = 0;
+                    canvas.height = 0;
+                }
+            } catch (err) {
+                console.error('Failed to render PDF:', pdfUrl, err);
+                const errDiv = document.createElement('div');
+                errDiv.className = 'print-page bg-white p-8 shadow-lg w-[210mm] min-h-[297mm] flex items-center justify-center text-center';
+                errDiv.innerHTML = `
+                    <div>
+                        <i class="fa-solid fa-triangle-exclamation text-xl text-amber-500 block mb-2"></i>
+                        <p class="text-sm text-gray-600">Failed to display PDF.</p>
+                        <a href="${pdfUrl}" target="_blank" class="text-blue-500 underline text-xs">Open PDF in new tab</a>
+                    </div>`;
+                pages.push(errDiv);
+            }
+            return pages;
         }
 
         async function previewFullSet(escapedGroupData) {
@@ -298,33 +372,25 @@
                     `;
                 }
 
+                container.innerHTML = compositeHtml;
+
                 const linkedPdfs = [...new Set(groupItems.map(g => g.mapped_pdf_url).filter(Boolean))];
 
                 if (linkedPdfs.length > 0) {
-                    linkedPdfs.forEach(pdfUrl => {
-                        compositeHtml += `
-                            <div class="print-page pdf-container bg-white shadow-lg w-[210mm] h-[297mm] box-sizing-border-box overflow-hidden" style="background:white;">
-                            <object data="${pdfUrl}#toolbar=0&navpanes=0" type="application/pdf" style="width:100%; height:297mm; display:block;">
-                                    <div class="p-8 text-center text-gray-500">
-                                        <i class="fa-solid fa-triangle-exclamation text-xl text-amber-500 block mb-2"></i>
-                                        Browser tidak menyokong paparan terus.
-                                        <a href="${pdfUrl}" target="_blank" class="text-blue-500 underline">Klik untuk buka fail PDF</a>.
-                                    </div>
-                                </object>
-                            </div>
-                        `;
-                    });
+                    for (const pdfUrl of linkedPdfs) {
+                        const pageEls = await renderPdfPagesAsElements(pdfUrl);
+                        pageEls.forEach(el => container.appendChild(el));
+                    }
                 } else {
-                    compositeHtml += `
-                        <div class="print-page bg-white p-12 shadow-lg w-[210mm] min-h-[297mm] flex flex-col items-center justify-center text-center" style="color:gray; background:white;">
-                            <i class="fa-solid fa-file-pdf text-4xl text-gray-300 mb-2"></i>
-                            <p class="text-sm font-semibold text-gray-600">No Linked Quotation PDF Found</p>
-                            <p class="text-xs text-gray-400">Only the Blueform page will be printed for this record.</p>
-                        </div>
-                    `;
+                    const noPdfDiv = document.createElement('div');
+                    noPdfDiv.className = 'print-page bg-white p-12 shadow-lg w-[210mm] min-h-[297mm] flex flex-col items-center justify-center text-center';
+                    noPdfDiv.style.color = 'gray';
+                    noPdfDiv.innerHTML = `
+                        <i class="fa-solid fa-file-pdf text-4xl text-gray-300 mb-2"></i>
+                        <p class="text-sm font-semibold text-gray-600">No Linked Quotation PDF Found</p>
+                        <p class="text-xs text-gray-400">Only the Blueform page will be printed for this record.</p>`;
+                    container.appendChild(noPdfDiv);
                 }
-
-                container.innerHTML = compositeHtml;
 
             } catch (error) {
                 console.error("Error creating Blueform preview:", error);
@@ -332,20 +398,25 @@
             }
         }
 
-        // KEMASKINI: Mengganti fungsi lama dengan `processAction` untuk kendali `APP-HOD` & `HOD-REJ` beserta ulasan
+        function closeBulkPreview() {
+            document.getElementById('bulkPreviewPage').style.display = 'none';
+            document.getElementById('bulkPagesContainer').innerHTML = '';
+        }
+
+        // Handles both Approve and Reject (with a reason) status changes
         async function processAction(workId, nextStatus) {
             let updatePayload = { status: nextStatus };
             
             if (nextStatus === 'HOD-REJ') {
-                const reason = prompt("Sila masukkan sebab penolakan (Reject Reason):");
+                const reason = prompt("Please enter the rejection reason:");
                 if (reason === null) return; 
                 if (!reason.trim()) {
-                    alert("Sebab penolakan wajib diisi!");
+                    alert("A rejection reason is required!");
                     return;
                 }
                 updatePayload.reject_reason = reason.trim();
             } else {
-                if (!confirm(`Adakah anda pasti untuk menukar status Work ID: ${workId} ke ${nextStatus}?`)) return;
+                if (!confirm(`Are you sure you want to change the status of Work ID: ${workId} to ${nextStatus}?`)) return;
                 updatePayload.reject_reason = null; 
             }
 
@@ -357,12 +428,12 @@
 
                 if (error) throw error;
 
-                alert(`Berjaya dikemaskini ke status ${nextStatus}!`);
+                alert(`Successfully updated to status ${nextStatus}!`);
                 fetchDashboard();
 
             } catch (err) {
-                console.error("Ralat semasa pemprosesan:", err.message);
-                alert("Gagal mengemaskini status: " + err.message);
+                console.error("Error during processing:", err.message);
+                alert("Failed to update status: " + err.message);
             }
         }
 
