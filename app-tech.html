@@ -16,12 +16,13 @@
     <script src="sidebar.js" defer></script>
     
     <style>
-        /* Paparkan semua huruf sebagai huruf besar secara visual semasa ditaip */
-        input[type="text"], 
-        textarea, 
-        .force-uppercase {
-            text-transform: uppercase;
-        }
+
+/* Paparkan semua huruf sebagai huruf besar secara visual semasa ditaip */
+input[type="text"], 
+textarea, 
+.force-uppercase {
+    text-transform: uppercase;
+}
 
         .glass-header {
             width: 100%;
@@ -133,7 +134,7 @@
     </div>
 
     <div id="bulkPreviewPage" style="display:none; position:fixed; inset:0; background:#525659; z-index:9998; overflow-y:auto; padding:60px 0 60px 0;">
-        <div class="bulk-toolbar" style="position:fixed; top:0; left:0; right:0; height:50px; background:#323639; display:flex; align-items:center; justify-content:space-between; padding:0 30px; z-index:9999; box-shadow:0 2px 10px rgba(0,0,0,0.4);">
+        <div class="bulk-toolbar" style="position:fixed; top:0; left:0; right:0; height:50px; background:#323639; display:flex; align-items:center; justify-space-between; padding:0 30px; z-index:9999; box-shadow:0 2px 10px rgba(0,0,0,0.4);">
             <div style="color:white;font-size:13px;font-weight:600;" id="bulkPreviewCount"></div>
             <div style="display:flex;gap:10px;">
                 <button class="text-white px-4 py-2 rounded-lg text-xs font-semibold bg-zinc-600 hover:bg-zinc-700 cursor-pointer transition-colors" onclick="closeBulkPreview()">
@@ -316,49 +317,6 @@
         function escapeJs(str) {
             return String(str).replace(/'/g, "\\'");
         }
-
-        function getBlueformGroupKey(item) {
-            const seq = (item.sequence_no || '').trim();
-            const district = (item.district || '').trim().toUpperCase();
-            if (!seq) return null;
-            return `${seq}___${district}`;
-        }
-
-        function buildSequenceGroups(orders) {
-            const groups = {};
-            (orders || []).forEach(item => {
-                const key = getBlueformGroupKey(item);
-                if (key) {
-                    if (!groups[key]) groups[key] = [];
-                    groups[key].push(item);
-                }
-            });
-            return groups;
-        }
-
-        async function archiveRejectedQuotation(workId, actionDate) {
-            try {
-                const checkRes = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(workId)}&status=eq.QUO-REJ`, { headers: qHeaders });
-                const rows = await checkRes.json();
-                if (rows && rows.length > 0) {
-                    const row = rows[0];
-                    await fetch(`${SB_URL}/rest/v1/quotations_history`, {
-                        method: 'POST',
-                        headers: qHeaders,
-                        body: JSON.stringify({
-                            work_id: row.work_id,
-                            contract_id: row.contract_id,
-                            status: row.status,
-                            pdf_url: row.pdf_url,
-                            reject_reason: row.reject_reason,
-                            action_date: actionDate || row.action_date
-                        })
-                    });
-                }
-            } catch (err) {
-                console.error("Failed to archive rejected quotation:", err);
-            }
-        }
         
         async function startRevision(type, workId) {
             const table = type === 'QUOTATION' ? 'quotations' : 'work_orders';
@@ -379,11 +337,11 @@
         let quotationModalInitialized = false;
 
         function normalizeWorkId(raw){
-            raw = (raw || '').trim().toUpperCase();
-            const match = raw.match(/^([CK])?\s*(\d+)\s*([A-Z]?)$/);
-            if(!match) return '';
-            return `${match[1] || 'C'} ${match[2]}${match[3] || ''}`;
-        }
+    raw = (raw || '').trim().toUpperCase(); // Encapsulate to Upper
+    const match = raw.match(/^([CK])?\s*(\d+)\s*([A-Z]?)$/);
+    if(!match) return '';
+    return `${match[1] || 'C'} ${match[2]}${match[3] || ''}`;
+}
 
         function openQuotationModal() {
             if(!quotationModalInitialized){ tqFetchUnits(); quotationModalInitialized = true; }
@@ -971,8 +929,8 @@
                 document.querySelectorAll('#wo_id_cards_container .wo-id-card').forEach(card => {
                     const workId = card.dataset.workId; if(!workId) return;
         
-                    const location = (card.querySelector('.wo_card_location')?.value || '').toUpperCase();
-                    const description = (card.querySelector('.wo_card_desc')?.value || '').toUpperCase();
+const location = (card.querySelector('.wo_card_location')?.value || '').toUpperCase();
+const description = (card.querySelector('.wo_card_desc')?.value || '').toUpperCase();
 
                     const breakdown = {};
                     let totalAmount = 0, additionalTotal = 0;
@@ -1222,6 +1180,7 @@
                     .in('status', ['APP-HOD', 'EXEC-REJ', 'HOS-REJ', 'HOD-REJ']); 
                 if (!isAdmin) blueformQuery = blueformQuery.in('contract.unit_id', activeUnitIds);
 
+                // FIX: Safely resolve both promises without inline nested destructuring errors
                 const [qResult, bResult] = await Promise.all([quotationsQuery, blueformQuery]);
 
                 if (qResult.error) throw qResult.error;
@@ -1329,7 +1288,7 @@
                     `;
                 }
 
-                const accordionContentId = String(contract.id || '').replace(/-/g, '');
+                const accordionContentId = String(contract.id || '').replace('-', '');
 
                 let sectionHtml = `
                     <div onclick="toggleContractAccordion('${accordionContentId}')" class="${headerBg} px-3 py-2 cursor-pointer transition-colors flex justify-between items-center gap-2">
@@ -1575,18 +1534,19 @@
 
         window.onload = fetchTechnicianDashboard;
 
-        // Memastikan semua teks input & textarea ditukar ke UPPERCASE secara automatik semasa ditaip
-        document.addEventListener('input', function (e) {
-            if (e.target && (e.target.tagName === 'INPUT' && e.target.type === 'text' || e.target.tagName === 'TEXTAREA')) {
-                const start = e.target.selectionStart;
-                const end = e.target.selectionEnd;
-                e.target.value = e.target.value.toUpperCase();
-                // Memelihara kedudukan kursor pengguna
-                if (start !== null && end !== null) {
-                    e.target.setSelectionRange(start, end);
-                }
-            }
-        }, true);
+// Memastikan semua teks input & textarea ditukar ke UPPERCASE secara automatik semasa ditaip
+document.addEventListener('input', function (e) {
+    if (e.target && (e.target.tagName === 'INPUT' && e.target.type === 'text' || e.target.tagName === 'TEXTAREA')) {
+        const start = e.target.selectionStart;
+        const end = e.target.selectionEnd;
+        e.target.value = e.target.value.toUpperCase();
+        // Memelihara kedudukan kursor pengguna
+        if (start !== null && end !== null) {
+            e.target.setSelectionRange(start, end);
+        }
+    }
+}, true);
+
     </script>
 
     <script src="uploader.js"></script>
