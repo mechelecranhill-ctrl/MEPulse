@@ -1098,24 +1098,25 @@
                         for (const rejRow of rejRows) {
                             const actionDate = rejRow.action_date || new Date().toISOString();
                             await archiveRejectedQuotation(primaryWorkId, actionDate);
-                            await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${rejRow.id}`, { method: 'DELETE', headers: qHeaders });
+
+                            // FIX: previously this DELETE's response was never
+                            // checked. fetch() does NOT throw on a non-2xx
+                            // response (e.g. an RLS policy silently blocking the
+                            // DELETE) — it just resolves with res.ok === false.
+                            // That meant a blocked delete looked identical to a
+                            // successful one here, the old QUO-REJ row for this
+                            // work_id stayed in the table, and the plain INSERT
+                            // further below then hit the unique constraint on
+                            // work_id ("duplicate key value violates unique
+                            // constraint quotation_stages_work_id_key").
+                            // Log it now so failures are visible instead of silent.
+                            const delRes = await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${rejRow.id}`, { method: 'DELETE', headers: qHeaders });
+                            if (!delRes.ok) {
+                                console.error(`Failed to delete old QUO-REJ row (id=${rejRow.id}) for work_id ${primaryWorkId}: HTTP ${delRes.status}`);
+                            }
                         }
                     } catch (archiveErr) {
                         console.error("Failed to archive old rejected quotation:", archiveErr);
-                    }
-
-                    // FIX: a DB trigger on "quotations" inserts a matching row into
-                    // "quotation_stages" (unique on work_id). Deleting the old
-                    // rejected row above only removes it from "quotations" — the
-                    // orphaned "quotation_stages" row for the same work_id stays
-                    // behind and causes "duplicate key value violates unique
-                    // constraint quotation_stages_work_id_key" on the next insert
-                    // below. Clear it here first (best-effort; ignore failures in
-                    // case the table/policy doesn't allow direct DELETE from client).
-                    try {
-                        await fetch(`${SB_URL}/rest/v1/quotation_stages?work_id=eq.${encodeURIComponent(primaryWorkId)}`, { method: 'DELETE', headers: qHeaders });
-                    } catch (stageCleanupErr) {
-                        console.error("Failed to clean up old quotation_stages row:", stageCleanupErr);
                     }
 
                     await uploadQuotationToR2('tq_pdf_file', primaryWorkId, unitText, 'tq_upload_status', 'tq_pdf_url');
@@ -1144,7 +1145,19 @@
                         qpd_date: document.getElementById('tq_qpb_date').value || null
                     };
 
-                    const res = await fetch(`${SB_URL}/rest/v1/quotations`, { method: 'POST', headers: qHeaders, body: JSON.stringify(payload) });
+                    // FIX 3: work_id has a unique constraint (named
+                    // "quotation_stages_work_id_key", a leftover name — it lives
+                    // on the "quotations" table itself, not a separate table). If
+                    // the delete above got blocked by RLS (or any other reason a
+                    // stale row survives), a plain INSERT here fails with a
+                    // duplicate-key error. Using an upsert on work_id makes this
+                    // step safe regardless: it overwrites any existing row for
+                    // this work_id instead of erroring out.
+                    const res = await fetch(`${SB_URL}/rest/v1/quotations?on_conflict=work_id`, {
+                        method: 'POST',
+                        headers: { ...qHeaders, 'Prefer': 'resolution=merge-duplicates,return=representation' },
+                        body: JSON.stringify(payload)
+                    });
 
                     if (res.ok) {
                         alert(`Quotation & document successfully recorded!`);
