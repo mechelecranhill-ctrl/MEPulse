@@ -1192,7 +1192,7 @@
                 let quotationsQuery = supabaseClient
                     .from('quotations')
                     .select(`
-                            id, work_id, status, contract_id, pdf_url, reject_reason, revision_in_progress,
+                            id, work_id, status, contract_id, pdf_url, reject_reason, revision_in_progress, action_date,
                             contract!inner (id, contract_name, contract_code, unit_id)
                     `)
                     .in('status', ['QUO-APP', 'QUO-REJ']);
@@ -1248,6 +1248,19 @@
             } catch (err) {
                 console.error("Error loading technician dashboard:", err.message);
                 alert("Failed to load dashboard data: " + err.message);
+            }
+        }
+
+        // NEW: helper to format an ISO timestamp (from Supabase `action_date`)
+        // into a short, human-readable date string for display on the card.
+        function formatActionDate(isoString) {
+            if (!isoString) return '';
+            try {
+                const d = new Date(isoString);
+                if (isNaN(d.getTime())) return '';
+                return d.toLocaleDateString('en-MY', { day: '2-digit', month: 'short', year: 'numeric' });
+            } catch (e) {
+                return '';
             }
         }
 
@@ -1331,6 +1344,11 @@
                         statusBadge = `<span class="bg-red-100 text-red-800 text-[9px] font-extrabold px-1 py-0.5 rounded border border-red-200 block text-center truncate" title="${item.status}"><i class="fa-solid fa-xmark mr-0.5"></i>Rej</span>`;
                     }
 
+                    // NEW: label showing when the QUO-APP/QUO-REJ action happened
+                    // (only meaningful for QUOTATION rows, since action_date is
+                    // only set/selected for the quotations table).
+                    const actionDateLabel = (type === 'QUOTATION') ? formatActionDate(item.action_date) : '';
+
                     let finalPdfUrl = (type === 'QUOTATION') ? item.pdf_url : item.mapped_pdf_url;
                     let remarkContent = '';
                     if (item.status.includes('REJ') && item.reject_reason) {
@@ -1361,6 +1379,7 @@
                                 </td>
                                 <td class="px-1 py-2">
                                     ${statusBadge}
+                                    ${actionDateLabel ? `<span class="block text-[8px] text-gray-400 text-center mt-0.5 truncate" title="Action date: ${actionDateLabel}">${actionDateLabel}</span>` : ''}
                                 </td>
                                 <td class="px-1 py-2 text-center">
                                     ${pdfBtnHtml}
