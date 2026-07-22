@@ -308,10 +308,13 @@
         </div>
         <div class="p-5 border-t border-gray-100 flex flex-col gap-2 sticky bottom-0 bg-white rounded-b-2xl">
             <button type="button" onclick="woConfirmOverwrite()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
-                <i class="fa-solid fa-rotate mr-1"></i>Overwrite Data
+                <i class="fa-solid fa-rotate mr-1"></i>Overwrite Data (Keep Sequence, Lock Date)
             </button>
             <button type="button" onclick="woConfirmSaveAsNew()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
-                <i class="fa-solid fa-plus mr-1"></i>Save as New
+                <i class="fa-solid fa-file-circle-plus mr-1"></i>Save as New (Cancel Old & Create New Sequence)
+            </button>
+            <button type="button" onclick="woConfirmAdditionalWorks()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-plus-circle mr-1"></i>Additional Works (Add Suffix A, B...)
             </button>
             <button type="button" onclick="woCancelDetectModal()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
                 Cancel
@@ -324,18 +327,17 @@
     <div id="woDateChangeModalOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[9999] p-4">
       <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full">
         <div class="p-5 border-b border-gray-100">
-            <h3 class="text-base font-bold text-gray-800"><i class="fa-solid fa-triangle-exclamation text-amber-500 mr-2"></i>Changing Date Will Cancel Existing Blueform</h3>
+            <h3 class="text-base font-bold text-gray-800"><i class="fa-solid fa-triangle-exclamation text-amber-500 mr-2"></i>Date Change Not Allowed in Overwrite Mode</h3>
         </div>
         <div class="p-5">
             <p class="text-xs text-gray-500">
-                Blueform Date changed. Proceed will cancel existing Blueform
-                (status <strong>CANCEL</strong>, Work ID marked as <strong>-CNX</strong>, and previous cost will become RM 0.00)
-                and will register a record under a new sequence no.
+                You are in Overwrite mode. Changing the date is not permitted. 
+                If you wish to change the date, please use the <strong>Save as New</strong> option instead.
             </p>
         </div>
         <div class="p-5 border-t border-gray-100 flex flex-col gap-2">
-            <button type="button" onclick="woProceedDateChange()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
-                <i class="fa-solid fa-check mr-1"></i>Proceed (Cancel Old & Create New)
+            <button type="button" onclick="woRevertDateAndProceed()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-rotate-left mr-1"></i>Revert to Original Date & Overwrite
             </button>
             <button type="button" onclick="woCancelDateChange()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
                 Cancel
@@ -506,7 +508,7 @@
         let woDetectTimer = null;
         let woPendingDetect = null; 
         let woPendingSubmitEvent = null; 
-        let woDateChangeConfirmed = false; 
+        let woModeSaveAsNew = false; // Flag untuk Save as New
 
         function openBlueformModal() {
             if(!blueformModalInitialized){
@@ -527,6 +529,12 @@
             document.getElementById('wo_dist').innerHTML = '<option value="">Choose Contract First</option>';
             woCurrentContractSections = {};
             woResetWorkIdRows();
+            woModeSaveAsNew = false;
+            const dateInput = document.getElementById('wo_qpb_date');
+            if(dateInput) {
+                dateInput.removeAttribute('disabled');
+                delete dateInput.dataset.originalDate;
+            }
         }
 
         async function woFetchUnits() {
@@ -611,7 +619,7 @@
                     <option value="K" ${selectedVal === 'K' ? 'selected' : ''}>K</option>
                 </select>
                 <input type="text" class="wo_id_num text-sm border border-gray-300 rounded-lg p-2 w-full" placeholder="123456" value="${num}" oninput="this.value=this.value.replace(/[^0-9]/g,''); woRenderWorkIdCards(); woAutoDetectWork();">
-                <span class="wo_id_suffix_badge ${suffix ? '' : 'hidden'} text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded px-1.5 py-1 flex-shrink-0" title="Save as New suffix">${suffix}</span>
+                <span class="wo_id_suffix_badge ${suffix ? '' : 'hidden'} text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded px-1.5 py-1 flex-shrink-0" title="Additional Work suffix">${suffix}</span>
                 <div onclick="woRemoveWorkIdRow('${rowId}')" class="text-red-500 cursor-pointer flex-shrink-0 px-1" title="Remove"><i class="fa-solid fa-xmark"></i></div>
             `;
             row.querySelector('.wo_id_prefix').addEventListener('change', () => { woRenderWorkIdCards(); woAutoDetectWork(); });
@@ -633,6 +641,7 @@
             woCurrentWorkSequenceNo = null;
             woWorkIdCardDataMap = {};
             woLastWorkIdNum = '';
+            woModeSaveAsNew = false;
             woAddWorkIdRow();
             woRenderWorkIdCards();
         }
@@ -809,12 +818,15 @@
             document.getElementById('woDetectModalOverlay').classList.remove('hidden');
         }
 
+        /* 1. OVERWRITE DATA: Kekalkan Sequence No, Lock/Revert Tarikh */
         function woConfirmOverwrite() {
             if(!woPendingDetect) return;
             const { group, sequenceNo } = woPendingDetect;
 
             woCurrentWorkSequenceNo = sequenceNo;
             woOriginalLoadedWorkIds = group.map(x => x.work_id);
+            woModeSaveAsNew = false;
+
             group.forEach(w => {
                 woWorkIdCardDataMap[w.work_id] = {
                     location: w.location || '',
@@ -836,6 +848,9 @@
             const dateInput = document.getElementById('wo_qpb_date');
             dateInput.value = group[0].qpb_date || '';
             dateInput.dataset.originalDate = group[0].qpb_date || '';
+            dateInput.setAttribute('disabled', 'disabled'); // Lock tarikh supaya tidak dibenarkan tukar
+            dateInput.title = "Date cannot be changed in Overwrite mode. Use 'Save as New' if date needs to be changed.";
+
             const districtSel = document.getElementById('wo_dist');
             if(!districtSel.value) districtSel.value = group[0].district || '';
             districtSel.dataset.originalDistrict = group[0].district || '';
@@ -846,11 +861,58 @@
             woCloseDetectModal();
         }
 
-        async function woConfirmSaveAsNew() {
+        /* 2. SAVE AS NEW: Batalkan Rekod Lama (CANCEL / -CNX / RM0) & Cipta Sequence No Baharu */
+        function woConfirmSaveAsNew() {
+            if(!woPendingDetect){ woCloseDetectModal(); return; }
+            const { group } = woPendingDetect;
+
+            woOriginalLoadedWorkIds = group.map(x => x.work_id);
+            woCurrentWorkSequenceNo = null; // Cipta sequence baharu
+            woModeSaveAsNew = true;
+
+            group.forEach(w => {
+                woWorkIdCardDataMap[w.work_id] = {
+                    location: w.location || '',
+                    description: w.description || '',
+                    section_category: structuredClone(w.section_category || {})
+                };
+            });
+
+            document.getElementById('wo_id_rows_container').innerHTML = '';
+            wo_workIdRowCounter = 0;
+            group.forEach(w => {
+                const m = (w.work_id || '').trim().match(/^([CK])?\s*(\d+)\s*([A-Z]?)$/i);
+                const prefix = (m && m[1]) ? m[1].toUpperCase() : 'C';
+                const num = m ? m[2] : '';
+                woAddWorkIdRow(prefix, num, ''); // Tanpa suffix
+            });
+
+            const dateInput = document.getElementById('wo_qpb_date');
+            dateInput.removeAttribute('disabled');
+            dateInput.value = ''; // Boleh pilih tarikh baharu
+
+            const districtSel = document.getElementById('wo_dist');
+            if(!districtSel.value) districtSel.value = group[0].district || '';
+
+            woRenderWorkIdCards(true);
+            woLastWorkIdNum = woGetCurrentWorkIdsFromRows().join('|');
+
+            woCloseDetectModal();
+        }
+
+        /* 3. ADDITIONAL WORKS: Behavior Tambah Suffix A, B... & Sequence No Baharu */
+        async function woConfirmAdditionalWorks() {
             if(!woPendingDetect){ woCloseDetectModal(); return; }
 
             const detectedIds = woPendingDetect.group.map(w => w.work_id);
             const contractId = document.getElementById('wo_contract_id').value;
+
+            woOriginalLoadedWorkIds = []; // Tidak membatalkan rekod lama
+            woCurrentWorkSequenceNo = null; // Cipta sequence baharu
+            woModeSaveAsNew = false;
+
+            const dateInput = document.getElementById('wo_qpb_date');
+            dateInput.removeAttribute('disabled');
 
             const rows = document.querySelectorAll('#wo_id_rows_container .wo-id-row');
             for(const row of rows){
@@ -891,7 +953,7 @@
             woPendingDetect = null;
         }
 
-        async function woCancelOldRecordsForDateChange(contractId) {
+        async function woCancelOldRecordsForSaveAsNew(contractId) {
             for(const oldWorkId of woOriginalLoadedWorkIds){
                 try {
                     const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(oldWorkId)}`, { headers: qHeaders });
@@ -924,12 +986,13 @@
         async function woSubmitBlueform(e) {
             e.preventDefault();
 
-            const isOverwriteMode = woOriginalLoadedWorkIds.length > 0 && !!woCurrentWorkSequenceNo;
+            const isOverwriteMode = woOriginalLoadedWorkIds.length > 0 && !!woCurrentWorkSequenceNo && !woModeSaveAsNew;
             const dateInput = document.getElementById('wo_qpb_date');
             const originalDate = dateInput.dataset.originalDate || '';
             const currentDateVal = dateInput.value;
 
-            if(isOverwriteMode && originalDate && originalDate !== currentDateVal && !woDateChangeConfirmed){
+            // Jika percubaan tukar tarikh dilakukan semasa Overwrite
+            if(isOverwriteMode && originalDate && originalDate !== currentDateVal){
                 woPendingSubmitEvent = e;
                 document.getElementById('woDateChangeModalOverlay').classList.remove('hidden');
                 return;
@@ -941,21 +1004,20 @@
         function woCancelDateChange() {
             document.getElementById('woDateChangeModalOverlay').classList.add('hidden');
             woPendingSubmitEvent = null;
-            woDateChangeConfirmed = false;
         }
 
-        async function woProceedDateChange() {
+        async function woRevertDateAndProceed() {
             document.getElementById('woDateChangeModalOverlay').classList.add('hidden');
-            woDateChangeConfirmed = true;
+            const dateInput = document.getElementById('wo_qpb_date');
+            if(dateInput.dataset.originalDate){
+                dateInput.value = dateInput.dataset.originalDate;
+            }
             const e = woPendingSubmitEvent;
             woPendingSubmitEvent = null;
             if(e) await woDoSubmit(e);
         }
 
         async function woDoSubmit(e) {
-            const shouldCancelForDateChange = woDateChangeConfirmed;
-            woDateChangeConfirmed = false;
-
             const contractId = document.getElementById('wo_contract_id').value;
             const districtSelected = document.getElementById('wo_dist').value;
             const contractOpt = document.getElementById('wo_contract_id').selectedOptions[0];
@@ -977,16 +1039,17 @@
                 const currentWorkIds = woGetCurrentWorkIdsFromRows();
                 if(currentWorkIds.length === 0){ alert('Please enter at least one Work Order ID!'); return; }
 
+                // Jika mod Save as New -> Batalkan rekod-rekod lama terlebih dahulu
+                if(woModeSaveAsNew){
+                    await woCancelOldRecordsForSaveAsNew(contractId);
+                    woCurrentWorkSequenceNo = null; // Teruskan dengan menjana Sequence baharu
+                    woOriginalLoadedWorkIds = [];
+                }
+
                 let sequenceToUse = woCurrentWorkSequenceNo;
                 const originalDistrict = document.getElementById('wo_dist').dataset.originalDistrict || '';
                 if(originalDistrict && originalDistrict.trim().toUpperCase() !== districtSelected.trim().toUpperCase()){
                     woCurrentWorkSequenceNo = null; sequenceToUse = null;
-                }
-
-                if(shouldCancelForDateChange){
-                    await woCancelOldRecordsForDateChange(contractId);
-                    woCurrentWorkSequenceNo = null; sequenceToUse = null;
-                    woOriginalLoadedWorkIds = [];
                 }
 
                 if(!sequenceToUse){
@@ -1346,7 +1409,6 @@
                 const contractSection = document.createElement('div');
                 contractSection.className = "bg-gray-50 rounded-lg border border-gray-200 shadow-sm mb-3 w-full overflow-hidden";
 
-                /* SWAPPED ACCORDION & BADGE COLORS */
                 let headerBg = type === 'QUOTATION' ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200' : 'bg-blue-50 hover:bg-blue-100 border-blue-200';
                 let badgeBg = type === 'QUOTATION' ? 'bg-emerald-600' : 'bg-blue-600';
 
