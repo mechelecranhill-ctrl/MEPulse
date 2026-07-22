@@ -307,13 +307,13 @@
                 if (type === 'BLUEFORM') {
                     headerRowHtml = `
                         <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Work ID</th>
-                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider w-40">Full Set (BF+Quote)</th>
-                        <th class="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Tindakan</th>
+                        <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider w-40">Reference</th>
+                        <th class="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Action</th>
                     `;
                 } else {
                     headerRowHtml = `
                         <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Work ID</th>
-                        <th class="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Tindakan</th>
+                        <th class="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Action</th>
                     `;
                 }
 
@@ -389,7 +389,7 @@
 
                             fullSetBtnHtml = `
                                 <button onclick="previewFullSet('${serializedGroup}')" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-2.5 py-1 rounded-lg text-[11px] shadow-xs cursor-pointer inline-flex items-center gap-1 transition-all">
-                                    <i class="fa-solid fa-print"></i> Full Set${countLabel}
+                                    <i class="fa-solid fa-print"></i> Blueform${countLabel}
                                 </button>
                             `;
                         } else {
@@ -451,9 +451,8 @@
             const groupItems = JSON.parse(decodeURIComponent(escapedGroupData));
             const container = document.getElementById('bulkPagesContainer');
 
-            container.innerHTML = '<div class="text-white text-sm p-4 animate-pulse"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Bundling full set documents...</div>';
+            container.innerHTML = '<div class="text-white text-sm p-4 animate-pulse"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Bundling Blueform documents...</div>';
             document.getElementById('bulkPreviewPage').style.display = 'block';
-            document.getElementById('bulkPreviewCount').innerText = `Full Set Preview: ${groupItems.map(g => g.work_id).join(', ')}`;
 
             try {
                 let compositeHtml = '';
@@ -462,10 +461,6 @@
                 const payload = ids.length > 1
                     ? await buildBlueformDataGroup(ids)
                     : await buildBlueformData(ids[0]);
-
-                if (ids.length > 1) {
-                    document.getElementById('bulkPreviewCount').innerText = `Full Set Preview: Gabungan ${ids.length} WO`;
-                }
 
                 // HALAMAN 1: Blueform. buildBlueformHTML() sudah ada .a4-container
                 // + page-break sendiri, jadi TIDAK dibalut dalam .print-page lagi
@@ -487,8 +482,8 @@
                 if (linkedPdfs.length > 0) {
                     linkedPdfs.forEach(pdfUrl => {
                         compositeHtml += `
-                            <div class="print-page pdf-container bg-white shadow-lg w-[210mm] min-h-[297mm] box-sizing-border-box" style="background:white;">
-                                <object data="${pdfUrl}#toolbar=0&navpanes=0" type="application/pdf" style="width:100%; min-height:297mm; height:100vh;">
+                            <div class="print-page pdf-container bg-white shadow-lg w-[210mm] h-[297mm] box-sizing-border-box overflow-hidden" style="background:white;">
+    <object data="${pdfUrl}#toolbar=0&navpanes=0" type="application/pdf" style="width:100%; height:297mm; display:block;">
                                     <div class="p-8 text-center text-gray-500">
                                         <i class="fa-solid fa-triangle-exclamation text-xl text-amber-500 block mb-2"></i>
                                         Browser tidak menyokong paparan terus.
@@ -511,7 +506,7 @@
                 container.innerHTML = compositeHtml;
 
             } catch (error) {
-                console.error("Error creating full set preview:", error);
+                console.error("Error creating blueform preview:", error);
                 container.innerHTML = `<div class="text-red-400 p-4 font-mono text-xs">Error bundling documents: ${error.message}</div>`;
             }
         }
