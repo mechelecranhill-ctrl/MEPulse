@@ -1137,12 +1137,23 @@
                     // 'contract_code' column of 'quotations' in the schema cache").
                     // The contract code is already derivable through the
                     // contract_id -> contract join, so it must not be sent here.
+                    // FIX 4: revision_in_progress / reject_reason must be reset
+                    // explicitly here. Because the request below is an upsert
+                    // (on_conflict=work_id, merge-duplicates), PostgREST only
+                    // SETs the columns present in the JSON body on conflict —
+                    // any column left out keeps its OLD value. Without these two
+                    // lines, a quotation that was previously rejected and marked
+                    // "revision_in_progress = true" (via startRevision()) would
+                    // stay stuck as true forever after resubmission, even though
+                    // a brand-new QUOTATION row was just registered.
                     const payload = {
                         work_id: primaryWorkId,
                         contract_id: contractId,
                         status: 'QUOTATION',
                         pdf_url: generatedPdfUrl,
-                        qpd_date: document.getElementById('tq_qpb_date').value || null
+                        qpd_date: document.getElementById('tq_qpb_date').value || null,
+                        revision_in_progress: false,
+                        reject_reason: null
                     };
 
                     // FIX 3: work_id has a unique constraint (named
