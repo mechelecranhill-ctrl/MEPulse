@@ -1104,6 +1104,20 @@
                         console.error("Failed to archive old rejected quotation:", archiveErr);
                     }
 
+                    // FIX: a DB trigger on "quotations" inserts a matching row into
+                    // "quotation_stages" (unique on work_id). Deleting the old
+                    // rejected row above only removes it from "quotations" — the
+                    // orphaned "quotation_stages" row for the same work_id stays
+                    // behind and causes "duplicate key value violates unique
+                    // constraint quotation_stages_work_id_key" on the next insert
+                    // below. Clear it here first (best-effort; ignore failures in
+                    // case the table/policy doesn't allow direct DELETE from client).
+                    try {
+                        await fetch(`${SB_URL}/rest/v1/quotation_stages?work_id=eq.${encodeURIComponent(primaryWorkId)}`, { method: 'DELETE', headers: qHeaders });
+                    } catch (stageCleanupErr) {
+                        console.error("Failed to clean up old quotation_stages row:", stageCleanupErr);
+                    }
+
                     await uploadQuotationToR2('tq_pdf_file', primaryWorkId, unitText, 'tq_upload_status', 'tq_pdf_url');
 
                     const generatedPdfUrl = document.getElementById('tq_pdf_url').value;
