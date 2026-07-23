@@ -387,7 +387,6 @@
         <div class="form-tabs-wrapper">
             <div class="form-tabs" id="formsNav">
                 <button onclick="showPage('adminPage')">Contracts</button>
-                <button onclick="showPage('quotationPage')">Quotations</button>
                 <button class="active" onclick="showPage('registerWorkPage')">Blue Forms</button>
                 <button onclick="showPage('interimPage')">Interims</button>
                 <button onclick="showPage('voPage')">Variation Order</button>
@@ -421,7 +420,7 @@
                     <label>Location & Cost Breakdown</label>
                     <div id="w_id_cards_container" class="w-id-cards-container"></div>
 
-                    <div style="margin-top:15px; padding:10px; background:rgba(0,122,255,0.1); border-radius:10px; display:flex; justify-content:space-between;">
+                    <div style="margin-top:15px; padding:10px; background:rgba(0,122,255,0.1); border-radius:10px; display:flex; justify-space-between;">
                         <strong>Total:</strong><span id="total_display" style="color:var(--ios-blue); font-weight:bold;">RM 0.00</span>
                     </div>
                     <button type="submit" class="btn-primary" style="background:var(--ios-green);">Submit</button>
@@ -591,40 +590,6 @@
             </div>
         </div>
 
-        <div id="quotationPage" class="page">
-            <div class="glass-card">
-                <h3 style="margin-top:0;"><i class="fa-solid fa-file-lines"></i> Quotation</h3>
-                <form id="quotationForm">
-                    <label>Units</label>
-                    <select id="q_unit_id" onchange="loadContractsByUnit('q')" required>
-                        <option value="">Choose Unit</option>
-                    </select>
-                    
-                    <label>Contracts</label>
-                    <select id="q_contract_id" required><option value="">Choose Unit First</option></select>
-
-                    <label>Work Order Id</label>
-                    <div id="q_id_rows_container"></div>
-
-                    <div style="display: grid; grid-template-columns: 1fr; gap: 10px;">
-                        <div>
-                            <label>Quotation Date</label>
-                            <input type="date" id="q_qpb_date" required>
-                        </div>
-                    </div>
-
-                    <label>Upload Document (OneDrive)</label>
-                    <input type="file" id="q_pdf_file" accept="application/pdf" required>
-
-                    <input type="hidden" id="q_pdf_url">
-
-                    <div id="q_upload_status" style="display: none; padding: 10px; border-radius: 8px; margin-top: 10px; font-size: 13px; font-weight: 600;"></div>
-
-                    <button type="submit" class="btn-primary" style="background: var(--ios-blue); margin-top:20px;">Register Quotation</button>
-                </form>
-            </div>
-        </div>
-
     </div>
 
 <script>
@@ -641,7 +606,6 @@
     let lastWorkIdNum = '';
 
     let w_workIdRowCounter = 0;
-    let q_workIdRowCounter = 0;
     let originalLoadedWorkIds = [];
     let currentWorkSequenceNo = null;
     let currentContractSections = {};
@@ -668,7 +632,6 @@
         setupFormListeners();
         renderDistrictChecklist();
         addWorkIdRow('w');
-        addWorkIdRow('q');
     }
 
     function showPage(id){
@@ -899,62 +862,6 @@
                 location.reload();
             } catch (error) { console.error(error); alert("Gagal memproses nombor turutan."); }
         });
-
-        // Quotation Form Submit (Saling bekerjasama dengan onedrive-uploader.js)
-        const qForm = document.getElementById('quotationForm');
-        if(qForm) {
-            qForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                
-                const contractOpt = document.getElementById('q_contract_id').selectedOptions[0];
-                const contractCode = contractOpt ? contractOpt.text : '';
-                const currentWorkIds = getCurrentWorkIdsFromRows('q');
-                if(currentWorkIds.length === 0){ alert("Sila masukkan Work Order ID!"); return; }
-                if(currentWorkIds.length > 1){ alert("Satu quotation hanya boleh untuk 1 Work Order ID sahaja!"); return; }
-
-                const selectUnitElement = document.getElementById('q_unit_id');
-                const unitText = selectUnitElement.options[selectUnitElement.selectedIndex].text;
-
-                const primaryWorkId = currentWorkIds[0];
-
-                try {
-                    const rejCheckRes = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(primaryWorkId)}&status=eq.QUO-REJ&select=*`, { headers });
-                    const rejRows = await rejCheckRes.json();
-                    for (const rejRow of rejRows) {
-                        const actionDate = rejRow.action_date || new Date().toISOString();
-                        await archiveRejectedQuotation(primaryWorkId, actionDate);
-                        await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${rejRow.id}`, { method: 'DELETE', headers });
-                    }
-                } catch (archiveErr) {
-                    console.error("Gagal arkibkan quotation rejected lama:", archiveErr);
-                }
-
-                await uploadQuotationToOneDrive('q_pdf_file', primaryWorkId, unitText, 'q_upload_status', 'q_pdf_url');
-
-                const generatedPdfUrl = document.getElementById('q_pdf_url').value;
-                if(!generatedPdfUrl) {
-                    alert("Proses upload OneDrive gagal. Data Supabase tidak disimpan.");
-                    return;
-                }
-                
-                const payload = {
-                    work_id: primaryWorkId,
-                    contract_code: contractCode,
-                    status: 'QUOTATION',
-                    pdf_url: generatedPdfUrl,
-                    qpd_date: document.getElementById('q_qpb_date').value || null
-                };
-
-                const res = await fetch(`${SB_URL}/rest/v1/quotations`, { method: 'POST', headers, body: JSON.stringify(payload) });
-
-                if (res.ok) { 
-                    alert(`Quotation & Dokumen OneDrive berjaya direkodkan!`); 
-                    location.reload(); 
-                } else { 
-                    alert("Gagal menyimpan quotation ke pangkalan data."); 
-                }
-            });
-        }
     }
 
     async function fetchUnits() {
@@ -966,20 +873,17 @@
             const wUnit = document.getElementById('w_unit_id');
             const iUnit = document.getElementById('i_unit_id');
             const voUnit = document.getElementById('vo_unit_id');
-            const qUnit = document.getElementById('q_unit_id');
 
             if(admin) admin.innerHTML = '<option value="">Choose Unit</option>';
             if(wUnit) wUnit.innerHTML = '<option value="">Choose Unit</option>';
             if(iUnit) iUnit.innerHTML = '<option value="">Choose Unit</option>';
             if(voUnit) voUnit.innerHTML = '<option value="">Choose Unit</option>';
-            if(qUnit) qUnit.innerHTML = '<option value="">Choose Unit</option>';
 
             units.forEach(u=>{
                 if(admin) admin.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
                 if(wUnit) wUnit.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
                 if(iUnit) iUnit.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
                 if(voUnit) voUnit.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
-                if(qUnit) qUnit.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`;
             });
         }catch(e){ console.error(e); }
     }
@@ -1084,12 +988,10 @@
 
     function addWorkIdRow(prefix, selectedVal = 'C', num = ''){
         const container = document.getElementById(`${prefix}_id_rows_container`);
-        let counter;
-        if(prefix === 'w') { w_workIdRowCounter++; counter = w_workIdRowCounter; }
-        else { q_workIdRowCounter++; counter = q_workIdRowCounter; }
+        w_workIdRowCounter++;
+        const counter = w_workIdRowCounter;
 
         const rowId = `${prefix}_id_row_${counter}`;
-        const isSingleOnly = (prefix === 'q');
         const row = document.createElement('div'); row.className = `${prefix}-id-row`; row.id = rowId;
         row.style = "display:flex; gap:8px; align-items:center; margin-bottom:8px;";
         row.innerHTML = `
@@ -1098,7 +1000,7 @@
                 <option value="K" ${selectedVal === 'K' ? 'selected' : ''}>K</option>
             </select>
             <input type="text" class="${prefix}_id_num" placeholder="123456" value="${num}" oninput="this.value=this.value.replace(/[^0-9]/g,''); if('${prefix}'==='w'){ renderWorkIdCards(); autoDetectWork(); }">
-            ${isSingleOnly ? '' : `<div onclick="removeWorkIdRow('${prefix}', '${rowId}')" style="color:red; cursor:pointer; flex-shrink:0; padding:0 6px;">✕</div>`}
+            <div onclick="removeWorkIdRow('${prefix}', '${rowId}')" style="color:red; cursor:pointer; flex-shrink:0; padding:0 6px;">✕</div>
         `;
         if(prefix === 'w') {
             row.querySelector('.w_id_prefix').addEventListener('change', () => { renderWorkIdCards(); autoDetectWork(); });
@@ -1116,8 +1018,6 @@
         document.getElementById(`${prefix}_id_rows_container`).innerHTML = '';
         if(prefix === 'w') {
             w_workIdRowCounter = 0; originalLoadedWorkIds = []; currentWorkSequenceNo = null; workIdCardDataMap = {}; lastWorkIdNum = '';
-        } else {
-            q_workIdRowCounter = 0;
         }
         addWorkIdRow(prefix); 
         if(prefix === 'w') { renderWorkIdCards(); }
