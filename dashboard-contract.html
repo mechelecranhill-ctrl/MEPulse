@@ -599,34 +599,46 @@
     }
 
     async function openAnalysis(contract) {
+    const mobileBtn = document.getElementById('mobileUsageBtn');
+    if(mobileBtn) mobileBtn.classList.remove('expanded');
+    
+    document.body.classList.add('analysis-active');
+    document.getElementById('analysis-panel').style.display = 'flex';
+    document.getElementById('panel-title').innerText = contract.contract_code;
+    document.getElementById('panel-vendor').innerText = contract.contract_name;
 
-const mobileBtn = document.getElementById('mobileUsageBtn');
-if(mobileBtn) mobileBtn.classList.remove('expanded');
-        document.body.classList.add('analysis-active');
-        document.getElementById('analysis-panel').style.display = 'flex';
-        document.getElementById('panel-title').innerText = contract.contract_code;
-        document.getElementById('panel-vendor').innerText = contract.contract_name;
+    currentContract = contract;
 
-        currentContract = contract;
-
-        try {
-            const [resW, resI] = await Promise.all([
-                fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}&select=interim_no,section_category`, { headers }),
-                fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${currentContract.id}&order=date_received.asc&select=claim_breakdown`, { headers })
-            ]);
-
-            currentWO = await resW.json();
-            const currentInterims = await resI.json();
-
-            selectedSections = (currentContract.selected_sections && currentContract.selected_sections.length > 0) 
-                ? currentContract.selected_sections 
-                : Object.keys(currentContract.contract_sections_breakdown || {});
+    try {
+        const [resW, resI] = await Promise.all([
+            // 1. Abaikan status CANCEL & REJ dari senarai Work Orders
+            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}&status=not.in.(CANCEL,REJ)&select=interim_no,section_category,status`, { headers }),
             
-            renderUI(currentInterims);
-        } catch (error) { 
-            console.error(error); 
-        }
+            // 2. Ambil data interims/claims yang berkaitan
+            fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${currentContract.id}&order=date_received.asc&select=claim_breakdown`, { headers })
+        ]);
+
+        let rawWO = await resW.json();
+        
+        // Penyesuaian: Mengubah huruf / penandaan status 'Claimed' kepada 'CLAIMED' sekiranya wujud
+        currentWO = rawWO.map(wo => {
+            if (wo.status && wo.status.toLowerCase() === 'claimed') {
+                wo.status = 'CLAIMED';
+            }
+            return wo;
+        });
+
+        const currentInterims = await resI.json();
+
+        selectedSections = (currentContract.selected_sections && currentContract.selected_sections.length > 0) 
+            ? currentContract.selected_sections 
+            : Object.keys(currentContract.contract_sections_breakdown || {});
+        
+        renderUI(currentInterims);
+    } catch (error) { 
+        console.error("Error fetching analysis data:", error); 
     }
+}
 
     async function renderUI(currentInterims = []) {
         if(!currentContract) return;
