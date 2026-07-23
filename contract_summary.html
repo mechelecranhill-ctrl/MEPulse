@@ -7,7 +7,7 @@
     <style>
         body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f5f7fb; color: #333; }
         .loader { text-align: center; }
-        </style>
+    </style>
 
     <link rel="stylesheet" href="style.css">
 
@@ -57,12 +57,21 @@ async function startAutoDownload() {
         const [conRes, intRes, woRes] = await Promise.all([
             fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}`, { headers }),
             fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=created_at.asc`, { headers }),
-            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}`, { headers })
+            // 1. TAMBAH PENAPIS: Abaikan status CANCEL dan REJ
+            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&status=not.in.(CANCEL,REJ)`, { headers })
         ]);
 
         const contracts = await conRes.json();
         const interims = await intRes.json();
-        const workorders = await woRes.json();
+        let rawWorkorders = await woRes.json();
+
+        // 2. PENYERAGAMAN: Tukar sebarang status 'Claimed' / 'claimed' kepada 'CLAIMED'
+        const workorders = rawWorkorders.map(w => {
+            if (w.status && w.status.toUpperCase() === 'CLAIMED') {
+                w.status = 'CLAIMED';
+            }
+            return w;
+        });
     
         if (contracts && contracts.length > 0) {
             const c = contracts[0];
@@ -87,9 +96,6 @@ async function startAutoDownload() {
             const voBreakdown = c.vo_breakdown || {};
             const wb = XLSX.utils.book_new();
 
-            // ===== Padankan setiap interim ikut NOMBOR INTERIM SEBENAR (interim_no),
-            // bukan ikut urutan rekod dimasukkan (created_at). Ini elak masalah
-            // "Interim 1" terpapar data Interim 29 sekiranya ia dimasukkan dahulu. =====
             const interimByNo = {};
             let maxInterimNo = 0;
             interims.forEach(int => {
@@ -148,11 +154,8 @@ async function startAutoDownload() {
                         row.push(val || 0);
                     }
 
-                    let ongoingExtraForSec = 0; // NON SOR untuk section ini
-                    // Dikira semula setiap table set (nilainya sama sebab diambil dari
-                    // work_orders, bukan dari data interim per-set) supaya baris NON SOR
-                    // boleh dipaparkan di SETIAP table, bukan hanya table terakhir.
-                    workorders.filter(w => w.status !== 'Claimed').forEach(w => {
+                    let ongoingExtraForSec = 0; 
+                    workorders.filter(w => w.status !== 'CLAIMED').forEach(w => {
                         const cat = w.section_category || {};
                         ongoingExtraForSec += Number(cat[sec]?.extra || 0);
                     });
@@ -161,7 +164,7 @@ async function startAutoDownload() {
                         let totalClaimAll = 0;
                         interims.forEach(int => totalClaimAll += Number(int.claim_breakdown?.[sec]?.amt || 0));
                         let ongoing = 0;
-                        workorders.filter(w => w.status !== 'Claimed').forEach(w => {
+                        workorders.filter(w => w.status !== 'CLAIMED').forEach(w => {
                             const cat = w.section_category || {};
                             ongoing += Number(cat[sec]?.amt || 0);
                             if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) ongoing += Number(w.additional || 0);
@@ -182,7 +185,6 @@ async function startAutoDownload() {
                         merges.push({ s: { r: nonSorRowIdx, c: 1 }, e: { r: nonSorRowIdx, c: 2 } });
                     }
 
-                    // ===== VO ROWS (samakan dengan dashboard) =====
                     Object.entries(voBreakdown).forEach(([voName, voData]) => {
                         if (voData && voData.breakdown && voData.breakdown[sec]) {
                             const voContractAmt = Number(voData.breakdown[sec].amt || 0);
@@ -216,7 +218,7 @@ async function startAutoDownload() {
                     });
                 });
 
-                                const addSpecialRow = (label, interimKey, isNet = false) => {
+                const addSpecialRow = (label, interimKey, isNet = false) => {
                     const rIdx = ws_data.length;
                     let row = ["", label, "", 0];
                     if(isNet) {
@@ -238,13 +240,12 @@ async function startAutoDownload() {
                             Object.values(voBreakdown).forEach(vo => { totalContractAmt += Number(vo.amt || 0); });
                             
                             let totalOngoingSum = 0;
-                            workorders.filter(w => w.status !== 'Claimed').forEach(w => {
+                            workorders.filter(w => w.status !== 'CLAIMED').forEach(w => {
                                 if(w.section_category) {
                                     sectionNames.forEach(s => totalOngoingSum += Number(w.section_category[s]?.amt || 0));
                                 } else { totalOngoingSum += Number(w.total_amount || 0); }
                             });
 
-                            // --- LOGIK INTEGRASI PENALTY KE BAKI KONTRAK ---
                             let totalClaimAllSections = 0;
                             let totalPgSum = 0;
                             let totalSalvageSum = 0;
@@ -267,7 +268,6 @@ async function startAutoDownload() {
                                 });
                             });
 
-                            // Formula baki mengambil kira - Penalty & - Tax
                             const totalBalance = totalContractAmt - totalClaimAllSections + totalSalvageSum + totalPgSum - totalTaxSum - totalPenaltySum;
                             
                             row.push(totalClaimSum, totalBalance, totalOngoingSum, (totalBalance - totalOngoingSum));
@@ -277,19 +277,15 @@ async function startAutoDownload() {
                     merges.push({ s: { r: rIdx, c: 1 }, e: { r: rIdx, c: 2 } });
                 };
 
-                // PANGGILAN BARIS KHAS (Termasuk Penalty)
                 addSpecialRow("PERFORMANCE GUARANTEE SUM", "performance_guarantee_sum");
                 addSpecialRow("SALVAGE VALUE", "salvage_value");
                 addSpecialRow("TAX", "tax");
-                addSpecialRow("PENALTY", "penalty"); // <--- BARIS BARU BARU DITAMBAH
+                addSpecialRow("PENALTY", "penalty");
                 addSpecialRow("TOTAL BRING TO INTERIM PAYMENT", "", true);
                 ws_data.push([]); 
  
             }
 
-            // ===== Bilangan lajur INTERIM: default 1-10, 11-20, 21-26.
-            // Kalau jumlah interim SEBENAR lebih besar dari 26, tambah lajur secara automatik
-            // dalam kumpulan 10. Kalau tidak, kekal seperti sedia ada (default). =====
             buildTableSet(1, 10, false);
             buildTableSet(11, 20, false);
 
@@ -345,9 +341,7 @@ async function startAutoDownload() {
 
                     if (rowDesc) {
                         const isVoRow = rowDesc.includes("↳");
-                        // 1. Logik Warna Latar Belakang
                         if (isVoRow) {
-                            // baris VO - tiada fill khas, guna font merah sahaja
                         }
                         else if (rowDesc.includes("LABOUR") || rowDesc.includes("WORKMANSHIP")) {
                             ws[cellRef].s.fill = { fgColor: { rgb: "FFCC99" } };
@@ -358,14 +352,12 @@ async function startAutoDownload() {
                         else if (rowDesc.includes("REFURBISHMENT")) {
                             ws[cellRef].s.fill = { fgColor: { rgb: "A9A9A9" } };
                         }
-                        // 2. Logik BOLD & FONT HITAM (Untuk semua baris total di bahagian bawah)
                         if (isVoRow) {
                             ws[cellRef].s.font = { color: { rgb: "C0392B" }, italic: true };
                         }
                         else if (rowDesc.includes("TOTAL BRING TO INTERIM")) {
                             ws[cellRef].s.font = { bold: true, color: { rgb: "000000" } };
                         } else {
-                            // Pastikan font selain header/total tetap hitam tapi tak bold 
                             if (!ws[cellRef].s.font) ws[cellRef].s.font = {};
                             ws[cellRef].s.font.color = { rgb: "000000" };
                         }
@@ -389,7 +381,7 @@ async function startAutoDownload() {
                 interims.forEach(int => totalClaimed += Number(int.claim_breakdown?.[sec]?.amt || 0));
                 
                 let ongoing = 0;
-                workorders.filter(w => w.status !== 'Claimed').forEach(w => {
+                workorders.filter(w => w.status !== 'CLAIMED').forEach(w => {
                     const cat = w.section_category || {};
                     ongoing += Number(cat[sec]?.amt || 0);
                     if (sec === "PROVISIONAL SUM" && !cat["PROVISIONAL SUM"]) ongoing += Number(w.additional || 0);
@@ -456,7 +448,7 @@ async function startAutoDownload() {
             XLSX.utils.book_append_sheet(wb, ws2, "Budget Usage");
             
             // ==========================================
-            // SHEET 3: LIST WORK ORDER (IKUT PECAHAN DAERAH)
+            // SHEET 3: LIST WORK ORDER
             // ==========================================
 
             const districtString = c.district || "SEGAMAT,MUAR,BATU PAHAT,KLUANG,MERSING";
@@ -465,7 +457,6 @@ async function startAutoDownload() {
             const allSectionKeys = Object.keys(sections || {});
             const selectedSections = c.selected_sections || [];
 
-            // Section "asas" (kekal walaupun tiada dalam selected_sections)
             const isBaseSection = (key) => {
                 const desc = (sections[key]?.desc || key).toUpperCase();
                 return desc.includes("LABOUR") ||
@@ -475,26 +466,18 @@ async function startAutoDownload() {
                     desc.includes("PROVISIONAL");
             };
 
-            // Susunan kekal ikut urutan asal A,B,C,D,E... (tiada .sort() supaya
-            // susunan sentiasa ikut kedudukan asal dalam contract_sections_breakdown).
-            // Section asas (LABOUR/SPARE/PROVISIONAL/dll) sentiasa dikekalkan, dan
-            // sebarang section TAMBAHAN yang dipilih dalam selected_sections turut disertakan.
             const dynamicSectionKeys = allSectionKeys.filter(key =>
                 isBaseSection(key) || selectedSections.includes(key)
             );
 
-            // Warna bagi setiap section (LABOUR=oren, SPARE/PROVISIONAL=kuning,
-            // REFURBISHMENT=kelabu gelap, tambahan dari selected_sections=kelabu)
             const getSectionColor = (key) => {
                 const desc = (sections[key]?.desc || key).toUpperCase();
                 if (desc.includes("LABOUR") || desc.includes("WORKMANSHIP")) return "FFCC99";
                 if (desc.includes("SPARE") || desc.includes("PROVISIONAL")) return "FFFF00";
                 if (desc.includes("REFURBISHMENT")) return "A9A9A9";
-                return "D9D9D9"; // tambahan dari selected_sections
+                return "D9D9D9";
             };
 
-            // Bina senarai lajur (columnDefs): setiap section biasa, dan khas untuk
-            // PROVISIONAL SUM disisipkan satu lajur tambahan "NON SOR" di sebelahnya.
             let columnDefs = [];
             dynamicSectionKeys.forEach(key => {
                 columnDefs.push({ key, label: sections[key]?.desc || key, isExtra: false });
@@ -510,394 +493,285 @@ async function startAutoDownload() {
             let currentMerges = [];
 
             daerahList.forEach((daerah) => {
-                // 1. Kenalpasti baris permulaan untuk daerah ini 
                 const startRow = ws3_data.length;
                 const lastColIdx = 3 + (sectionCount * 2) + 2;
    
-                // Tajuk Daerah & Header
                 ws3_data.push([daerah.toUpperCase()]); 
                 ws3_data.push([]);
                 ws3_data.push(["SENARAI PERMOHONAN KERJA-KERJA KONTRAK PENYELENGGARAAN"]);
                 ws3_data.push([]);
     
-                // BARIS 5: Tajuk Utama (Merge Quotation & Payment mengikut bilangan seksyen)
-    let h1 = ["NO.", "DESCRIPTION", "LOCATION", "WORK ORDER", "QUOTATION"];
-    for(let i=0; i < sectionCount - 1; i++) h1.push(""); // Padding untuk merge Quotation
-    h1.push("PAYMENT");
-    for(let i=0; i < sectionCount - 1; i++) h1.push(""); // Padding untuk merge Payment
-    h1.push("QUOTATION APPROVAL DATE", "STATUS / PAID AS PER INTERIM NO");
-    ws3_data.push(h1);
+                let h1 = ["NO.", "DESCRIPTION", "LOCATION", "WORK ORDER", "QUOTATION"];
+                for(let i=0; i < sectionCount - 1; i++) h1.push("");
+                h1.push("PAYMENT");
+                for(let i=0; i < sectionCount - 1; i++) h1.push("");
+                h1.push("QUOTATION APPROVAL DATE", "STATUS / PAID AS PER INTERIM NO");
+                ws3_data.push(h1);
 
-    // BARIS 6: Tajuk Seksyen Dinamik (E.g. SECTION C, SECTION D... + NON SOR)
-    let h2 = ["", "", "", ""];
-    columnDefs.forEach(col => {
-    h2.push(col.label);
-});
+                let h2 = ["", "", "", ""];
+                columnDefs.forEach(col => {
+                    h2.push(col.label);
+                });
 
-columnDefs.forEach(col => {
-    h2.push(col.label);
-});
-    h2.push("", "");
-    ws3_data.push(h2);
+                columnDefs.forEach(col => {
+                    h2.push(col.label);
+                });
+                h2.push("", "");
+                ws3_data.push(h2);
 
-    // BARIS 7: Unit (RM)
-    let h3 = ["", "", "", ""];
-    for(let i=0; i < (sectionCount * 2); i++) h3.push("(RM)");
-    h3.push("", "");
-    ws3_data.push(h3);
+                let h3 = ["", "", "", ""];
+                for(let i=0; i < (sectionCount * 2); i++) h3.push("(RM)");
+                h3.push("", "");
+                ws3_data.push(h3);
 
-    // LOGIK MERGE DINAMIK
                 currentMerges.push({ s: { r: startRow, c: 0 }, e: { r: startRow, c: lastColIdx } }); 
                 currentMerges.push({ s: { r: startRow + 2, c: 0 }, e: { r: startRow + 2, c: lastColIdx } }); 
     
-    // Merge NO, DESC, LOC, WO (Vertical)
-    [0, 1, 2, 3].forEach(cIdx => {
-        currentMerges.push({ s: { r: startRow + 4, c: cIdx }, e: { r: startRow + 6, c: cIdx } });
-    });
-    
-    // Merge QUOTATION & PAYMENT (Horizontal)
-    currentMerges.push({ s: { r: startRow + 4, c: 4 }, e: { r: startRow + 4, c: 4 + sectionCount - 1 } });
-    currentMerges.push({ s: { r: startRow + 4, c: 4 + sectionCount }, e: { r: startRow + 4, c: 4 + (sectionCount * 2) - 1 } });
+                [0, 1, 2, 3].forEach(cIdx => {
+                    currentMerges.push({ s: { r: startRow + 4, c: cIdx }, e: { r: startRow + 6, c: cIdx } });
+                });
+                
+                currentMerges.push({ s: { r: startRow + 4, c: 4 }, e: { r: startRow + 4, c: 4 + sectionCount - 1 } });
+                currentMerges.push({ s: { r: startRow + 4, c: 4 + sectionCount }, e: { r: startRow + 4, c: 4 + (sectionCount * 2) - 1 } });
 
-    // Merge DATE & STATUS (Vertical)
-    currentMerges.push({ s: { r: startRow + 4, c: 4 + (sectionCount * 2) }, e: { r: startRow + 6, c: 4 + (sectionCount * 2) } });
-    currentMerges.push({ s: { r: startRow + 4, c: 4 + (sectionCount * 2) + 1 }, e: { r: startRow + 6, c: 4 + (sectionCount * 2) + 1 } });
+                currentMerges.push({ s: { r: startRow + 4, c: 4 + (sectionCount * 2) }, e: { r: startRow + 6, c: 4 + (sectionCount * 2) } });
+                currentMerges.push({ s: { r: startRow + 4, c: 4 + (sectionCount * 2) + 1 }, e: { r: startRow + 6, c: 4 + (sectionCount * 2) + 1 } });
 
-    const filteredWO = workorders
-    .filter(wo => (wo.district || "").toUpperCase() === daerah.toUpperCase())
-    .sort((a, b) => {
-        return (a.sequence_no || "").localeCompare(
-            (b.sequence_no || ""),
-            undefined,
-            { numeric: true, sensitivity: 'base' }
-        );
-    });
+                const filteredWO = workorders
+                .filter(wo => (wo.district || "").toUpperCase() === daerah.toUpperCase())
+                .sort((a, b) => {
+                    return (a.sequence_no || "").localeCompare(
+                        (b.sequence_no || ""),
+                        undefined,
+                        { numeric: true, sensitivity: 'base' }
+                    );
+                });
                 let totalCols = 4 + (sectionCount * 2) + 2;
                 let dTotals = new Array(totalCols).fill(0);
     
-    if (filteredWO.length > 0) {
-        filteredWO.forEach((wo, index) => {
-            const cat = wo.section_category || {};
-            let rowData = [index + 1, wo.description || "-", wo.location || "-", wo.work_id || "-"];
-            
-            // Masukkan data Quotation
-            columnDefs.forEach((col, kIdx) => {
-                const amt = col.isExtra ? Number(cat[col.key]?.extra || 0) : Number(cat[col.key]?.amt || 0);
-                const quotationVal = (wo.status === 'Claimed') ? 0 : amt;
-                rowData.push(quotationVal);
-                dTotals[kIdx] += quotationVal;
-            });
+                if (filteredWO.length > 0) {
+                    filteredWO.forEach((wo, index) => {
+                        const cat = wo.section_category || {};
+                        let rowData = [index + 1, wo.description || "-", wo.location || "-", wo.work_id || "-"];
+                        
+                        columnDefs.forEach((col, kIdx) => {
+                            const amt = col.isExtra ? Number(cat[col.key]?.extra || 0) : Number(cat[col.key]?.amt || 0);
+                            const quotationVal = (wo.status === 'CLAIMED') ? 0 : amt;
+                            rowData.push(quotationVal);
+                            dTotals[kIdx] += quotationVal;
+                        });
 
-            // Masukkan data Payment (Jika Claimed)
-            columnDefs.forEach((col, kIdx) => {
-                const amt = col.isExtra ? Number(cat[col.key]?.extra || 0) : Number(cat[col.key]?.amt || 0);
-                const paymentVal = (wo.status === 'Claimed') ? amt : 0;
-                rowData.push(paymentVal);
-                dTotals[sectionCount + kIdx] += paymentVal;
+                        columnDefs.forEach((col, kIdx) => {
+                            const amt = col.isExtra ? Number(cat[col.key]?.extra || 0) : Number(cat[col.key]?.amt || 0);
+                            const paymentVal = (wo.status === 'CLAIMED') ? amt : 0;
+                            rowData.push(paymentVal);
+                            dTotals[sectionCount + kIdx] += paymentVal;
+                        });
 
-            });
+                        rowData.push(formatShortDate(wo.qpb_date));
+                        rowData.push(wo.status === 'CLAIMED' ? `INT ${wo.interim_no}` : (wo.status || "PENDING"));
+                        
+                        ws3_data.push(rowData);
+                    });
+                }
 
-            rowData.push(formatShortDate(wo.qpb_date));
-            rowData.push(wo.status === 'Claimed' ? `INT ${wo.interim_no}` : (wo.status || "PENDING"));
-            
-            ws3_data.push(rowData);
-        });
-    }
-                // 2. MASUKKAN GRAND TOTAL
-const totalRowIdx = ws3_data.length;
+                const totalRowIdx = ws3_data.length;
+                let grandTotalRow = Array(totalCols).fill("");
 
-let grandTotalRow = Array(totalCols).fill("");
+                grandTotalRow[0] = "GRAND TOTAL";
 
-grandTotalRow[0] = "GRAND TOTAL";
+                for (let i = 0; i < sectionCount; i++) {
+                    grandTotalRow[4 + i] = dTotals[i] || 0;
+                }
 
-// QUOTATION TOTAL PER SECTION
-for (let i = 0; i < sectionCount; i++) {
-    grandTotalRow[4 + i] = dTotals[i] || 0;
-}
+                for (let i = 0; i < sectionCount; i++) {
+                    grandTotalRow[4 + sectionCount + i] = dTotals[sectionCount + i] || 0;
+                }
 
-// PAYMENT TOTAL PER SECTION
-for (let i = 0; i < sectionCount; i++) {
-    grandTotalRow[4 + sectionCount + i] = dTotals[sectionCount + i] || 0;
-}
-                // TOTAL SEMUA SECTION (quotation + payment)
-let overallGrandTotal = 0;
+                let overallGrandTotal = 0;
+                for (let i = 0; i < sectionCount; i++) {
+                    overallGrandTotal += Number(dTotals[i] || 0);
+                    overallGrandTotal += Number(dTotals[sectionCount + i] || 0);
+                }
 
-for (let i = 0; i < sectionCount; i++) {
-    overallGrandTotal += Number(dTotals[i] || 0); // quotation
-    overallGrandTotal += Number(dTotals[sectionCount + i] || 0); // payment
-}
+                grandTotalRow[totalCols - 1] = overallGrandTotal;
+                ws3_data.push(grandTotalRow);
 
-// letak dekat kolum paling hujung
-grandTotalRow[totalCols - 1] = overallGrandTotal;
+                currentMerges.push({
+                    s: { r: totalRowIdx, c: 0 },
+                    e: { r: totalRowIdx, c: 3 }
+                });
 
-ws3_data.push(grandTotalRow);
-
-// merge kiri
-currentMerges.push({
-    s: { r: totalRowIdx, c: 0 },
-    e: { r: totalRowIdx, c: 3 }
-});
-                // jarak antara daerah
-ws3_data.push([]);
-ws3_data.push([]);
-ws3_data.push([]);
-                
+                ws3_data.push([]);
+                ws3_data.push([]);
+                ws3_data.push([]);
             });
 
             const ws3 = XLSX.utils.aoa_to_sheet(ws3_data);
             ws3["!merges"] = currentMerges;
 
-            // 4. Styling Dinamik untuk Sheet 3
+            for (let r = 0; r < ws3_data.length; r++) {
 
-for (let r = 0; r < ws3_data.length; r++) {
+                const isGrandTotalRow = ws3_data[r] && ws3_data[r][0] === "GRAND TOTAL";
+                const currentLastCol = 3 + (sectionCount * 2) + 2;
 
-    const isGrandTotalRow = ws3_data[r] && ws3_data[r][0] === "GRAND TOTAL";
-    const currentLastCol = 3 + (sectionCount * 2) + 2;
+                for (let c = 0; c <= currentLastCol; c++) {
 
-    for (let c = 0; c <= currentLastCol; c++) {
+                    const ref = XLSX.utils.encode_cell({ r: r, c: c });
 
-        const ref = XLSX.utils.encode_cell({ r: r, c: c });
+                    if (!ws3[ref]) {
+                        ws3[ref] = { v: "", t: "s", s: {} };
+                    }
 
-        if (!ws3[ref]) {
-            ws3[ref] = { v: "", t: "s", s: {} };
-        }
+                    if (!ws3[ref].s) ws3[ref].s = {};
 
-        if (!ws3[ref].s) ws3[ref].s = {};
+                    const val = ws3[ref].v ? ws3[ref].v.toString() : "";
 
-        const val = ws3[ref].v ? ws3[ref].v.toString() : "";
-
-        // =========================
-        // DEFAULT ALIGNMENT
-        // =========================
-        ws3[ref].s.alignment = {
-            horizontal: "center",
-            vertical: "center",
-            wrapText: true
-        };
-
-        if (c === 1) {
-            ws3[ref].s.alignment.horizontal = "left";
-        }
-
-        // =========================
-// HEADER STYLE
-// =========================
-if (
-    daerahList.includes(val) ||
-    val.includes("SENARAI PERMOHONAN") ||
-    val === "NO." ||
-    val === "DESCRIPTION" ||
-    val === "LOCATION" ||
-    val === "WORK ORDER" ||
-    val === "QUOTATION" ||
-    val === "PAYMENT" ||
-    val === "(RM)" || 
-    val === "QUOTATION APPROVAL DATE" ||
-    val === "STATUS / PAID AS PER INTERIM NO" ||
-
-    // tambah section description sekali (termasuk label NON SOR)
-    columnDefs.some(col => val === col.label)
-) {
-
-    ws3[ref].s.fill = {
-        fgColor: { rgb: "EAEAEA" } // kelabu
-    };
-
-    ws3[ref].s.font = {
-        bold: true,
-        color: { rgb: "000000" }
-    };
-
-    ws3[ref].s.alignment = {
-        horizontal: "center",
-        vertical: "center",
-        wrapText: true
-    };
-}
-
-        // =========================
-        // BORDER
-        // =========================
-        if (
-            r > 0 &&
-            ws3_data[r] &&
-            ws3_data[r].length > 0 &&
-            !daerahList.includes(ws3_data[r][0])
-        ) {
-
-            ws3[ref].s.border = {
-                top: { style: "thin" },
-                bottom: { style: "thin" },
-                left: { style: "thin" },
-                right: { style: "thin" }
-            };
-        }
-
-        // =========================
-        // GRAND TOTAL STYLE
-        // =========================
-        if (isGrandTotalRow) {
-
-            ws3[ref].s.font = {
-                bold: true
-            };
-
-            ws3[ref].s.fill = {
-                fgColor: { rgb: "EAEAEA" }
-            };
-
-            ws3[ref].s.border = {
-                top: { style: "double" },
-                bottom: { style: "double" },
-                left: { style: "double" },
-                right: { style: "double" }
-            };
-
-            if (c === 0) {
-                ws3[ref].s.alignment = {
-                    horizontal: "center",
-                    vertical: "center"
-                };
-            }
-        }
-
-        // =========================
-        // NUMBER FORMAT + WARNA
-        // =========================
-        if (r > 6 && typeof ws3[ref].v === 'number') {
-
-            let currentSecIdx;
-
-            // QUOTATION SECTION
-            if (c >= 4 && c < 4 + sectionCount) {
-                currentSecIdx = c - 4;
-            }
-
-            // PAYMENT SECTION
-            else if (
-                c >= 4 + sectionCount &&
-                c < 4 + (sectionCount * 2)
-            ) {
-                currentSecIdx = c - (4 + sectionCount);
-            }
-
-            if (currentSecIdx !== undefined) {
-
-                const colDef = columnDefs[currentSecIdx];
-                const secKey = colDef.key;
-                const secColor = getSectionColor(secKey);
-
-                // CHECK ADA PAYMENT / INTERIM
-// =========================
-// HIGHLIGHT ROW CLAIMED
-// =========================
-
-const isPaymentColumn = (
-    c >= 4 + sectionCount &&
-    c < 4 + (sectionCount * 2)
-);
-
-const hasInterim = Number(ws3[ref].v || 0) > 0;
-
-// highlight row claimed sahaja
-// EXCLUDE grand total
-if (
-    isPaymentColumn &&
-    hasInterim &&
-    !isGrandTotalRow
-) {
-
-    for (let cc = 0; cc <= currentLastCol; cc++) {
-
-        const rowRef = XLSX.utils.encode_cell({
-            r: r,
-            c: cc
-        });
-
-        if (!ws3[rowRef]) continue;
-
-        if (!ws3[rowRef].s) ws3[rowRef].s = {};
-
-        // jangan overwrite header
-        const rowVal = ws3[rowRef].v
-            ? ws3[rowRef].v.toString()
-            : "";
-
-        const isHeaderCell =
-            rowVal === "NO." ||
-            rowVal === "DESCRIPTION" ||
-            rowVal === "LOCATION" ||
-            rowVal === "WORK ORDER" ||
-            rowVal === "QUOTATION" ||
-            rowVal === "PAYMENT" ||
-            rowVal === "(RM)" ||
-            rowVal === "QUOTATION APPROVAL DATE" ||
-            rowVal === "STATUS / PAID AS PER INTERIM NO";
-
-        if (!isHeaderCell) {
-
-            ws3[rowRef].s.fill = {
-                fgColor: { rgb: "C6EFCE" }
-            };
-
-            ws3[rowRef].s.font = {
-                ...(ws3[rowRef].s.font || {}),
-                color: { rgb: "006100" }
-            };
-        }
-    }
-}
-                // Warna lajur ikut section (LABOUR=oren, SPARE/PROVISIONAL=kuning,
-                // REFURBISHMENT=kelabu gelap, tambahan selected_sections=kelabu).
-                // Lajur NON SOR turut guna warna section induknya (PROVISIONAL).
-                if (!isPaymentColumn) {
-                    ws3[ref].s.fill = {
-                        fgColor: { rgb: secColor }
+                    ws3[ref].s.alignment = {
+                        horizontal: "center",
+                        vertical: "center",
+                        wrapText: true
                     };
+
+                    if (c === 1) {
+                        ws3[ref].s.alignment.horizontal = "left";
+                    }
+
+                    if (
+                        daerahList.includes(val) ||
+                        val.includes("SENARAI PERMOHONAN") ||
+                        val === "NO." ||
+                        val === "DESCRIPTION" ||
+                        val === "LOCATION" ||
+                        val === "WORK ORDER" ||
+                        val === "QUOTATION" ||
+                        val === "PAYMENT" ||
+                        val === "(RM)" || 
+                        val === "QUOTATION APPROVAL DATE" ||
+                        val === "STATUS / PAID AS PER INTERIM NO" ||
+                        columnDefs.some(col => val === col.label)
+                    ) {
+                        ws3[ref].s.fill = { fgColor: { rgb: "EAEAEA" } };
+                        ws3[ref].s.font = { bold: true, color: { rgb: "000000" } };
+                        ws3[ref].s.alignment = { horizontal: "center", vertical: "center", wrapText: true };
+                    }
+
+                    if (
+                        r > 0 &&
+                        ws3_data[r] &&
+                        ws3_data[r].length > 0 &&
+                        !daerahList.includes(ws3_data[r][0])
+                    ) {
+                        ws3[ref].s.border = {
+                            top: { style: "thin" },
+                            bottom: { style: "thin" },
+                            left: { style: "thin" },
+                            right: { style: "thin" }
+                        };
+                    }
+
+                    if (isGrandTotalRow) {
+                        ws3[ref].s.font = { bold: true };
+                        ws3[ref].s.fill = { fgColor: { rgb: "EAEAEA" } };
+                        ws3[ref].s.border = {
+                            top: { style: "double" },
+                            bottom: { style: "double" },
+                            left: { style: "double" },
+                            right: { style: "double" }
+                        };
+
+                        if (c === 0) {
+                            ws3[ref].s.alignment = { horizontal: "center", vertical: "center" };
+                        }
+                    }
+
+                    if (r > 6 && typeof ws3[ref].v === 'number') {
+                        let currentSecIdx;
+
+                        if (c >= 4 && c < 4 + sectionCount) {
+                            currentSecIdx = c - 4;
+                        }
+                        else if (c >= 4 + sectionCount && c < 4 + (sectionCount * 2)) {
+                            currentSecIdx = c - (4 + sectionCount);
+                        }
+
+                        if (currentSecIdx !== undefined) {
+                            const colDef = columnDefs[currentSecIdx];
+                            const secKey = colDef.key;
+                            const secColor = getSectionColor(secKey);
+
+                            const isPaymentColumn = (c >= 4 + sectionCount && c < 4 + (sectionCount * 2));
+                            const hasInterim = Number(ws3[ref].v || 0) > 0;
+
+                            if (isPaymentColumn && hasInterim && !isGrandTotalRow) {
+                                for (let cc = 0; cc <= currentLastCol; cc++) {
+                                    const rowRef = XLSX.utils.encode_cell({ r: r, c: cc });
+                                    if (!ws3[rowRef]) continue;
+                                    if (!ws3[rowRef].s) ws3[rowRef].s = {};
+
+                                    const rowVal = ws3[rowRef].v ? ws3[rowRef].v.toString() : "";
+                                    const isHeaderCell =
+                                        rowVal === "NO." ||
+                                        rowVal === "DESCRIPTION" ||
+                                        rowVal === "LOCATION" ||
+                                        rowVal === "WORK ORDER" ||
+                                        rowVal === "QUOTATION" ||
+                                        rowVal === "PAYMENT" ||
+                                        rowVal === "(RM)" ||
+                                        rowVal === "QUOTATION APPROVAL DATE" ||
+                                        rowVal === "STATUS / PAID AS PER INTERIM NO";
+
+                                    if (!isHeaderCell) {
+                                        ws3[rowRef].s.fill = { fgColor: { rgb: "C6EFCE" } };
+                                        ws3[rowRef].s.font = {
+                                            ...(ws3[rowRef].s.font || {}),
+                                            color: { rgb: "006100" }
+                                        };
+                                    }
+                                }
+                            }
+
+                            if (!isPaymentColumn) {
+                                ws3[ref].s.fill = { fgColor: { rgb: secColor } };
+                            }
+                            if (isGrandTotalRow) {
+                                ws3[ref].s.font = {
+                                    ...(ws3[ref].s.font || {}),
+                                    bold: true,
+                                    color: { rgb: "000000" }
+                                };
+                            }
+                        }
+
+                        ws3[ref].t = 'n';
+                        ws3[ref].z = fmtCurrency;
+                    }
                 }
-                if (isGrandTotalRow) {
-
-    ws3[ref].s.font = {
-        ...(ws3[ref].s.font || {}),
-        bold: true,
-        color: { rgb: "000000" }
-    };
-}
-            }
-
-            ws3[ref].t = 'n';
-            ws3[ref].z = fmtCurrency;
-        }
-    }
-}  
+            }  
 
             ws3["!rows"] = ws3_data.map(() => ({ hpt: 15.75 }));
             let ws3Cols = [
-    { wch: 5 },   // NO
-    { wch: 40 },  // DESCRIPTION
-    { wch: 20 },  // LOCATION
-    { wch: 15 }   // WORK ORDER
-];
+                { wch: 5 },   // NO
+                { wch: 40 },  // DESCRIPTION
+                { wch: 20 },  // LOCATION
+                { wch: 15 }   // WORK ORDER
+            ];
 
-// quotation columns
-for(let i=0; i<sectionCount; i++) {
-    ws3Cols.push({ wch: 12 });
-}
+            for(let i=0; i<sectionCount; i++) {
+                ws3Cols.push({ wch: 12 });
+            }
 
-// payment columns
-for(let i=0; i<sectionCount; i++) {
-    ws3Cols.push({ wch: 12 });
-}
+            for(let i=0; i<sectionCount; i++) {
+                ws3Cols.push({ wch: 12 });
+            }
 
-// final columns
-ws3Cols.push({ wch: 15 });
-ws3Cols.push({ wch: 20 });
+            ws3Cols.push({ wch: 15 });
+            ws3Cols.push({ wch: 20 });
 
-ws3["!cols"] = ws3Cols;
+            ws3["!cols"] = ws3Cols;
 
             XLSX.utils.book_append_sheet(wb, ws3, "List Work Order");
 
-// ===== PWA SAFE DOWNLOAD LOGIC =====
             const wbout = XLSX.write(wb, {
                 bookType: 'xlsx',
                 type: 'array'
@@ -912,7 +786,6 @@ ws3["!cols"] = ws3Cols;
             const statusText = document.getElementById('status-text');
             const subText = document.getElementById('sub-text');
 
-            // Fungsi untuk proses muat turun
             const triggerDownload = () => {
                 const a = document.createElement("a");
                 a.href = url;
@@ -927,7 +800,6 @@ ws3["!cols"] = ws3Cols;
                 }, 1000);
             };
 
-            // Paparkan butang untuk PWA
             statusText.innerText = "Fail Sedia!";
             subText.innerText = "Sila klik butang di bawah jika muat turun tidak bermula.";
             btn.style.display = "inline-block";
@@ -936,7 +808,6 @@ ws3["!cols"] = ws3Cols;
                 triggerDownload();
             };
 
-            // Cuba trigger automatik
             try {
                 triggerDownload();
             } catch (e) {
