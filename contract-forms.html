@@ -861,35 +861,35 @@
                 });
 
                 for(const workIdValue of currentWorkIds){
-    const payload = perWorkIdPayload[workIdValue]; if(!payload) continue;
-    const checkRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}`, { headers });
-    const existing = await checkRes.json();
+                    const payload = perWorkIdPayload[workIdValue]; if(!payload) continue;
+                    const checkRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}`, { headers });
+                    const existing = await checkRes.json();
 
-    if(existing.length > 0){
-        const existingStatus = existing[0].status || '';
-        const isRejected = existingStatus.includes('REJ');
+                    if(existing.length > 0){
+                        const existingStatus = existing[0].status || '';
+                        const isRejected = existingStatus.includes('REJ');
 
-        const patchPayload = {
-            ...payload,
-            sequence_no: sequenceToUse,
-            district: districtSelected
-        };
+                        const patchPayload = {
+                            ...payload,
+                            sequence_no: sequenceToUse,
+                            district: districtSelected
+                        };
 
-        if(isRejected){
-            patchPayload.status = 'BLUEFORM';
-            patchPayload.reject_reason = null;
-            patchPayload.revision_in_progress = false; // ⬅️ clear flag lepas submit sebenar
-        }
+                        if(isRejected){
+                            patchPayload.status = 'BLUEFORM';
+                            patchPayload.reject_reason = null;
+                            patchPayload.revision_in_progress = false;
+                        }
 
-        await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`, {
-            method: 'PATCH', headers, body: JSON.stringify(patchPayload)
-        });
-    }else{
-        await fetch(`${SB_URL}/rest/v1/work_orders`, {
-            method: 'POST', headers, body: JSON.stringify(payload)
-        });
-    }
-}
+                        await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`, {
+                            method: 'PATCH', headers, body: JSON.stringify(patchPayload)
+                        });
+                    }else{
+                        await fetch(`${SB_URL}/rest/v1/work_orders`, {
+                            method: 'POST', headers, body: JSON.stringify(payload)
+                        });
+                    }
+                }
 
                 originalLoadedWorkIds.filter(id => !currentWorkIds.includes(id)).forEach(async (removedId) => {
                     await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(removedId)}`, { method: 'DELETE', headers });
@@ -917,10 +917,6 @@
 
                 const primaryWorkId = currentWorkIds[0];
 
-                // === Semak & arkibkan quotation QUO-REJ sedia ada untuk work_id ini ===
-                // Kalau work_id ini ada rekod QUO-REJ lama, arkibkan fail lama (rename jadi
-                // {work_id}_REJECTEDn_{tarikh}) dan padam rekod lama tu (List + Supabase)
-                // supaya tak bertindih dengan quotation baru yang akan didaftarkan di bawah.
                 try {
                     const rejCheckRes = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(primaryWorkId)}&status=eq.QUO-REJ&select=*`, { headers });
                     const rejRows = await rejCheckRes.json();
@@ -931,28 +927,23 @@
                     }
                 } catch (archiveErr) {
                     console.error("Gagal arkibkan quotation rejected lama:", archiveErr);
-                    // Teruskan proses upload baru walaupun arkib gagal, supaya technician tidak terhalang.
                 }
 
-                // 🚀 Panggil fungsi OneDrive Uploader untuk proses fail ke cloud
-                // Parameter: fileInputId, workId, unitText, statusDivId, hiddenUrlInputId
                 await uploadQuotationToOneDrive('q_pdf_file', primaryWorkId, unitText, 'q_upload_status', 'q_pdf_url');
 
-                // Ambil nilai yang dijana oleh uploader dari hidden input
                 const generatedPdfUrl = document.getElementById('q_pdf_url').value;
                 if(!generatedPdfUrl) {
                     alert("Proses upload OneDrive gagal. Data Supabase tidak disimpan.");
                     return;
                 }
                 
-                // Simpan satu-satunya Work Order ID ke Supabase bersama rujukan nama fail OneDrive tadi
                 const payload = {
-    work_id: primaryWorkId,
-    contract_code: contractCode,
-    status: 'QUOTATION',
-    pdf_url: generatedPdfUrl,
-    qpd_date: document.getElementById('q_qpb_date').value || null
-};
+                    work_id: primaryWorkId,
+                    contract_code: contractCode,
+                    status: 'QUOTATION',
+                    pdf_url: generatedPdfUrl,
+                    qpd_date: document.getElementById('q_qpb_date').value || null
+                };
 
                 const res = await fetch(`${SB_URL}/rest/v1/quotations`, { method: 'POST', headers, body: JSON.stringify(payload) });
 
@@ -1320,7 +1311,7 @@
                 const findRes = await fetch(`${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}&select=id`, { headers });
                 const rows = await findRes.json();
                 if (rows.length > 0) {
-                    await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${rows[0].id}`, { method: 'PATCH', headers, body: JSON.stringify({ interim_no: iNo, status: 'Claimed' }) });
+                    await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${rows[0].id}`, { method: 'PATCH', headers, body: JSON.stringify({ interim_no: iNo, status: 'CLAIMED' }) });
                 }
             }
             alert(currentInterimId ? "Interim berjaya dikemaskini!" : "Interim berjaya direkodkan!"); location.reload();
@@ -1594,7 +1585,7 @@
     });
 </script>
 
-<script src="onedrive-uploader.js"></script>
+<script src="uploader.js"></script>
 
 </body>
 </html>
