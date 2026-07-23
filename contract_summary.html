@@ -57,8 +57,10 @@ async function startAutoDownload() {
         const [conRes, intRes, woRes] = await Promise.all([
             fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}`, { headers }),
             fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=created_at.asc`, { headers }),
-            // 1. TAMBAH PENAPIS: Abaikan status CANCEL dan REJ
-            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&status=not.in.(CANCEL,REJ)`, { headers })
+            // 1. PENAPIS DITAMBAHBAIK:
+            // - status=not.ilike.*REJ* -> Membuang sebarang status yang ada 'REJ' (EXEC-REJ, HOS-REJ, HOD-REJ, REJ, etc.)
+            // - status=neq.CANCEL      -> Membuang status CANCEL
+            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&status=not.ilike.*REJ*&status=neq.CANCEL`, { headers })
         ]);
 
         const contracts = await conRes.json();
