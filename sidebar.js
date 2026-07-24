@@ -1,4 +1,4 @@
-Class AppSidebar extends HTMLElement {
+class AppSidebar extends HTMLElement {
     connectedCallback() { 
         const staffName = localStorage.getItem("staff_name") || "USER";
         const staffRole = localStorage.getItem("role") || "STAFF";
