@@ -1,4 +1,4 @@
-class AppSidebar extends HTMLElement {
+Class AppSidebar extends HTMLElement {
     connectedCallback() { 
         const staffName = localStorage.getItem("staff_name") || "USER";
         const staffRole = localStorage.getItem("role") || "STAFF";
@@ -40,7 +40,6 @@ class AppSidebar extends HTMLElement {
                         Dashboard-Approvals <span class="arrow">▼</span>
                     </a>
                     <div class="submenu" id="quotationMenu">
-                        <!-- Updated to app-tech.html -->
                         <a href="app-tech.html" class="menu-link">Technician</a>
                         <a href="app-exec.html" class="menu-link">Executive</a>
                         <a href="app-sect.html" class="menu-link">Section Head</a>
@@ -131,7 +130,7 @@ class AppSidebar extends HTMLElement {
         this.querySelector("#cancelLogout").onclick = () => this.logoutModal.classList.remove("active");
         this.querySelector("#confirmLogout").onclick = () => this.logout();
 
-        // Section Links
+        // Section Links Click
         this.subLinks.forEach(link => {
             link.addEventListener("click", (e) => {
                 e.preventDefault();
@@ -149,27 +148,55 @@ class AppSidebar extends HTMLElement {
             });
             if (!res.ok) return;
             const sections = await res.json();
+            
             this.subLinks.forEach(a => {
                 const match = sections.find(s => s.section_name === a.dataset.section);
                 if (match) a.dataset.sectionId = match.id;
             });
-        } catch (e) { console.error(e); }
+
+            // Kemas kini semula status aktif selepas sectionId dimasukkan
+            this.setActiveMenu();
+        } catch (e) { 
+            console.error("Error loading dashboard links:", e); 
+        }
     }
 
     setActiveMenu() {
-        const path = window.location.pathname.split("/").pop();
-        
-        // Highlight active sub-page
-        this.menuLinks.forEach(link => {
-            if (link.getAttribute("href") === path) link.classList.add("active");
-        });
+        const fullPath = window.location.pathname.split("/").pop();
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentSectionId = urlParams.get("section");
 
-        // Included app-tech.html to auto-expand the dropdown when active
+        // Bersihkan kelas active terdahulu
+        this.menuLinks.forEach(link => link.classList.remove("active"));
+
+        // 1. Semakan untuk Submenu Dashboard-Contracts
+        if (fullPath === "dashboard-contract.html") {
+            this.dashboardMenu.classList.add("open");
+            this.dashArrow.innerText = "▲";
+
+            if (currentSectionId) {
+                this.subLinks.forEach(link => {
+                    if (link.dataset.sectionId === currentSectionId) {
+                        link.classList.add("active");
+                    }
+                });
+            }
+        }
+
+        // 2. Semakan untuk Submenu Dashboard-Approvals
         const quotePages = ['app-tech.html', 'app-exec.html', 'app-sect.html', 'app-dept.html'];
-        if (quotePages.includes(path)) {
+        if (quotePages.includes(fullPath)) {
             this.quotationMenu.classList.add("open");
             this.quoteArrow.innerText = "▲";
         }
+
+        // 3. Highlight pautan halaman biasa
+        this.menuLinks.forEach(link => {
+            const href = link.getAttribute("href");
+            if (href && href !== "#" && href === fullPath) {
+                link.classList.add("active");
+            }
+        });
     }
 
     toggle() {
