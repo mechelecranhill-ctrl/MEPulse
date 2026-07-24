@@ -6,7 +6,7 @@
 
 <title>M&E Connect Sign In</title>
 
-<link rel="preload" href="fish.svg" as="image" type="image/svg+xml">
+<link rel="preload" href="Pickup.png" as="image" type="image/png">
 <link rel="preload" href="logo.svg" as="image" type="image/svg+xml">
 <link href="https://fonts.googleapis.com/css?family=Lato:300,400&display=swap" rel="stylesheet">
 <link rel="stylesheet"
@@ -227,10 +227,11 @@ body{
 .fish{
     position:absolute;
 
-    width:140px;
+    /* Dilaraskan saiz untuk pikap supaya lebih selim/sesuai */
+    width:180px;
     height:auto;
 
-    right:-220px;
+    right:-250px;
     top:42%;
 
     transform:translateY(-50%);
@@ -251,7 +252,7 @@ body{
 @keyframes fishSwim{
 
     0%{
-        right:-220px;
+        right:-250px;
         opacity:0;
 
         transform:
@@ -562,7 +563,8 @@ input{
 <div class="header">
 
     <div class="inner-header flex">
-<img src="fish.svg" class="fish">
+        <!-- Ditukar kepada Pickup.png -->
+        <img src="Pickup.png" class="fish">
 
         <div class="logo-click">
 
@@ -671,11 +673,6 @@ const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
 
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
 
-// PENTING: guna nama lain (sbClient) — jangan namakan const sebagai "supabase",
-// sebab "supabase" dah jadi objek global (window.supabase) bila CDN
-// @supabase/supabase-js dimuatkan. const supabase = supabase.createClient(...)
-// akan clash dengan global tu dan bagi ralat "Identifier 'supabase' has
-// already been declared".
 window.sbClient = window.sbClient || supabase.createClient(SB_URL, SB_KEY);
 const sbClient = window.sbClient;
 
@@ -688,7 +685,6 @@ async function login(){
         return;
     }
 
-    // 1. MASTER ADMIN (@dm1n) - Kekalkan fungsi bypass sedia ada anda
     if(employeeId === "@dm1n" && pass === "@AnakAnakSyurga1"){
         localStorage.setItem("loggedIn","true");
         localStorage.setItem("userId", "@dm1n");
@@ -701,7 +697,6 @@ async function login(){
         return;
     }
 
-    // 2. CARI EMEL BERDASARKAN EMPLOYEE ID (staff isi Employee ID, bukan emel)
     try {
         const { data: lookupData, error: lookupError } = await sbClient
             .from('staff')
@@ -716,9 +711,6 @@ async function login(){
 
         const staffEmail = lookupData.email;
 
-        // 3. LOGIN MENGGUNAKAN SUPABASE AUTH API (guna emel yang dah dicari)
-        console.log("Cuba login dengan emel:", staffEmail);
-
         const { data: authData, error: authError } = await sbClient.auth.signInWithPassword({
             email: staffEmail,
             password: pass
@@ -730,7 +722,6 @@ async function login(){
             return;
         }
 
-        // Ambil data profil penuh daripada jadual staff menggunakan UUID (authData.user.id)
         const { data: staffData, error: staffError } = await sbClient
             .from('staff')
             .select('*')
@@ -742,25 +733,20 @@ async function login(){
             return;
         }
 
-        // JIKA BERJAYA, SIMPAN DATA SESI
-localStorage.setItem("loggedIn","true");
-localStorage.setItem("userId", staffData.employee_id);
-localStorage.setItem("role", staffData.position);
-localStorage.setItem("staff_name", staffData.name);
-localStorage.setItem("staff_avatar", staffData.avatar_url || "");
-localStorage.setItem("me_user", staffData.employee_id);
-localStorage.setItem("lastActivity", Date.now());
-localStorage.removeItem("sessionExpired");
+        localStorage.setItem("loggedIn","true");
+        localStorage.setItem("userId", staffData.employee_id);
+        localStorage.setItem("role", staffData.position);
+        localStorage.setItem("staff_name", staffData.name);
+        localStorage.setItem("staff_avatar", staffData.avatar_url || "");
+        localStorage.setItem("me_user", staffData.employee_id);
+        localStorage.setItem("lastActivity", Date.now());
+        localStorage.removeItem("sessionExpired");
 
-// ==========================================
-// TAMBAH BARIS INI UNTUK SIMPAN TOKEN JWT RLS
-// ==========================================
-if (authData.session && authData.session.access_token) {
-    localStorage.setItem("supabase_token", authData.session.access_token);
-}
-// ==========================================
+        if (authData.session && authData.session.access_token) {
+            localStorage.setItem("supabase_token", authData.session.access_token);
+        }
 
-window.location.href = "sections.html";
+        window.location.href = "sections.html";
 
     } catch(err){
         console.error(err);
@@ -840,13 +826,13 @@ if(savedUser){
         ripples.forEach(r => {
             r.classList.add("start");
         });
-setTimeout(()=>{
+        setTimeout(()=>{
 
-    document
-    .getElementById("loginBox")
-    .classList.add("show");
+            document
+            .getElementById("loginBox")
+            .classList.add("show");
 
-},3200);
+        },3200);
 
     }
 
