@@ -214,6 +214,30 @@
                 <input type="date" id="tq_qpb_date" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5">
             </div>
             <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">District</label>
+                <select id="tq_dist" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5">
+                    <option value="">Choose Contract First</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Location</label>
+                <input type="text" id="tq_location" placeholder="Location" class="w-full text-sm border border-gray-300 rounded-lg p-2.5">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Work Description</label>
+                <textarea id="tq_description" rows="2" placeholder="Work Description" class="w-full text-sm border border-gray-300 rounded-lg p-2.5"></textarea>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cost Breakdown</label>
+                <div id="tq_breakdown_container" class="grid grid-cols-1 gap-2 mt-1">
+                    <p class="text-[10px] text-gray-400 italic">Choose Contract to load cost breakdown sections.</p>
+                </div>
+            </div>
+            <div class="flex justify-between items-center bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
+                <strong class="text-sm text-gray-700">Total:</strong>
+                <span id="tq_total_display" class="text-emerald-600 font-extrabold text-sm">RM 0.00</span>
+            </div>
+            <div>
                 <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Upload Document (PDF)</label>
                 <div id="tq_dropzone" onclick="document.getElementById('tq_pdf_file').click()" class="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center transition-all cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/30">
                     <input type="file" id="tq_pdf_file" accept="application/pdf" required class="hidden">
@@ -413,6 +437,7 @@
 
         // ============ QUOTATION MODAL LOGIC ============
         let quotationModalInitialized = false;
+        let tqCurrentContractSections = {};
 
         function normalizeWorkId(raw){
             raw = (raw || '').trim().toUpperCase();
@@ -433,7 +458,10 @@
         function resetQuotationModalForm() {
             document.getElementById('techQuotationForm').reset();
             document.getElementById('tq_contract_id').innerHTML = '<option value="">Choose Unit First</option>';
+            document.getElementById('tq_dist').innerHTML = '<option value="">Choose Contract First</option>';
             document.getElementById('tq_pdf_url').value = '';
+            tqCurrentContractSections = {};
+            tqRenderBreakdown();
             clearSelectedFile();
             document.getElementById('tq_upload_status').classList.add('hidden');
         }
@@ -454,15 +482,70 @@
             if(!unitId){ contractSelect.innerHTML = '<option value="">Choose Unit First</option>'; return; }
             contractSelect.innerHTML = '<option value="">Loading...</option>';
             try {
-                const res = await fetch(`${SB_URL}/rest/v1/contract?select=id,contract_code&unit_id=eq.${unitId}`, { headers: qHeaders });
+                const res = await fetch(`${SB_URL}/rest/v1/contract?select=id,contract_code,district,contract_sections_breakdown&unit_id=eq.${unitId}`, { headers: qHeaders });
                 const data = await res.json();
                 contractSelect.innerHTML = '<option value="">Choose Contract</option>';
                 data.forEach(c => {
                     const opt = document.createElement('option');
                     opt.value = c.id; opt.text = c.contract_code;
+                    opt.dataset.b = JSON.stringify(c.contract_sections_breakdown);
+                    opt.dataset.dist = (c.district || '').toUpperCase();
                     contractSelect.appendChild(opt);
                 });
             } catch(e) { console.error(e); }
+        }
+
+        function tqOnContractSelect() {
+            const opt = document.getElementById('tq_contract_id').selectedOptions[0];
+            const dSel = document.getElementById('tq_dist');
+            dSel.innerHTML = '<option value="">Choose District</option>';
+
+            if(opt && opt.dataset.dist){
+                opt.dataset.dist.split(',').forEach(d => {
+                    const district = d.trim();
+                    if(district) dSel.innerHTML += `<option value="${district}">${district}</option>`;
+                });
+            }
+            tqCurrentContractSections = (opt && opt.dataset.b) ? JSON.parse(opt.dataset.b) : {};
+            tqRenderBreakdown();
+        }
+
+        function tqRenderBreakdown(saved = {}) {
+            const container = document.getElementById('tq_breakdown_container');
+            if(!container) return;
+
+            const sections = Object.keys(tqCurrentContractSections || {});
+            if(sections.length === 0){
+                container.innerHTML = '<p class="text-[10px] text-gray-400 italic">Choose Contract to load cost breakdown sections.</p>';
+                tqCalcTotal();
+                return;
+            }
+
+            let html = '';
+            sections.sort().forEach(sec => {
+                const desc = tqCurrentContractSections[sec].desc || '';
+                const data = saved[sec] || {};
+                const amt = Number(data.amt || 0);
+                const extra = Number(data.extra || 0);
+                html += `
+                    <div class="bg-white border border-gray-200 rounded-lg p-2">
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase">${sec}</label>
+                        <span class="block text-[9px] text-gray-400 mb-1">${desc}</span>
+                        <input type="text" class="tq_sec_amt w-full text-sm border border-gray-300 rounded-lg p-2" data-sec="${sec}" data-raw-value="${amt}" value="${amt.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}" oninput="woFormatCurrencyInput(this); tqCalcTotal();">
+                        ${desc.toUpperCase().includes('PROVISIONAL') ? `<input type="text" class="tq_sec_extra w-full text-sm border border-gray-300 rounded-lg p-2 mt-1" data-sec="${sec}" data-raw-value="${extra}" value="${extra.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}" oninput="woFormatCurrencyInput(this); tqCalcTotal();">` : ''}
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+            tqCalcTotal();
+        }
+
+        function tqCalcTotal() {
+            let total = 0;
+            document.querySelectorAll('#tq_breakdown_container .tq_sec_amt').forEach(i => { total += parseFloat(i.dataset.rawValue || 0); });
+            document.querySelectorAll('#tq_breakdown_container .tq_sec_extra').forEach(i => { total += parseFloat(i.dataset.rawValue || 0); });
+            const el = document.getElementById('tq_total_display');
+            if(el) el.innerText = `RM ${total.toLocaleString(undefined,{minimumFractionDigits:2})}`;
         }
 
         function assignFileToInput(inputEl, file) {
@@ -766,7 +849,10 @@
                     const filter = currentIds.map(id => `work_id.eq.${encodeURIComponent(id)}`).join(',');
                     const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&or=(${filter})&select=*`, { headers: qHeaders });
                     const matches = await res.json();
-                    if(!Array.isArray(matches) || matches.length === 0) return;
+                    if(!Array.isArray(matches) || matches.length === 0) {
+                        await woAutofillFromQuotations(currentIds);
+                        return;
+                    }
 
                     const sequenceNo = matches[0].sequence_no;
                     const groupRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&sequence_no=eq.${encodeURIComponent(sequenceNo)}&select=*`, { headers: qHeaders });
@@ -777,6 +863,37 @@
                     woShowDetectModal(group);
                 } catch(err) { console.error(err); }
             }, 400);
+        }
+
+        async function woAutofillFromQuotations(workIds) {
+            try {
+                const filter = workIds.map(id => `work_id.eq.${encodeURIComponent(id)}`).join(',');
+                const res = await fetch(`${SB_URL}/rest/v1/quotations?or=(${filter})&select=work_id,district,location,description,section_category`, { headers: qHeaders });
+                const quotes = await res.json();
+                if(!Array.isArray(quotes) || quotes.length === 0) return;
+
+                let districtToSet = null;
+                quotes.forEach(q => {
+                    const hasData = q.location || q.description || (q.section_category && Object.keys(q.section_category).length > 0);
+                    if(!woWorkIdCardDataMap[q.work_id] && hasData){
+                        woWorkIdCardDataMap[q.work_id] = {
+                            location: q.location || '',
+                            description: q.description || '',
+                            section_category: structuredClone(q.section_category || {})
+                        };
+                    }
+                    if(!districtToSet && q.district) districtToSet = q.district;
+                });
+
+                const distSel = document.getElementById('wo_dist');
+                if(distSel && !distSel.value && districtToSet){
+                    distSel.value = districtToSet;
+                }
+
+                woRenderWorkIdCards(true);
+            } catch(err) {
+                console.error('Failed to autofill blueform from quotations:', err);
+            }
         }
 
         function woShowDetectModal(group) {
@@ -1145,6 +1262,7 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('tq_unit_id')?.addEventListener('change', tqLoadContracts);
+            document.getElementById('tq_contract_id')?.addEventListener('change', tqOnContractSelect);
             document.getElementById('tq_pdf_file')?.addEventListener('change', (e) => {
                 if(e.target.files[0]) showFilePreview(e.target.files[0]);
             });
@@ -1231,12 +1349,33 @@
                         return;
                     }
 
+                    const tqDistrict = document.getElementById('tq_dist').value;
+                    const tqLocation = (document.getElementById('tq_location').value || '').toUpperCase();
+                    const tqDescription = (document.getElementById('tq_description').value || '').toUpperCase();
+
+                    const tqBreakdown = {};
+                    let tqTotalAmount = 0, tqAdditionalTotal = 0;
+                    document.querySelectorAll('#tq_breakdown_container .tq_sec_amt').forEach(i => {
+                        const sec = i.dataset.sec;
+                        const base = parseFloat(i.dataset.rawValue || 0);
+                        const extraInput = document.querySelector(`#tq_breakdown_container .tq_sec_extra[data-sec="${sec}"]`);
+                        const extra = parseFloat(extraInput?.dataset.rawValue || 0);
+                        tqBreakdown[sec] = { amt: base, extra: extra };
+                        tqTotalAmount += base; tqAdditionalTotal += extra;
+                    });
+
                     const payload = {
                         work_id: primaryWorkId,
                         contract_id: contractId,
                         status: 'QUOTATION',
                         pdf_url: generatedPdfUrl,
                         qpd_date: document.getElementById('tq_qpb_date').value || null,
+                        district: tqDistrict,
+                        location: tqLocation,
+                        description: tqDescription,
+                        section_category: tqBreakdown,
+                        additional: tqAdditionalTotal,
+                        amount_spent: tqTotalAmount + tqAdditionalTotal,
                         revision_in_progress: false,
                         reject_reason: null
                     };
