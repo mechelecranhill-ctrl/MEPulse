@@ -764,69 +764,78 @@
         }
 
         function woRenderWorkIdCards(skipSave = false) {
-            const container = document.getElementById('wo_id_cards_container');
-            if(!container) return;
+    const container = document.getElementById('wo_id_cards_container');
+    if(!container) return;
 
-            if(!skipSave){
-                document.querySelectorAll('.wo-id-card').forEach(card => {
-                    const workId = card.dataset.workId; if(!workId) return;
-                    if(!woWorkIdCardDataMap[workId]) woWorkIdCardDataMap[workId] = {};
-                    woWorkIdCardDataMap[workId].location = card.querySelector('.wo_card_location')?.value || '';
-                    woWorkIdCardDataMap[workId].description = card.querySelector('.wo_card_desc')?.value || '';
-                    if(!woWorkIdCardDataMap[workId].section_category) woWorkIdCardDataMap[workId].section_category = {};
+    if(!skipSave){
+        document.querySelectorAll('.wo-id-card').forEach(card => {
+            const workId = card.dataset.workId; if(!workId) return;
+            if(!woWorkIdCardDataMap[workId]) woWorkIdCardDataMap[workId] = {};
+            woWorkIdCardDataMap[workId].location = card.querySelector('.wo_card_location')?.value || '';
+            woWorkIdCardDataMap[workId].description = card.querySelector('.wo_card_desc')?.value || '';
+            if(!woWorkIdCardDataMap[workId].section_category) woWorkIdCardDataMap[workId].section_category = {};
 
-                    card.querySelectorAll('.wo_sec_amt').forEach(input => {
-                        const sec = input.dataset.sec;
-                        if(!woWorkIdCardDataMap[workId].section_category[sec]) woWorkIdCardDataMap[workId].section_category[sec] = {};
-                        woWorkIdCardDataMap[workId].section_category[sec].amt = parseFloat(input.dataset.rawValue || 0);
-                    });
-                    card.querySelectorAll('.wo_sec_extra').forEach(input => {
-                        const sec = input.dataset.sec;
-                        if(!woWorkIdCardDataMap[workId].section_category[sec]) woWorkIdCardDataMap[workId].section_category[sec] = {};
-                        woWorkIdCardDataMap[workId].section_category[sec].extra = parseFloat(input.dataset.rawValue || 0);
-                    });
-                });
-            }
-
-            const currentIds = woGetCurrentWorkIdsFromRows();
-            container.innerHTML = '';
-            currentIds.forEach(workId => {
-                const saved = woWorkIdCardDataMap[workId] || {};
-                const breakdown = saved.section_category || {};
-                const card = document.createElement('div');
-                card.className = 'wo-id-card bg-gray-50 border border-gray-200 rounded-xl p-3';
-                card.dataset.workId = workId;
-
-                let html = `
-                    <span class="inline-block bg-blue-100 text-blue-800 text-[11px] font-bold px-2 py-0.5 rounded-full mb-2">${workId}</span>
-                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Location</label>
-                    <input type="text" class="wo_card_location w-full text-sm border border-gray-300 rounded-lg p-2 mb-2" value="${woEscapeAttr(saved.location || '')}" placeholder="Location">
-                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Work Description</label>
-                    <textarea class="wo_card_desc w-full text-sm border border-gray-300 rounded-lg p-2 mb-2" rows="2" placeholder="Description for ${workId}">${woEscapeAttr(saved.description || '')}</textarea>
-                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cost Breakdown</label>
-                    <div class="grid grid-cols-1 gap-2">
-                `;
-
-                Object.keys(woCurrentContractSections).sort().forEach(sec => {
-                    const desc = woCurrentContractSections[sec].desc || '';
-                    const data = breakdown[sec] || {};
-                    const amt = Number(data.amt || 0);
-                    const extra = Number(data.extra || 0);
-                    html += `
-                        <div class="bg-white border border-gray-200 rounded-lg p-2">
-                            <label class="block text-[10px] font-bold text-gray-500 uppercase">${sec}</label>
-                            <span class="block text-[9px] text-gray-400 mb-1">${desc}</span>
-                            <input type="text" class="wo_sec_amt w-full text-sm border border-gray-300 rounded-lg p-2" data-sec="${woEscapeAttr(sec)}" data-work-id="${woEscapeAttr(workId)}" data-raw-value="${amt}" value="${amt.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}" oninput="woFormatCurrencyInput(this); woCalcTotalWork();">
-                            ${desc.toUpperCase().includes('PROVISIONAL') ? `<input type="text" class="wo_sec_extra w-full text-sm border border-gray-300 rounded-lg p-2 mt-1" data-sec="${woEscapeAttr(sec)}" data-work-id="${woEscapeAttr(workId)}" data-raw-value="${extra}" value="${extra.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}" oninput="woFormatCurrencyInput(this); woCalcTotalWork();">` : ''}
-                        </div>
-                    `;
-                });
-                html += `</div>`;
-                card.innerHTML = html;
-                container.appendChild(card);
+            card.querySelectorAll('.wo_sec_amt').forEach(input => {
+                const sec = input.dataset.sec;
+                if(!woWorkIdCardDataMap[workId].section_category[sec]) woWorkIdCardDataMap[workId].section_category[sec] = {};
+                woWorkIdCardDataMap[workId].section_category[sec].amt = parseFloat(input.dataset.rawValue || 0);
             });
-            woCalcTotalWork();
-        }
+            card.querySelectorAll('.wo_sec_extra').forEach(input => {
+                const sec = input.dataset.sec;
+                if(!woWorkIdCardDataMap[workId].section_category[sec]) woWorkIdCardDataMap[workId].section_category[sec] = {};
+                woWorkIdCardDataMap[workId].section_category[sec].extra = parseFloat(input.dataset.rawValue || 0);
+            });
+        });
+    }
+
+    const currentIds = woGetCurrentWorkIdsFromRows();
+    container.innerHTML = '';
+    currentIds.forEach(workId => {
+        const saved = woWorkIdCardDataMap[workId] || {};
+        const breakdown = saved.section_category || {};
+        const card = document.createElement('div');
+        card.className = 'wo-id-card bg-gray-50 border border-gray-200 rounded-xl p-3';
+        card.dataset.workId = workId;
+
+        let html = `
+            <span class="inline-block bg-blue-100 text-blue-800 text-[11px] font-bold px-2 py-0.5 rounded-full mb-2">${workId}</span>
+            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Location</label>
+            <input type="text" class="wo_card_location w-full text-sm border border-gray-300 rounded-lg p-2 mb-2" value="${woEscapeAttr(saved.location || '')}" placeholder="Location">
+            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Work Description</label>
+            <textarea class="wo_card_desc w-full text-sm border border-gray-300 rounded-lg p-2 mb-2" rows="2" placeholder="Description for ${workId}">${woEscapeAttr(saved.description || '')}</textarea>
+            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cost Breakdown</label>
+            <div class="grid grid-cols-1 gap-2">
+        `;
+
+        // FIX 2: union antara seksyen kontrak SEMASA dan seksyen yang tersimpan dalam
+        // quotation/blueform lama, supaya nilai lama tak "hilang" bila key tak sepadan.
+        const allSections = new Set([
+            ...Object.keys(woCurrentContractSections || {}),
+            ...Object.keys(breakdown || {})
+        ]);
+
+        Array.from(allSections).sort().forEach(sec => {
+            const descMeta = woCurrentContractSections[sec];
+            const desc = descMeta ? (descMeta.desc || '') : '(seksyen lama - tiada dalam kontrak semasa)';
+            const data = breakdown[sec] || {};
+            const amt = Number(data.amt || 0);
+            const extra = Number(data.extra || 0);
+            const isProvisional = desc.toUpperCase().includes('PROVISIONAL');
+            html += `
+                <div class="bg-white border border-gray-200 rounded-lg p-2 ${!descMeta ? 'border-amber-300' : ''}">
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase">${sec}</label>
+                    <span class="block text-[9px] text-gray-400 mb-1">${desc}</span>
+                    <input type="text" class="wo_sec_amt w-full text-sm border border-gray-300 rounded-lg p-2" data-sec="${woEscapeAttr(sec)}" data-work-id="${woEscapeAttr(workId)}" data-raw-value="${amt}" value="${amt.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}" oninput="woFormatCurrencyInput(this); woCalcTotalWork();">
+                    ${isProvisional || extra ? `<input type="text" class="wo_sec_extra w-full text-sm border border-gray-300 rounded-lg p-2 mt-1" data-sec="${woEscapeAttr(sec)}" data-work-id="${woEscapeAttr(workId)}" data-raw-value="${extra}" value="${extra.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}" oninput="woFormatCurrencyInput(this); woCalcTotalWork();">` : ''}
+                </div>
+            `;
+        });
+        html += `</div>`;
+        card.innerHTML = html;
+        container.appendChild(card);
+    });
+    woCalcTotalWork();
+}
 
         function woCalcTotalWork() {
             let total = 0;
@@ -866,35 +875,49 @@
         }
 
         async function woAutofillFromQuotations(workIds) {
-            try {
-                const filter = workIds.map(id => `work_id.eq.${encodeURIComponent(id)}`).join(',');
-                const res = await fetch(`${SB_URL}/rest/v1/quotations?or=(${filter})&select=work_id,district,location,description,section_category`, { headers: qHeaders });
-                const quotes = await res.json();
-                if(!Array.isArray(quotes) || quotes.length === 0) return;
+    try {
+        const filter = workIds.map(id => `work_id.eq.${encodeURIComponent(id)}`).join(',');
+        const res = await fetch(`${SB_URL}/rest/v1/quotations?or=(${filter})&select=work_id,district,location,description,section_category`, { headers: qHeaders });
+        const quotes = await res.json();
+        if(!Array.isArray(quotes) || quotes.length === 0) return;
 
-                let districtToSet = null;
-                quotes.forEach(q => {
-                    const hasData = q.location || q.description || (q.section_category && Object.keys(q.section_category).length > 0);
-                    if(!woWorkIdCardDataMap[q.work_id] && hasData){
-                        woWorkIdCardDataMap[q.work_id] = {
-                            location: q.location || '',
-                            description: q.description || '',
-                            section_category: structuredClone(q.section_category || {})
-                        };
-                    }
-                    if(!districtToSet && q.district) districtToSet = q.district;
-                });
+        let districtToSet = null;
+        quotes.forEach(q => {
+            const hasData = q.location || q.description || (q.section_category && Object.keys(q.section_category).length > 0);
+            if(!woWorkIdCardDataMap[q.work_id] && hasData){
+                woWorkIdCardDataMap[q.work_id] = {
+                    location: q.location || '',
+                    description: q.description || '',
+                    section_category: structuredClone(q.section_category || {})
+                };
+            }
+            if(!districtToSet && q.district) districtToSet = q.district;
+        });
 
-                const distSel = document.getElementById('wo_dist');
-                if(distSel && !distSel.value && districtToSet){
-                    distSel.value = districtToSet;
-                }
-
-                woRenderWorkIdCards(true);
-            } catch(err) {
-                console.error('Failed to autofill blueform from quotations:', err);
+        // FIX 1: padankan district ikut nilai (bukan case-sensitive & tanpa ruang lebih),
+        // bukan sekadar assign terus yang boleh gagal senyap
+        const distSel = document.getElementById('wo_dist');
+        if(distSel && !distSel.value && districtToSet){
+            const target = districtToSet.trim().toUpperCase();
+            const matchOpt = Array.from(distSel.options).find(o => o.value.trim().toUpperCase() === target);
+            if(matchOpt){
+                distSel.value = matchOpt.value;
+            } else {
+                // Option tak wujud dalam senarai kontrak semasa — tambah supaya data tak hilang
+                const opt = document.createElement('option');
+                opt.value = districtToSet;
+                opt.text = districtToSet + ' (dari quotation)';
+                distSel.appendChild(opt);
+                distSel.value = districtToSet;
+                console.warn(`District "${districtToSet}" dari quotation tiada dalam senarai district kontrak semasa.`);
             }
         }
+
+        woRenderWorkIdCards(true);
+    } catch(err) {
+        console.error('Failed to autofill blueform from quotations:', err);
+    }
+}
 
         function woShowDetectModal(group) {
             const body = document.getElementById('woDetectModalBody');
