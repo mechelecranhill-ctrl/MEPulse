@@ -56,6 +56,9 @@
             background:#10b981; color:#fff; font-size:9px; margin-right:5px; flex-shrink:0;
         }
 
+        .wo-hold-row { cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: pan-y; }
+        .wo-hold-row:active { background-color: #eff6ff; }
+
         #blueform-section.q-drop-target-active {
             outline: 3px dashed #3b82f6; outline-offset: -3px;
             background-color: rgba(59,130,246,0.06); border-radius: 12px;
@@ -402,6 +405,20 @@
       </div>
     </div>
 
+    <!-- BLUEFORM ROW ACTION MODAL (Hold-to-open) -->
+<div id="woActionModalOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[9999] p-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full">
+    <div class="p-5 border-b border-gray-100">
+        <h3 class="text-base font-bold text-gray-800"><i class="fa-solid fa-bolt text-blue-500 mr-2"></i>Blueform Action</h3>
+        <p id="woActionModalWorkId" class="text-xs text-gray-400 mt-1"></p>
+    </div>
+    <div id="woActionModalBody" class="p-5 flex flex-col gap-2"></div>
+    <div class="p-5 border-t border-gray-100">
+        <button type="button" onclick="closeWoActionModal()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">Batal</button>
+    </div>
+  </div>
+</div>
+    
     <!-- QUOTATION DRAG GHOST -->
     <div id="qDragGhost"><i class="fa-solid fa-file-invoice-dollar"></i><span id="qDragGhostLabel"></span></div>
 
@@ -1137,6 +1154,143 @@
             woPendingDetect = null;
         }
 
+        // ============================================================
+// BLUEFORM ROW HOLD-TO-ACTION (EXEC-REJ / HOS-REJ / HOD-REJ / APP-HOD)
+// ============================================================
+let woHoldTimer = null;
+let woHoldStartXY = null;
+let woHoldMoved = false;
+const WO_HOLD_MS = 480;
+const WO_HOLD_MOVE_THRESHOLD = 10;
+let woActionCurrentItem = null;
+
+function woHandleRowPointerDown(e, encodedItem) {
+    if (e.target.closest('a, button')) return;
+    woHoldStartXY = { x: e.clientX, y: e.clientY };
+    woHoldMoved = false;
+    clearTimeout(woHoldTimer);
+
+    const item = JSON.parse(decodeURIComponent(encodedItem));
+    woHoldTimer = setTimeout(() => {
+        if (woHoldMoved) return;
+        if (navigator.vibrate) navigator.vibrate(35);
+        openWoActionModal(item);
+    }, WO_HOLD_MS);
+}
+
+function woHandleRowPointerMove(e) {
+    if (!woHoldStartXY) return;
+    const dx = e.clientX - woHoldStartXY.x;
+    const dy = e.clientY - woHoldStartXY.y;
+    if (Math.hypot(dx, dy) > WO_HOLD_MOVE_THRESHOLD) {
+        woHoldMoved = true;
+        clearTimeout(woHoldTimer);
+    }
+}
+
+function woHandleRowPointerUp() { clearTimeout(woHoldTimer); }
+function woHandleRowPointerCancel() { clearTimeout(woHoldTimer); }
+
+function openWoActionModal(item) {
+    woActionCurrentItem = item;
+    document.getElementById('woActionModalWorkId').textContent = `${item.work_id} — ${item.status}`;
+    const body = document.getElementById('woActionModalBody');
+    const isRejStatus = ['EXEC-REJ', 'HOS-REJ', 'HOD-REJ'].includes(item.status);
+    const isAppHod = item.status === 'APP-HOD';
+
+    let html = '';
+    if (isRejStatus) {
+        html += `
+            <button type="button" onclick="woActionCancelBlueform()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-ban mr-1"></i>CANCEL
+            </button>
+            <button type="button" onclick="woActionProcessResubmit()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-rotate mr-1"></i>PROCESS RESUBMIT
+            </button>
+        `;
+    } else if (isAppHod) {
+        html += `
+            <button type="button" onclick="woActionApprove()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-check-double mr-1"></i>APPROVED
+            </button>
+        `;
+    } else {
+        html = '<p class="text-xs text-gray-400 italic">No action available for this status.</p>';
+    }
+
+    body.innerHTML = html;
+    document.getElementById('woActionModalOverlay').classList.remove('hidden');
+}
+
+function closeWoActionModal() {
+    document.getElementById('woActionModalOverlay').classList.add('hidden');
+    woActionCurrentItem = null;
+}
+
+async function woActionCancelBlueform() {
+    if (!woActionCurrentItem) return;
+    const item = woActionCurrentItem;
+    if (!confirm(`Confirm CANCEL blueform ${item.work_id}?`)) return;
+
+    try {
+        const res = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${item.id}`, { headers: qHeaders });
+        const rows = await res.json();
+        if (!rows || rows.length === 0) throw new Error('Record not found.');
+        const rec = rows[0];
+
+        const zeroedBreakdown = {};
+        Object.keys(rec.section_category || {}).forEach(sec => {
+            zeroedBreakdown[sec] = { amt: 0, extra: 0 };
+        });
+
+        const patchRes = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${rec.id}`, {
+            method: 'PATCH',
+            headers: qHeaders,
+            body: JSON.stringify({
+                work_id: `${rec.work_id}-CNX`,
+                status: 'CANCEL',
+                section_category: zeroedBreakdown,
+                additional: 0,
+                amount_spent: 0
+            })
+        });
+        if (!patchRes.ok) throw new Error(`HTTP ${patchRes.status}`);
+
+        closeWoActionModal();
+        fetchTechnicianDashboard();
+    } catch (err) {
+        console.error('Failed to cancel blueform:', err);
+        alert('Failed to cancel blueform: ' + err.message);
+    }
+}
+
+async function woActionProcessResubmit() {
+    if (!woActionCurrentItem) return;
+    const workId = woActionCurrentItem.work_id;
+    closeWoActionModal();
+    await startRevision('BLUEFORM', workId);
+}
+
+async function woActionApprove() {
+    if (!woActionCurrentItem) return;
+    const item = woActionCurrentItem;
+    if (!confirm(`Confirm APPROVED for ${item.work_id}?`)) return;
+
+    try {
+        const { error } = await supabaseClient
+            .from('work_orders')
+            .update({ status: 'APPROVED' })
+            .eq('id', item.id);
+        if (error) throw error;
+
+        closeWoActionModal();
+        fetchTechnicianDashboard();
+    } catch (err) {
+        console.error('Failed to approve blueform:', err);
+        alert('Failed to approve blueform: ' + err.message);
+    }
+}
+
         async function woCancelOldRecordsForSaveAsNew(contractId) {
             for(const oldWorkId of woOriginalLoadedWorkIds){
                 try {
@@ -1746,11 +1900,16 @@ sectionHtml += `
                             actionBtnHtml = `<span class="text-[9px] text-gray-400 italic">Refer to first row of seq ${seq}</span>`;
                         }
 
-                        sectionHtml += `
-                            <tr class="hover:bg-gray-50 transition-colors">
-                                <td class="px-2 py-2 font-mono text-gray-900 font-semibold truncate" title="${item.work_id}${seq ? ` (${seq})` : ''}">
-                                    ${item.work_id}${seq ? `<span class="text-gray-400 font-normal">(${seq})</span>` : ''}
-                                </td>
+                        const canHold = ['EXEC-REJ', 'HOS-REJ', 'HOD-REJ', 'APP-HOD'].includes(item.status);
+const holdSlim = { id: item.id, work_id: item.work_id, status: item.status, sequence_no: item.sequence_no, district: item.district };
+const holdEncoded = encodeURIComponent(JSON.stringify(holdSlim));
+const holdAttrs = canHold ? `onpointerdown="woHandleRowPointerDown(event, '${holdEncoded}')" onpointermove="woHandleRowPointerMove(event)" onpointerup="woHandleRowPointerUp(event)" onpointerleave="woHandleRowPointerCancel(event)" onpointercancel="woHandleRowPointerCancel(event)"` : '';
+
+sectionHtml += `
+    <tr class="hover:bg-gray-50 transition-colors ${canHold ? 'wo-hold-row' : ''}" ${holdAttrs}>
+        <td class="px-2 py-2 font-mono text-gray-900 font-semibold truncate" title="${item.work_id}${seq ? ` (${seq})` : ''}">
+            ${item.work_id}${seq ? `<span class="text-gray-400 font-normal">(${seq})</span>` : ''}
+        </td>
                                 <td class="px-1 py-2">
                                     ${statusBadge}
                                 </td>
