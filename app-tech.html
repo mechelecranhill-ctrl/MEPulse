@@ -46,6 +46,38 @@
             box-sizing: border-box;
         }
 
+        /* ============ DRAG QUOTATION -> BLUEFORM STYLES ============ */
+        .q-drag-row { cursor: grab; user-select: none; -webkit-user-select: none; touch-action: pan-y; }
+        .q-drag-row.q-row-selected { background-color: #ecfdf5 !important; box-shadow: inset 0 0 0 1.5px #34d399; }
+        .q-drag-row.q-row-dragging-source { opacity: 0.4; }
+        .q-select-check {
+            display: inline-flex; align-items:center; justify-content:center;
+            width:15px; height:15px; border-radius:4px; border:1.5px solid #34d399;
+            background:#10b981; color:#fff; font-size:9px; margin-right:5px; flex-shrink:0;
+        }
+
+        #blueform-section.q-drop-target-active {
+            outline: 3px dashed #3b82f6; outline-offset: -3px;
+            background-color: rgba(59,130,246,0.06); border-radius: 12px;
+            transition: outline-color .15s ease;
+        }
+
+        #qDragGhost {
+            position: fixed; z-index: 100000; pointer-events: none; display:none;
+            background: #059669; color: #fff; font-size: 11px; font-weight: 800;
+            padding: 6px 12px; border-radius: 999px; box-shadow: 0 6px 20px rgba(0,0,0,.25);
+            align-items: center; gap: 6px; transform: translate(-50%, -140%);
+        }
+
+        #qSelectionToolbar {
+            position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+            z-index: 9990; background: #111827; color: #fff; padding: 8px 8px 8px 14px;
+            border-radius: 999px; display: none; align-items: center; gap: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,.35); font-size: 12px; font-weight: 700;
+        }
+        #qSelectionToolbar.active { display: flex; }
+        #qSelectionToolbar button { cursor: pointer; border: none; }
+
         /* Controls the appearance of multi-page printing */
         @media print {
             @page {
@@ -143,6 +175,9 @@
                 <div id="quotation-dropzone-hint" class="hidden mb-2 text-[10px] text-emerald-600 font-bold text-center bg-emerald-50 border border-dashed border-emerald-300 rounded-lg py-2">
                     <i class="fa-solid fa-file-arrow-up mr-1"></i>Drop a PDF file here to start a new quotation
                 </div>
+                <p class="text-[9px] text-gray-400 text-center mb-1 flex-shrink-0">
+                    <i class="fa-solid fa-hand-pointer mr-1"></i>Tekan &amp; tahan (touch) atau seret (mouse) baris untuk hantar ke Blueform
+                </p>
                 <div id="quotations-container" class="flex-1 overflow-y-auto space-y-4 pr-1">
                     <div class="text-center text-gray-400 py-4 text-xs">Loading quotation data...</div>
                 </div>
@@ -367,6 +402,18 @@
       </div>
     </div>
 
+    <!-- QUOTATION DRAG GHOST -->
+    <div id="qDragGhost"><i class="fa-solid fa-file-invoice-dollar"></i><span id="qDragGhostLabel"></span></div>
+
+    <!-- FLOATING SELECTION TOOLBAR (touch multi-select mode) -->
+    <div id="qSelectionToolbar">
+        <span id="qSelectionCount">0 dipilih</span>
+        <button onclick="qCancelSelectionMode()" class="bg-gray-700 hover:bg-gray-600 text-white text-[11px] px-3 py-1.5 rounded-full">Batal</button>
+        <button id="qSendToBlueformBtn" onpointerdown="qHandlePointerDown(event, null, true)" class="bg-blue-600 hover:bg-blue-700 text-white text-[11px] px-3 py-1.5 rounded-full inline-flex items-center gap-1">
+            <i class="fa-solid fa-arrow-right-to-bracket"></i> Hantar ke Blueform
+        </button>
+    </div>
+
     <script src="blueform.js"></script>
     <script>
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
@@ -579,6 +626,7 @@
 
         // ============ BLUEFORM MODAL LOGIC ============
         let blueformModalInitialized = false;
+        let blueformUnitsReadyPromise = null;
         let wo_workIdRowCounter = 0;
         let woOriginalLoadedWorkIds = [];
         let woCurrentWorkSequenceNo = null;
@@ -592,7 +640,7 @@
 
         function openBlueformModal() {
             if(!blueformModalInitialized){
-                woFetchUnits();
+                blueformUnitsReadyPromise = woFetchUnits();
                 woResetWorkIdRows();
                 blueformModalInitialized = true;
             }
@@ -764,78 +812,78 @@
         }
 
         function woRenderWorkIdCards(skipSave = false) {
-    const container = document.getElementById('wo_id_cards_container');
-    if(!container) return;
+            const container = document.getElementById('wo_id_cards_container');
+            if(!container) return;
 
-    if(!skipSave){
-        document.querySelectorAll('.wo-id-card').forEach(card => {
-            const workId = card.dataset.workId; if(!workId) return;
-            if(!woWorkIdCardDataMap[workId]) woWorkIdCardDataMap[workId] = {};
-            woWorkIdCardDataMap[workId].location = card.querySelector('.wo_card_location')?.value || '';
-            woWorkIdCardDataMap[workId].description = card.querySelector('.wo_card_desc')?.value || '';
-            if(!woWorkIdCardDataMap[workId].section_category) woWorkIdCardDataMap[workId].section_category = {};
+            if(!skipSave){
+                document.querySelectorAll('.wo-id-card').forEach(card => {
+                    const workId = card.dataset.workId; if(!workId) return;
+                    if(!woWorkIdCardDataMap[workId]) woWorkIdCardDataMap[workId] = {};
+                    woWorkIdCardDataMap[workId].location = card.querySelector('.wo_card_location')?.value || '';
+                    woWorkIdCardDataMap[workId].description = card.querySelector('.wo_card_desc')?.value || '';
+                    if(!woWorkIdCardDataMap[workId].section_category) woWorkIdCardDataMap[workId].section_category = {};
 
-            card.querySelectorAll('.wo_sec_amt').forEach(input => {
-                const sec = input.dataset.sec;
-                if(!woWorkIdCardDataMap[workId].section_category[sec]) woWorkIdCardDataMap[workId].section_category[sec] = {};
-                woWorkIdCardDataMap[workId].section_category[sec].amt = parseFloat(input.dataset.rawValue || 0);
+                    card.querySelectorAll('.wo_sec_amt').forEach(input => {
+                        const sec = input.dataset.sec;
+                        if(!woWorkIdCardDataMap[workId].section_category[sec]) woWorkIdCardDataMap[workId].section_category[sec] = {};
+                        woWorkIdCardDataMap[workId].section_category[sec].amt = parseFloat(input.dataset.rawValue || 0);
+                    });
+                    card.querySelectorAll('.wo_sec_extra').forEach(input => {
+                        const sec = input.dataset.sec;
+                        if(!woWorkIdCardDataMap[workId].section_category[sec]) woWorkIdCardDataMap[workId].section_category[sec] = {};
+                        woWorkIdCardDataMap[workId].section_category[sec].extra = parseFloat(input.dataset.rawValue || 0);
+                    });
+                });
+            }
+
+            const currentIds = woGetCurrentWorkIdsFromRows();
+            container.innerHTML = '';
+            currentIds.forEach(workId => {
+                const saved = woWorkIdCardDataMap[workId] || {};
+                const breakdown = saved.section_category || {};
+                const card = document.createElement('div');
+                card.className = 'wo-id-card bg-gray-50 border border-gray-200 rounded-xl p-3';
+                card.dataset.workId = workId;
+
+                let html = `
+                    <span class="inline-block bg-blue-100 text-blue-800 text-[11px] font-bold px-2 py-0.5 rounded-full mb-2">${workId}</span>
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Location</label>
+                    <input type="text" class="wo_card_location w-full text-sm border border-gray-300 rounded-lg p-2 mb-2" value="${woEscapeAttr(saved.location || '')}" placeholder="Location">
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Work Description</label>
+                    <textarea class="wo_card_desc w-full text-sm border border-gray-300 rounded-lg p-2 mb-2" rows="2" placeholder="Description for ${workId}">${woEscapeAttr(saved.description || '')}</textarea>
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cost Breakdown</label>
+                    <div class="grid grid-cols-1 gap-2">
+                `;
+
+                // Union antara seksyen kontrak SEMASA dan seksyen yang tersimpan dalam
+                // quotation/blueform lama, supaya nilai lama tak "hilang" bila key tak sepadan.
+                const allSections = new Set([
+                    ...Object.keys(woCurrentContractSections || {}),
+                    ...Object.keys(breakdown || {})
+                ]);
+
+                Array.from(allSections).sort().forEach(sec => {
+                    const descMeta = woCurrentContractSections[sec];
+                    const desc = descMeta ? (descMeta.desc || '') : '(seksyen lama - tiada dalam kontrak semasa)';
+                    const data = breakdown[sec] || {};
+                    const amt = Number(data.amt || 0);
+                    const extra = Number(data.extra || 0);
+                    const isProvisional = desc.toUpperCase().includes('PROVISIONAL');
+                    html += `
+                        <div class="bg-white border border-gray-200 rounded-lg p-2 ${!descMeta ? 'border-amber-300' : ''}">
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase">${sec}</label>
+                            <span class="block text-[9px] text-gray-400 mb-1">${desc}</span>
+                            <input type="text" class="wo_sec_amt w-full text-sm border border-gray-300 rounded-lg p-2" data-sec="${woEscapeAttr(sec)}" data-work-id="${woEscapeAttr(workId)}" data-raw-value="${amt}" value="${amt.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}" oninput="woFormatCurrencyInput(this); woCalcTotalWork();">
+                            ${isProvisional || extra ? `<input type="text" class="wo_sec_extra w-full text-sm border border-gray-300 rounded-lg p-2 mt-1" data-sec="${woEscapeAttr(sec)}" data-work-id="${woEscapeAttr(workId)}" data-raw-value="${extra}" value="${extra.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}" oninput="woFormatCurrencyInput(this); woCalcTotalWork();">` : ''}
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+                card.innerHTML = html;
+                container.appendChild(card);
             });
-            card.querySelectorAll('.wo_sec_extra').forEach(input => {
-                const sec = input.dataset.sec;
-                if(!woWorkIdCardDataMap[workId].section_category[sec]) woWorkIdCardDataMap[workId].section_category[sec] = {};
-                woWorkIdCardDataMap[workId].section_category[sec].extra = parseFloat(input.dataset.rawValue || 0);
-            });
-        });
-    }
-
-    const currentIds = woGetCurrentWorkIdsFromRows();
-    container.innerHTML = '';
-    currentIds.forEach(workId => {
-        const saved = woWorkIdCardDataMap[workId] || {};
-        const breakdown = saved.section_category || {};
-        const card = document.createElement('div');
-        card.className = 'wo-id-card bg-gray-50 border border-gray-200 rounded-xl p-3';
-        card.dataset.workId = workId;
-
-        let html = `
-            <span class="inline-block bg-blue-100 text-blue-800 text-[11px] font-bold px-2 py-0.5 rounded-full mb-2">${workId}</span>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Location</label>
-            <input type="text" class="wo_card_location w-full text-sm border border-gray-300 rounded-lg p-2 mb-2" value="${woEscapeAttr(saved.location || '')}" placeholder="Location">
-            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Work Description</label>
-            <textarea class="wo_card_desc w-full text-sm border border-gray-300 rounded-lg p-2 mb-2" rows="2" placeholder="Description for ${workId}">${woEscapeAttr(saved.description || '')}</textarea>
-            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cost Breakdown</label>
-            <div class="grid grid-cols-1 gap-2">
-        `;
-
-        // FIX 2: union antara seksyen kontrak SEMASA dan seksyen yang tersimpan dalam
-        // quotation/blueform lama, supaya nilai lama tak "hilang" bila key tak sepadan.
-        const allSections = new Set([
-            ...Object.keys(woCurrentContractSections || {}),
-            ...Object.keys(breakdown || {})
-        ]);
-
-        Array.from(allSections).sort().forEach(sec => {
-            const descMeta = woCurrentContractSections[sec];
-            const desc = descMeta ? (descMeta.desc || '') : '(seksyen lama - tiada dalam kontrak semasa)';
-            const data = breakdown[sec] || {};
-            const amt = Number(data.amt || 0);
-            const extra = Number(data.extra || 0);
-            const isProvisional = desc.toUpperCase().includes('PROVISIONAL');
-            html += `
-                <div class="bg-white border border-gray-200 rounded-lg p-2 ${!descMeta ? 'border-amber-300' : ''}">
-                    <label class="block text-[10px] font-bold text-gray-500 uppercase">${sec}</label>
-                    <span class="block text-[9px] text-gray-400 mb-1">${desc}</span>
-                    <input type="text" class="wo_sec_amt w-full text-sm border border-gray-300 rounded-lg p-2" data-sec="${woEscapeAttr(sec)}" data-work-id="${woEscapeAttr(workId)}" data-raw-value="${amt}" value="${amt.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}" oninput="woFormatCurrencyInput(this); woCalcTotalWork();">
-                    ${isProvisional || extra ? `<input type="text" class="wo_sec_extra w-full text-sm border border-gray-300 rounded-lg p-2 mt-1" data-sec="${woEscapeAttr(sec)}" data-work-id="${woEscapeAttr(workId)}" data-raw-value="${extra}" value="${extra.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}" oninput="woFormatCurrencyInput(this); woCalcTotalWork();">` : ''}
-                </div>
-            `;
-        });
-        html += `</div>`;
-        card.innerHTML = html;
-        container.appendChild(card);
-    });
-    woCalcTotalWork();
-}
+            woCalcTotalWork();
+        }
 
         function woCalcTotalWork() {
             let total = 0;
@@ -875,49 +923,48 @@
         }
 
         async function woAutofillFromQuotations(workIds) {
-    try {
-        const filter = workIds.map(id => `work_id.eq.${encodeURIComponent(id)}`).join(',');
-        const res = await fetch(`${SB_URL}/rest/v1/quotations?or=(${filter})&select=work_id,district,location,description,section_category`, { headers: qHeaders });
-        const quotes = await res.json();
-        if(!Array.isArray(quotes) || quotes.length === 0) return;
+            try {
+                const filter = workIds.map(id => `work_id.eq.${encodeURIComponent(id)}`).join(',');
+                const res = await fetch(`${SB_URL}/rest/v1/quotations?or=(${filter})&select=work_id,district,location,description,section_category`, { headers: qHeaders });
+                const quotes = await res.json();
+                if(!Array.isArray(quotes) || quotes.length === 0) return;
 
-        let districtToSet = null;
-        quotes.forEach(q => {
-            const hasData = q.location || q.description || (q.section_category && Object.keys(q.section_category).length > 0);
-            if(!woWorkIdCardDataMap[q.work_id] && hasData){
-                woWorkIdCardDataMap[q.work_id] = {
-                    location: q.location || '',
-                    description: q.description || '',
-                    section_category: structuredClone(q.section_category || {})
-                };
-            }
-            if(!districtToSet && q.district) districtToSet = q.district;
-        });
+                let districtToSet = null;
+                quotes.forEach(q => {
+                    const hasData = q.location || q.description || (q.section_category && Object.keys(q.section_category).length > 0);
+                    if(!woWorkIdCardDataMap[q.work_id] && hasData){
+                        woWorkIdCardDataMap[q.work_id] = {
+                            location: q.location || '',
+                            description: q.description || '',
+                            section_category: structuredClone(q.section_category || {})
+                        };
+                    }
+                    if(!districtToSet && q.district) districtToSet = q.district;
+                });
 
-        // FIX 1: padankan district ikut nilai (bukan case-sensitive & tanpa ruang lebih),
-        // bukan sekadar assign terus yang boleh gagal senyap
-        const distSel = document.getElementById('wo_dist');
-        if(distSel && !distSel.value && districtToSet){
-            const target = districtToSet.trim().toUpperCase();
-            const matchOpt = Array.from(distSel.options).find(o => o.value.trim().toUpperCase() === target);
-            if(matchOpt){
-                distSel.value = matchOpt.value;
-            } else {
-                // Option tak wujud dalam senarai kontrak semasa — tambah supaya data tak hilang
-                const opt = document.createElement('option');
-                opt.value = districtToSet;
-                opt.text = districtToSet + ' (dari quotation)';
-                distSel.appendChild(opt);
-                distSel.value = districtToSet;
-                console.warn(`District "${districtToSet}" dari quotation tiada dalam senarai district kontrak semasa.`);
+                // Padankan district ikut nilai (case/space-insensitive), bukan sekadar assign
+                // terus yang boleh gagal senyap jika format tidak sepadan 100%.
+                const distSel = document.getElementById('wo_dist');
+                if(distSel && !distSel.value && districtToSet){
+                    const target = districtToSet.trim().toUpperCase();
+                    const matchOpt = Array.from(distSel.options).find(o => o.value.trim().toUpperCase() === target);
+                    if(matchOpt){
+                        distSel.value = matchOpt.value;
+                    } else {
+                        const opt = document.createElement('option');
+                        opt.value = districtToSet;
+                        opt.text = districtToSet + ' (dari quotation)';
+                        distSel.appendChild(opt);
+                        distSel.value = districtToSet;
+                        console.warn(`District "${districtToSet}" dari quotation tiada dalam senarai district kontrak semasa.`);
+                    }
+                }
+
+                woRenderWorkIdCards(true);
+            } catch(err) {
+                console.error('Failed to autofill blueform from quotations:', err);
             }
         }
-
-        woRenderWorkIdCards(true);
-    } catch(err) {
-        console.error('Failed to autofill blueform from quotations:', err);
-    }
-}
 
         function woShowDetectModal(group) {
             const body = document.getElementById('woDetectModalBody');
@@ -1467,6 +1514,7 @@
                     .from('quotations')
                     .select(`
                             id, work_id, status, contract_id, pdf_url, reject_reason, revision_in_progress, action_date,
+                            district, location, description, section_category,
                             contract!inner (id, contract_name, contract_code, unit_id)
                     `)
                     .in('status', ['QUOTATION', 'QUO-APP', 'QUO-REJ']);
@@ -1516,6 +1564,10 @@
                     if (q.status === 'QUO-APP' && workOrderWorkIdSet.has(q.work_id)) return false;
                     return true;
                 });
+
+                // Reset state seretan/pilihan setiap kali dashboard dimuat semula
+                techQuotationItemsById = {};
+                qCancelSelectionMode();
 
                 renderTechnicianSection('quotations-container', filteredQuotationData, 'QUOTATION');
                 renderTechnicianSection('blueforms-container', blueformData, 'BLUEFORM');
@@ -1646,6 +1698,9 @@
                     }
 
                     if (type === 'QUOTATION') {
+                        // Simpan rujukan item ini untuk fungsi drag & drop (Quotation -> Blueform)
+                        techQuotationItemsById[item.id] = item;
+
                         let pdfBtnHtml = finalPdfUrl ? `
                             <a href="${finalPdfUrl}" target="_blank" class="text-gray-700 bg-gray-100 hover:bg-gray-200 px-1 py-0.5 rounded border border-gray-300 transition-all font-medium inline-flex items-center gap-0.5 text-[9px]" title="View Quotation PDF">
                                 <i class="fa-solid fa-file-pdf text-red-600"></i>Quote
@@ -1653,9 +1708,9 @@
                         ` : '<span class="text-gray-400 text-[9px] italic">None</span>';
 
                         sectionHtml += `
-                            <tr class="hover:bg-gray-50 transition-colors">
+                            <tr class="hover:bg-gray-50 transition-colors q-drag-row" data-qrow-id="${item.id}" onpointerdown="qHandlePointerDown(event, '${item.id}')">
                                 <td class="px-2 py-2 font-mono text-gray-900 font-semibold truncate" title="${item.work_id}">
-                                    ${item.work_id}
+                                    <span class="q-select-check hidden"><i class="fa-solid fa-check"></i></span>${item.work_id}
                                 </td>
                                 <td class="px-1 py-2">
                                     ${statusBadge}
@@ -1871,6 +1926,263 @@
                 <div class="text-center py-12 text-gray-400 text-xs italic bg-gray-50 rounded-lg border border-dashed border-gray-300">
                     <i class="fa-solid fa-folder-open block text-2xl mb-2 text-gray-300"></i> ${message}
                 </div>`;
+        }
+
+        // ============================================================
+        // DRAG QUOTATION -> BLUEFORM (Pointer Events: berfungsi untuk mouse & touch)
+        // ============================================================
+        let techQuotationItemsById = {};
+        let qSelectedIds = new Set();
+        let qSelectionModeOn = false;
+        let qLongPressTimer = null;
+        let qPointerState = null;
+        const Q_LONG_PRESS_MS = 480;
+        const Q_MOVE_THRESHOLD = 8;
+
+        function qHandlePointerDown(e, qid, fromToolbar = false) {
+            if (!fromToolbar) {
+                if (e.target.closest('a, button')) return; // jangan ganggu link PDF / butang resubmission
+                if (e.button !== undefined && e.button !== 0) return; // mouse: klik kiri sahaja
+            }
+
+            qPointerState = {
+                pointerId: e.pointerId,
+                qid: qid,
+                startX: e.clientX,
+                startY: e.clientY,
+                moved: false,
+                dragging: false,
+                fromToolbar: fromToolbar,
+                isTouch: e.pointerType === 'touch',
+                longPressSelected: false
+            };
+
+            clearTimeout(qLongPressTimer);
+
+            if (!fromToolbar && qPointerState.isTouch) {
+                // Touch: kena tahan lama (touch-and-hold) untuk masuk mod pilih
+                qLongPressTimer = setTimeout(() => {
+                    if (!qPointerState || qPointerState.qid !== qid || qPointerState.moved) return;
+                    if (navigator.vibrate) navigator.vibrate(35);
+                    qEnterSelectionMode();
+                    qToggleSelection(qid, true);
+                    qPointerState.longPressSelected = true;
+                }, Q_LONG_PRESS_MS);
+            }
+
+            document.addEventListener('pointermove', qHandlePointerMove);
+            document.addEventListener('pointerup', qHandlePointerUp);
+            document.addEventListener('pointercancel', qHandlePointerCancel);
+        }
+
+        function qHandlePointerMove(e) {
+            if (!qPointerState) return;
+            const dx = e.clientX - qPointerState.startX;
+            const dy = e.clientY - qPointerState.startY;
+
+            if (!qPointerState.moved && Math.hypot(dx, dy) > Q_MOVE_THRESHOLD) {
+                qPointerState.moved = true;
+                clearTimeout(qLongPressTimer);
+
+                if (!qPointerState.dragging) {
+                    if (qPointerState.fromToolbar) {
+                        qBeginDrag(qPointerState.startX, qPointerState.startY);
+                    } else if (!qPointerState.isTouch) {
+                        // Mouse: seret terus tanpa perlu tahan lama
+                        qBeginDrag(qPointerState.startX, qPointerState.startY);
+                    } else if (qSelectionModeOn && qSelectedIds.has(qPointerState.qid)) {
+                        // Touch: item sudah dipilih sebelum ini -> boleh seret terus
+                        qBeginDrag(qPointerState.startX, qPointerState.startY);
+                    }
+                    // Touch, belum dalam mod pilih -> biarkan skrol biasa, jangan drag
+                }
+            }
+
+            if (qPointerState.dragging) {
+                e.preventDefault();
+                qMoveGhost(e.clientX, e.clientY);
+                qHighlightDropTarget(e.clientX, e.clientY);
+            }
+        }
+
+        function qHandlePointerUp(e) {
+            document.removeEventListener('pointermove', qHandlePointerMove);
+            document.removeEventListener('pointerup', qHandlePointerUp);
+            document.removeEventListener('pointercancel', qHandlePointerCancel);
+            clearTimeout(qLongPressTimer);
+
+            if (!qPointerState) return;
+
+            if (qPointerState.dragging) {
+                qEndDrag(e.clientX, e.clientY);
+            } else if (!qPointerState.moved) {
+                if (qPointerState.fromToolbar) {
+                    qSendSelectedToBlueform();
+                } else if (qPointerState.longPressSelected) {
+                    // sudah dipilih semasa touch-and-hold, jangan toggle lagi
+                } else if (qPointerState.isTouch) {
+                    if (qSelectionModeOn) qToggleSelection(qPointerState.qid);
+                } else {
+                    // Mouse: klik ringkas terus toggle pilihan (senang untuk multi-select)
+                    qToggleSelection(qPointerState.qid);
+                }
+            }
+
+            qPointerState = null;
+        }
+
+        function qHandlePointerCancel() {
+            document.removeEventListener('pointermove', qHandlePointerMove);
+            document.removeEventListener('pointerup', qHandlePointerUp);
+            document.removeEventListener('pointercancel', qHandlePointerCancel);
+            clearTimeout(qLongPressTimer);
+            qCancelDrag();
+            qPointerState = null;
+        }
+
+        function qEnterSelectionMode() {
+            qSelectionModeOn = true;
+            document.getElementById('qSelectionToolbar')?.classList.add('active');
+        }
+
+        function qCancelSelectionMode() {
+            qSelectionModeOn = false;
+            qSelectedIds.clear();
+            document.getElementById('qSelectionToolbar')?.classList.remove('active');
+            qRefreshRowSelectionUI();
+        }
+
+        function qToggleSelection(qid, forceOn = false) {
+            if (forceOn) qSelectedIds.add(qid);
+            else if (qSelectedIds.has(qid)) qSelectedIds.delete(qid);
+            else qSelectedIds.add(qid);
+
+            if (qSelectedIds.size === 0) { qCancelSelectionMode(); return; }
+            qEnterSelectionMode();
+            qRefreshRowSelectionUI();
+        }
+
+        function qRefreshRowSelectionUI() {
+            document.querySelectorAll('.q-drag-row').forEach(row => {
+                const on = qSelectedIds.has(row.dataset.qrowId);
+                row.classList.toggle('q-row-selected', on);
+                row.querySelector('.q-select-check')?.classList.toggle('hidden', !on);
+            });
+            const countEl = document.getElementById('qSelectionCount');
+            if (countEl) countEl.textContent = `${qSelectedIds.size} dipilih`;
+        }
+
+        // ---------- Visual seretan + kesan zon lepas ----------
+        function qBeginDrag(x, y) {
+            qPointerState.dragging = true;
+
+            if (!qPointerState.fromToolbar && !qSelectedIds.has(qPointerState.qid)) {
+                qSelectedIds = new Set([qPointerState.qid]);
+                qRefreshRowSelectionUI();
+            }
+
+            document.querySelectorAll('.q-drag-row.q-row-selected').forEach(r => r.classList.add('q-row-dragging-source'));
+
+            const ghost = document.getElementById('qDragGhost');
+            const label = document.getElementById('qDragGhostLabel');
+            const idsArr = [...qSelectedIds];
+            label.textContent = idsArr.length > 1
+                ? `${idsArr.length} sebut harga`
+                : (techQuotationItemsById[idsArr[0]]?.work_id || '1 sebut harga');
+            ghost.style.display = 'flex';
+            qMoveGhost(x, y);
+        }
+
+        function qMoveGhost(x, y) {
+            const ghost = document.getElementById('qDragGhost');
+            ghost.style.left = x + 'px';
+            ghost.style.top = y + 'px';
+        }
+
+        function qHighlightDropTarget(x, y) {
+            const zone = document.getElementById('blueform-section');
+            if (!zone) return;
+            const rect = zone.getBoundingClientRect();
+            const over = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+            zone.classList.toggle('q-drop-target-active', over);
+        }
+
+        function qCancelDrag() {
+            document.getElementById('qDragGhost').style.display = 'none';
+            document.getElementById('blueform-section')?.classList.remove('q-drop-target-active');
+            document.querySelectorAll('.q-drag-row.q-row-dragging-source').forEach(r => r.classList.remove('q-row-dragging-source'));
+        }
+
+        function qEndDrag(x, y) {
+            const zone = document.getElementById('blueform-section');
+            const rect = zone ? zone.getBoundingClientRect() : null;
+            const dropped = rect && x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+
+            qCancelDrag();
+            if (dropped) qSendSelectedToBlueform();
+        }
+
+        // ---------- Hantar quotation terpilih ke dalam modal Blueform ----------
+        async function qSendSelectedToBlueform() {
+            const ids = [...qSelectedIds];
+            if (ids.length === 0) return;
+
+            const items = ids.map(id => techQuotationItemsById[id]).filter(Boolean);
+            qCancelSelectionMode();
+            if (items.length === 0) return;
+
+            await startBlueformFromQuotations(items);
+        }
+
+        async function startBlueformFromQuotations(items) {
+            openBlueformModal();
+            if (blueformUnitsReadyPromise) await blueformUnitsReadyPromise;
+
+            const first = items[0];
+            const contractData = Array.isArray(first.contract) ? first.contract[0] : first.contract;
+            const unitId = contractData?.unit_id;
+            const contractId = first.contract_id;
+
+            if (unitId) {
+                document.getElementById('wo_unit_id').value = unitId;
+                await woLoadContractsByUnit();
+            }
+            if (contractId) {
+                document.getElementById('wo_contract_id').value = contractId;
+                woOnContractSelect(); // ini reset rows ke 1 baris kosong dahulu
+            }
+
+            // Bina semula baris Work ID ikut quotation yang diseret
+            document.getElementById('wo_id_rows_container').innerHTML = '';
+            wo_workIdRowCounter = 0;
+            const workIds = [];
+            items.forEach(item => {
+                const m = (item.work_id || '').trim().match(/^([CK])?\s*(\d+)\s*([A-Z]?)$/i);
+                const prefix = (m && m[1]) ? m[1].toUpperCase() : 'C';
+                const num = m ? m[2] : '';
+                if (!num) return;
+                woAddWorkIdRow(prefix, num, '');
+                workIds.push(`${prefix} ${num}`);
+            });
+            if (document.getElementById('wo_id_rows_container').children.length === 0) woAddWorkIdRow();
+
+            // Set district terus dari quotation yang diseret (lebih tepat dari auto-detect umum)
+            if (first.district) {
+                const distSel = document.getElementById('wo_dist');
+                const target = first.district.trim().toUpperCase();
+                const matchOpt = Array.from(distSel.options).find(o => o.value.trim().toUpperCase() === target);
+                if (matchOpt) distSel.value = matchOpt.value;
+            }
+
+            woRenderWorkIdCards();
+
+            // Tarik location/description/cost breakdown dari jadual quotations
+            if (workIds.length > 0) {
+                await woAutofillFromQuotations(workIds);
+            }
+
+            // Semak jika Work ID ini sudah wujud dalam work_orders (papar modal overwrite/new/additional jika ada)
+            woAutoDetectWork();
         }
 
         window.onload = fetchTechnicianDashboard;
