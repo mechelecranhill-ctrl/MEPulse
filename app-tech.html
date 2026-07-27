@@ -1238,6 +1238,9 @@ async function woActionCancelBlueform() {
         if (!rows || rows.length === 0) throw new Error('Record not found.');
         const rec = rows[0];
 
+        const originalWorkId = rec.work_id;
+        const reasonForQuotation = rec.reject_reason || 'Blueform dibatalkan (CANCEL).';
+
         const zeroedBreakdown = {};
         Object.keys(rec.section_category || {}).forEach(sec => {
             zeroedBreakdown[sec] = { amt: 0, extra: 0 };
@@ -1247,7 +1250,7 @@ async function woActionCancelBlueform() {
             method: 'PATCH',
             headers: qHeaders,
             body: JSON.stringify({
-                work_id: `${rec.work_id}-CNX`,
+                work_id: `${originalWorkId}-CNX`,
                 status: 'CANCEL',
                 section_category: zeroedBreakdown,
                 additional: 0,
@@ -1255,6 +1258,24 @@ async function woActionCancelBlueform() {
             })
         });
         if (!patchRes.ok) throw new Error(`HTTP ${patchRes.status}`);
+
+        // Sync balik ke quotation asal (guna work_id SEBELUM ditukar -CNX)
+        try {
+            const quoPatchRes = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(originalWorkId)}`, {
+                method: 'PATCH',
+                headers: qHeaders,
+                body: JSON.stringify({
+                    status: 'QUO-REJ',
+                    reject_reason: reasonForQuotation,
+                    revision_in_progress: false
+                })
+            });
+            if (!quoPatchRes.ok) {
+                console.error(`Failed to sync quotation status for ${originalWorkId}: HTTP ${quoPatchRes.status}`);
+            }
+        } catch (quoErr) {
+            console.error('Failed to sync quotation status after cancel:', quoErr);
+        }
 
         closeWoActionModal();
         fetchTechnicianDashboard();
