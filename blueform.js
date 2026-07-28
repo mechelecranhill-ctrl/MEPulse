@@ -703,7 +703,7 @@ let formattedRef = seq ? ` - ${seq}` : '';
         <div id="bf_content" style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;">
             ${contentHtml}
         </div>
-                        <div class="bf-signature-grid">
+                                <div class="bf-signature-grid">
             <div>
                 <strong>Dimohon Oleh:</strong>
                 <div style="height:70px; position:relative;">
@@ -711,10 +711,11 @@ let formattedRef = seq ? ` - ${seq}` : '';
                 </div>
                 <div style="position:relative;">
                     <div class="bf-sign-line"></div>
-                    ${stampImages.tech_initial?.initial ? `<img src="${stampImages.tech_initial.initial}" style="height:22px;width:auto;object-fit:contain;position:absolute;left:2px;top:-12px;">` : ''}
+                    ${stampImages.tech_initial?.initial ? `<img src="${stampImages.tech_initial.initial}" style="height:22px;width:auto;object-fit:contain;position:absolute;left:0px;top:-12px;">` : ''}
+                    ${stampImages.tech_initial?.date ? `<span style="position:absolute;left:0px;top:10px;font-size:8px;color:#555;white-space:nowrap;">(${formatShortDate(stampImages.tech_initial.date)})</span>` : ''}
                 </div>
                 <small style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
-                    <span>${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'} ${stampImages.tech_initial?.date ? `<span style="font-weight:normal;">(${formatShortDate(stampImages.tech_initial.date)})</span>` : ''}</span>
+                    <span>${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}</span>
                     ${stampImages.exec_signature?.date ? `<span style="font-weight:normal;font-size:8px;color:#555;">Lulus: ${formatShortDate(stampImages.exec_signature.date)}</span>` : ''}
                 </small>
             </div>
