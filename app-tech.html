@@ -712,17 +712,89 @@ function formatStampDate(dateStr) {
     return `${String(d).padStart(2,'0')} ${STAMP_MONTHS[m-1]} ${y}`;
 }
 
+function drawStampTextSpaced(ctx, text, x, y, spacingPx) {
+    if (!spacingPx) { ctx.fillText(text, x, y); return; }
+    const chars = text.split('');
+    const widths = chars.map(c => ctx.measureText(c).width);
+    const totalWidth = widths.reduce((a, b) => a + b, 0) + spacingPx * (chars.length - 1);
+    const prevAlign = ctx.textAlign;
+    ctx.textAlign = 'left';
+    let cursorX = x - totalWidth / 2;
+    chars.forEach((c, i) => {
+        ctx.fillText(c, cursorX, y);
+        cursorX += widths[i] + spacingPx;
+    });
+    ctx.textAlign = prevAlign;
+}
+
 async function renderStampPng(dateStr) {
-    const dateEl = document.getElementById('diterimaStampDate');
-    dateEl.innerText = formatStampDate(dateStr);
-    const stampBox = document.getElementById('diterimaStampBox');
-    const canvas = await html2canvas(stampBox, { backgroundColor: null, scale: 4 });
+    const PPM = 12; // resolusi: piksel per mm
+    const SIZE_MM = 41;
+    const CANVAS_PX = Math.round(SIZE_MM * PPM); // 492px
+    const mm = (v) => v * PPM;
+    const ptToPx = (pt) => pt * 0.3528 * PPM; // pt -> mm -> px
+    const letterSpacingPx = 0.2 * (PPM / 3.7795); // 0.2px CSS -> skala kanvas
+
+    const canvas = document.createElement('canvas');
+    canvas.width = CANVAS_PX;
+    canvas.height = CANVAS_PX;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, CANVAS_PX, CANVAS_PX);
+
+    const cx = CANVAS_PX / 2;
+    const cy = CANVAS_PX / 2;
+    const radius = CANVAS_PX / 2 - mm(1);
+    const color = '#0000CC';
+
+    // Bulatan cop
+    ctx.strokeStyle = color;
+    ctx.lineWidth = mm(0.53); // setara border 2px CSS
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+
+    let cursorY = cy - radius + mm(5); // padding-top 5mm
+
+    // DITERIMA - Arial Bold 16pt, scaleY(1.3)
+    const titleFontPx = ptToPx(16);
+    cursorY += titleFontPx;
+    ctx.save();
+    ctx.translate(cx, cursorY);
+    ctx.scale(1, 1.3);
+    ctx.font = `bold ${titleFontPx}px Arial, sans-serif`;
+    drawStampTextSpaced(ctx, 'DITERIMA', 0, 0, letterSpacingPx);
+    ctx.restore();
+    cursorY += mm(5); // margin-bottom 5mm
+
+    // Tarikh - Arial Bold 13pt, scaleY(1.25)
+    const dateFontPx = ptToPx(13);
+    cursorY += dateFontPx;
+    ctx.save();
+    ctx.translate(cx, cursorY);
+    ctx.scale(1, 1.25);
+    ctx.font = `bold ${dateFontPx}px Arial, sans-serif`;
+    drawStampTextSpaced(ctx, formatStampDate(dateStr), 0, 0, letterSpacingPx);
+    ctx.restore();
+    cursorY += mm(4); // margin-bottom 4mm
+
+    // Footer - Arial Narrow Bold 9.2pt
+    const footerFontPx = ptToPx(9.2);
+    ctx.font = `bold ${footerFontPx}px 'Arial Narrow', Arial, sans-serif`;
+    cursorY += footerFontPx;
+    drawStampTextSpaced(ctx, 'JABATAN M&E', cx, cursorY, letterSpacingPx);
+    cursorY += footerFontPx + mm(0.5); // margin-bottom 0.5mm
+    drawStampTextSpaced(ctx, 'RANHILL SAJ SDN BHD', cx, cursorY, letterSpacingPx);
+
     return canvas.toDataURL('image/png');
 }
 
 async function stampQuotationPdf(file, qpdDateStr) {
-    if(!window.PDFLib || !window.html2canvas){
-        console.warn('pdf-lib / html2canvas belum dimuat, skip stamping.');
+    if(!window.PDFLib){
+        console.warn('pdf-lib belum dimuat, skip stamping.');
         return file;
     }
     try {
@@ -737,8 +809,6 @@ async function stampQuotationPdf(file, qpdDateStr) {
         const firstPage = pdfDoc.getPages()[0];
         const { width: pageW, height: pageH } = firstPage.getSize();
 
-        // Posisi cop dikira nisbah kepada A4 (210mm x 297mm) ikut design asal,
-        // supaya tetap betul walaupun saiz PDF sebenar bukan A4 tepat.
         const A4_W_MM = 210, A4_H_MM = 297;
         const stampLeftMM = 30, stampTopMM = 240, stampSizeMM = 41;
 
@@ -753,7 +823,7 @@ async function stampQuotationPdf(file, qpdDateStr) {
         return new File([stampedBytes], file.name, { type: 'application/pdf' });
     } catch(err) {
         console.error('Gagal burn cop DITERIMA pada quotation:', err);
-        return file; // fallback: upload PDF asal jika stamping gagal
+        return file;
     }
 }
 
