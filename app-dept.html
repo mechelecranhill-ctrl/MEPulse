@@ -417,7 +417,12 @@
                 updatePayload.reject_reason = reason.trim();
             } else {
                 if (!confirm(`Are you sure you want to change the status of Work ID: ${workId} to ${nextStatus}?`)) return;
-                updatePayload.reject_reason = null; 
+                updatePayload.reject_reason = null;
+
+                if (nextStatus === 'APP-HOD') {
+                    const stamps = await mergeApprovalStamp('work_orders', workId, 'dept_head');
+                    if (stamps) updatePayload.approval_stamps = stamps;
+                }
             }
 
             try {
