@@ -535,6 +535,22 @@ body {
                 </div>
             </div>
         </div>
+        <div style="margin-bottom: 16px;">
+            <label style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; display:block;">Initial (JPG)</label>
+            <div id="initialDropzone" onclick="document.getElementById('fInitialFile').click()" style="border: 2px dashed rgba(0,0,0,0.1); border-radius: 12px; padding: 12px; text-align:center; cursor:pointer; background:#fafafa;">
+                <input type="file" id="fInitialFile" accept="image/jpeg" style="display:none;" onchange="handleInitialFileChange(this)">
+                <div id="initialEmptyState">
+                    <i class="fa-solid fa-pen-fancy" style="font-size: 22px; color: #c7c7cc; display:block; margin-bottom:6px;"></i>
+                    <p style="font-size:12px; font-weight:600; color: var(--accent-blue); margin:0;">Pilih Fail JPG Initial</p>
+                </div>
+                <div id="initialPreviewWrap" style="display:none; align-items:center; justify-content:center; flex-direction:column; gap:8px;">
+                    <img id="initialPreviewImg" src="" style="max-height:60px; max-width:100%; object-fit:contain; background:white; border-radius:6px; border:1px solid rgba(0,0,0,0.05); padding:4px;">
+                    <button type="button" onclick="event.stopPropagation(); clearInitialPreview()" style="font-size:11px; color:var(--accent-red); background:none; border:none; cursor:pointer;">
+                        <i class="fa fa-xmark"></i> Buang Initial
+                    </button>
+                </div>
+            </div>
+        </div>
         <div class="modal-actions">
             <button onclick="closeModal()">Cancel</button>
             <button onclick="saveStaff()">Save</button>
@@ -611,7 +627,7 @@ async function loadAssignments(){
 }
 
 async function loadStaff(){
-    let res=await fetch(`${SB_URL}/rest/v1/staff?select=id,name,position,employee_id,phone_no,email,signature`, {headers});
+    let res=await fetch(`${SB_URL}/rest/v1/staff?select=id,name,position,employee_id,phone_no,email,signature,initial`, {headers});
     staffData=await res.json();
     renderStaff();
 }
@@ -1149,6 +1165,13 @@ function addStaff(existing=null){
     } else {
         clearSignaturePreview();
     }
+    document.getElementById('fInitialFile').value = '';
+    if(existing?.initial){
+        currentInitialBase64 = existing.initial;
+        showInitialPreview(existing.initial);
+    } else {
+        clearInitialPreview();
+    }
     document.getElementById("staffModal").style.display="flex";
 }
 
@@ -1188,6 +1211,35 @@ function clearSignaturePreview() {
     document.getElementById('signaturePreviewImg').src = '';
 }
 
+    let currentInitialBase64 = null;
+
+function handleInitialFileChange(input) {
+    const file = input.files && input.files[0];
+    if(!file) return;
+    if(file.type !== 'image/jpeg'){ alert('Sila pilih fail JPG sahaja.'); input.value = ''; return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        currentInitialBase64 = e.target.result;
+        showInitialPreview(currentInitialBase64);
+    };
+    reader.readAsDataURL(file);
+}
+
+function showInitialPreview(base64) {
+    document.getElementById('initialEmptyState').style.display = 'none';
+    const wrap = document.getElementById('initialPreviewWrap');
+    wrap.style.display = 'flex';
+    document.getElementById('initialPreviewImg').src = base64;
+}
+
+function clearInitialPreview() {
+    currentInitialBase64 = null;
+    document.getElementById('fInitialFile').value = '';
+    document.getElementById('initialEmptyState').style.display = 'block';
+    document.getElementById('initialPreviewWrap').style.display = 'none';
+    document.getElementById('initialPreviewImg').src = '';
+}
+
 async function saveStaff(){
     let trimmedName = fName.value ? fName.value.trim() : "";
     let trimmedEmail = fEmail.value ? fEmail.value.trim() : "";
@@ -1204,7 +1256,8 @@ async function saveStaff(){
         employee_id: employeeValue, 
         phone_no: phoneValue, 
         email: emailValue,
-        signature: currentSignatureBase64
+        signature: currentSignatureBase64,
+        initial: currentInitialBase64
     };
     
     if(!body.name || !body.position){ alert("Nama dan Jawatan wajib diisi."); return; }
