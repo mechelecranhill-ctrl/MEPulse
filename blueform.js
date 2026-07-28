@@ -705,47 +705,61 @@ let formattedRef = seq ? ` - ${seq}` : '';
         </div>
         <div class="bf-signature-grid">
     <div>
-        <strong>Dimohon Oleh:</strong>
-        <div style="height:70px;position:relative;">
+    <strong>Dimohon Oleh:</strong>
 
-    <!-- Initial overlay -->
-    ${stampImages.tech_initial?.initial ? `
-    <img src="${stampImages.tech_initial.initial}"
-         style="
-            position:absolute;
-            left:-45px;
-            bottom:8px;
-            height:26px;
-            width:auto;
-            z-index:20;
-            pointer-events:none;
-         ">
-    ` : ''}
+    <div style="position:relative;height:70px;">
 
-    <!-- Tarikh -->
-    ${stampImages.tech_initial?.date ? `
-    <span style="
-        position:absolute;
-        left:15px;
-        bottom:28px;
-        font-size:10px;
-    ">
-        ${formatShortDate(stampImages.tech_initial.date)}
-    </span>
-    ` : ''}
+        <!-- INITIAL (Floating kiri - tidak ganggu signature) -->
+        ${stampImages.tech_initial?.initial ? `
+            <div style="
+                position:absolute;
+                left:0;
+                bottom:0;
+                width:55px;
+                text-align:center;
+            ">
 
-    <!-- Signature asal -->
-    ${stampImages.exec_signature?.signature ? `
-    <img src="${stampImages.exec_signature.signature}"
-         style="
-            max-height:60px;
-            max-width:90%;
-            object-fit:contain;
-            position:absolute;
-            bottom:0;
-            left:5%;
-         ">
-    ` : ''}
+                ${stampImages.tech_initial?.date ? `
+                    <div style="
+                        font-size:9px;
+                        font-weight:normal;
+                        margin-bottom:3px;
+                    ">
+                        ${formatShortDate(stampImages.tech_initial.date)}
+                    </div>
+                ` : ''}
+
+                <img
+                    src="${stampImages.tech_initial.initial}"
+                    style="
+                        width:40px;
+                        height:auto;
+                        object-fit:contain;
+                    ">
+            </div>
+        ` : ''}
+
+        <!-- Signature kekal di tempat asal -->
+        ${stampImages.exec_signature?.signature ? `
+            <img
+                src="${stampImages.exec_signature.signature}"
+                style="
+                    max-height:60px;
+                    max-width:90%;
+                    object-fit:contain;
+                    position:absolute;
+                    bottom:0;
+                    left:70px;
+                ">
+        ` : ''}
+
+    </div>
+
+    <div class="bf-sign-line"></div>
+
+    <small>
+        ${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}
+    </small>
 
 </div>
     <div>
