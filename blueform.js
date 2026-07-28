@@ -712,7 +712,7 @@ let formattedRef = seq ? ` - ${seq}` : '';
                 <div style="position:relative;">
                     <div class="bf-sign-line"></div>
                     ${stampImages.tech_initial?.initial ? `<img src="${stampImages.tech_initial.initial}" style="height:22px;width:auto;object-fit:contain;position:absolute;left:0px;top:-12px;">` : ''}
-                    ${stampImages.tech_initial?.date ? `<span style="position:absolute;left:0px;top:10px;font-size:8px;color:#555;white-space:nowrap;">(${formatShortDate(stampImages.tech_initial.date)})</span>` : ''}
+                    ${stampImages.tech_initial?.date ? `<span style="position:absolute;left:-20px;top:10px;font-size:8px;color:#555;white-space:nowrap;">(${formatShortDate(stampImages.tech_initial.date)})</span>` : ''}
                 </div>
                 <small style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
                     <span>${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}</span>
