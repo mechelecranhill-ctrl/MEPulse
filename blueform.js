@@ -26,6 +26,64 @@ const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
 const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
 
+let _bfSupabaseClient = null;
+function getBfSupabaseClient(){
+    if(!_bfSupabaseClient) _bfSupabaseClient = supabase.createClient(SB_URL, SB_KEY);
+    return _bfSupabaseClient;
+}
+
+function formatShortDate(dateStr){
+    if(!dateStr) return '';
+    const d = new Date(dateStr);
+    if(isNaN(d.getTime())) return '';
+    return `${d.getDate()}/${d.getMonth()+1}`;
+}
+
+// Baca approval_stamps sedia ada (kalau ada), gabung dengan stage baharu.
+// Return null untuk @dm1n (admin tak ada staff_id/signature sendiri) — bila
+// null, caller kena SKIP terus set approval_stamps supaya stamp lama tak kena wipe.
+async function mergeApprovalStamp(table, workId, stageKey) {
+    try {
+        const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
+        if (isAdmin) return null;
+
+        const { data: { user } } = await getBfSupabaseClient().auth.getUser();
+        if (!user) return null;
+
+        const res = await fetch(`${SB_URL}/rest/v1/${table}?work_id=eq.${encodeURIComponent(workId)}&select=approval_stamps`, { headers });
+        const rows = await res.json();
+        const stamps = (rows[0] && rows[0].approval_stamps) ? { ...rows[0].approval_stamps } : {};
+        stamps[stageKey] = { staff_id: user.id, date: new Date().toISOString().slice(0, 10) };
+        return stamps;
+    } catch (e) {
+        console.error('Gagal merge approval stamp:', e);
+        return null;
+    }
+}
+
+// Selesaikan staff_id -> signature/initial image untuk semua stamp dalam satu record
+async function resolveStampImages(approvalStamps) {
+    const stamps = approvalStamps || {};
+    const staffIds = [...new Set(Object.values(stamps).map(s => s?.staff_id).filter(Boolean))];
+    const images = {};
+    if (staffIds.length === 0) return images;
+
+    try {
+        const res = await fetch(`${SB_URL}/rest/v1/staff?id=in.(${staffIds.join(',')})&select=id,signature,initial`, { headers });
+        const staffRows = await res.json();
+        const staffMap = {};
+        staffRows.forEach(s => { staffMap[s.id] = s; });
+
+        Object.entries(stamps).forEach(([key, stamp]) => {
+            const rec = staffMap[stamp.staff_id];
+            images[key] = { date: stamp.date, signature: rec?.signature || null, initial: rec?.initial || null };
+        });
+    } catch (e) {
+        console.error('Gagal resolve staff signature/initial:', e);
+    }
+    return images;
+}
+
 function generatePresetFromContractCode(contractCode) {
     if (!contractCode) return 'RSAJ/M&E/IP/11-';
     
@@ -250,14 +308,17 @@ bakiKontrak -= Number(int.penalty || 0); // Tolak denda untuk dapatkan baki bers
         bakiKontrak -= Number(wo.amount_spent || 0);
     });
 
+    const stampImages = await resolveStampImages(data.approval_stamps);
+
     return {
-    data, c, b, s,
-    totalWorkValue, provisionalExtra,
-    sectionUsed,
-    totalSalvage, totalPG, totalTax, totalPenalty,
-    bakiKontrak,
-    voBreakdown, activeVO
-};
+        data, c, b, s,
+        totalWorkValue, provisionalExtra,
+        sectionUsed,
+        totalSalvage, totalPG, totalTax, totalPenalty,
+        bakiKontrak,
+        voBreakdown, activeVO,
+        stampImages
+    };
 
 }
 
@@ -441,22 +502,25 @@ bakiKontrak -= Number(int.penalty || 0);
         contract: c
     };
 
+    const stampImages = await resolveStampImages(primaryWO.approval_stamps);
+
     return {
         data: combinedData, c, b,
         s: combinedSections,
         totalWorkValue,
         provisionalExtra: combinedProvisional,
         sectionUsed,
-        totalSalvage, totalPG, totalTax,totalPenalty,
+        totalSalvage, totalPG, totalTax, totalPenalty,
         bakiKontrak,
-        voBreakdown, activeVO
+        voBreakdown, activeVO,
+        stampImages
     };
 }
 
 function buildBlueformHTML(payload) {
     const { data, c, b, s, totalWorkValue, provisionalExtra,
             sectionUsed, totalSalvage, totalPG, totalTax, totalPenalty,
-            bakiKontrak, voBreakdown, activeVO } = payload;
+            bakiKontrak, voBreakdown, activeVO, stampImages } = payload;
 
 
     const effectiveVO = activeVO || voBreakdown;
@@ -640,31 +704,42 @@ let formattedRef = seq ? ` - ${seq}` : '';
             ${contentHtml}
         </div>
         <div class="bf-signature-grid">
-            <div>
-                <strong>Dimohon Oleh:</strong>
-                <div style="height:70px;"></div>
-                <div class="bf-sign-line"></div>
-                <small>${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}</small>
-            </div>
-            <div>
-                <strong>Disemak Oleh:</strong>
-                <div style="height:70px;"></div>
-                <div class="bf-sign-line"></div>
-                <small>Ketua Seksyen Selenggara</small>
-            </div>
-            <div>
-                <strong>Disahkan Oleh:</strong>
-                <div style="height:70px;"></div>
-                <div class="bf-sign-line"></div>
-                <small>Ketua Mekanikal & Elektrikal</small>
-            </div>
-            <div>
-                <strong>Disokong Oleh:</strong>
-                <div style="height:70px;"></div>
-                <div class="bf-sign-line"></div>
-                <small>Ketua Bahagian Operasi & Penyelenggaraan</small>
-            </div>
+    <div>
+        <strong>Dimohon Oleh:</strong>
+        <div style="height:70px; position:relative;">
+            ${stampImages.exec_signature?.signature ? `<img src="${stampImages.exec_signature.signature}" style="max-height:60px;max-width:90%;object-fit:contain;position:absolute;bottom:0;left:5%;">` : ''}
         </div>
+        <div class="bf-sign-line"></div>
+        <small style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+            ${stampImages.tech_initial?.initial ? `<img src="${stampImages.tech_initial.initial}" style="height:16px;width:auto;object-fit:contain;">` : ''}
+            ${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}
+            ${stampImages.tech_initial?.date ? `<span style="font-weight:normal;">(${formatShortDate(stampImages.tech_initial.date)})</span>` : ''}
+            ${stampImages.exec_signature?.date ? `<span style="font-weight:normal;font-size:8px;color:#555;">Lulus: ${formatShortDate(stampImages.exec_signature.date)}</span>` : ''}
+        </small>
+    </div>
+    <div>
+        <strong>Disemak Oleh:</strong>
+        <div style="height:70px; position:relative;">
+            ${stampImages.section_head?.signature ? `<img src="${stampImages.section_head.signature}" style="max-height:60px;max-width:90%;object-fit:contain;position:absolute;bottom:0;left:5%;">` : ''}
+        </div>
+        <div class="bf-sign-line"></div>
+        <small>Ketua Seksyen Selenggara ${stampImages.section_head?.date ? `<span style="font-weight:normal;">(${formatShortDate(stampImages.section_head.date)})</span>` : ''}</small>
+    </div>
+    <div>
+        <strong>Disahkan Oleh:</strong>
+        <div style="height:70px; position:relative;">
+            ${stampImages.dept_head?.signature ? `<img src="${stampImages.dept_head.signature}" style="max-height:60px;max-width:90%;object-fit:contain;position:absolute;bottom:0;left:5%;">` : ''}
+        </div>
+        <div class="bf-sign-line"></div>
+        <small>Ketua Mekanikal & Elektrikal ${stampImages.dept_head?.date ? `<span style="font-weight:normal;">(${formatShortDate(stampImages.dept_head.date)})</span>` : ''}</small>
+    </div>
+    <div>
+        <strong>Disokong Oleh:</strong>
+        <div style="height:70px;"></div>
+        <div class="bf-sign-line"></div>
+        <small>Ketua Bahagian Operasi & Penyelenggaraan</small>
+    </div>
+</div>
         <div class="bf-footer-note">
             * Sebutharga dan Work Order telah disemak sepenuhnya oleh Pihak Daerah
         </div>
