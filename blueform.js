@@ -711,7 +711,15 @@ let formattedRef = seq ? ` - ${seq}` : '';
         </div>
         <div class="bf-sign-line"></div>
         <small style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
-            ${stampImages.tech_initial?.initial ? `<img src="${stampImages.tech_initial.initial}" style="height:16px;width:auto;object-fit:contain;">` : ''}
+            ${stampImages.tech_initial?.initial ? `<img src="${stampImages.tech_initial.initial}"
+     style="
+        max-height:28px;
+        max-width:80px;
+        width:auto;
+        object-fit:contain;
+        vertical-align:middle;
+        margin-right:6px;
+     ">` : ''}
             ${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}
             ${stampImages.tech_initial?.date ? `<span style="font-weight:normal;">(${formatShortDate(stampImages.tech_initial.date)})</span>` : ''}
             ${stampImages.exec_signature?.date ? `<span style="font-weight:normal;font-size:8px;color:#555;">Lulus: ${formatShortDate(stampImages.exec_signature.date)}</span>` : ''}
