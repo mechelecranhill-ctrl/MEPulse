@@ -703,18 +703,19 @@ let formattedRef = seq ? ` - ${seq}` : '';
         <div id="bf_content" style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;">
             ${contentHtml}
         </div>
-                <div class="bf-signature-grid">
+                        <div class="bf-signature-grid">
             <div>
                 <strong>Dimohon Oleh:</strong>
                 <div style="height:70px; position:relative;">
                     ${stampImages.exec_signature?.signature ? `<img src="${stampImages.exec_signature.signature}" style="max-height:60px;max-width:90%;object-fit:contain;position:absolute;bottom:0;left:5%;">` : ''}
                 </div>
-                <div class="bf-sign-line"></div>
-                <small style="display:flex; align-items:center; gap:4px; flex-wrap:wrap; position:relative;">
-                    ${stampImages.tech_initial?.initial ? `<img src="${stampImages.tech_initial.initial}" style="height:16px;width:auto;object-fit:contain;position:absolute;left:-20px;top:-2px;">` : ''}
-                    <span>${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}</span>
-                    ${stampImages.tech_initial?.date ? `<span style="font-weight:normal;">(${formatShortDate(stampImages.tech_initial.date)})</span>` : ''}
-                    ${stampImages.exec_signature?.date ? `<span style="font-weight:normal;font-size:8px;color:#555;margin-left:auto;">(${formatShortDate(stampImages.exec_signature.date)})</span>` : ''}
+                <div style="position:relative;">
+                    <div class="bf-sign-line"></div>
+                    ${stampImages.tech_initial?.initial ? `<img src="${stampImages.tech_initial.initial}" style="height:22px;width:auto;object-fit:contain;position:absolute;left:2px;top:-12px;">` : ''}
+                </div>
+                <small style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
+                    <span>${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'} ${stampImages.tech_initial?.date ? `<span style="font-weight:normal;">(${formatShortDate(stampImages.tech_initial.date)})</span>` : ''}</span>
+                    ${stampImages.exec_signature?.date ? `<span style="font-weight:normal;font-size:8px;color:#555;">Lulus: ${formatShortDate(stampImages.exec_signature.date)}</span>` : ''}
                 </small>
             </div>
             <div>
@@ -723,7 +724,7 @@ let formattedRef = seq ? ` - ${seq}` : '';
                     ${stampImages.section_head?.signature ? `<img src="${stampImages.section_head.signature}" style="max-height:60px;max-width:90%;object-fit:contain;position:absolute;bottom:0;left:5%;">` : ''}
                 </div>
                 <div class="bf-sign-line"></div>
-                <small style="display:flex; align-items:center; justify-content:space-between;">
+                <small style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
                     <span>Ketua Seksyen Selenggara</span>
                     ${stampImages.section_head?.date ? `<span style="font-weight:normal;">(${formatShortDate(stampImages.section_head.date)})</span>` : ''}
                 </small>
@@ -734,7 +735,7 @@ let formattedRef = seq ? ` - ${seq}` : '';
                     ${stampImages.dept_head?.signature ? `<img src="${stampImages.dept_head.signature}" style="max-height:60px;max-width:90%;object-fit:contain;position:absolute;bottom:0;left:5%;">` : ''}
                 </div>
                 <div class="bf-sign-line"></div>
-                <small style="display:flex; align-items:center; justify-content:space-between;">
+                <small style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
                     <span>Ketua Mekanikal & Elektrikal</span>
                     ${stampImages.dept_head?.date ? `<span style="font-weight:normal;">(${formatShortDate(stampImages.dept_head.date)})</span>` : ''}
                 </small>
