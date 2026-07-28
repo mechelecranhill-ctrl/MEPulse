@@ -713,7 +713,7 @@ let formattedRef = seq ? ` - ${seq}` : '';
             <div class="bf-sign-line"></div>
             ${stampImages.tech_initial?.initial ? `<img src="${stampImages.tech_initial.initial}" style="height:25px;width:auto;object-fit:contain;position:absolute;left:-23px;top:-12px;">` : ''}
             ${stampImages.tech_initial?.date ? `<span style="position:absolute;left:-28px;top:10px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.tech_initial.date)}</span>` : ''}
-            ${stampImages.exec_signature?.date ? `<span style="position:absolute;right:0;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.exec_signature.date)}</span>` : ''}
+            ${stampImages.exec_signature?.date ? `<span style="position:absolute;right:-30px;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.exec_signature.date)}</span>` : ''}
         </div>
         <small style="display:block; margin-top:2px;">
             <span>${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}</span>
@@ -726,7 +726,7 @@ let formattedRef = seq ? ` - ${seq}` : '';
         </div>
         <div style="position:relative;">
             <div class="bf-sign-line"></div>
-            ${stampImages.section_head?.date ? `<span style="position:absolute;right:0;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.section_head.date)}</span>` : ''}
+            ${stampImages.section_head?.date ? `<span style="position:absolute;right:-30px;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.section_head.date)}</span>` : ''}
         </div>
         <small style="display:block; margin-top:2px;">
             <span>Ketua Seksyen Selenggara</span>
@@ -739,7 +739,7 @@ let formattedRef = seq ? ` - ${seq}` : '';
         </div>
         <div style="position:relative;">
             <div class="bf-sign-line"></div>
-            ${stampImages.dept_head?.date ? `<span style="position:absolute;right:0;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.dept_head.date)}</span>` : ''}
+            ${stampImages.dept_head?.date ? `<span style="position:absolute;right:-30px;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.dept_head.date)}</span>` : ''}
         </div>
         <small style="display:block; margin-top:2px;">
             <span>Ketua Mekanikal & Elektrikal</span>
