@@ -722,11 +722,11 @@ let formattedRef = seq ? ` - ${seq}` : '';
     <div>
         <strong>Disemak Oleh:</strong>
         <div style="height:70px; position:relative;">
-            ${stampImages.section_head?.signature ? `<img src="${stampImages.section_head.signature}" style="max-height:60px; max-width:300px; object-fit:contain; position:absolute; bottom:0; left:5%;">` : ''}
+            ${stampImages.section_head?.signature ? `<img src="${stampImages.section_head.signature}" style="max-height:60px; max-width:250px; object-fit:contain; position:absolute; bottom:0; left:5%;">` : ''}
         </div>
         <div style="position:relative;">
             <div class="bf-sign-line"></div>
-            ${stampImages.section_head?.date ? `<span style="position:absolute;right:200px;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.section_head.date)}</span>` : ''}
+            ${stampImages.section_head?.date ? `<span style="position:absolute;right:250px;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.section_head.date)}</span>` : ''}
         </div>
         <small style="display:block; margin-top:2px;">
             <span>Ketua Seksyen Selenggara</span>
