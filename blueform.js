@@ -1,4 +1,4 @@
-/* ============================================================
+/* ===========================================================
    BLUEFORM SHARED LOGIC
    Extracted verbatim from contract-usage.html
    Digunakan bersama oleh: contract-usage.html, app-exec.html,
