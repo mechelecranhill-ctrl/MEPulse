@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="blueform.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
     <script>
         if (window['pdfjsLib']) {
             pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -649,6 +650,68 @@
             preview.classList.remove('hidden');
             preview.classList.add('flex');
         }
+
+        function formatStampDate(dateStr) {
+    const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+    if(!dateStr) return '';
+    const [y, m, d] = dateStr.split('-').map(Number);
+    if(!y || !m || !d) return '';
+    return `${String(d).padStart(2,'0')} ${months[m-1]} ${y}`;
+}
+
+async function stampQuotationPdf(file, qpdDateStr) {
+    if (typeof PDFLib === 'undefined') {
+        console.error('pdf-lib tidak dimuatkan, cop dilangkau.');
+        return file;
+    }
+    try {
+        const existingBytes = await file.arrayBuffer();
+        const pdfDoc = await PDFLib.PDFDocument.load(existingBytes);
+        const pages = pdfDoc.getPages();
+        if (pages.length === 0) return file;
+
+        const page = pages[0]; // Cop hanya pada page PERTAMA
+        const { width, height } = page.getSize();
+
+        // Reka bentuk asal dikira atas A4 (210mm x 297mm)
+        const A4_W_PT = 595.2756, A4_H_PT = 841.8898;
+        const mmToPt = 2.834645669;
+        const scaleX = width / A4_W_PT;
+        const scaleY = height / A4_H_PT;
+        const uniformScale = Math.min(scaleX, scaleY);
+
+        // stamp: top 240mm, left 30mm, diameter 41mm (ikut design asal anda)
+        const centerX = (30 + 41 / 2) * mmToPt * scaleX;
+        const centerYFromTop = (240 + 41 / 2) * mmToPt * scaleY;
+        const centerY = height - centerYFromTop;
+        const radius = (41 / 2) * mmToPt * uniformScale;
+
+        const boldFont = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+        const blue = PDFLib.rgb(0, 0, 0.8); // ~#0000CC
+
+        page.drawEllipse({
+            x: centerX, y: centerY,
+            xScale: radius, yScale: radius,
+            borderColor: blue, borderWidth: 1.4
+        });
+
+        const drawCentered = (text, size, yOffset) => {
+            const w = boldFont.widthOfTextAtSize(text, size);
+            page.drawText(text, { x: centerX - w / 2, y: centerY + yOffset, size, font: boldFont, color: blue });
+        };
+
+        drawCentered('DITERIMA', 13, radius * 0.42);
+        drawCentered(formatStampDate(qpdDateStr), 10.5, radius * 0.05);
+        drawCentered('JABATAN M&E', 7, -radius * 0.42);
+        drawCentered('RANHILL SAJ SDN BHD', 7, -radius * 0.42 - 8);
+
+        const stampedBytes = await pdfDoc.save();
+        return new File([stampedBytes], file.name, { type: 'application/pdf' });
+    } catch (err) {
+        console.error('Gagal cop PDF, upload fail asal:', err);
+        return file; // fallback: jangan gagalkan submit sepenuhnya
+    }
+}
 
         function clearSelectedFile() {
             document.getElementById('tq_pdf_file').value = '';
@@ -1709,6 +1772,14 @@ async function qActionDeleteQuotation() {
                     } catch (archiveErr) {
                         console.error("Failed to archive old rejected quotation:", archiveErr);
                     }
+
+                    const rawFileInput = document.getElementById('tq_pdf_file');
+                    const rawFile = rawFileInput.files[0];
+                    if (!rawFile) { alert('Please select a PDF file!'); return; }
+
+                    const qpdDateVal = document.getElementById('tq_qpb_date').value;
+                    const stampedFile = await stampQuotationPdf(rawFile, qpdDateVal);
+                    assignFileToInput(rawFileInput, stampedFile); // ganti fail input dgn versi yg dah dicop
 
                     await uploadQuotationToR2('tq_pdf_file', primaryWorkId, unitText, 'tq_upload_status', 'tq_pdf_url');
 
