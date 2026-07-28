@@ -711,12 +711,12 @@ let formattedRef = seq ? ` - ${seq}` : '';
                 </div>
                 <div style="position:relative;">
                     <div class="bf-sign-line"></div>
-                    ${stampImages.tech_initial?.initial ? `<img src="${stampImages.tech_initial.initial}" style="height:22px;width:auto;object-fit:contain;position:absolute;left:-20px;top:-12px;">` : ''}
-                    ${stampImages.tech_initial?.date ? `<span style="position:absolute;left:-20px;top:10px;font-size:8px;color:#555;white-space:nowrap;">(${formatShortDate(stampImages.tech_initial.date)})</span>` : ''}
+                    ${stampImages.tech_initial?.initial ? `<img src="${stampImages.tech_initial.initial}" style="height:25px;width:auto;object-fit:contain;position:absolute;left:-23px;top:-12px;">` : ''}
+                    ${stampImages.tech_initial?.date ? `<span style="position:absolute;left:-23px;top:10px;font-size:10px;color:#000;white-space:nowrap;">(${formatShortDate(stampImages.tech_initial.date)})</span>` : ''}
                 </div>
                 <small style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
                     <span>${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}</span>
-                    ${stampImages.exec_signature?.date ? `<span style="font-weight:normal;font-size:8px;color:#555;">Lulus: ${formatShortDate(stampImages.exec_signature.date)}</span>` : ''}
+                    ${stampImages.exec_signature?.date ? `<span style="font-weight:normal;font-size:10px;color:#000;">${formatShortDate(stampImages.exec_signature.date)}</span>` : ''}
                 </small>
             </div>
             <div>
