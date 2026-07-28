@@ -705,63 +705,18 @@ let formattedRef = seq ? ` - ${seq}` : '';
         </div>
         <div class="bf-signature-grid">
     <div>
-    <strong>Dimohon Oleh:</strong>
-
-    <div style="position:relative;height:70px;">
-
-        <!-- INITIAL (Floating kiri - tidak ganggu signature) -->
-        ${stampImages.tech_initial?.initial ? `
-            <div style="
-                position:absolute;
-                left:0;
-                bottom:0;
-                width:55px;
-                text-align:center;
-            ">
-
-                ${stampImages.tech_initial?.date ? `
-                    <div style="
-                        font-size:9px;
-                        font-weight:normal;
-                        margin-bottom:3px;
-                    ">
-                        ${formatShortDate(stampImages.tech_initial.date)}
-                    </div>
-                ` : ''}
-
-                <img
-                    src="${stampImages.tech_initial.initial}"
-                    style="
-                        width:40px;
-                        height:auto;
-                        object-fit:contain;
-                    ">
-            </div>
-        ` : ''}
-
-        <!-- Signature kekal di tempat asal -->
-        ${stampImages.exec_signature?.signature ? `
-            <img
-                src="${stampImages.exec_signature.signature}"
-                style="
-                    max-height:60px;
-                    max-width:90%;
-                    object-fit:contain;
-                    position:absolute;
-                    bottom:0;
-                    left:70px;
-                ">
-        ` : ''}
-
+        <strong>Dimohon Oleh:</strong>
+        <div style="height:70px; position:relative;">
+            ${stampImages.exec_signature?.signature ? `<img src="${stampImages.exec_signature.signature}" style="max-height:60px;max-width:90%;object-fit:contain;position:absolute;bottom:0;left:5%;">` : ''}
+        </div>
+        <div class="bf-sign-line"></div>
+        <small style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+            ${stampImages.tech_initial?.initial ? `<img src="${stampImages.tech_initial.initial}" style="height:16px;width:auto;object-fit:contain;">` : ''}
+            ${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}
+            ${stampImages.tech_initial?.date ? `<span style="font-weight:normal;">(${formatShortDate(stampImages.tech_initial.date)})</span>` : ''}
+            ${stampImages.exec_signature?.date ? `<span style="font-weight:normal;font-size:8px;color:#555;">Lulus: ${formatShortDate(stampImages.exec_signature.date)}</span>` : ''}
+        </small>
     </div>
-
-    <div class="bf-sign-line"></div>
-
-    <small>
-        ${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}
-    </small>
-
-</div>
     <div>
         <strong>Disemak Oleh:</strong>
         <div style="height:70px; position:relative;">
