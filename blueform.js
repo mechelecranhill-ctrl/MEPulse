@@ -704,50 +704,56 @@ let formattedRef = seq ? ` - ${seq}` : '';
             ${contentHtml}
         </div>
                                 <div class="bf-signature-grid">
-            <div>
-                <strong>Dimohon Oleh:</strong>
-                <div style="height:70px; position:relative;">
-                    ${stampImages.exec_signature?.signature ? `<img src="${stampImages.exec_signature.signature}" style="max-height:60px;max-width:90%;object-fit:contain;position:absolute;bottom:0;left:5%;">` : ''}
-                </div>
-                <div style="position:relative;">
-                    <div class="bf-sign-line"></div>
-                    ${stampImages.tech_initial?.initial ? `<img src="${stampImages.tech_initial.initial}" style="height:25px;width:auto;object-fit:contain;position:absolute;left:-23px;top:-12px;">` : ''}
-                    ${stampImages.tech_initial?.date ? `<span style="position:absolute;left:-28px;top:10px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.tech_initial.date)}</span>` : ''}
-                </div>
-                <small style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
-                    <span>${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}</span>
-                    ${stampImages.exec_signature?.date ? `<span style="font-weight:normal;font-size:10px;color:#000;">${formatShortDate(stampImages.exec_signature.date)}</span>` : ''}
-                </small>
-            </div>
-            <div>
-                <strong>Disemak Oleh:</strong>
-                <div style="height:70px; position:relative;">
-                    ${stampImages.section_head?.signature ? `<img src="${stampImages.section_head.signature}" style="max-height:60px;max-width:90%;object-fit:contain;position:absolute;bottom:0;left:5%;">` : ''}
-                </div>
-                <div class="bf-sign-line"></div>
-                <small style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
-                    <span>Ketua Seksyen Selenggara</span>
-                    ${stampImages.section_head?.date ? `<span style="font-weight:normal;">(${formatShortDate(stampImages.section_head.date)})</span>` : ''}
-                </small>
-            </div>
-            <div>
-                <strong>Disahkan Oleh:</strong>
-                <div style="height:70px; position:relative;">
-                    ${stampImages.dept_head?.signature ? `<img src="${stampImages.dept_head.signature}" style="max-height:60px;max-width:90%;object-fit:contain;position:absolute;bottom:0;left:5%;">` : ''}
-                </div>
-                <div class="bf-sign-line"></div>
-                <small style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
-                    <span>Ketua Mekanikal & Elektrikal</span>
-                    ${stampImages.dept_head?.date ? `<span style="font-weight:normal;">(${formatShortDate(stampImages.dept_head.date)})</span>` : ''}
-                </small>
-            </div>
-            <div>
-                <strong>Disokong Oleh:</strong>
-                <div style="height:70px;"></div>
-                <div class="bf-sign-line"></div>
-                <small>Ketua Bahagian Operasi & Penyelenggaraan</small>
-            </div>
+    <div>
+        <strong>Dimohon Oleh:</strong>
+        <div style="height:70px; position:relative;">
+            ${stampImages.exec_signature?.signature ? `<img src="${stampImages.exec_signature.signature}" style="max-height:60px;max-width:90%;object-fit:contain;position:absolute;bottom:0;left:5%;">` : ''}
         </div>
+        <div style="position:relative;">
+            <div class="bf-sign-line"></div>
+            ${stampImages.tech_initial?.initial ? `<img src="${stampImages.tech_initial.initial}" style="height:25px;width:auto;object-fit:contain;position:absolute;left:-23px;top:-12px;">` : ''}
+            ${stampImages.tech_initial?.date ? `<span style="position:absolute;left:-28px;top:10px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.tech_initial.date)}</span>` : ''}
+            ${stampImages.exec_signature?.date ? `<span style="position:absolute;right:0;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.exec_signature.date)}</span>` : ''}
+        </div>
+        <small style="display:block; margin-top:2px;">
+            <span>${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}</span>
+        </small>
+    </div>
+    <div>
+        <strong>Disemak Oleh:</strong>
+        <div style="height:70px; position:relative;">
+            ${stampImages.section_head?.signature ? `<img src="${stampImages.section_head.signature}" style="max-height:60px;max-width:90%;object-fit:contain;position:absolute;bottom:0;left:5%;">` : ''}
+        </div>
+        <div style="position:relative;">
+            <div class="bf-sign-line"></div>
+            ${stampImages.section_head?.date ? `<span style="position:absolute;right:0;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.section_head.date)}</span>` : ''}
+        </div>
+        <small style="display:block; margin-top:2px;">
+            <span>Ketua Seksyen Selenggara</span>
+        </small>
+    </div>
+    <div>
+        <strong>Disahkan Oleh:</strong>
+        <div style="height:70px; position:relative;">
+            ${stampImages.dept_head?.signature ? `<img src="${stampImages.dept_head.signature}" style="max-height:60px;max-width:90%;object-fit:contain;position:absolute;bottom:0;left:5%;">` : ''}
+        </div>
+        <div style="position:relative;">
+            <div class="bf-sign-line"></div>
+            ${stampImages.dept_head?.date ? `<span style="position:absolute;right:0;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.dept_head.date)}</span>` : ''}
+        </div>
+        <small style="display:block; margin-top:2px;">
+            <span>Ketua Mekanikal & Elektrikal</span>
+        </small>
+    </div>
+    <div>
+        <strong>Disokong Oleh:</strong>
+        <div style="height:70px;"></div>
+        <div style="position:relative;">
+            <div class="bf-sign-line"></div>
+        </div>
+        <small style="display:block; margin-top:2px;">Ketua Bahagian Operasi & Penyelenggaraan</small>
+    </div>
+</div>
 
         <div class="bf-footer-note">
             * Sebutharga dan Work Order telah disemak sepenuhnya oleh Pihak Daerah
