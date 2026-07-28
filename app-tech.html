@@ -1,123 +1,2634 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<head> 
     <meta charset="UTF-8">
-    <title>Cetak Cop Diterima</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contract Approvals-Technician</title>
+    <link class="icon" href="data:;base64,iVBORw0KGgo=">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="blueform.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script>
+        if (window['pdfjsLib']) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc =
+                'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+    </script>
+
+    <link rel="stylesheet" href="style.css">
+
+    <script src="session.js"></script>
+    <script src="sidebar.js" defer></script>
+    
     <style>
-        /* Tetapan saiz kertas A4 untuk cetakan */
-        @page {
-            size: A4;
-            margin: 0;
+        /* Paparkan semua huruf sebagai huruf besar secara visual semasa ditaip */
+        input[type="text"], 
+        textarea, 
+        .force-uppercase {
+            text-transform: uppercase;
         }
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #555;
+
+        .glass-header {
+            width: 100%;
+            height: calc(60px + env(safe-area-inset-top));
+            padding: env(safe-area-inset-top) 25px 0 25px;
+            background: radial-gradient(circle at top, rgba(255,255,255,.15), transparent 35%),
+                        linear-gradient(60deg, #1d4ed8 0%, #3b82f6 40%, #60a5fa 100%);
             display: flex;
+            align-items: center;
             justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-
-        /* Simulasi kertas A4 di skrin */
-        .a4-page {
-            width: 210mm;
-            height: 297mm;
-            background: white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             position: relative;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            z-index: 1000;
+            flex-shrink: 0;
             box-sizing: border-box;
-            padding: 20mm; 
         }
 
-        /* Kotak Cop - Jejari 2cm = Diameter 4cm (40mm) -> Kita guna 75mm-80mm untuk muat teks */
-        .stamp {
-            width: 41mm;
-            height: 41mm;
-            border: 2px solid #0000CC; /* Warna biru cop */
-            border-radius: 50%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-            color: #0000CC;
-            position: absolute;
-            top: 240mm; 
-            left: 30mm;
-            box-sizing: border-box;
-            padding-top: 5mm; /* Jarak 5mm dari radius atas ke DITERIMA */
+        /* ============ DRAG QUOTATION -> BLUEFORM STYLES ============ */
+        .q-drag-row { cursor: grab; user-select: none; -webkit-user-select: none; touch-action: pan-y; }
+        .q-drag-row.q-row-selected { background-color: #ecfdf5 !important; box-shadow: inset 0 0 0 1.5px #34d399; }
+        .q-drag-row.q-row-dragging-source { opacity: 0.4; }
+        .q-select-check {
+            display: inline-flex; align-items:center; justify-content:center;
+            width:15px; height:15px; border-radius:4px; border:1.5px solid #34d399;
+            background:#10b981; color:#fff; font-size:9px; margin-right:5px; flex-shrink:0;
         }
 
-        /* Font Arial Bold untuk DITERIMA */
-        .stamp-title {
-            font-family: 'Arial', sans-serif;
-            font-size: 16pt;
-            font-weight: bold;
-            letter-spacing: 0.2px;
-            margin-bottom: 5mm; /* Jarak 6mm dari DITERIMA ke tarikh */
-            transform: scaleY(1.3);
+        .wo-hold-row { cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: pan-y; }
+        .wo-hold-row:active { background-color: #eff6ff; }
+
+        .q-hold-row-del { cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: pan-y; }
+        .q-hold-row-del:active { background-color: #fef2f2; }
+
+        #blueform-section.q-drop-target-active {
+            outline: 3px dashed #3b82f6; outline-offset: -3px;
+            background-color: rgba(59,130,246,0.06); border-radius: 12px;
+            transition: outline-color .15s ease;
         }
 
-        /* Font Arial Bold untuk Tarikh */
-        .stamp-date {
-            font-family: 'Arial', sans-serif;
-            font-size: 13pt;
-            font-weight: bold;
-            letter-spacing: 0.2px;
-            margin-bottom: 4mm;
-            transform: scaleY(1.25);
+        #qDragGhost {
+            position: fixed; z-index: 100000; pointer-events: none; display:none;
+            background: #059669; color: #fff; font-size: 11px; font-weight: 800;
+            padding: 6px 12px; border-radius: 999px; box-shadow: 0 6px 20px rgba(0,0,0,.25);
+            align-items: center; gap: 6px; transform: translate(-50%, -140%);
         }
 
-        /* Font Arial Narrow untuk Bahagian Jabatan */
-        .stamp-footer {
-            font-family: 'Arial Narrow', Arial, sans-serif;
-            font-size: 9.2pt;
-            font-weight: bold;
-            line-height: 1;
-            letter-spacing: 0.2px;
+        #qSelectionToolbar {
+            position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+            z-index: 9990; background: #111827; color: #fff; padding: 8px 8px 8px 14px;
+            border-radius: 999px; display: none; align-items: center; gap: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,.35); font-size: 12px; font-weight: 700;
         }
+        #qSelectionToolbar.active { display: flex; }
+        #qSelectionToolbar button { cursor: pointer; border: none; }
 
-        .stamp-footer .line-1 {
-            margin-bottom: 0.5mm; /* Jarak 1mm antara JABATAN M&E dan RANHILL SAJ SDN BHD */
-        }
-
-        /* Buang background kelabu dan bayang semasa print */
+        /* Controls the appearance of multi-page printing */
         @media print {
-            body {
-                background: none;
-            }
-            .a4-page {
-                box-shadow: none;
+            @page {
+                size: A4;
                 margin: 0;
             }
+            html, body {
+                height: auto !important;
+                min-height: 0 !important;
+                max-height: none !important;
+                overflow: visible !important;
+                display: block !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+            body * {
+                visibility: hidden;
+            }
+            body > *:not(#bulkPreviewPage) {
+                display: none !important;
+            }
+            #bulkPreviewPage, #bulkPreviewPage * {
+                visibility: visible;
+            }
+            #bulkPreviewPage {
+                position: static !important;
+                inset: auto !important;
+                width: 100% !important;
+                height: auto !important;
+                max-height: none !important;
+                background: white !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: visible !important;
+            }
+            #bulkPagesContainer {
+                overflow: visible !important;
+                height: auto !important;
+                max-height: none !important;
+            }
+            .bulk-toolbar {
+                display: none !important;
+            }
+            .print-page {
+                box-shadow: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 210mm;
+                page-break-after: always !important;
+                break-after: page !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            .print-page img, .print-page canvas {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                width: 100% !important;
+                display: block !important;
+            }
         }
+        .stamp {
+    width: 41mm;
+    height: 41mm;
+    border: 2px solid #0000CC;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    color: #0000CC;
+    box-sizing: border-box;
+    padding-top: 5mm;
+    background: transparent;
+}
+.stamp-title {
+    font-family: 'Arial', sans-serif;
+    font-size: 16pt;
+    font-weight: bold;
+    letter-spacing: 0.2px;
+    margin-bottom: 5mm;
+    transform: scaleY(1.3);
+}
+.stamp-date {
+    font-family: 'Arial', sans-serif;
+    font-size: 13pt;
+    font-weight: bold;
+    letter-spacing: 0.2px;
+    margin-bottom: 4mm;
+    transform: scaleY(1.25);
+}
+.stamp-footer {
+    font-family: 'Arial Narrow', Arial, sans-serif;
+    font-size: 9.2pt;
+    font-weight: bold;
+    line-height: 1;
+    letter-spacing: 0.2px;
+}
+.stamp-footer .line-1 { margin-bottom: 0.5mm; }
+        
     </style>
 </head>
-<body>
+<body class="bg-gray-100 text-gray-800 font-sans h-screen overflow-hidden flex flex-col relative">
 
-    <div class="a4-page">
-        <!-- Reka bentuk Cop -->
-        <div class="stamp">
-            <div class="stamp-title">DITERIMA</div>
-            <!-- Tarikh automatik hari ini -->
-            <div class="stamp-date" id="current-date"></div>
-            <div class="stamp-footer">
-                <div class="line-1">JABATAN M&E</div>
-                <div>RANHILL SAJ SDN BHD</div>
-            </div>
+    <app-sidebar></app-sidebar>
+
+    <div class="glass-header">
+        <div style="text-align:center;">
+            <h1 style="margin:0; font-size:22px; font-weight:800; color:#ffffff; letter-spacing:0.5px;">
+                <i class="fa-solid fa-file-signature" style="margin-right:8px;"></i>Contract Approvals
+            </h1>
+            <p style="margin:4px 0 0 0; color:rgba(255,255,255,0.8); font-size:15px;">
+                Mode: Technician
+            </p>
         </div>
     </div>
 
+    <div class="container mx-auto px-4 flex-1 my-6 overflow-hidden w-full">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full pb-4">
+            
+            <!-- QUOTATION SECTION (EMERALD) -->
+            <section id="quotation-section" class="bg-white rounded-xl shadow-md p-4 border-t-4 border-emerald-500 flex flex-col h-full overflow-hidden w-full transition-all">
+                <div class="flex justify-between items-center mb-4 flex-shrink-0">
+                    <h2 class="text-sm font-bold text-gray-700">
+                        <i class="fa-solid fa-file-invoice-dollar text-emerald-500 mr-1"></i>1. Quotation Status
+                    </h2>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">Filter: QUOTATION / QUO-APP / QUO-REJ</span>
+                        <button onclick="openQuotationModal()" class="w-6 h-6 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shadow-sm cursor-pointer transition-all" title="Add New Quotation">
+                            <i class="fa-solid fa-plus text-[10px]"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="quotation-dropzone-hint" class="hidden mb-2 text-[10px] text-emerald-600 font-bold text-center bg-emerald-50 border border-dashed border-emerald-300 rounded-lg py-2">
+                    <i class="fa-solid fa-file-arrow-up mr-1"></i>Drop a PDF file here to start a new quotation
+                </div>
+                <p class="text-[9px] text-gray-400 text-center mb-1 flex-shrink-0">
+                    <i class="fa-solid fa-hand-pointer mr-1"></i>Press &amp; hold (touch) or drag (mouse) the row to prepare Blueform
+                </p>
+                <div id="quotations-container" class="flex-1 overflow-y-auto space-y-4 pr-1">
+                    <div class="text-center text-gray-400 py-4 text-xs">Loading quotation data...</div>
+                </div>
+            </section>
+
+            <!-- BLUEFORM SECTION (BLUE) -->
+            <section id="blueform-section" class="bg-white rounded-xl shadow-md p-4 border-t-4 border-blue-500 flex flex-col h-full overflow-hidden w-full">
+                <div class="flex justify-between items-center mb-4 flex-shrink-0">
+                    <h2 class="text-sm font-bold text-gray-700">
+                        <i class="fa-solid fa-file-lines text-blue-500 mr-1"></i>2. Blueform Status
+                    </h2>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded">Filter: APP-HOD / REJECTED</span>
+                        <button onclick="openBlueformModal()" class="w-6 h-6 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-sm cursor-pointer transition-all" title="Add New Blueform">
+                            <i class="fa-solid fa-plus text-[10px]"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="blueforms-container" class="flex-1 overflow-y-auto space-y-4 pr-1">
+                    <div class="text-center text-gray-400 py-4 text-xs">Loading blueform data...</div>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <div id="bulkPreviewPage" style="display:none; position:fixed; inset:0; background:#525659; z-index:9998; overflow-y:auto; padding:60px 0 60px 0;">
+        <div class="bulk-toolbar" style="position:fixed; top:0; left:0; right:0; height:50px; background:#323639; display:flex; align-items:center; justify-content:space-between; padding:0 30px; z-index:9999; box-shadow:0 2px 10px rgba(0,0,0,0.4);">
+            <div style="color:white;font-size:13px;font-weight:600;" id="bulkPreviewCount"></div>
+            <div style="display:flex;gap:10px;">
+                <button class="text-white px-4 py-2 rounded-lg text-xs font-semibold bg-zinc-600 hover:bg-zinc-700 cursor-pointer transition-colors" onclick="closeBulkPreview()">
+                    <i class="fa fa-times"></i> Close
+                </button>
+                <button class="text-white px-4 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 cursor-pointer transition-colors" onclick="window.print()">
+                    <i class="fa fa-print"></i> Print / Save PDF
+                </button>
+            </div>
+        </div>
+        <div id="bulkPagesContainer" style="display:flex; flex-direction:column; align-items:center; gap:20px; padding:10px 0;"></div>
+    </div>
+
+    <!-- QUOTATION MODAL (EMERALD) -->
+    <div id="quotationModalOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[9999] p-4">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center p-5 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10">
+            <h3 class="text-base font-bold text-gray-800"><i class="fa-solid fa-file-lines text-emerald-500 mr-2"></i>Quotation</h3>
+            <button type="button" onclick="closeQuotationModal()" class="text-gray-400 hover:text-gray-600 cursor-pointer"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <form id="techQuotationForm" class="p-5 space-y-3">
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Unit</label>
+                <select id="tq_unit_id" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5"><option value="">Choose Unit</option></select>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Contract</label>
+                <select id="tq_contract_id" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5"><option value="">Choose Unit First</option></select>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Work Order Id</label>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <select id="tq_id_prefix" class="text-sm border border-gray-300 rounded-lg p-2.5" style="width:80px;flex-shrink:0;">
+                        <option value="C">C</option><option value="K">K</option>
+                    </select>
+                    <input type="text" id="tq_id_num" placeholder="123456" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                </div>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Quotation Date</label>
+                <input type="date" id="tq_qpb_date" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">District</label>
+                <select id="tq_dist" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5">
+                    <option value="">Choose Contract First</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Location</label>
+                <input type="text" id="tq_location" placeholder="Location" class="w-full text-sm border border-gray-300 rounded-lg p-2.5">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Work Description</label>
+                <textarea id="tq_description" rows="2" placeholder="Work Description" class="w-full text-sm border border-gray-300 rounded-lg p-2.5"></textarea>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cost Breakdown</label>
+                <div id="tq_breakdown_container" class="grid grid-cols-1 gap-2 mt-1">
+                    <p class="text-[10px] text-gray-400 italic">Choose Contract to load cost breakdown sections.</p>
+                </div>
+            </div>
+            <div class="flex justify-between items-center bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
+                <strong class="text-sm text-gray-700">Total:</strong>
+                <span id="tq_total_display" class="text-emerald-600 font-extrabold text-sm">RM 0.00</span>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Upload Document (PDF)</label>
+                <div id="tq_dropzone" onclick="document.getElementById('tq_pdf_file').click()" class="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center transition-all cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/30">
+                    <input type="file" id="tq_pdf_file" accept="application/pdf" required class="hidden">
+
+                    <div id="tq_file_empty_state">
+                        <i class="fa-solid fa-file-arrow-up text-2xl text-gray-300 mb-1.5 block"></i>
+                        <p class="text-xs font-bold text-emerald-600">Select PDF Files</p>
+                        <p class="text-[10px] text-gray-400 mt-0.5">or drag & drop the files</p>
+                    </div>
+
+                    <div id="tq_file_preview" class="hidden items-center justify-between gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-left">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <i class="fa-solid fa-file-pdf text-red-500 text-lg flex-shrink-0"></i>
+                            <div class="min-w-0">
+                                <p id="tq_file_name" class="text-xs font-bold text-gray-800 truncate"></p>
+                                <p id="tq_file_size" class="text-[10px] text-gray-400"></p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="event.stopPropagation(); clearSelectedFile()" class="text-gray-400 hover:text-red-500 flex-shrink-0 cursor-pointer" title="Remove file">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <input type="hidden" id="tq_pdf_url">
+            <div id="tq_upload_status" class="hidden p-2.5 rounded-lg text-xs font-semibold"></div>
+            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">Register Quotation</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- BLUEFORM MODAL (BLUE) -->
+    <div id="blueformModalOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[9999] p-4">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center p-5 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10">
+            <h3 class="text-base font-bold text-gray-800"><i class="fa-solid fa-file-pen text-blue-500 mr-2"></i>Blueform</h3>
+            <button type="button" onclick="closeBlueformModal()" class="text-gray-400 hover:text-gray-600 cursor-pointer"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <form id="techBlueformForm" class="p-5 space-y-3">
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Unit</label>
+                <select id="wo_unit_id" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5"><option value="">Choose Unit</option></select>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Contract</label>
+                <select id="wo_contract_id" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5"><option value="">Choose Unit First</option></select>
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Work Order Id(s)</label>
+                <div id="wo_id_rows_container"></div>
+                <button type="button" onclick="woAddWorkIdRow()" class="w-full text-xs text-blue-600 border border-dashed border-blue-400 rounded-lg py-2 mt-1 cursor-pointer hover:bg-blue-50 transition-all">+ Add Work ID</button>
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Blueform Date</label>
+                <input type="date" id="wo_qpb_date" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5">
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">District</label>
+                <select id="wo_dist" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5">
+                    <option value="">Choose Contract First</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Location & Cost Breakdown</label>
+                <div id="wo_id_cards_container" class="grid grid-cols-1 gap-3 mt-1"></div>
+            </div>
+
+            <div class="flex justify-between items-center bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+                <strong class="text-sm text-gray-700">Total:</strong>
+                <span id="wo_total_display" class="text-blue-600 font-extrabold text-sm">RM 0.00</span>
+            </div>
+
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">Submit Blueform</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- DETECT WORK ORDER MODAL -->
+    <div id="woDetectModalOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[9999] p-4">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center p-5 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10">
+            <h3 class="text-base font-bold text-gray-800"><i class="fa-solid fa-triangle-exclamation text-amber-500 mr-2"></i>Existing Work Order Detected</h3>
+            <button type="button" onclick="woCancelDetectModal()" class="text-gray-400 hover:text-gray-600 cursor-pointer"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <div class="p-5">
+            <p class="text-xs text-gray-500 mb-3">The following Work Order ID(s) already exist with existing data:</p>
+            <div id="woDetectModalBody" class="space-y-3"></div>
+        </div>
+        <div class="p-5 border-t border-gray-100 flex flex-col gap-2 sticky bottom-0 bg-white rounded-b-2xl">
+            <button type="button" onclick="woConfirmOverwrite()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-rotate mr-1"></i>Overwrite Data
+            </button>
+            <button type="button" onclick="woConfirmSaveAsNew()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-file-circle-plus mr-1"></i>Save as New
+            </button>
+            <button type="button" onclick="woConfirmAdditionalWorks()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-plus-circle mr-1"></i>Additional Works
+            </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DATE CHANGE CONFIRMATION MODAL -->
+    <div id="woDateChangeModalOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[9999] p-4">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full">
+        <div class="p-5 border-b border-gray-100">
+            <h3 class="text-base font-bold text-gray-800"><i class="fa-solid fa-triangle-exclamation text-amber-500 mr-2"></i>Date Change Not Allowed in Overwrite Mode</h3>
+        </div>
+        <div class="p-5">
+            <p class="text-xs text-gray-500">
+                You are in Overwrite mode. Changing the date is not permitted. 
+                If you wish to change the date, please use the <strong>Save as New</strong> option instead.
+            </p>
+        </div>
+        <div class="p-5 border-t border-gray-100 flex flex-col gap-2">
+            <button type="button" onclick="woRevertDateAndProceed()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-rotate-left mr-1"></i>Revert to Original Date & Overwrite
+            </button>
+            <button type="button" onclick="woCancelDateChange()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                Cancel
+            </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- BLUEFORM ROW ACTION MODAL (Hold-to-open) -->
+<div id="woActionModalOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[9999] p-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full">
+    <div class="p-5 border-b border-gray-100">
+        <h3 class="text-base font-bold text-gray-800"><i class="fa-solid fa-bolt text-blue-500 mr-2"></i>Blueform Action</h3>
+        <p id="woActionModalWorkId" class="text-xs text-gray-400 mt-1"></p>
+    </div>
+    <div id="woActionModalBody" class="p-5 flex flex-col gap-2"></div>
+    <div class="p-5 border-t border-gray-100">
+        <button type="button" onclick="closeWoActionModal()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">Cancel</button>
+    </div>
+  </div>
+</div>
+
+    <!-- QUOTATION ROW ACTION MODAL (Hold-to-open, QUO-REJ only) -->
+<div id="qActionModalOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[9999] p-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full">
+    <div class="p-5 border-b border-gray-100">
+        <h3 class="text-base font-bold text-gray-800"><i class="fa-solid fa-bolt text-emerald-500 mr-2"></i>Quotation Action</h3>
+        <p id="qActionModalWorkId" class="text-xs text-gray-400 mt-1"></p>
+    </div>
+    <div id="qActionModalBody" class="p-5 flex flex-col gap-2"></div>
+    <div class="p-5 border-t border-gray-100">
+        <button type="button" onclick="closeQActionModal()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">Cancel</button>
+    </div>
+  </div>
+</div>
+    
+    <!-- QUOTATION DRAG GHOST -->
+    <div id="qDragGhost"><i class="fa-solid fa-file-invoice-dollar"></i><span id="qDragGhostLabel"></span></div>
+
+    <!-- FLOATING SELECTION TOOLBAR (touch multi-select mode) -->
+    <div id="qSelectionToolbar">
+        <span id="qSelectionCount">0 chosen</span>
+        <button onclick="qCancelSelectionMode()" class="bg-gray-700 hover:bg-gray-600 text-white text-[11px] px-3 py-1.5 rounded-full">Cancel</button>
+        <button id="qSendToBlueformBtn" onpointerdown="qHandlePointerDown(event, null, true)" class="bg-blue-600 hover:bg-blue-700 text-white text-[11px] px-3 py-1.5 rounded-full inline-flex items-center gap-1">
+            <i class="fa-solid fa-arrow-right-to-bracket"></i> Proceed to Blueform
+        </button>
+    </div>
+
+    <!-- STAMP TEMPLATE (untuk di-render jadi PNG, bukan untuk dipaparkan) -->
+<div style="position:fixed; left:-10000px; top:0; z-index:-1;">
+    <div class="stamp" id="diterimaStampBox">
+        <div class="stamp-title">DITERIMA</div>
+        <div class="stamp-date" id="diterimaStampDate"></div>
+        <div class="stamp-footer">
+            <div class="line-1">JABATAN M&amp;E</div>
+            <div>RANHILL SAJ SDN BHD</div>
+        </div>
+    </div>
+</div>
+    
+    <script src="blueform.js"></script>
     <script>
-        // Script untuk letak tarikh secara automatik (Format: 12 JUN 2026)
-        const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-        const today = new Date();
-        const day = String(today.getDate()).padStart(2, '0');
-        const month = months[today.getMonth()];
-        const year = today.getFullYear();
+        const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+        const qHeaders = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+        let renderedBlueformSeqs = new Set();
+
+        function escapeJs(str) {
+            return String(str).replace(/'/g, "\\'");
+        }
+
+        function getBlueformGroupKey(item) {
+            const seq = (item.sequence_no || '').trim();
+            const district = (item.district || '').trim().toUpperCase();
+            if (!seq) return null;
+            return `${seq}___${district}`;
+        }
+
+        function buildSequenceGroups(orders) {
+            const groups = {};
+            (orders || []).forEach(item => {
+                const key = getBlueformGroupKey(item);
+                if (key) {
+                    if (!groups[key]) groups[key] = [];
+                    groups[key].push(item);
+                }
+            });
+            return groups;
+        }
+
+        async function archiveRejectedQuotation(workId, actionDate) {
+            try {
+                const checkRes = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(workId)}&status=eq.QUO-REJ`, { headers: qHeaders });
+                const rows = await checkRes.json();
+                if (rows && rows.length > 0) {
+                    const row = rows[0];
+                    await fetch(`${SB_URL}/rest/v1/quotations_history`, {
+                        method: 'POST',
+                        headers: qHeaders,
+                        body: JSON.stringify({
+                            work_id: row.work_id,
+                            contract_id: row.contract_id,
+                            status: row.status,
+                            pdf_url: row.pdf_url,
+                            reject_reason: row.reject_reason,
+                            action_date: actionDate || row.action_date
+                        })
+                    });
+                }
+            } catch (err) {
+                console.error("Failed to archive rejected quotation:", err);
+            }
+        }
         
-        document.getElementById('current-date').innerText = `${day} ${month} ${year}`;
+        async function startRevision(type, workId) {
+            const table = type === 'QUOTATION' ? 'quotations' : 'work_orders';
+            try {
+                const { error } = await supabaseClient   
+                    .from(table)
+                    .update({ revision_in_progress: true })
+                    .eq('work_id', workId);
+                if (error) throw error;
+                fetchTechnicianDashboard();
+            } catch (err) {
+                console.error('Failed to mark revision:', err.message);
+                alert('Failed to mark revision status: ' + err.message);
+            }
+        }
+
+        // ============ QUOTATION MODAL LOGIC ============
+        let quotationModalInitialized = false;
+        let tqCurrentContractSections = {};
+
+        function normalizeWorkId(raw){
+            raw = (raw || '').trim().toUpperCase();
+            const match = raw.match(/^([CK])?\s*(\d+)\s*([A-Z]?)$/);
+            if(!match) return '';
+            return `${match[1] || 'C'} ${match[2]}${match[3] || ''}`;
+        }
+
+        function openQuotationModal() {
+            if(!quotationModalInitialized){ tqFetchUnits(); quotationModalInitialized = true; }
+            document.getElementById('quotationModalOverlay').classList.remove('hidden');
+        }
+
+        function closeQuotationModal() {
+            document.getElementById('quotationModalOverlay').classList.add('hidden');
+        }
+
+        function resetQuotationModalForm() {
+            document.getElementById('techQuotationForm').reset();
+            document.getElementById('tq_contract_id').innerHTML = '<option value="">Choose Unit First</option>';
+            document.getElementById('tq_dist').innerHTML = '<option value="">Choose Contract First</option>';
+            document.getElementById('tq_pdf_url').value = '';
+            tqCurrentContractSections = {};
+            tqRenderBreakdown();
+            clearSelectedFile();
+            document.getElementById('tq_upload_status').classList.add('hidden');
+        }
+
+        async function tqFetchUnits() {
+            try {
+                const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers: qHeaders });
+                const units = await res.json();
+                const sel = document.getElementById('tq_unit_id');
+                sel.innerHTML = '<option value="">Choose Unit</option>';
+                units.forEach(u => { sel.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`; });
+            } catch(e) { console.error(e); }
+        }
+
+        async function tqLoadContracts() {
+            const unitId = document.getElementById('tq_unit_id').value;
+            const contractSelect = document.getElementById('tq_contract_id');
+            if(!unitId){ contractSelect.innerHTML = '<option value="">Choose Unit First</option>'; return; }
+            contractSelect.innerHTML = '<option value="">Loading...</option>';
+            try {
+                const res = await fetch(`${SB_URL}/rest/v1/contract?select=id,contract_code,district,contract_sections_breakdown&unit_id=eq.${unitId}`, { headers: qHeaders });
+                const data = await res.json();
+                contractSelect.innerHTML = '<option value="">Choose Contract</option>';
+                data.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id; opt.text = c.contract_code;
+                    opt.dataset.b = JSON.stringify(c.contract_sections_breakdown);
+                    opt.dataset.dist = (c.district || '').toUpperCase();
+                    contractSelect.appendChild(opt);
+                });
+            } catch(e) { console.error(e); }
+        }
+
+        function tqOnContractSelect() {
+            const opt = document.getElementById('tq_contract_id').selectedOptions[0];
+            const dSel = document.getElementById('tq_dist');
+            dSel.innerHTML = '<option value="">Choose District</option>';
+
+            if(opt && opt.dataset.dist){
+                opt.dataset.dist.split(',').forEach(d => {
+                    const district = d.trim();
+                    if(district) dSel.innerHTML += `<option value="${district}">${district}</option>`;
+                });
+            }
+            tqCurrentContractSections = (opt && opt.dataset.b) ? JSON.parse(opt.dataset.b) : {};
+            tqRenderBreakdown();
+        }
+
+        function tqRenderBreakdown(saved = {}) {
+            const container = document.getElementById('tq_breakdown_container');
+            if(!container) return;
+
+            const sections = Object.keys(tqCurrentContractSections || {});
+            if(sections.length === 0){
+                container.innerHTML = '<p class="text-[10px] text-gray-400 italic">Choose Contract to load cost breakdown sections.</p>';
+                tqCalcTotal();
+                return;
+            }
+
+            let html = '';
+            sections.sort().forEach(sec => {
+                const desc = tqCurrentContractSections[sec].desc || '';
+                const data = saved[sec] || {};
+                const amt = Number(data.amt || 0);
+                const extra = Number(data.extra || 0);
+                html += `
+                    <div class="bg-white border border-gray-200 rounded-lg p-2">
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase">${sec}</label>
+                        <span class="block text-[9px] text-gray-400 mb-1">${desc}</span>
+                        <input type="text" class="tq_sec_amt w-full text-sm border border-gray-300 rounded-lg p-2" data-sec="${sec}" data-raw-value="${amt}" value="${amt.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}" oninput="woFormatCurrencyInput(this); tqCalcTotal();">
+                        ${desc.toUpperCase().includes('PROVISIONAL') ? `<input type="text" class="tq_sec_extra w-full text-sm border border-gray-300 rounded-lg p-2 mt-1" data-sec="${sec}" data-raw-value="${extra}" value="${extra.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}" oninput="woFormatCurrencyInput(this); tqCalcTotal();">` : ''}
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+            tqCalcTotal();
+        }
+
+        function tqCalcTotal() {
+            let total = 0;
+            document.querySelectorAll('#tq_breakdown_container .tq_sec_amt').forEach(i => { total += parseFloat(i.dataset.rawValue || 0); });
+            document.querySelectorAll('#tq_breakdown_container .tq_sec_extra').forEach(i => { total += parseFloat(i.dataset.rawValue || 0); });
+            const el = document.getElementById('tq_total_display');
+            if(el) el.innerText = `RM ${total.toLocaleString(undefined,{minimumFractionDigits:2})}`;
+        }
+
+        function assignFileToInput(inputEl, file) {
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            inputEl.files = dt.files;
+        }
+
+        function formatFileSize(bytes) {
+            if(bytes < 1024) return bytes + ' B';
+            if(bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+
+        function showFilePreview(file) {
+            document.getElementById('tq_file_name').textContent = file.name;
+            document.getElementById('tq_file_size').textContent = formatFileSize(file.size);
+            document.getElementById('tq_file_empty_state').classList.add('hidden');
+            const preview = document.getElementById('tq_file_preview');
+            preview.classList.remove('hidden');
+            preview.classList.add('flex');
+        }
+        // ============ DITERIMA STAMP (Quotation) ============
+const STAMP_MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+
+function formatStampDate(dateStr) {
+    if(!dateStr) return '';
+    const [y, m, d] = dateStr.split('-').map(Number);
+    if(!y || !m || !d) return '';
+    return `${String(d).padStart(2,'0')} ${STAMP_MONTHS[m-1]} ${y}`;
+}
+
+async function renderStampPng(dateStr) {
+    const dateEl = document.getElementById('diterimaStampDate');
+    dateEl.innerText = formatStampDate(dateStr);
+    const stampBox = document.getElementById('diterimaStampBox');
+    const canvas = await html2canvas(stampBox, { backgroundColor: null, scale: 4 });
+    return canvas.toDataURL('image/png');
+}
+
+async function stampQuotationPdf(file, qpdDateStr) {
+    if(!window.PDFLib || !window.html2canvas){
+        console.warn('pdf-lib / html2canvas belum dimuat, skip stamping.');
+        return file;
+    }
+    try {
+        const stampPngDataUrl = await renderStampPng(qpdDateStr);
+        const stampPngBytes = await (await fetch(stampPngDataUrl)).arrayBuffer();
+
+        const { PDFDocument } = window.PDFLib;
+        const srcBytes = await file.arrayBuffer();
+        const pdfDoc = await PDFDocument.load(srcBytes);
+
+        const pngImage = await pdfDoc.embedPng(stampPngBytes);
+        const firstPage = pdfDoc.getPages()[0];
+        const { width: pageW, height: pageH } = firstPage.getSize();
+
+        // Posisi cop dikira nisbah kepada A4 (210mm x 297mm) ikut design asal,
+        // supaya tetap betul walaupun saiz PDF sebenar bukan A4 tepat.
+        const A4_W_MM = 210, A4_H_MM = 297;
+        const stampLeftMM = 30, stampTopMM = 240, stampSizeMM = 41;
+
+        const stampWidthPt = (stampSizeMM / A4_W_MM) * pageW;
+        const stampHeightPt = (stampSizeMM / A4_H_MM) * pageH;
+        const stampXPt = (stampLeftMM / A4_W_MM) * pageW;
+        const stampYPt = pageH - ((stampTopMM / A4_H_MM) * pageH) - stampHeightPt;
+
+        firstPage.drawImage(pngImage, { x: stampXPt, y: stampYPt, width: stampWidthPt, height: stampHeightPt });
+
+        const stampedBytes = await pdfDoc.save();
+        return new File([stampedBytes], file.name, { type: 'application/pdf' });
+    } catch(err) {
+        console.error('Gagal burn cop DITERIMA pada quotation:', err);
+        return file; // fallback: upload PDF asal jika stamping gagal
+    }
+}
+
+        function clearSelectedFile() {
+            document.getElementById('tq_pdf_file').value = '';
+            document.getElementById('tq_file_empty_state').classList.remove('hidden');
+            const preview = document.getElementById('tq_file_preview');
+            preview.classList.add('hidden');
+            preview.classList.remove('flex');
+        }
+
+        // ============ BLUEFORM MODAL LOGIC ============
+        let blueformModalInitialized = false;
+        let blueformUnitsReadyPromise = null;
+        let wo_workIdRowCounter = 0;
+        let woOriginalLoadedWorkIds = [];
+        let woCurrentWorkSequenceNo = null;
+        let woCurrentContractSections = {};
+        let woWorkIdCardDataMap = {};
+        let woLastWorkIdNum = '';
+        let woDetectTimer = null;
+        let woPendingDetect = null; 
+        let woPendingSubmitEvent = null; 
+        let woModeSaveAsNew = false; // Flag untuk Save as New
+
+        function openBlueformModal() {
+            if(!blueformModalInitialized){
+                blueformUnitsReadyPromise = woFetchUnits();
+                woResetWorkIdRows();
+                blueformModalInitialized = true;
+            }
+            document.getElementById('blueformModalOverlay').classList.remove('hidden');
+        }
+
+        function closeBlueformModal() {
+            document.getElementById('blueformModalOverlay').classList.add('hidden');
+        }
+
+        function resetBlueformModalForm() {
+            document.getElementById('techBlueformForm').reset();
+            document.getElementById('wo_contract_id').innerHTML = '<option value="">Choose Unit First</option>';
+            document.getElementById('wo_dist').innerHTML = '<option value="">Choose Contract First</option>';
+            woCurrentContractSections = {};
+            woResetWorkIdRows();
+            woModeSaveAsNew = false;
+            const dateInput = document.getElementById('wo_qpb_date');
+            if(dateInput) {
+                dateInput.removeAttribute('disabled');
+                delete dateInput.dataset.originalDate;
+            }
+        }
+
+        async function woFetchUnits() {
+            try {
+                const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers: qHeaders });
+                const units = await res.json();
+                const sel = document.getElementById('wo_unit_id');
+                sel.innerHTML = '<option value="">Choose Unit</option>';
+                units.forEach(u => { sel.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`; });
+            } catch(e) { console.error(e); }
+        }
+
+        async function woLoadContractsByUnit() {
+            const unitId = document.getElementById('wo_unit_id').value;
+            const contractSelect = document.getElementById('wo_contract_id');
+            if(!unitId){ contractSelect.innerHTML = '<option value="">Choose Unit First</option>'; return; }
+            contractSelect.innerHTML = '<option value="">Loading...</option>';
+            try {
+                const res = await fetch(`${SB_URL}/rest/v1/contract?select=*&unit_id=eq.${unitId}`, { headers: qHeaders });
+                const data = await res.json();
+
+                data.sort((a, b) => {
+                    const dateA = a.contract_start ? new Date(a.contract_start).getTime() : 0;
+                    const dateB = b.contract_start ? new Date(b.contract_start).getTime() : 0;
+                    return dateA - dateB;
+                });
+
+                contractSelect.innerHTML = '<option value="">Choose Contract</option>';
+                data.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id; opt.text = c.contract_code;
+                    opt.dataset.b = JSON.stringify(c.contract_sections_breakdown);
+                    opt.dataset.dist = (c.district || '').toUpperCase();
+                    opt.dataset.area = c.area_code;
+                    contractSelect.appendChild(opt);
+                });
+            } catch(e) { console.error(e); }
+        }
+
+        function woOnContractSelect() {
+            woResetWorkIdRows();
+            document.getElementById('wo_qpb_date').value = '';
+            document.getElementById('wo_total_display').innerText = 'RM 0.00';
+
+            const opt = document.getElementById('wo_contract_id').selectedOptions[0];
+            const dSel = document.getElementById('wo_dist');
+            dSel.innerHTML = '<option value="">Choose District</option>';
+
+            if(opt && opt.dataset.dist){
+                opt.dataset.dist.split(',').forEach(d => {
+                    const district = d.trim();
+                    if(district) dSel.innerHTML += `<option value="${district}">${district}</option>`;
+                });
+            }
+            woCurrentContractSections = (opt && opt.dataset.b) ? JSON.parse(opt.dataset.b) : {};
+            woRenderWorkIdCards();
+            document.getElementById('wo_dist').dataset.originalDistrict = '';
+        }
+
+        function woEscapeAttr(str){ return String(str).replace(/"/g, '&quot;'); }
+
+        function woFormatCurrencyInput(input) {
+            let digits = input.value.replace(/\D/g, '');
+            if (!digits) digits = '0';
+            let val = parseInt(digits) / 100;
+            input.value = val.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            input.dataset.rawValue = val.toFixed(2);
+        }
+
+        function woAddWorkIdRow(selectedVal = 'C', num = '', suffix = '') {
+            const container = document.getElementById('wo_id_rows_container');
+            wo_workIdRowCounter++;
+            const rowId = `wo_id_row_${wo_workIdRowCounter}`;
+            const row = document.createElement('div');
+            row.className = 'wo-id-row';
+            row.id = rowId;
+            row.dataset.suffix = suffix || '';
+            row.style = 'display:flex; gap:8px; align-items:center; margin-bottom:8px;';
+            row.innerHTML = `
+                <select class="wo_id_prefix text-sm border border-gray-300 rounded-lg p-2" style="width:70px;flex-shrink:0;">
+                    <option value="C" ${selectedVal === 'C' ? 'selected' : ''}>C</option>
+                    <option value="K" ${selectedVal === 'K' ? 'selected' : ''}>K</option>
+                </select>
+                <input type="text" class="wo_id_num text-sm border border-gray-300 rounded-lg p-2 w-full" placeholder="123456" value="${num}" oninput="this.value=this.value.replace(/[^0-9]/g,''); woRenderWorkIdCards(); woAutoDetectWork();">
+                <span class="wo_id_suffix_badge ${suffix ? '' : 'hidden'} text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded px-1.5 py-1 flex-shrink-0" title="Additional Work suffix">${suffix}</span>
+                <div onclick="woRemoveWorkIdRow('${rowId}')" class="text-red-500 cursor-pointer flex-shrink-0 px-1" title="Remove"><i class="fa-solid fa-xmark"></i></div>
+            `;
+            row.querySelector('.wo_id_prefix').addEventListener('change', () => { woRenderWorkIdCards(); woAutoDetectWork(); });
+            container.appendChild(row);
+        }
+
+        function woRemoveWorkIdRow(rowId) {
+            const row = document.getElementById(rowId);
+            if(row) row.remove();
+            if(document.getElementById('wo_id_rows_container').children.length === 0){ woAddWorkIdRow(); }
+            woRenderWorkIdCards();
+            woAutoDetectWork();
+        }
+
+        function woResetWorkIdRows() {
+            document.getElementById('wo_id_rows_container').innerHTML = '';
+            wo_workIdRowCounter = 0;
+            woOriginalLoadedWorkIds = [];
+            woCurrentWorkSequenceNo = null;
+            woWorkIdCardDataMap = {};
+            woLastWorkIdNum = '';
+            woModeSaveAsNew = false;
+            woAddWorkIdRow();
+            woRenderWorkIdCards();
+        }
+
+        function woGetCurrentWorkIdsFromRows() {
+            const ids = [];
+            document.querySelectorAll('#wo_id_rows_container .wo-id-row').forEach(row => {
+                const selPrefix = row.querySelector('.wo_id_prefix').value;
+                const num = row.querySelector('.wo_id_num').value.trim();
+                const suffix = row.dataset.suffix || '';
+                if(num.length > 0){
+                    const normalized = `${selPrefix} ${num}${suffix}`;
+                    if(!ids.includes(normalized)) ids.push(normalized);
+                }
+            });
+            return ids;
+        }
+
+        async function woGetNextSuffixLetter(contractId, prefix, num) {
+            try {
+                const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&select=work_id`, { headers: qHeaders });
+                const rows = await res.json();
+                const base = `${prefix} ${num}`;
+                const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const pattern = new RegExp(`^${escapedBase}([A-Z])$`);
+                let usedLetters = [];
+                (rows || []).forEach(r => {
+                    const m = (r.work_id || '').trim().toUpperCase().match(pattern);
+                    if(m) usedLetters.push(m[1]);
+                });
+                for(let i = 0; i < 26; i++){
+                    const letter = String.fromCharCode(65 + i);
+                    if(!usedLetters.includes(letter)) return letter;
+                }
+                return 'Z';
+            } catch(e) {
+                console.error('Failed to determine next suffix:', e);
+                return 'A';
+            }
+        }
+
+        function woRenderWorkIdCards(skipSave = false) {
+            const container = document.getElementById('wo_id_cards_container');
+            if(!container) return;
+
+            if(!skipSave){
+                document.querySelectorAll('.wo-id-card').forEach(card => {
+                    const workId = card.dataset.workId; if(!workId) return;
+                    if(!woWorkIdCardDataMap[workId]) woWorkIdCardDataMap[workId] = {};
+                    woWorkIdCardDataMap[workId].location = card.querySelector('.wo_card_location')?.value || '';
+                    woWorkIdCardDataMap[workId].description = card.querySelector('.wo_card_desc')?.value || '';
+                    if(!woWorkIdCardDataMap[workId].section_category) woWorkIdCardDataMap[workId].section_category = {};
+
+                    card.querySelectorAll('.wo_sec_amt').forEach(input => {
+                        const sec = input.dataset.sec;
+                        if(!woWorkIdCardDataMap[workId].section_category[sec]) woWorkIdCardDataMap[workId].section_category[sec] = {};
+                        woWorkIdCardDataMap[workId].section_category[sec].amt = parseFloat(input.dataset.rawValue || 0);
+                    });
+                    card.querySelectorAll('.wo_sec_extra').forEach(input => {
+                        const sec = input.dataset.sec;
+                        if(!woWorkIdCardDataMap[workId].section_category[sec]) woWorkIdCardDataMap[workId].section_category[sec] = {};
+                        woWorkIdCardDataMap[workId].section_category[sec].extra = parseFloat(input.dataset.rawValue || 0);
+                    });
+                });
+            }
+
+            const currentIds = woGetCurrentWorkIdsFromRows();
+            container.innerHTML = '';
+            currentIds.forEach(workId => {
+                const saved = woWorkIdCardDataMap[workId] || {};
+                const breakdown = saved.section_category || {};
+                const card = document.createElement('div');
+                card.className = 'wo-id-card bg-gray-50 border border-gray-200 rounded-xl p-3';
+                card.dataset.workId = workId;
+
+                let html = `
+                    <span class="inline-block bg-blue-100 text-blue-800 text-[11px] font-bold px-2 py-0.5 rounded-full mb-2">${workId}</span>
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Location</label>
+                    <input type="text" class="wo_card_location w-full text-sm border border-gray-300 rounded-lg p-2 mb-2" value="${woEscapeAttr(saved.location || '')}" placeholder="Location">
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Work Description</label>
+                    <textarea class="wo_card_desc w-full text-sm border border-gray-300 rounded-lg p-2 mb-2" rows="2" placeholder="Description for ${workId}">${woEscapeAttr(saved.description || '')}</textarea>
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cost Breakdown</label>
+                    <div class="grid grid-cols-1 gap-2">
+                `;
+
+                // Union antara seksyen kontrak SEMASA dan seksyen yang tersimpan dalam
+                // quotation/blueform lama, supaya nilai lama tak "hilang" bila key tak sepadan.
+                const allSections = new Set([
+                    ...Object.keys(woCurrentContractSections || {}),
+                    ...Object.keys(breakdown || {})
+                ]);
+
+                Array.from(allSections).sort().forEach(sec => {
+                    const descMeta = woCurrentContractSections[sec];
+                    const desc = descMeta ? (descMeta.desc || '') : '(seksyen lama - tiada dalam kontrak semasa)';
+                    const data = breakdown[sec] || {};
+                    const amt = Number(data.amt || 0);
+                    const extra = Number(data.extra || 0);
+                    const isProvisional = desc.toUpperCase().includes('PROVISIONAL');
+                    html += `
+                        <div class="bg-white border border-gray-200 rounded-lg p-2 ${!descMeta ? 'border-amber-300' : ''}">
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase">${sec}</label>
+                            <span class="block text-[9px] text-gray-400 mb-1">${desc}</span>
+                            <input type="text" class="wo_sec_amt w-full text-sm border border-gray-300 rounded-lg p-2" data-sec="${woEscapeAttr(sec)}" data-work-id="${woEscapeAttr(workId)}" data-raw-value="${amt}" value="${amt.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}" oninput="woFormatCurrencyInput(this); woCalcTotalWork();">
+                            ${isProvisional || extra ? `<input type="text" class="wo_sec_extra w-full text-sm border border-gray-300 rounded-lg p-2 mt-1" data-sec="${woEscapeAttr(sec)}" data-work-id="${woEscapeAttr(workId)}" data-raw-value="${extra}" value="${extra.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}" oninput="woFormatCurrencyInput(this); woCalcTotalWork();">` : ''}
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+                card.innerHTML = html;
+                container.appendChild(card);
+            });
+            woCalcTotalWork();
+        }
+
+        function woCalcTotalWork() {
+            let total = 0;
+            document.querySelectorAll('.wo_sec_amt').forEach(i => { total += parseFloat(i.dataset.rawValue || 0); });
+            document.querySelectorAll('.wo_sec_extra').forEach(i => { total += parseFloat(i.dataset.rawValue || 0); });
+            document.getElementById('wo_total_display').innerText = `RM ${total.toLocaleString(undefined,{minimumFractionDigits:2})}`;
+        }
+
+        function woAutoDetectWork() {
+            const currentIds = woGetCurrentWorkIdsFromRows();
+            const idsKey = currentIds.join('|');
+            if(idsKey === woLastWorkIdNum || currentIds.length === 0) return;
+            woLastWorkIdNum = idsKey;
+            clearTimeout(woDetectTimer);
+
+            woDetectTimer = setTimeout(async () => {
+                const contractId = document.getElementById('wo_contract_id').value;
+                if(!contractId) return;
+                try {
+                    const filter = currentIds.map(id => `work_id.eq.${encodeURIComponent(id)}`).join(',');
+                    const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&or=(${filter})&select=*`, { headers: qHeaders });
+                    const matches = await res.json();
+                    if(!Array.isArray(matches) || matches.length === 0) {
+                        await woAutofillFromQuotations(currentIds);
+                        return;
+                    }
+
+                    const sequenceNo = matches[0].sequence_no;
+                    const groupRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&sequence_no=eq.${encodeURIComponent(sequenceNo)}&select=*`, { headers: qHeaders });
+                    const group = await groupRes.json();
+                    if(!Array.isArray(group) || group.length === 0) return;
+
+                    woPendingDetect = { group, sequenceNo };
+                    woShowDetectModal(group);
+                } catch(err) { console.error(err); }
+            }, 400);
+        }
+
+        async function woAutofillFromQuotations(workIds) {
+            try {
+                const filter = workIds.map(id => `work_id.eq.${encodeURIComponent(id)}`).join(',');
+                const res = await fetch(`${SB_URL}/rest/v1/quotations?or=(${filter})&select=work_id,district,location,description,section_category`, { headers: qHeaders });
+                const quotes = await res.json();
+                if(!Array.isArray(quotes) || quotes.length === 0) return;
+
+                let districtToSet = null;
+                quotes.forEach(q => {
+                    const hasData = q.location || q.description || (q.section_category && Object.keys(q.section_category).length > 0);
+                    if(!woWorkIdCardDataMap[q.work_id] && hasData){
+                        woWorkIdCardDataMap[q.work_id] = {
+                            location: q.location || '',
+                            description: q.description || '',
+                            section_category: structuredClone(q.section_category || {})
+                        };
+                    }
+                    if(!districtToSet && q.district) districtToSet = q.district;
+                });
+
+                // Padankan district ikut nilai (case/space-insensitive), bukan sekadar assign
+                // terus yang boleh gagal senyap jika format tidak sepadan 100%.
+                const distSel = document.getElementById('wo_dist');
+                if(distSel && !distSel.value && districtToSet){
+                    const target = districtToSet.trim().toUpperCase();
+                    const matchOpt = Array.from(distSel.options).find(o => o.value.trim().toUpperCase() === target);
+                    if(matchOpt){
+                        distSel.value = matchOpt.value;
+                    } else {
+                        const opt = document.createElement('option');
+                        opt.value = districtToSet;
+                        opt.text = districtToSet + ' (dari quotation)';
+                        distSel.appendChild(opt);
+                        distSel.value = districtToSet;
+                        console.warn(`District "${districtToSet}" dari quotation tiada dalam senarai district kontrak semasa.`);
+                    }
+                }
+
+                woRenderWorkIdCards(true);
+            } catch(err) {
+                console.error('Failed to autofill blueform from quotations:', err);
+            }
+        }
+
+        function woShowDetectModal(group) {
+            const body = document.getElementById('woDetectModalBody');
+            let html = '';
+            group.forEach(w => {
+                const breakdown = w.section_category || {};
+                html += `
+                    <div class="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="inline-block bg-amber-100 text-amber-800 text-[11px] font-bold px-2 py-0.5 rounded-full">${w.work_id}</span>
+                            <span class="text-[10px] text-gray-400">${w.location || ''}</span>
+                        </div>
+                        <div class="space-y-1">
+                `;
+                Object.keys(breakdown).sort().forEach(sec => {
+                    const desc = (woCurrentContractSections[sec] && woCurrentContractSections[sec].desc) || '';
+                    const amt = Number(breakdown[sec].amt || 0);
+                    const extra = Number(breakdown[sec].extra || 0);
+                    html += `
+                        <div class="flex justify-between items-start text-[11px] border-b border-gray-100 pb-1">
+                            <div class="pr-2">
+                                <span class="font-bold text-gray-600">${sec}</span>
+                                <span class="block text-[9px] text-gray-400">${desc}</span>
+                            </div>
+                            <div class="text-right flex-shrink-0">
+                                <span class="block font-semibold text-gray-800">RM ${amt.toLocaleString('en-MY',{minimumFractionDigits:2})}</span>
+                                ${extra ? `<span class="block text-[9px] text-gray-400">+RM ${extra.toLocaleString('en-MY',{minimumFractionDigits:2})} prov.</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                html += `</div></div>`;
+            });
+            body.innerHTML = html;
+            document.getElementById('woDetectModalOverlay').classList.remove('hidden');
+        }
+
+        /* 1. OVERWRITE DATA: Kekalkan Sequence No, Lock/Revert Tarikh */
+        function woConfirmOverwrite() {
+            if(!woPendingDetect) return;
+            const { group, sequenceNo } = woPendingDetect;
+
+            woCurrentWorkSequenceNo = sequenceNo;
+            woOriginalLoadedWorkIds = group.map(x => x.work_id);
+            woModeSaveAsNew = false;
+
+            group.forEach(w => {
+                woWorkIdCardDataMap[w.work_id] = {
+                    location: w.location || '',
+                    description: w.description || '',
+                    section_category: structuredClone(w.section_category || {})
+                };
+            });
+
+            document.getElementById('wo_id_rows_container').innerHTML = '';
+            wo_workIdRowCounter = 0;
+            group.forEach(w => {
+                const m = (w.work_id || '').trim().match(/^([CK])?\s*(\d+)\s*([A-Z]?)$/i);
+                const prefix = (m && m[1]) ? m[1].toUpperCase() : 'C';
+                const num = m ? m[2] : '';
+                const suffix = m ? (m[3] || '').toUpperCase() : '';
+                woAddWorkIdRow(prefix, num, suffix);
+            });
+
+            const dateInput = document.getElementById('wo_qpb_date');
+            dateInput.value = group[0].qpb_date || '';
+            dateInput.dataset.originalDate = group[0].qpb_date || '';
+            dateInput.setAttribute('disabled', 'disabled'); // Lock tarikh supaya tidak dibenarkan tukar
+            dateInput.title = "Date cannot be changed in Overwrite mode. Use 'Save as New' if date needs to be changed.";
+
+            const districtSel = document.getElementById('wo_dist');
+            if(!districtSel.value) districtSel.value = group[0].district || '';
+            districtSel.dataset.originalDistrict = group[0].district || '';
+
+            woRenderWorkIdCards(true);
+            woLastWorkIdNum = woGetCurrentWorkIdsFromRows().join('|');
+
+            woCloseDetectModal();
+        }
+
+        /* 2. SAVE AS NEW: Batalkan Rekod Lama (CANCEL / -CNX / RM0) & Cipta Sequence No Baharu */
+        function woConfirmSaveAsNew() {
+            if(!woPendingDetect){ woCloseDetectModal(); return; }
+            const { group } = woPendingDetect;
+
+            woOriginalLoadedWorkIds = group.map(x => x.work_id);
+            woCurrentWorkSequenceNo = null; // Cipta sequence baharu
+            woModeSaveAsNew = true;
+
+            group.forEach(w => {
+                woWorkIdCardDataMap[w.work_id] = {
+                    location: w.location || '',
+                    description: w.description || '',
+                    section_category: structuredClone(w.section_category || {})
+                };
+            });
+
+            document.getElementById('wo_id_rows_container').innerHTML = '';
+            wo_workIdRowCounter = 0;
+            group.forEach(w => {
+                const m = (w.work_id || '').trim().match(/^([CK])?\s*(\d+)\s*([A-Z]?)$/i);
+                const prefix = (m && m[1]) ? m[1].toUpperCase() : 'C';
+                const num = m ? m[2] : '';
+                woAddWorkIdRow(prefix, num, ''); // Tanpa suffix
+            });
+
+            const dateInput = document.getElementById('wo_qpb_date');
+            dateInput.removeAttribute('disabled');
+            dateInput.value = ''; // Boleh pilih tarikh baharu
+
+            const districtSel = document.getElementById('wo_dist');
+            if(!districtSel.value) districtSel.value = group[0].district || '';
+
+            woRenderWorkIdCards(true);
+            woLastWorkIdNum = woGetCurrentWorkIdsFromRows().join('|');
+
+            woCloseDetectModal();
+        }
+
+        /* 3. ADDITIONAL WORKS: Behavior Tambah Suffix A, B... & Sequence No Baharu */
+        async function woConfirmAdditionalWorks() {
+            if(!woPendingDetect){ woCloseDetectModal(); return; }
+
+            const detectedIds = woPendingDetect.group.map(w => w.work_id);
+            const contractId = document.getElementById('wo_contract_id').value;
+
+            woOriginalLoadedWorkIds = []; // Tidak membatalkan rekod lama
+            woCurrentWorkSequenceNo = null; // Cipta sequence baharu
+            woModeSaveAsNew = false;
+
+            const dateInput = document.getElementById('wo_qpb_date');
+            dateInput.removeAttribute('disabled');
+
+            const rows = document.querySelectorAll('#wo_id_rows_container .wo-id-row');
+            for(const row of rows){
+                const prefix = row.querySelector('.wo_id_prefix').value;
+                const numInput = row.querySelector('.wo_id_num');
+                const num = numInput.value.trim();
+                const fullId = `${prefix} ${num}`;
+                if(detectedIds.includes(fullId)){
+                    const letter = await woGetNextSuffixLetter(contractId, prefix, num);
+                    row.dataset.suffix = letter;
+                    const badge = row.querySelector('.wo_id_suffix_badge');
+                    if(badge){ badge.textContent = letter; badge.classList.remove('hidden'); }
+                }
+            }
+
+            woRenderWorkIdCards();
+            woLastWorkIdNum = woGetCurrentWorkIdsFromRows().join('|');
+            woCloseDetectModal();
+        }
+
+        function woCancelDetectModal() {
+            if(woPendingDetect){
+                const detectedIds = woPendingDetect.group.map(w => w.work_id);
+                document.querySelectorAll('#wo_id_rows_container .wo-id-row').forEach(row => {
+                    const prefix = row.querySelector('.wo_id_prefix').value;
+                    const numInput = row.querySelector('.wo_id_num');
+                    const fullId = `${prefix} ${numInput.value.trim()}`;
+                    if(detectedIds.includes(fullId)) numInput.value = '';
+                });
+                woRenderWorkIdCards();
+                woLastWorkIdNum = woGetCurrentWorkIdsFromRows().join('|');
+            }
+            woCloseDetectModal();
+        }
+
+        function woCloseDetectModal() {
+            document.getElementById('woDetectModalOverlay').classList.add('hidden');
+            woPendingDetect = null;
+        }
+
+        // ============================================================
+// BLUEFORM ROW HOLD-TO-ACTION (EXEC-REJ / HOS-REJ / HOD-REJ / APP-HOD)
+// ============================================================
+let woHoldTimer = null;
+let woHoldStartXY = null;
+let woHoldMoved = false;
+const WO_HOLD_MS = 480;
+const WO_HOLD_MOVE_THRESHOLD = 10;
+let woActionCurrentItem = null;
+
+function woHandleRowPointerDown(e, encodedItem) {
+    if (e.target.closest('a, button')) return;
+    woHoldStartXY = { x: e.clientX, y: e.clientY };
+    woHoldMoved = false;
+    clearTimeout(woHoldTimer);
+
+    const item = JSON.parse(decodeURIComponent(encodedItem));
+    woHoldTimer = setTimeout(() => {
+        if (woHoldMoved) return;
+        if (navigator.vibrate) navigator.vibrate(35);
+        openWoActionModal(item);
+    }, WO_HOLD_MS);
+}
+
+function woHandleRowPointerMove(e) {
+    if (!woHoldStartXY) return;
+    const dx = e.clientX - woHoldStartXY.x;
+    const dy = e.clientY - woHoldStartXY.y;
+    if (Math.hypot(dx, dy) > WO_HOLD_MOVE_THRESHOLD) {
+        woHoldMoved = true;
+        clearTimeout(woHoldTimer);
+    }
+}
+
+function woHandleRowPointerUp() { clearTimeout(woHoldTimer); }
+function woHandleRowPointerCancel() { clearTimeout(woHoldTimer); }
+
+function openWoActionModal(item) {
+    woActionCurrentItem = item;
+    document.getElementById('woActionModalWorkId').textContent = `${item.work_id} — ${item.status}`;
+    const body = document.getElementById('woActionModalBody');
+    const isRejStatus = ['EXEC-REJ', 'HOS-REJ', 'HOD-REJ'].includes(item.status);
+    const isAppHod = item.status === 'APP-HOD';
+
+    let html = '';
+    if (isRejStatus) {
+        html += `
+            <button type="button" onclick="woActionCancelBlueform()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-ban mr-1"></i>CANCEL WORK ORDER
+            </button>
+            <button type="button" onclick="woActionProcessResubmit()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-rotate mr-1"></i>PROCESS RESUBMIT
+            </button>
+        `;
+    } else if (isAppHod) {
+        html += `
+            <button type="button" onclick="woActionApprove()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-check-double mr-1"></i>APPROVED
+            </button>
+        `;
+    } else {
+        html = '<p class="text-xs text-gray-400 italic">No action available for this status.</p>';
+    }
+
+    body.innerHTML = html;
+    document.getElementById('woActionModalOverlay').classList.remove('hidden');
+}
+
+function closeWoActionModal() {
+    document.getElementById('woActionModalOverlay').classList.add('hidden');
+    woActionCurrentItem = null;
+}
+
+async function woActionCancelBlueform() {
+    if (!woActionCurrentItem) return;
+    const item = woActionCurrentItem;
+    if (!confirm(`Confirm CANCEL blueform ${item.work_id}?`)) return;
+
+    try {
+        const res = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${item.id}`, { headers: qHeaders });
+        const rows = await res.json();
+        if (!rows || rows.length === 0) throw new Error('Record not found.');
+        const rec = rows[0];
+
+        const originalWorkId = rec.work_id;
+        const reasonForQuotation = rec.reject_reason || 'Blueform dibatalkan (CANCEL).';
+
+        const zeroedBreakdown = {};
+        Object.keys(rec.section_category || {}).forEach(sec => {
+            zeroedBreakdown[sec] = { amt: 0, extra: 0 };
+        });
+
+        const patchRes = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${rec.id}`, {
+            method: 'PATCH',
+            headers: qHeaders,
+            body: JSON.stringify({
+                work_id: `${originalWorkId}-CNX`,
+                status: 'CANCEL',
+                section_category: zeroedBreakdown,
+                additional: 0,
+                amount_spent: 0
+            })
+        });
+        if (!patchRes.ok) throw new Error(`HTTP ${patchRes.status}`);
+
+        // Sync balik ke quotation asal (guna work_id SEBELUM ditukar -CNX)
+        try {
+            const quoPatchRes = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(originalWorkId)}`, {
+                method: 'PATCH',
+                headers: qHeaders,
+                body: JSON.stringify({
+                    status: 'QUO-REJ',
+                    reject_reason: reasonForQuotation,
+                    revision_in_progress: false
+                })
+            });
+            if (!quoPatchRes.ok) {
+                console.error(`Failed to sync quotation status for ${originalWorkId}: HTTP ${quoPatchRes.status}`);
+            }
+        } catch (quoErr) {
+            console.error('Failed to sync quotation status after cancel:', quoErr);
+        }
+
+        closeWoActionModal();
+        fetchTechnicianDashboard();
+    } catch (err) {
+        console.error('Failed to cancel blueform:', err);
+        alert('Failed to cancel blueform: ' + err.message);
+    }
+}
+
+async function woActionProcessResubmit() {
+    if (!woActionCurrentItem) return;
+    const workId = woActionCurrentItem.work_id;
+    closeWoActionModal();
+    await startRevision('BLUEFORM', workId);
+}
+
+async function woActionApprove() {
+    if (!woActionCurrentItem) return;
+    const item = woActionCurrentItem;
+    if (!confirm(`Confirm APPROVED for ${item.work_id}?`)) return;
+
+    try {
+        const { error } = await supabaseClient
+            .from('work_orders')
+            .update({ status: 'APPROVED' })
+            .eq('id', item.id);
+        if (error) throw error;
+
+        closeWoActionModal();
+        fetchTechnicianDashboard();
+    } catch (err) {
+        console.error('Failed to approve blueform:', err);
+        alert('Failed to approve blueform: ' + err.message);
+    }
+}
+        // ============================================================
+// QUOTATION ROW HOLD-TO-DELETE (QUO-REJ only)
+// ============================================================
+let qRowHoldTimer = null;
+let qRowHoldStartXY = null;
+let qRowHoldMoved = false;
+const Q_ROW_HOLD_MS = 480;
+const Q_ROW_HOLD_MOVE_THRESHOLD = 10;
+let qActionCurrentItem = null;
+
+function qHandleRowHoldPointerDown(e, encodedItem) {
+    if (e.target.closest('a, button')) return;
+    qRowHoldStartXY = { x: e.clientX, y: e.clientY };
+    qRowHoldMoved = false;
+    clearTimeout(qRowHoldTimer);
+
+    const item = JSON.parse(decodeURIComponent(encodedItem));
+    qRowHoldTimer = setTimeout(() => {
+        if (qRowHoldMoved) return;
+        if (navigator.vibrate) navigator.vibrate(35);
+        openQActionModal(item);
+    }, Q_ROW_HOLD_MS);
+}
+
+function qHandleRowHoldPointerMove(e) {
+    if (!qRowHoldStartXY) return;
+    const dx = e.clientX - qRowHoldStartXY.x;
+    const dy = e.clientY - qRowHoldStartXY.y;
+    if (Math.hypot(dx, dy) > Q_ROW_HOLD_MOVE_THRESHOLD) {
+        qRowHoldMoved = true;
+        clearTimeout(qRowHoldTimer);
+    }
+}
+
+function qHandleRowHoldPointerUp() { clearTimeout(qRowHoldTimer); }
+function qHandleRowHoldPointerCancel() { clearTimeout(qRowHoldTimer); }
+
+function openQActionModal(item) {
+    qActionCurrentItem = item;
+    document.getElementById('qActionModalWorkId').textContent = `${item.work_id} — ${item.status}`;
+    const body = document.getElementById('qActionModalBody');
+
+    let html = '';
+    if (item.status === 'QUO-REJ') {
+        html += `
+            <button type="button" onclick="qActionDeleteQuotation()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-trash mr-1"></i>DELETE
+            </button>
+        `;
+    } else {
+        html = '<p class="text-xs text-gray-400 italic">No action available for this status.</p>';
+    }
+
+    body.innerHTML = html;
+    document.getElementById('qActionModalOverlay').classList.remove('hidden');
+}
+
+function closeQActionModal() {
+    document.getElementById('qActionModalOverlay').classList.add('hidden');
+    qActionCurrentItem = null;
+}
+
+async function qActionDeleteQuotation() {
+    if (!qActionCurrentItem) return;
+    const item = qActionCurrentItem;
+    if (!confirm(`Confirm DELETE quotation ${item.work_id}? This action cannot be undone.`)) return;
+
+    try {
+        const res = await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${item.id}`, { headers: qHeaders });
+        const rows = await res.json();
+        if (!rows || rows.length === 0) throw new Error('Record not found.');
+        const rec = rows[0];
+
+        // 1. Padam fail dari Cloudflare R2 (jika ada pdf_url)
+        if (rec.pdf_url) {
+            try {
+                const workerBaseUrl = "https://uploader.mech-elec-ranhill.workers.dev";
+                let objectKey = rec.pdf_url;
+                if (objectKey.startsWith(workerBaseUrl)) {
+                    objectKey = objectKey.substring(workerBaseUrl.length + 1); // buang base URL + '/'
+                }
+
+                const delRes = await fetch(`${workerBaseUrl}/delete?filename=${encodeURIComponent(objectKey)}`, {
+                    method: 'DELETE'
+                });
+                if (!delRes.ok) {
+                    console.warn(`R2 delete returned HTTP ${delRes.status} for "${objectKey}". Worker route/param may differ from assumption — verify uploader.js.`);
+                }
+            } catch (r2Err) {
+                console.error('Failed to delete file from Cloudflare R2:', r2Err);
+                // Teruskan padam rekod Supabase walaupun R2 gagal, supaya tidak "stuck"
+            }
+        }
+
+        // 2. Padam rekod dari Supabase
+        const supaDelRes = await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${item.id}`, {
+            method: 'DELETE', headers: qHeaders
+        });
+        if (!supaDelRes.ok) throw new Error(`HTTP ${supaDelRes.status}`);
+
+        closeQActionModal();
+        fetchTechnicianDashboard();
+    } catch (err) {
+        console.error('Failed to delete quotation:', err);
+        alert('Failed to delete quotation: ' + err.message);
+    }
+}
+
+        async function woCancelOldRecordsForSaveAsNew(contractId) {
+            for(const oldWorkId of woOriginalLoadedWorkIds){
+                try {
+                    const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(oldWorkId)}`, { headers: qHeaders });
+                    const rows = await res.json();
+                    if(!rows || rows.length === 0) continue;
+                    const rec = rows[0];
+
+                    const zeroedBreakdown = {};
+                    Object.keys(rec.section_category || {}).forEach(sec => {
+                        zeroedBreakdown[sec] = { amt: 0, extra: 0 };
+                    });
+
+                    await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${rec.id}`, {
+                        method: 'PATCH',
+                        headers: qHeaders,
+                        body: JSON.stringify({
+                            work_id: `${oldWorkId}-CNX`,
+                            status: 'CANCEL',
+                            section_category: zeroedBreakdown,
+                            additional: 0,
+                            amount_spent: 0
+                        })
+                    });
+                } catch(err) {
+                    console.error('Failed to cancel old record:', oldWorkId, err);
+                }
+            }
+        }
+
+        async function woSubmitBlueform(e) {
+            e.preventDefault();
+
+            const isOverwriteMode = woOriginalLoadedWorkIds.length > 0 && !!woCurrentWorkSequenceNo && !woModeSaveAsNew;
+            const dateInput = document.getElementById('wo_qpb_date');
+            const originalDate = dateInput.dataset.originalDate || '';
+            const currentDateVal = dateInput.value;
+
+            // Jika percubaan tukar tarikh dilakukan semasa Overwrite
+            if(isOverwriteMode && originalDate && originalDate !== currentDateVal){
+                woPendingSubmitEvent = e;
+                document.getElementById('woDateChangeModalOverlay').classList.remove('hidden');
+                return;
+            }
+
+            await woDoSubmit(e);
+        }
+
+        function woCancelDateChange() {
+            document.getElementById('woDateChangeModalOverlay').classList.add('hidden');
+            woPendingSubmitEvent = null;
+        }
+
+        async function woRevertDateAndProceed() {
+            document.getElementById('woDateChangeModalOverlay').classList.add('hidden');
+            const dateInput = document.getElementById('wo_qpb_date');
+            if(dateInput.dataset.originalDate){
+                dateInput.value = dateInput.dataset.originalDate;
+            }
+            const e = woPendingSubmitEvent;
+            woPendingSubmitEvent = null;
+            if(e) await woDoSubmit(e);
+        }
+
+        async function woDoSubmit(e) {
+            const contractId = document.getElementById('wo_contract_id').value;
+            const districtSelected = document.getElementById('wo_dist').value;
+            const contractOpt = document.getElementById('wo_contract_id').selectedOptions[0];
+
+            if(!contractId || !districtSelected || !contractOpt){ alert('Please complete the contract and district!'); return; }
+
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.innerHTML;
+            submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+
+            try {
+                const areaMapping = contractOpt.dataset.area || '';
+                const districtsMapping = contractOpt.dataset.dist || '';
+                const areaCodes = areaMapping.split(',').map(s => s.trim().toUpperCase());
+                const districts = districtsMapping.split(',').map(s => s.trim().toUpperCase());
+                const index = districts.indexOf(districtSelected.trim().toUpperCase());
+                let areaCode = (index !== -1 && areaCodes[index]) ? areaCodes[index] : 'WO';
+
+                const currentWorkIds = woGetCurrentWorkIdsFromRows();
+                if(currentWorkIds.length === 0){ alert('Please enter at least one Work Order ID!'); return; }
+
+                // Jika mod Save as New -> Batalkan rekod-rekod lama terlebih dahulu
+                if(woModeSaveAsNew){
+                    await woCancelOldRecordsForSaveAsNew(contractId);
+                    woCurrentWorkSequenceNo = null; // Teruskan dengan menjana Sequence baharu
+                    woOriginalLoadedWorkIds = [];
+                }
+
+                let sequenceToUse = woCurrentWorkSequenceNo;
+                const originalDistrict = document.getElementById('wo_dist').dataset.originalDistrict || '';
+                if(originalDistrict && originalDistrict.trim().toUpperCase() !== districtSelected.trim().toUpperCase()){
+                    woCurrentWorkSequenceNo = null; sequenceToUse = null;
+                }
+
+                if(!sequenceToUse){
+                    const seqRes = await fetch(`${SB_URL}/rest/v1/work_orders?select=sequence_no&contract_id=eq.${contractId}`, { headers: qHeaders });
+                    const seqData = await seqRes.json();
+                    let max = 0;
+                    seqData.forEach(r => {
+                        if(!r.sequence_no || !r.sequence_no.startsWith(areaCode)) return;
+                        const num = parseInt(r.sequence_no.replace(areaCode, ''));
+                        if(num > max) max = num;
+                    });
+                    sequenceToUse = areaCode + String(max + 1).padStart(3, '0');
+                    woCurrentWorkSequenceNo = sequenceToUse;
+                }
+
+                const sharedFields = { contract_id: contractId, sequence_no: sequenceToUse, qpb_date: document.getElementById('wo_qpb_date').value, district: districtSelected };
+                const perWorkIdPayload = {};
+
+                document.querySelectorAll('#wo_id_cards_container .wo-id-card').forEach(card => {
+                    const workId = card.dataset.workId; if(!workId) return;
+        
+                    const location = (card.querySelector('.wo_card_location')?.value || '').toUpperCase();
+                    const description = (card.querySelector('.wo_card_desc')?.value || '').toUpperCase();
+
+                    const breakdown = {};
+                    let totalAmount = 0, additionalTotal = 0;
+
+                    card.querySelectorAll('.wo_sec_amt').forEach(i => {
+                        const sec = i.dataset.sec;
+                        const base = parseFloat(i.dataset.rawValue || 0);
+                        const extra = parseFloat(card.querySelector(`.wo_sec_extra[data-sec="${woEscapeAttr(sec)}"]`)?.dataset.rawValue || 0);
+                        breakdown[sec] = { amt: base, extra: extra };
+                        totalAmount += base; additionalTotal += extra;
+                    });
+
+                    perWorkIdPayload[workId] = {
+                        ...sharedFields,
+                        work_id: workId,
+                        status: 'BLUEFORM',
+                        location: location,
+                        description: description,
+                        section_category: breakdown,
+                        additional: additionalTotal,
+                        amount_spent: totalAmount + additionalTotal
+                    };
+                });
+
+                for(const workIdValue of currentWorkIds){
+                    const payload = perWorkIdPayload[workIdValue]; if(!payload) continue;
+                    const checkRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}`, { headers: qHeaders });
+                    const existing = await checkRes.json();
+
+                    if(existing.length > 0){
+                        const existingStatus = existing[0].status || '';
+                        const isRejected = existingStatus.includes('REJ');
+
+                        const patchPayload = { ...payload, sequence_no: sequenceToUse, district: districtSelected };
+
+                        if(isRejected){
+                            patchPayload.status = 'BLUEFORM';
+                            patchPayload.reject_reason = null;
+                            patchPayload.revision_in_progress = false;
+                        }
+
+                        await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`, {
+                            method: 'PATCH', headers: qHeaders, body: JSON.stringify(patchPayload)
+                        });
+                    } else {
+                        await fetch(`${SB_URL}/rest/v1/work_orders`, {
+                            method: 'POST', headers: qHeaders, body: JSON.stringify(payload)
+                        });
+                    }
+                }
+
+                for(const removedId of woOriginalLoadedWorkIds.filter(id => !currentWorkIds.includes(id))){
+                    await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(removedId)}`, { method: 'DELETE', headers: qHeaders });
+                }
+
+                alert(`Successfully registered! Reference No: ${sequenceToUse}`);
+                closeBlueformModal();
+                resetBlueformModalForm();
+                fetchTechnicianDashboard();
+            } catch (error) {
+                console.error(error);
+                alert('Failed to process sequence number.');
+            } finally {
+                submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('wo_unit_id')?.addEventListener('change', woLoadContractsByUnit);
+            document.getElementById('wo_contract_id')?.addEventListener('change', woOnContractSelect);
+            document.getElementById('techBlueformForm')?.addEventListener('submit', woSubmitBlueform);
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('tq_unit_id')?.addEventListener('change', tqLoadContracts);
+            document.getElementById('tq_contract_id')?.addEventListener('change', tqOnContractSelect);
+            document.getElementById('tq_pdf_file')?.addEventListener('change', (e) => {
+                if(e.target.files[0]) showFilePreview(e.target.files[0]);
+            });
+
+            const qSection = document.getElementById('quotation-section');
+            const dropHint = document.getElementById('quotation-dropzone-hint');
+            if(qSection){
+                let dragCounter = 0;
+
+                qSection.addEventListener('dragenter', e => {
+                    e.preventDefault(); e.stopPropagation();
+                    dragCounter++;
+                    qSection.classList.add('ring-2','ring-emerald-400');
+                    dropHint?.classList.remove('hidden');
+                });
+                qSection.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); });
+                qSection.addEventListener('dragleave', e => {
+                    e.preventDefault(); e.stopPropagation();
+                    dragCounter--;
+                    if(dragCounter <= 0){
+                        qSection.classList.remove('ring-2','ring-emerald-400');
+                        dropHint?.classList.add('hidden');
+                    }
+                });
+                qSection.addEventListener('drop', e => {
+                    e.preventDefault(); e.stopPropagation();
+                    dragCounter = 0;
+                    qSection.classList.remove('ring-2','ring-emerald-400');
+                    dropHint?.classList.add('hidden');
+                    const files = e.dataTransfer.files;
+                    if(!files || files.length === 0) return;
+                    const file = files[0];
+                    if(file.type !== 'application/pdf'){ alert('Please drop PDF files only.'); return; }
+
+                    openQuotationModal();
+                    setTimeout(() => {
+                        assignFileToInput(document.getElementById('tq_pdf_file'), file);
+                        showFilePreview(file);
+                    }, 50);
+                });
+            }
+
+            document.getElementById('techQuotationForm')?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const contractOpt = document.getElementById('tq_contract_id').selectedOptions[0];
+                const contractId = document.getElementById('tq_contract_id').value;
+                const prefix = document.getElementById('tq_id_prefix').value;
+                const num = document.getElementById('tq_id_num').value.trim();
+                if(!num){ alert('Please enter a Work Order ID!'); return; }
+                const primaryWorkId = normalizeWorkId(`${prefix} ${num}`);
+
+                if(!contractId){ alert('Please select a Contract!'); return; }
+
+                const unitSelect = document.getElementById('tq_unit_id');
+                const unitText = unitSelect.options[unitSelect.selectedIndex]?.text || '';
+
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                const originalBtnText = submitBtn.innerHTML;
+                submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+
+                try {
+                    try {
+                        const rejCheckRes = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(primaryWorkId)}&status=eq.QUO-REJ&select=*`, { headers: qHeaders });
+                        const rejRows = await rejCheckRes.json();
+                        for (const rejRow of rejRows) {
+                            const actionDate = rejRow.action_date || new Date().toISOString();
+                            await archiveRejectedQuotation(primaryWorkId, actionDate);
+
+                            const delRes = await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${rejRow.id}`, { method: 'DELETE', headers: qHeaders });
+                            if (!delRes.ok) {
+                                console.error(`Failed to delete old QUO-REJ row (id=${rejRow.id}) for work_id ${primaryWorkId}: HTTP ${delRes.status}`);
+                            }
+                        }
+                    } catch (archiveErr) {
+                        console.error("Failed to archive old rejected quotation:", archiveErr);
+                    }
+
+                    // Burn cop DITERIMA (tarikh guna qpd_date) sebelum upload
+                    try {
+                        const originalFile = document.getElementById('tq_pdf_file').files[0];
+                        const qpdDateVal = document.getElementById('tq_qpb_date').value;
+                        if(originalFile && qpdDateVal){
+                            const stampedFile = await stampQuotationPdf(originalFile, qpdDateVal);
+                            assignFileToInput(document.getElementById('tq_pdf_file'), stampedFile);
+                        }
+                    } catch(stampErr) {
+                        console.error('Gagal proses cop DITERIMA:', stampErr);
+                    }
+
+                    await uploadQuotationToR2('tq_pdf_file', primaryWorkId, unitText, 'tq_upload_status', 'tq_pdf_url');
+
+                    const generatedPdfUrl = document.getElementById('tq_pdf_url').value;
+                    if(!generatedPdfUrl) {
+                        alert("Cloud upload process failed. Supabase data was not saved.");
+                        return;
+                    }
+
+                    const tqDistrict = document.getElementById('tq_dist').value;
+                    const tqLocation = (document.getElementById('tq_location').value || '').toUpperCase();
+                    const tqDescription = (document.getElementById('tq_description').value || '').toUpperCase();
+
+                    const tqBreakdown = {};
+                    let tqTotalAmount = 0, tqAdditionalTotal = 0;
+                    document.querySelectorAll('#tq_breakdown_container .tq_sec_amt').forEach(i => {
+                        const sec = i.dataset.sec;
+                        const base = parseFloat(i.dataset.rawValue || 0);
+                        const extraInput = document.querySelector(`#tq_breakdown_container .tq_sec_extra[data-sec="${sec}"]`);
+                        const extra = parseFloat(extraInput?.dataset.rawValue || 0);
+                        tqBreakdown[sec] = { amt: base, extra: extra };
+                        tqTotalAmount += base; tqAdditionalTotal += extra;
+                    });
+
+                    const payload = {
+                        work_id: primaryWorkId,
+                        contract_id: contractId,
+                        status: 'QUOTATION',
+                        pdf_url: generatedPdfUrl,
+                        qpd_date: document.getElementById('tq_qpb_date').value || null,
+                        district: tqDistrict,
+                        location: tqLocation,
+                        description: tqDescription,
+                        section_category: tqBreakdown,
+                        additional: tqAdditionalTotal,
+                        amount_spent: tqTotalAmount + tqAdditionalTotal,
+                        revision_in_progress: false,
+                        reject_reason: null
+                    };
+
+                    const res = await fetch(`${SB_URL}/rest/v1/quotations?on_conflict=work_id`, {
+                        method: 'POST',
+                        headers: { ...qHeaders, 'Prefer': 'resolution=merge-duplicates,return=representation' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (res.ok) {
+                        alert(`Quotation & document successfully recorded!`);
+                        closeQuotationModal();
+                        resetQuotationModalForm();
+                        fetchTechnicianDashboard();
+                    } else {
+                        let errBody = null;
+                        try { errBody = await res.json(); } catch(_) { }
+                        console.error("Supabase insert error:", errBody);
+                        alert("Failed to save quotation to database: " + (errBody?.message || errBody?.hint || `HTTP ${res.status}`));
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert("Error while processing quotation: " + err.message);
+                } finally {
+                    submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText;
+                }
+            });
+        });
+
+        async function fetchTechnicianDashboard() {
+            try {
+                const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
+                let activeUnitIds = [];
+
+                if (!isAdmin) {
+                    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+
+                    if (userError || !user) {
+                        showEmptyState('quotations-container', 'Please log in first.');
+                        showEmptyState('blueforms-container', 'Please log in first.');
+                        return;
+                    }
+
+                    const currentStaffId = user.id;
+
+                    const { data: assignments, error: assError } = await supabaseClient
+                        .from('staff_unit_assignment')
+                        .select('unit_id')
+                        .eq('staff_id', currentStaffId)
+                        .eq('active', true);
+
+                    if (assError) throw assError;
+
+                    activeUnitIds = (assignments || []).map(a => a.unit_id);
+
+                    if (activeUnitIds.length === 0) {
+                        showEmptyState('quotations-container', 'Your account has not been assigned to any unit.');
+                        showEmptyState('blueforms-container', 'Your account has not been assigned to any unit.');
+                        return;
+                    }
+                }
+
+                // Prepare Queries
+                let quotationsQuery = supabaseClient
+                    .from('quotations')
+                    .select(`
+                            id, work_id, status, contract_id, pdf_url, reject_reason, revision_in_progress, action_date,
+                            district, location, description, section_category,
+                            contract!inner (id, contract_name, contract_code, unit_id)
+                    `)
+                    .in('status', ['QUOTATION', 'QUO-APP', 'QUO-REJ']);
+                if (!isAdmin) quotationsQuery = quotationsQuery.in('contract.unit_id', activeUnitIds);
+
+                let blueformQuery = supabaseClient
+                    .from('work_orders')
+                    .select(`
+                            id, work_id, status, sequence_no, contract_id, district, reject_reason, revision_in_progress,
+                            contract!inner (id, contract_name, contract_code, unit_id)
+                    `)
+                    .in('status', ['APP-HOD', 'EXEC-REJ', 'HOS-REJ', 'HOD-REJ']); 
+                if (!isAdmin) blueformQuery = blueformQuery.in('contract.unit_id', activeUnitIds);
+
+                const [qResult, bResult] = await Promise.all([quotationsQuery, blueformQuery]);
+
+                if (qResult.error) throw qResult.error;
+                if (bResult.error) throw bResult.error;
+
+                const quotationData = qResult.data || [];
+                const blueformData = bResult.data || [];
+
+                const { data: crossQuotes, error: crossQError } = await supabaseClient
+                    .from('quotations')
+                    .select('work_id, pdf_url');
+                    
+                if (!crossQError && crossQuotes) {
+                    const quoteMap = {};
+                    crossQuotes.forEach(q => { if (q.work_id) quoteMap[q.work_id] = q.pdf_url; });
+                    blueformData.forEach(item => { item.mapped_pdf_url = quoteMap[item.work_id] || null; });
+                }
+
+                const quotationWorkIds = quotationData.map(q => q.work_id).filter(Boolean);
+                let workOrderWorkIdSet = new Set();
+                if (quotationWorkIds.length > 0) {
+                    const { data: matchingWOs, error: matchError } = await supabaseClient
+                        .from('work_orders')
+                        .select('work_id')
+                        .in('work_id', quotationWorkIds);
+
+                    if (!matchError && matchingWOs) {
+                        workOrderWorkIdSet = new Set(matchingWOs.map(w => w.work_id));
+                    }
+                }
+
+                const filteredQuotationData = quotationData.filter(q => {
+                    if (q.status === 'QUO-APP' && workOrderWorkIdSet.has(q.work_id)) return false;
+                    return true;
+                });
+
+                // Reset state seretan/pilihan setiap kali dashboard dimuat semula
+                techQuotationItemsById = {};
+                qCancelSelectionMode();
+
+                renderTechnicianSection('quotations-container', filteredQuotationData, 'QUOTATION');
+                renderTechnicianSection('blueforms-container', blueformData, 'BLUEFORM');
+
+            } catch (err) {
+                console.error("Error loading technician dashboard:", err.message);
+                alert("Failed to load dashboard data: " + err.message);
+            }
+        }
+
+        function formatActionDate(isoString) {
+            if (!isoString) return '';
+            try {
+                const d = new Date(isoString);
+                if (isNaN(d.getTime())) return '';
+                return d.toLocaleDateString('en-MY', { day: '2-digit', month: 'short', year: 'numeric' });
+            } catch (e) {
+                return '';
+            }
+        }
+
+        function renderTechnicianSection(containerId, orders, type) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+
+            if (!orders || orders.length === 0) {
+                showEmptyState(containerId, `No processed logs found for ${type} documents.`);
+                return;
+            }
+
+            const contractsMap = {};
+            orders.forEach(item => {
+                const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
+                const cId = contractData?.id || item.contract_id || 'UNKNOWN-ID';
+                const cCode = contractData?.contract_code || 'GEN-MNT';
+                const cName = contractData?.contract_name || 'General Maintenance Contract';
+
+                if (!contractsMap[cId]) {
+                    contractsMap[cId] = { id: cId, code: cCode, name: cName, orders: [] };
+                }
+                contractsMap[cId].orders.push(item);
+            });
+
+            renderedBlueformSeqs = new Set();
+
+            for (const contractId in contractsMap) {
+                const contract = contractsMap[contractId];
+                const contractSeqGroups = type === 'BLUEFORM' ? buildSequenceGroups(contract.orders) : null;
+
+                const contractSection = document.createElement('div');
+                contractSection.className = "bg-gray-50 rounded-lg border border-gray-200 shadow-sm mb-3 w-full overflow-hidden";
+
+                let headerBg = type === 'QUOTATION' ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200' : 'bg-blue-50 hover:bg-blue-100 border-blue-200';
+                let badgeBg = type === 'QUOTATION' ? 'bg-emerald-600' : 'bg-blue-600';
+
+                let tableHeaderHtml = '';
+                if (type === 'BLUEFORM') {
+                    tableHeaderHtml = `
+                        <th class="px-2 py-1.5 text-left font-semibold text-gray-500 uppercase tracking-tight w-[35%]">Work ID</th>
+                        <th class="px-1 py-1.5 text-center font-semibold text-gray-500 uppercase tracking-tight w-[15%]">Status</th>
+                        <th class="px-1 py-1.5 text-center font-semibold text-gray-500 uppercase tracking-tight w-[32%]">Reference</th>
+                        <th class="px-2 py-1.5 text-left font-semibold text-gray-500 uppercase tracking-tight w-[18%]">Remarks</th>
+                    `;
+                } else {
+                    tableHeaderHtml = `
+                        <th class="px-2 py-1.5 text-left font-semibold text-gray-500 uppercase tracking-tight w-[40%]">Work ID</th>
+                        <th class="px-1 py-1.5 text-center font-semibold text-gray-500 uppercase tracking-tight w-[18%]">Status</th>
+                        <th class="px-1 py-1.5 text-center font-semibold text-gray-500 uppercase tracking-tight w-[18%]">Reference</th>
+                        <th class="px-2 py-1.5 text-left font-semibold text-gray-500 uppercase tracking-tight w-[26%]">Remarks</th>
+                    `;
+                }
+
+                const accordionContentId = `${type}_${String(contract.id || '').replace(/-/g, '')}`;
+
+                let sectionHtml = `
+                    <div onclick="toggleContractAccordion('${accordionContentId}')" class="${headerBg} px-3 py-2 cursor-pointer transition-colors flex justify-between items-center gap-2">
+                        <div class="flex items-start gap-2 min-w-0 flex-1">
+                            <span class="${badgeBg} text-white text-[10px] px-1.5 py-0.5 rounded font-mono font-bold flex-shrink-0 shadow-xs mt-0.5">${contract.code}</span> 
+                            <span class="font-bold text-gray-800 text-xs leading-snug break-words">${contract.name}</span>
+                        </div>
+                        <div class="flex items-center gap-2 flex-shrink-0">
+                            <span class="text-[10px] bg-white text-gray-700 border border-gray-300 font-extrabold px-2 py-0.5 rounded-full shadow-xs">
+                                ${contract.orders.length}
+                            </span>
+                            <i id="icon_${accordionContentId}" class="fa-solid fa-chevron-down text-xs text-gray-500 transition-transform duration-200"></i>
+                        </div>
+                    </div>
+
+                    <div id="${accordionContentId}" class="hidden bg-white border-t border-gray-200 w-full overflow-hidden">
+                        <table class="w-full text-[11px] table-fixed divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>${tableHeaderHtml}</tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                `;
+
+                contract.orders.forEach(item => {
+                    const seq = (item.sequence_no || '').trim();
+                    let statusBadge = '';
+                    let reasonText = item.reject_reason ? item.reject_reason : 'No notes.';
+
+                    if (item.status === 'QUO-APP' || item.status === 'APP-HOD') {
+                        statusBadge = `<span class="bg-emerald-100 text-emerald-800 text-[9px] font-extrabold px-1 py-0.5 rounded border border-emerald-200 block text-center truncate" title="${item.status}"><i class="fa-solid fa-check mr-0.5"></i>App</span>`;
+                    } else if (item.status === 'QUOTATION') {
+                        statusBadge = `<span class="bg-amber-100 text-amber-800 text-[9px] font-extrabold px-1 py-0.5 rounded border border-amber-200 block text-center truncate" title="${item.status}"><i class="fa-solid fa-clock mr-0.5"></i>Pending</span>`;
+                    } else {
+                        statusBadge = `<span class="bg-red-100 text-red-800 text-[9px] font-extrabold px-1 py-0.5 rounded border border-red-200 block text-center truncate" title="${item.status}"><i class="fa-solid fa-xmark mr-0.5"></i>Rejected</span>`;
+                    }
+
+                    const actionDateLabel = (type === 'QUOTATION') ? formatActionDate(item.action_date) : '';
+                    let finalPdfUrl = (type === 'QUOTATION') ? item.pdf_url : item.mapped_pdf_url;
+                    let remarkContent = '';
+
+                    if (item.status.includes('REJ') && item.reject_reason) {
+                        const revisionBadge = item.revision_in_progress
+                            ? `<span class="text-amber-600 text-[9px] font-bold inline-flex items-center gap-0.5 mt-0.5"><i class="fa-solid fa-pen"></i> Resubmission in progress...</span>`
+                            : `<button onclick="startRevision('${type}','${escapeJs(item.work_id)}')" class="text-[9px] text-blue-600 underline mt-0.5 cursor-pointer bg-transparent border-none p-0">Start resubmission</button>`;
+                        remarkContent = `
+                            <div class="text-red-700 font-medium text-[10px] truncate" title="[${item.status}] ${reasonText}">
+                                ${reasonText}
+                            </div>
+                            ${revisionBadge}
+                        `;
+                    } else if (item.status === 'QUOTATION') {
+                        remarkContent = `<span class="text-amber-600 font-medium text-[10px] truncate block"><i class="fa-solid fa-hourglass-half mr-1"></i>Awaiting Approval</span>`;
+                    } else {
+                        remarkContent = `<span class="text-gray-400 italic text-[10px] truncate block">${type === 'QUOTATION' ? 'Ready for Blueform' : 'Completed'}</span>`;
+                    }
+
+                    if (type === 'QUOTATION') {
+                        // Simpan rujukan item ini untuk fungsi drag & drop (Quotation -> Blueform)
+                        techQuotationItemsById[item.id] = item;
+
+                        let pdfBtnHtml = finalPdfUrl ? `
+                            <a href="${finalPdfUrl}" target="_blank" class="text-gray-700 bg-gray-100 hover:bg-gray-200 px-1 py-0.5 rounded border border-gray-300 transition-all font-medium inline-flex items-center gap-0.5 text-[9px]" title="View Quotation PDF">
+                                <i class="fa-solid fa-file-pdf text-red-600"></i>Quote
+                            </a>
+                        ` : '<span class="text-gray-400 text-[9px] italic">None</span>';
+
+                        const isDraggable = item.status === 'QUO-APP';
+const isDeletable = item.status === 'QUO-REJ';
+const qHoldSlim = { id: item.id, work_id: item.work_id, status: item.status };
+const qHoldEncoded = encodeURIComponent(JSON.stringify(qHoldSlim));
+const qHoldAttrs = isDeletable ? `onpointerdown="qHandleRowHoldPointerDown(event, '${qHoldEncoded}')" onpointermove="qHandleRowHoldPointerMove(event)" onpointerup="qHandleRowHoldPointerUp(event)" onpointerleave="qHandleRowHoldPointerCancel(event)" onpointercancel="qHandleRowHoldPointerCancel(event)"` : '';
+
+sectionHtml += `
+    <tr class="hover:bg-gray-50 transition-colors ${isDraggable ? 'q-drag-row' : ''} ${isDeletable ? 'q-hold-row-del' : ''}" data-qrow-id="${item.id}" ${isDraggable ? `onpointerdown="qHandlePointerDown(event, '${item.id}')"` : ''} ${qHoldAttrs}>
+        <td class="px-2 py-2 font-mono text-gray-900 font-semibold truncate" title="${item.work_id}">
+            ${item.work_id}
+        </td>
+        <td class="px-1 py-2">
+            ${statusBadge}
+            ${actionDateLabel ? `<span class="block text-[8px] text-gray-400 text-center mt-0.5 truncate" title="Action date: ${actionDateLabel}">${actionDateLabel}</span>` : ''}
+        </td>
+        <td class="px-1 py-2 text-center">
+            ${pdfBtnHtml}
+        </td>
+        <td class="px-2 py-2 min-w-0">
+            ${remarkContent}
+        </td>
+    </tr>
+`;
+                    } else {
+                        const groupKey = seq ? getBlueformGroupKey(item) : null;
+                        const isFirstInGroup = !groupKey || !renderedBlueformSeqs.has(groupKey);
+
+                        let actionBtnHtml;
+                        if (isFirstInGroup) {
+                            if (groupKey) renderedBlueformSeqs.add(groupKey);
+                            const groupCount = groupKey ? (contractSeqGroups[groupKey] || [item]).length : 1;
+                            const countLabel = groupCount > 1 ? ` (${groupCount})` : '';
+                            const serializedItem = encodeURIComponent(JSON.stringify(item));
+
+                            actionBtnHtml = `
+                                <button onclick="previewFullSet('${serializedItem}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2 py-0.5 rounded text-[10px] shadow-xs cursor-pointer inline-flex items-center gap-1 transition-all">
+                                    <i class="fa-solid fa-print"></i> BLUEFORM${countLabel}
+                                </button>
+                            `;
+                        } else {
+                            actionBtnHtml = `<span class="text-[9px] text-gray-400 italic">Refer to first row of seq ${seq}</span>`;
+                        }
+
+                        const canHold = ['EXEC-REJ', 'HOS-REJ', 'HOD-REJ', 'APP-HOD'].includes(item.status);
+const holdSlim = { id: item.id, work_id: item.work_id, status: item.status, sequence_no: item.sequence_no, district: item.district };
+const holdEncoded = encodeURIComponent(JSON.stringify(holdSlim));
+const holdAttrs = canHold ? `onpointerdown="woHandleRowPointerDown(event, '${holdEncoded}')" onpointermove="woHandleRowPointerMove(event)" onpointerup="woHandleRowPointerUp(event)" onpointerleave="woHandleRowPointerCancel(event)" onpointercancel="woHandleRowPointerCancel(event)"` : '';
+
+sectionHtml += `
+    <tr class="hover:bg-gray-50 transition-colors ${canHold ? 'wo-hold-row' : ''}" ${holdAttrs}>
+        <td class="px-2 py-2 font-mono text-gray-900 font-semibold truncate" title="${item.work_id}${seq ? ` (${seq})` : ''}">
+            ${item.work_id}${seq ? `<span class="text-gray-400 font-normal">(${seq})</span>` : ''}
+        </td>
+                                <td class="px-1 py-2">
+                                    ${statusBadge}
+                                </td>
+                                <td class="px-1 py-2 text-center">
+                                    ${actionBtnHtml}
+                                </td>
+                                <td class="px-2 py-2 min-w-0">
+                                    ${remarkContent}
+                                </td>
+                            </tr>
+                        `;
+                    }
+                });
+
+                sectionHtml += `</tbody></table></div>`;
+                contractSection.innerHTML = sectionHtml;
+                container.appendChild(contractSection);
+            }
+        }
+
+        function toggleContractAccordion(elementId) {
+            const target = document.getElementById(elementId);
+            const icon = document.getElementById(`icon_${elementId}`);
+            
+            if (target) {
+                target.classList.toggle('hidden');
+                if (icon) {
+                    icon.classList.toggle('rotate-180');
+                }
+            }
+        }
+
+        // ============ PDF -> IMAGE PAGE RENDERING ============
+        async function renderPdfPagesAsElements(pdfUrl) {
+            const pages = [];
+            try {
+                const pdf = await pdfjsLib.getDocument(pdfUrl).promise;
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const baseViewport = page.getViewport({ scale: 1 });
+                    const scale = (794 * 2) / baseViewport.width;
+                    const viewport = page.getViewport({ scale });
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+
+                    const img = document.createElement('img');
+                    img.src = dataUrl;
+                    img.style.width = '100%';
+                    img.style.display = 'block';
+                    img.alt = `Quotation page ${i}`;
+
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'print-page bg-white shadow-lg';
+                    pageDiv.style.width = '210mm';
+                    pageDiv.style.boxSizing = 'border-box';
+                    pageDiv.appendChild(img);
+                    pages.push(pageDiv);
+
+                    canvas.width = 0;
+                    canvas.height = 0;
+                }
+            } catch (err) {
+                console.error('Gagal render PDF:', pdfUrl, err);
+                const errDiv = document.createElement('div');
+                errDiv.className = 'print-page bg-white p-8 shadow-lg w-[210mm] min-h-[297mm] flex items-center justify-center text-center';
+                errDiv.innerHTML = `
+                    <div>
+                        <i class="fa-solid fa-triangle-exclamation text-xl text-amber-500 block mb-2"></i>
+                        <p class="text-sm text-gray-600">Gagal papar PDF.</p>
+                        <a href="${pdfUrl}" target="_blank" class="text-blue-500 underline text-xs">Buka PDF dalam tab baru</a>
+                    </div>`;
+                pages.push(errDiv);
+            }
+            return pages;
+        }
+
+        async function previewFullSet(escapedItemData) {
+            const item = JSON.parse(decodeURIComponent(escapedItemData));
+            const container = document.getElementById('bulkPagesContainer');
+            
+            container.innerHTML = '<div class="text-white text-sm p-4 animate-pulse"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Bundling full set documents...</div>';
+            document.getElementById('bulkPreviewPage').style.display = 'block';
+
+            try {
+                let compositeHtml = '';
+                let payload;
+                let linkedPdfs = [];
+
+                const seq = (item.sequence_no || '').trim();
+                const contractData = Array.isArray(item.contract) ? item.contract[0] : item.contract;
+                const currentContractId = contractData?.id || item.contract_id;
+
+                if (seq && currentContractId && typeof buildBlueformDataGroup === 'function') {
+                    const { data: siblingWOs } = await supabaseClient
+                        .from('work_orders')
+                        .select('id, work_id, sequence_no, district')
+                        .eq('contract_id', currentContractId);
+
+                    const currentDistrict = (item.district || '').trim().toUpperCase();
+                    const groupMembers = (siblingWOs || []).filter(w => 
+                        (w.sequence_no || '').trim() === seq && 
+                        (w.district || '').trim().toUpperCase() === currentDistrict
+                    );
+
+                    if (groupMembers.length > 1) {
+                        const groupIds = groupMembers.map(g => g.id);
+                        payload = await buildBlueformDataGroup(groupIds);
+                        
+                        const groupWorkIds = groupMembers.map(g => g.work_id);
+                        const { data: quotes } = await supabaseClient
+                            .from('quotations')
+                            .select('work_id, pdf_url')
+                            .in('work_id', groupWorkIds);
+                        
+                        if (quotes) {
+                            linkedPdfs = quotes.map(q => q.pdf_url).filter(url => url);
+                        }
+                    }
+                }
+
+                if (!payload) {
+                    if (typeof buildBlueformData === 'function') {
+                        payload = await buildBlueformData(item.id);
+                        if (item.mapped_pdf_url) linkedPdfs.push(item.mapped_pdf_url);
+                    }
+                }
+
+                if (payload && typeof buildBlueformHTML === 'function') {
+                    compositeHtml += buildBlueformHTML(payload);
+                } else {
+                    compositeHtml += `
+                        <div class="print-page bg-white p-8 shadow-lg w-[210mm] min-h-[297mm] text-red-500 font-bold flex items-center justify-center">
+                            Error: buildBlueformData or buildBlueformHTML logic failed.
+                        </div>
+                    `;
+                }
+
+                container.innerHTML = compositeHtml;
+
+                if (linkedPdfs.length > 0) {
+                    const uniquePdfs = [...new Set(linkedPdfs)];
+                    for (const pdfUrl of uniquePdfs) {
+                        const pageEls = await renderPdfPagesAsElements(pdfUrl);
+                        pageEls.forEach(el => container.appendChild(el));
+                    }
+                } else {
+                    const noPdfDiv = document.createElement('div');
+                    noPdfDiv.className = 'print-page bg-white p-12 shadow-lg w-[210mm] min-h-[297mm] flex flex-col items-center justify-center text-center';
+                    noPdfDiv.style.color = 'gray';
+                    noPdfDiv.innerHTML = `
+                        <i class="fa-solid fa-file-pdf text-4xl text-gray-300 mb-2"></i>
+                        <p class="text-sm font-semibold text-gray-600">No Linked Quotation PDF Found</p>
+                        <p class="text-xs text-gray-400">Only the Blueform page will be printed for this record.</p>`;
+                    container.appendChild(noPdfDiv);
+                }
+
+            } catch (error) {
+                console.error("Error creating full set preview:", error);
+                container.innerHTML = `<div class="text-red-400 p-4 font-mono text-xs">Error bundling documents: ${error.message}</div>`;
+            }
+        }
+
+        function closeBulkPreview() {
+            document.getElementById('bulkPreviewPage').style.display = 'none';
+            document.getElementById('bulkPagesContainer').innerHTML = '';
+        }
+
+        function showEmptyState(containerId, message) {
+            document.getElementById(containerId).innerHTML = `
+                <div class="text-center py-12 text-gray-400 text-xs italic bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                    <i class="fa-solid fa-folder-open block text-2xl mb-2 text-gray-300"></i> ${message}
+                </div>`;
+        }
+
+        // ============================================================
+        // DRAG QUOTATION -> BLUEFORM (Pointer Events: berfungsi untuk mouse & touch)
+        // ============================================================
+        let techQuotationItemsById = {};
+        let qSelectedIds = new Set();
+        let qSelectionModeOn = false;
+        let qLongPressTimer = null;
+        let qPointerState = null;
+        const Q_LONG_PRESS_MS = 480;
+        const Q_MOVE_THRESHOLD = 8;
+
+        function qHandlePointerDown(e, qid, fromToolbar = false) {
+            if (!fromToolbar) {
+                if (e.target.closest('a, button')) return; // jangan ganggu link PDF / butang resubmission
+                if (e.button !== undefined && e.button !== 0) return; // mouse: klik kiri sahaja
+            }
+
+            qPointerState = {
+                pointerId: e.pointerId,
+                qid: qid,
+                startX: e.clientX,
+                startY: e.clientY,
+                moved: false,
+                dragging: false,
+                fromToolbar: fromToolbar,
+                isTouch: e.pointerType === 'touch',
+                longPressSelected: false
+            };
+
+            clearTimeout(qLongPressTimer);
+
+            if (!fromToolbar && qPointerState.isTouch) {
+                // Touch: kena tahan lama (touch-and-hold) untuk masuk mod pilih
+                qLongPressTimer = setTimeout(() => {
+                    if (!qPointerState || qPointerState.qid !== qid || qPointerState.moved) return;
+                    if (navigator.vibrate) navigator.vibrate(35);
+                    qEnterSelectionMode();
+                    qToggleSelection(qid, true);
+                    qPointerState.longPressSelected = true;
+                }, Q_LONG_PRESS_MS);
+            }
+
+            document.addEventListener('pointermove', qHandlePointerMove);
+            document.addEventListener('pointerup', qHandlePointerUp);
+            document.addEventListener('pointercancel', qHandlePointerCancel);
+        }
+
+        function qHandlePointerMove(e) {
+            if (!qPointerState) return;
+            const dx = e.clientX - qPointerState.startX;
+            const dy = e.clientY - qPointerState.startY;
+
+            if (!qPointerState.moved && Math.hypot(dx, dy) > Q_MOVE_THRESHOLD) {
+                qPointerState.moved = true;
+                clearTimeout(qLongPressTimer);
+
+                if (!qPointerState.dragging) {
+                    if (qPointerState.fromToolbar) {
+                        qBeginDrag(qPointerState.startX, qPointerState.startY);
+                    } else if (!qPointerState.isTouch) {
+                        // Mouse: seret terus tanpa perlu tahan lama
+                        qBeginDrag(qPointerState.startX, qPointerState.startY);
+                    } else if (qSelectionModeOn && qSelectedIds.has(qPointerState.qid)) {
+                        // Touch: item sudah dipilih sebelum ini -> boleh seret terus
+                        qBeginDrag(qPointerState.startX, qPointerState.startY);
+                    }
+                    // Touch, belum dalam mod pilih -> biarkan skrol biasa, jangan drag
+                }
+            }
+
+            if (qPointerState.dragging) {
+                e.preventDefault();
+                qMoveGhost(e.clientX, e.clientY);
+                qHighlightDropTarget(e.clientX, e.clientY);
+            }
+        }
+
+        function qHandlePointerUp(e) {
+            document.removeEventListener('pointermove', qHandlePointerMove);
+            document.removeEventListener('pointerup', qHandlePointerUp);
+            document.removeEventListener('pointercancel', qHandlePointerCancel);
+            clearTimeout(qLongPressTimer);
+
+            if (!qPointerState) return;
+
+            if (qPointerState.dragging) {
+                qEndDrag(e.clientX, e.clientY);
+            } else if (!qPointerState.moved) {
+                if (qPointerState.fromToolbar) {
+                    qSendSelectedToBlueform();
+                } else if (qPointerState.longPressSelected) {
+                    // sudah dipilih semasa touch-and-hold, jangan toggle lagi
+                } else if (qPointerState.isTouch) {
+                    if (qSelectionModeOn) qToggleSelection(qPointerState.qid);
+                } else {
+                    // Mouse: klik ringkas terus toggle pilihan (senang untuk multi-select)
+                    qToggleSelection(qPointerState.qid);
+                }
+            }
+
+            qPointerState = null;
+        }
+
+        function qHandlePointerCancel() {
+            document.removeEventListener('pointermove', qHandlePointerMove);
+            document.removeEventListener('pointerup', qHandlePointerUp);
+            document.removeEventListener('pointercancel', qHandlePointerCancel);
+            clearTimeout(qLongPressTimer);
+            qCancelDrag();
+            qPointerState = null;
+        }
+
+        function qEnterSelectionMode() {
+            qSelectionModeOn = true;
+            document.getElementById('qSelectionToolbar')?.classList.add('active');
+        }
+
+        function qCancelSelectionMode() {
+            qSelectionModeOn = false;
+            qSelectedIds.clear();
+            document.getElementById('qSelectionToolbar')?.classList.remove('active');
+            qRefreshRowSelectionUI();
+        }
+
+        function qToggleSelection(qid, forceOn = false) {
+            if (forceOn) qSelectedIds.add(qid);
+            else if (qSelectedIds.has(qid)) qSelectedIds.delete(qid);
+            else qSelectedIds.add(qid);
+
+            if (qSelectedIds.size === 0) { qCancelSelectionMode(); return; }
+            qEnterSelectionMode();
+            qRefreshRowSelectionUI();
+        }
+
+        function qRefreshRowSelectionUI() {
+            document.querySelectorAll('.q-drag-row').forEach(row => {
+                const on = qSelectedIds.has(row.dataset.qrowId);
+                row.classList.toggle('q-row-selected', on);
+                row.querySelector('.q-select-check')?.classList.toggle('hidden', !on);
+            });
+            const countEl = document.getElementById('qSelectionCount');
+            if (countEl) countEl.textContent = `${qSelectedIds.size} chosen`;
+        }
+
+        // ---------- Visual seretan + kesan zon lepas ----------
+        function qBeginDrag(x, y) {
+            qPointerState.dragging = true;
+
+            if (!qPointerState.fromToolbar && !qSelectedIds.has(qPointerState.qid)) {
+                qSelectedIds = new Set([qPointerState.qid]);
+                qRefreshRowSelectionUI();
+            }
+
+            document.querySelectorAll('.q-drag-row.q-row-selected').forEach(r => r.classList.add('q-row-dragging-source'));
+
+            const ghost = document.getElementById('qDragGhost');
+            const label = document.getElementById('qDragGhostLabel');
+            const idsArr = [...qSelectedIds];
+            label.textContent = idsArr.length > 1
+                ? `${idsArr.length} sebut harga`
+                : (techQuotationItemsById[idsArr[0]]?.work_id || '1 sebut harga');
+            ghost.style.display = 'flex';
+            qMoveGhost(x, y);
+        }
+
+        function qMoveGhost(x, y) {
+            const ghost = document.getElementById('qDragGhost');
+            ghost.style.left = x + 'px';
+            ghost.style.top = y + 'px';
+        }
+
+        function qHighlightDropTarget(x, y) {
+            const zone = document.getElementById('blueform-section');
+            if (!zone) return;
+            const rect = zone.getBoundingClientRect();
+            const over = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+            zone.classList.toggle('q-drop-target-active', over);
+        }
+
+        function qCancelDrag() {
+            document.getElementById('qDragGhost').style.display = 'none';
+            document.getElementById('blueform-section')?.classList.remove('q-drop-target-active');
+            document.querySelectorAll('.q-drag-row.q-row-dragging-source').forEach(r => r.classList.remove('q-row-dragging-source'));
+        }
+
+        function qEndDrag(x, y) {
+            const zone = document.getElementById('blueform-section');
+            const rect = zone ? zone.getBoundingClientRect() : null;
+            const dropped = rect && x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+
+            qCancelDrag();
+            if (dropped) qSendSelectedToBlueform();
+        }
+
+        // ---------- Hantar quotation terpilih ke dalam modal Blueform ----------
+        async function qSendSelectedToBlueform() {
+            const ids = [...qSelectedIds];
+            if (ids.length === 0) return;
+
+            const items = ids.map(id => techQuotationItemsById[id]).filter(Boolean);
+            qCancelSelectionMode();
+            if (items.length === 0) return;
+
+            await startBlueformFromQuotations(items);
+        }
+
+        async function startBlueformFromQuotations(items) {
+            openBlueformModal();
+            if (blueformUnitsReadyPromise) await blueformUnitsReadyPromise;
+
+            const first = items[0];
+            const contractData = Array.isArray(first.contract) ? first.contract[0] : first.contract;
+            const unitId = contractData?.unit_id;
+            const contractId = first.contract_id;
+
+            if (unitId) {
+                document.getElementById('wo_unit_id').value = unitId;
+                await woLoadContractsByUnit();
+            }
+            if (contractId) {
+                document.getElementById('wo_contract_id').value = contractId;
+                woOnContractSelect(); // ini reset rows ke 1 baris kosong dahulu
+            }
+
+            // Bina semula baris Work ID ikut quotation yang diseret
+            document.getElementById('wo_id_rows_container').innerHTML = '';
+            wo_workIdRowCounter = 0;
+            const workIds = [];
+            items.forEach(item => {
+                const m = (item.work_id || '').trim().match(/^([CK])?\s*(\d+)\s*([A-Z]?)$/i);
+                const prefix = (m && m[1]) ? m[1].toUpperCase() : 'C';
+                const num = m ? m[2] : '';
+                if (!num) return;
+                woAddWorkIdRow(prefix, num, '');
+                workIds.push(`${prefix} ${num}`);
+            });
+            if (document.getElementById('wo_id_rows_container').children.length === 0) woAddWorkIdRow();
+
+            // Set district terus dari quotation yang diseret (lebih tepat dari auto-detect umum)
+            if (first.district) {
+                const distSel = document.getElementById('wo_dist');
+                const target = first.district.trim().toUpperCase();
+                const matchOpt = Array.from(distSel.options).find(o => o.value.trim().toUpperCase() === target);
+                if (matchOpt) distSel.value = matchOpt.value;
+            }
+
+            woRenderWorkIdCards();
+
+            // Tarik location/description/cost breakdown dari jadual quotations
+            if (workIds.length > 0) {
+                await woAutofillFromQuotations(workIds);
+            }
+
+            // Semak jika Work ID ini sudah wujud dalam work_orders (papar modal overwrite/new/additional jika ada)
+            woAutoDetectWork();
+        }
+
+        window.onload = fetchTechnicianDashboard;
+
+        document.addEventListener('input', function (e) {
+            if (e.target && (e.target.tagName === 'INPUT' && e.target.type === 'text' || e.target.tagName === 'TEXTAREA')) {
+                const start = e.target.selectionStart;
+                const end = e.target.selectionEnd;
+                e.target.value = e.target.value.toUpperCase();
+                if (start !== null && end !== null) {
+                    e.target.setSelectionRange(start, end);
+                }
+            }
+        }, true);
     </script>
 
+    <script src="uploader.js"></script>
+    
 </body>
 </html>
