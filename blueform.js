@@ -706,17 +706,48 @@ let formattedRef = seq ? ` - ${seq}` : '';
         <div class="bf-signature-grid">
     <div>
         <strong>Dimohon Oleh:</strong>
-        <div style="height:70px; position:relative;">
-            ${stampImages.exec_signature?.signature ? `<img src="${stampImages.exec_signature.signature}" style="max-height:60px;max-width:90%;object-fit:contain;position:absolute;bottom:0;left:5%;">` : ''}
-        </div>
-        <div class="bf-sign-line"></div>
-        <small style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
-            ${stampImages.tech_initial?.initial ? `<img src="${stampImages.tech_initial.initial}" style="height:16px;width:auto;object-fit:contain;">` : ''}
-            ${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}
-            ${stampImages.tech_initial?.date ? `<span style="font-weight:normal;">(${formatShortDate(stampImages.tech_initial.date)})</span>` : ''}
-            ${stampImages.exec_signature?.date ? `<span style="font-weight:normal;font-size:8px;color:#555;">Lulus: ${formatShortDate(stampImages.exec_signature.date)}</span>` : ''}
-        </small>
-    </div>
+        <div style="height:70px;position:relative;">
+
+    <!-- Initial overlay -->
+    ${stampImages.tech_initial?.initial ? `
+    <img src="${stampImages.tech_initial.initial}"
+         style="
+            position:absolute;
+            left:-45px;
+            bottom:8px;
+            height:26px;
+            width:auto;
+            z-index:20;
+            pointer-events:none;
+         ">
+    ` : ''}
+
+    <!-- Tarikh -->
+    ${stampImages.tech_initial?.date ? `
+    <span style="
+        position:absolute;
+        left:15px;
+        bottom:28px;
+        font-size:10px;
+    ">
+        ${formatShortDate(stampImages.tech_initial.date)}
+    </span>
+    ` : ''}
+
+    <!-- Signature asal -->
+    ${stampImages.exec_signature?.signature ? `
+    <img src="${stampImages.exec_signature.signature}"
+         style="
+            max-height:60px;
+            max-width:90%;
+            object-fit:contain;
+            position:absolute;
+            bottom:0;
+            left:5%;
+         ">
+    ` : ''}
+
+</div>
     <div>
         <strong>Disemak Oleh:</strong>
         <div style="height:70px; position:relative;">
