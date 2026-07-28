@@ -671,20 +671,16 @@ async function stampQuotationPdf(file, qpdDateStr) {
         if (pages.length === 0) return file;
 
         const page = pages[0]; // Cop hanya pada page PERTAMA
-        const { width, height } = page.getSize();
+        const { height } = page.getSize();
 
-        // Reka bentuk asal dikira atas A4 (210mm x 297mm)
-        const A4_W_PT = 595.2756, A4_H_PT = 841.8898;
-        const mmToPt = 2.834645669;
-        const scaleX = width / A4_W_PT;
-        const scaleY = height / A4_H_PT;
-        const uniformScale = Math.min(scaleX, scaleY);
+        const mmToPt = 2.834645669; // 1mm = 2.834645669pt (unit fizikal tetap, TIDAK bergantung saiz page)
 
-        // stamp: top 240mm, left 30mm, diameter 41mm (ikut design asal anda)
-        const centerX = (30 + 41 / 2) * mmToPt * scaleX;
-        const centerYFromTop = (240 + 41 / 2) * mmToPt * scaleY;
-        const centerY = height - centerYFromTop;
-        const radius = (41 / 2) * mmToPt * uniformScale;
+        // Ikut CSS asal tepat: top 240mm, left 30mm, diameter 41mm
+        const diameterMm = 41;
+        const radius = (diameterMm / 2) * mmToPt;
+        const centerX = (30 + diameterMm / 2) * mmToPt;
+        const centerYFromTop = (240 + diameterMm / 2) * mmToPt;
+        const centerY = height - centerYFromTop; // origin PDF di bawah kiri, jadi tolak dari height
 
         const boldFont = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
         const blue = PDFLib.rgb(0, 0, 0.8); // ~#0000CC
@@ -700,16 +696,17 @@ async function stampQuotationPdf(file, qpdDateStr) {
             page.drawText(text, { x: centerX - w / 2, y: centerY + yOffset, size, font: boldFont, color: blue });
         };
 
-        drawCentered('DITERIMA', 13, radius * 0.42);
-        drawCentered(formatStampDate(qpdDateStr), 10.5, radius * 0.05);
-        drawCentered('JABATAN M&E', 7, -radius * 0.42);
-        drawCentered('RANHILL SAJ SDN BHD', 7, -radius * 0.42 - 8);
+        // Susunan ikut CSS asal: DITERIMA (16pt) -> tarikh (13pt) -> 2 baris footer (9.2pt)
+        drawCentered('DITERIMA', 16, radius * 0.30);
+        drawCentered(formatStampDate(qpdDateStr), 13, radius * -0.08);
+        drawCentered('JABATAN M&E', 9.2, -radius * 0.55);
+        drawCentered('RANHILL SAJ SDN BHD', 9.2, -radius * 0.55 - 9);
 
         const stampedBytes = await pdfDoc.save();
         return new File([stampedBytes], file.name, { type: 'application/pdf' });
     } catch (err) {
         console.error('Gagal cop PDF, upload fail asal:', err);
-        return file; // fallback: jangan gagalkan submit sepenuhnya
+        return file;
     }
 }
 
