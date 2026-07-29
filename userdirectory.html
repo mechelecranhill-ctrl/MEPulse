@@ -1250,9 +1250,11 @@ async function saveStaff(){
     let phoneValue = trimmedPhone !== "" ? trimmedPhone : null;
     let employeeValue = trimmedEmployee !== "" ? trimmedEmployee : null;
 
-    let body={ 
+    let selectedPosition = fPosition.value;
+
+    let body = { 
         name: trimmedName, 
-        position: fPosition.value, 
+        position: selectedPosition, 
         employee_id: employeeValue, 
         phone_no: phoneValue, 
         email: emailValue,
@@ -1265,6 +1267,7 @@ async function saveStaff(){
     let res;
     let treatAsNew = !editingStaff;
     let hasEmailInput = emailValue !== null;
+    let savedStaffId = null;
 
     if(treatAsNew){
         // ==========================================
@@ -1284,6 +1287,7 @@ async function saveStaff(){
             body.id = crypto.randomUUID();
         }
 
+        savedStaffId = body.id;
         res = await fetch(`${SB_URL}/rest/v1/staff`, { method:"POST", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(body) });
     
     } else {
@@ -1293,7 +1297,6 @@ async function saveStaff(){
         let isEmailNewlyAdded = (!editingStaff.email || editingStaff.email.trim() === "") && hasEmailInput;
 
         if (isEmailNewlyAdded) {
-            // A. Daftar akaun di Supabase Auth untuk dapatkan UUID rasmi
             let auth = await fetch(`${SB_URL}/auth/v1/signup`, {
                 method:"POST", headers, body:JSON.stringify({ email:body.email, password:"StaffPassword123!" })
             });
@@ -1304,12 +1307,11 @@ async function saveStaff(){
                 return;
             }
 
-            // B. Masukkan UUID baharu ke dalam body untuk menggantikan UUID rawak lama
             body.id = authData.id || authData.user?.id;
         }
 
-        // C. Terus hantar PATCH. Jika body.id ada (kes emel baru), ID lama akan dikemaskini. 
-        //    Disebabkan kita dah set CASCADE UPDATE di SQL, data penempatan unit/seksyen akan bertukar secara automatik!
+        savedStaffId = body.id || editingStaff.id;
+
         res = await fetch(`${SB_URL}/rest/v1/staff?id=eq.${editingStaff.id}`, { 
             method:"PATCH", 
             headers:{...headers, "Prefer":"return=minimal"}, 
@@ -1322,7 +1324,31 @@ async function saveStaff(){
         alert("Gagal menyimpan data ke database: " + (dbErr.message || "Ralat tidak diketahui.")); 
         return; 
     }
-    
+
+    // =========================================================
+    // SINKRONISASI OTOMATIK KE JADUAL department_head
+    // =========================================================
+    if (selectedPosition && selectedPosition.toUpperCase() === "KETUA JABATAN") {
+        // Masukkan / Kemaskini status dalam jadual department_head
+        await fetch(`${SB_URL}/rest/v1/department_head`, {
+            method: "POST",
+            headers: { 
+                ...headers, 
+                "Prefer": "resolution=merge-duplicates,return=minimal" 
+            },
+            body: JSON.stringify({ 
+                staff_id: savedStaffId, 
+                active: true 
+            })
+        });
+    } else {
+        // Jika jawatan BUKAN Ketua Jabatan (mungkin ditukar), padam rekod dari department_head jika ada
+        await fetch(`${SB_URL}/rest/v1/department_head?staff_id=eq.${savedStaffId}`, {
+            method: "DELETE",
+            headers: headers
+        });
+    }
+
     closeModal();
     await loadAssignments(); 
     await loadStaff();
