@@ -735,7 +735,7 @@ let formattedRef = seq ? ` - ${seq}` : '';
     <div>
         <strong>Disahkan Oleh:</strong>
         <div style="height:70px; position:relative;">
-            ${stampImages.dept_head?.signature ? `<img src="${stampImages.dept_head.signature}" style="max-height:60px; max-width:200px; object-fit:contain; position:absolute; bottom:0; left:5%;">` : ''}
+            ${stampImages.dept_head?.signature ? `<img src="${stampImages.dept_head.signature}" style="max-height:100px; max-width:200px; object-fit:contain; position:absolute; bottom:-20px; left:5%;">` : ''}
         </div>
         <div style="position:relative;">
             <div class="bf-sign-line"></div>
