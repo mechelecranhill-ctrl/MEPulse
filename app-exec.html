@@ -205,10 +205,70 @@
     <script>
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
+        // ============ ROLE / PERMISSION CONTEXT (KONGSI SEMUA PAGE) ============
+const ACT_ROLES = {
+    TECH: ['JURUTEKNIK', 'JURUTEKNIK KANAN', 'EKSEKUTIF'],
+    UNIT_EXEC: ['EKSEKUTIF', 'EKSEKUTIF KANAN'],
+    SECTION_HEAD: ['KETUA SEKSYEN'],
+    DEPT_HEAD: ['KETUA JABATAN']
+};
+
+async function getPermissionContext() {
+    const _permHeaders = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
+    const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
+
+    const ctx = {
+        isAdmin, position: '', userId: null,
+        isActingUnitExec: false, isActingSectionHead: false, isDeptHeadActive: false,
+        canManageTech: false, canActUnit: false, canActSection: false, canActDept: false
+    };
+
+    if (isAdmin) {
+        ctx.canManageTech = true; ctx.canActUnit = true; ctx.canActSection = true; ctx.canActDept = true;
+        return ctx;
+    }
+
+    try {
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        if (!user) return ctx;
+        ctx.userId = user.id;
+
+        try {
+            const sRes = await fetch(`${SB_URL}/rest/v1/staff?id=eq.${user.id}&select=position`, { headers: _permHeaders });
+            const sRows = await sRes.json();
+            ctx.position = (sRows[0]?.position || '').trim().toUpperCase();
+        } catch (e) { console.error('Failed to load staff position:', e); }
+
+        try {
+            const uRes = await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${user.id}&is_acting=eq.true&select=unit_id`, { headers: _permHeaders });
+            ctx.isActingUnitExec = (await uRes.json()).length > 0;
+        } catch (e) {}
+
+        try {
+            const secRes = await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${user.id}&is_acting=eq.true&select=section_id`, { headers: _permHeaders });
+            ctx.isActingSectionHead = (await secRes.json()).length > 0;
+        } catch (e) {}
+
+        try {
+            const dRes = await fetch(`${SB_URL}/rest/v1/department_head?staff_id=eq.${user.id}&active=eq.true&select=is_acting`, { headers: _permHeaders });
+            ctx.isDeptHeadActive = (await dRes.json()).length > 0;
+        } catch (e) {}
+
+        ctx.canManageTech = ACT_ROLES.TECH.includes(ctx.position);
+        ctx.canActUnit = ACT_ROLES.UNIT_EXEC.includes(ctx.position) || ctx.isActingUnitExec;
+        ctx.canActSection = ACT_ROLES.SECTION_HEAD.includes(ctx.position) || ctx.isActingSectionHead;
+        ctx.canActDept = ACT_ROLES.DEPT_HEAD.includes(ctx.position) || ctx.isDeptHeadActive; // covers Pemangku KJ (row aktif dgn is_acting)
+    } catch (err) {
+        console.error('Permission context error:', err);
+    }
+    return ctx;
+}
+
         async function fetchDashboard() {
             try {
-                // ADMIN BYPASS: check localStorage for admin login
-                const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
+                const perm = await getPermissionContext();
+                window.__perm = perm;
+                const isAdmin = perm.isAdmin;
 
                 let userUnitId = null;
 
@@ -286,8 +346,8 @@
                     });
                 }
 
-                renderSection('quotations-container', quotationOrders, 'QUOTATION');
-                renderSection('blueforms-container', blueformOrders, 'BLUEFORM');
+                renderSection('quotations-container', quotationOrders, 'QUOTATION', perm);
+                renderSection('blueforms-container', blueformOrders, 'BLUEFORM', perm);
 
             } catch (err) {
                 console.error("Error fetching data:", err.message);
@@ -295,7 +355,8 @@
             }
         }
 
-        function renderSection(containerId, orders, type) {
+        function renderSection(containerId, orders, type, perm) {
+            perm = perm || window.__perm || { canActUnit: false };
             const container = document.getElementById(containerId);
             container.innerHTML = '';
 
@@ -384,7 +445,7 @@
                     }
 
                     if (type === 'QUOTATION') {
-                        let actionButtonsHtml = `
+                        let actionButtonsHtml = perm.canActUnit ? `
                             <div class="inline-flex items-center gap-1">
                                 ${finalPdfUrl ? `<a href="${finalPdfUrl}" target="_blank" class="text-gray-700 bg-gray-200 hover:bg-gray-300 px-2.5 py-1 rounded transition-all font-medium inline-block" title="View PDF"><i class="fa-solid fa-file-pdf text-red-600"></i></a>` : ''}
                                 <button onclick="openConfirmModal('${item.work_id}', 'QUO-REJ', 'REJECT-QUOTE')" 
@@ -395,6 +456,11 @@
                                         class="text-white px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Approve Quotation">
                                     <i class="fa-solid fa-check"></i>
                                 </button>
+                            </div>
+                        ` : `
+                            <div class="inline-flex items-center gap-2">
+                                ${finalPdfUrl ? `<a href="${finalPdfUrl}" target="_blank" class="text-gray-700 bg-gray-200 hover:bg-gray-300 px-2.5 py-1 rounded transition-all font-medium inline-block" title="View PDF"><i class="fa-solid fa-file-pdf text-red-600"></i></a>` : ''}
+                                <span class="text-[10px] text-gray-400 italic font-semibold px-1"><i class="fa-solid fa-eye mr-1"></i>View Only</span>
                             </div>
                         `;
                         
@@ -427,7 +493,7 @@
                             fullSetBtnHtml = `<span class="text-[10px] text-gray-400 italic">Refer to first row seq ${seq}</span>`;
                         }
 
-                        let actionButtonsHtml = `
+                        let actionButtonsHtml = perm.canActUnit ? `
                             <div class="inline-flex items-center gap-1">
                                 <button onclick="openConfirmModal('${item.work_id}', 'EXEC-REJ', 'REJECT-BF')" 
                                         class="text-white px-2 py-1 rounded bg-red-600 hover:bg-red-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Reject Blueform">
@@ -438,6 +504,8 @@
                                     <i class="fa-solid fa-check"></i>
                                 </button>
                             </div>
+                        ` : `
+                            <span class="text-[10px] text-gray-400 italic font-semibold px-1"><i class="fa-solid fa-eye mr-1"></i>View Only</span>
                         `;
 
                         rowDataHtml = `
