@@ -607,6 +607,12 @@ let sectionData=[];
 let staffSectionAssignments=[];
 let staffUnitAssignments=[];
 let currentTargetStaff=null;
+let deptHeadAssignments=[];
+
+async function loadDeptHead(){
+    let res=await fetch(`${SB_URL}/rest/v1/department_head?select=staff_id,active,is_acting`, {headers});
+    deptHeadAssignments = await res.json();
+}
 
 async function loadUnits(){
     let res=await fetch(`${SB_URL}/rest/v1/units?select=id,unit_name,section_id,me_sections(section_name)`, {headers});
@@ -733,15 +739,20 @@ function renderStaff(){
     let html = "";
 
     // 1. KETUA JABATAN
+    // 1. KETUA JABATAN
     let kjStaff = staffData.find(s => s.position?.toUpperCase() === "KETUA JABATAN");
+    let actingKjRow = deptHeadAssignments.find(a => (a.is_acting === true || a.is_acting === 'true'));
+    let actingKjStaff = (!kjStaff && actingKjRow) ? staffData.find(x => x.id === actingKjRow.staff_id) : null;
+
     let matchKj = kjStaff && (kjStaff.name.toLowerCase().includes(keyword) || kjStaff.position.toLowerCase().includes(keyword));
-    
-    if (!keyword || matchKj) {
+    let matchActingKj = actingKjStaff && (actingKjStaff.name.toLowerCase().includes(keyword) || actingKjStaff.position.toLowerCase().includes(keyword));
+
+    if (!keyword || matchKj || matchActingKj) {
         html += `
         <div class="tree-group" style="border-left: 4px solid var(--accent-blue);">
             <div class="section-title" style="margin-top:0;"><i class="fa fa-user-tie" style="color:#004b93;"></i> Ketua Jabatan</div>
             <div class="tree-wrapper">
-                ${kjStaff ? staffCardHtml(kjStaff) : emptyCardHtml("KETUA JABATAN", "kj", "kj")}
+                ${kjStaff ? staffCardHtml(kjStaff) : (actingKjStaff ? staffCardHtml(actingKjStaff, true, 'kj', 'kj') : emptyCardHtml("KETUA JABATAN", "kj", "kj"))}
             </div>
         </div>`;
     }
@@ -884,6 +895,7 @@ window.onload=async()=>{
     await loadUnits();
     await loadSections();
     await loadAssignments();
+    await loadDeptHead();
     await loadStaff();
     populatePositionDropdown(); 
 };
@@ -927,6 +939,23 @@ async function assignActingStaff(staffId){
     let body = {};
     let cleanTargetId = isNaN(currentActingTargetId) ? currentActingTargetId : Number(currentActingTargetId);
 
+    if(currentActingType === 'kj'){
+        let res = await fetch(`${SB_URL}/rest/v1/department_head?on_conflict=staff_id`, {
+            method: "POST",
+            headers: { ...headers, "Prefer": "resolution=merge-duplicates,return=minimal" },
+            body: JSON.stringify({ staff_id: staffId, active: true, is_acting: true })
+        });
+        if(res.ok){
+            closeActingModal();
+            await loadDeptHead();
+            renderStaff();
+        } else {
+            let errRes = await res.json().catch(() => ({}));
+            alert("Gagal melantik pemangku Ketua Jabatan: " + (errRes.message || "Ralat pangkalan data."));
+        }
+        return;
+    }
+
     if(currentActingType === 'section'){
         url = `${SB_URL}/rest/v1/staff_section_assignment`;
         body = { staff_id: staffId, section_id: cleanTargetId, is_acting: true };
@@ -934,7 +963,6 @@ async function assignActingStaff(staffId){
         url = `${SB_URL}/rest/v1/staff_unit_assignment`;
         body = { staff_id: staffId, unit_id: cleanTargetId, is_acting: true };
     } else {
-        alert("Nota: Bagi jawatan Ketua Jabatan, sila edit rekod asal jawatan tersebut.");
         closeActingModal();
         return;
     }
@@ -966,12 +994,14 @@ async function removeActing(type, targetId, staffId, event){
         url = `${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${staffId}&section_id=eq.${cleanTargetId}&is_acting=eq.true`;
     } else if(type === 'unit'){
         url = `${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${staffId}&unit_id=eq.${cleanTargetId}&is_acting=eq.true`;
+    } else if(type === 'kj'){
+        url = `${SB_URL}/rest/v1/department_head?staff_id=eq.${staffId}&is_acting=eq.true`;
     }
 
     try {
         let res = await fetch(url, { method: "DELETE", headers });
         if(res.ok){
-            await loadAssignments();
+            if(type === 'kj') { await loadDeptHead(); } else { await loadAssignments(); }
             renderStaff();
         } else {
             let errorData = await res.json().catch(() => ({}));
