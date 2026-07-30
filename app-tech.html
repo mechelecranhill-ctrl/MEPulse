@@ -563,6 +563,21 @@ async function getPermissionContext() {
     }
     return ctx;
 }
+
+function applyTechPermissionUI(perm) {
+            const canManage = !!perm.canManageTech;
+            const addQuoBtn = document.querySelector('#quotation-section button[onclick="openQuotationModal()"]');
+            const addBfBtn = document.querySelector('#blueform-section button[onclick="openBlueformModal()"]');
+            if (addQuoBtn) addQuoBtn.style.display = canManage ? '' : 'none';
+            if (addBfBtn) addBfBtn.style.display = canManage ? '' : 'none';
+
+            const dragHint = document.querySelector('#quotation-section p.text-\\[9px\\]');
+            if (dragHint) dragHint.style.display = canManage ? '' : 'none';
+
+            if (!canManage) {
+                document.getElementById('quotation-dropzone-hint')?.classList.add('hidden');
+            }
+        }
         
         const qHeaders = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
         let renderedBlueformSeqs = new Set();
@@ -1898,6 +1913,7 @@ async function qActionDeleteQuotation() {
                 qSection.addEventListener('drop', e => {
                     e.preventDefault(); e.stopPropagation();
                     dragCounter = 0;
+                    if (!window.__techPerm?.canManageTech) { return; }
                     qSection.classList.remove('ring-2','ring-emerald-400');
                     dropHint?.classList.add('hidden');
                     const files = e.dataTransfer.files;
@@ -2028,7 +2044,10 @@ async function qActionDeleteQuotation() {
 
         async function fetchTechnicianDashboard() {
             try {
-                const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
+                const perm = await getPermissionContext();
+                window.__techPerm = perm;
+                applyTechPermissionUI(perm);
+                const isAdmin = perm.isAdmin;
                 let activeUnitIds = [];
 
                 if (!isAdmin) {
