@@ -217,7 +217,7 @@ async function getPermissionContext() {
         async function fetchDashboard() {
             try {
                 const perm = await getPermissionContext();
-window.__lastPerm = perm;
+                window.__lastPerm = perm;
                 const isAdmin = perm.isAdmin;
                 let unitsPreset = [];
                 let activeUnitIds = null;
@@ -229,17 +229,43 @@ window.__lastPerm = perm;
                         return;
                     }
 
-                    const { data: assignments, error: assError } = await supabaseClient
+                    // 1. Assignment TERUS ke seksyen (Ketua Seksyen / Pemangku Ketua Seksyen)
+                    const { data: sectionAssignments, error: assError } = await supabaseClient
                         .from('staff_section_assignment')
                         .select('section_id')
                         .eq('staff_id', user.id)
                         .eq('active', true);
 
                     if (assError) throw assError;
-                    const activeSectionIds = (assignments || []).map(a => a.section_id);
+                    let activeSectionIds = (sectionAssignments || []).map(a => a.section_id);
+
+                    // 2. Assignment ke UNIT (Juruteknik / Eksekutif / Eksekutif Kanan) ->
+                    //    derive seksyen dari unit tersebut, sebab unit tergolong dalam seksyen.
+                    const { data: unitAssignments, error: unitAssignError } = await supabaseClient
+                        .from('staff_unit_assignment')
+                        .select('unit_id')
+                        .eq('staff_id', user.id)
+                        .eq('active', true);
+
+                    if (unitAssignError) throw unitAssignError;
+                    const assignedUnitIds = (unitAssignments || []).map(a => a.unit_id);
+
+                    if (assignedUnitIds.length > 0) {
+                        const { data: unitsForSection, error: unitsForSectionErr } = await supabaseClient
+                            .from('units')
+                            .select('id, section_id')
+                            .in('id', assignedUnitIds);
+
+                        if (unitsForSectionErr) throw unitsForSectionErr;
+                        (unitsForSection || []).forEach(u => {
+                            if (u.section_id && !activeSectionIds.includes(u.section_id)) {
+                                activeSectionIds.push(u.section_id);
+                            }
+                        });
+                    }
 
                     if (activeSectionIds.length === 0) {
-                        showEmptyRow('Your account has not been assigned to any section.');
+                        showEmptyRow('Your account has not been assigned to any section or unit.');
                         return;
                     }
 
@@ -282,7 +308,8 @@ window.__lastPerm = perm;
                     allQuotes.forEach(q => { if (q.work_id) quoteMap[q.work_id] = q.pdf_url; });
                     workOrders.forEach(item => { item.mapped_pdf_url = quoteMap[item.work_id] || null; });
                 }
- renderUnitContractView('table-sect-container', unitsPreset, workOrders, perm.canActSection, {
+
+                renderUnitContractView('table-sect-container', unitsPreset, workOrders, perm.canActSection, {
                     approveStatus: 'APP-HOS',
                     rejectStatus: 'HOS-REJ',
                     emptyMsg: 'Awaiting Executive approval.'
