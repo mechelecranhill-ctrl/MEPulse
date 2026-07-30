@@ -265,71 +265,101 @@ async function getPermissionContext() {
 }
 
         async function fetchDashboard() {
-            try {
-                const perm = await getPermissionContext();
-                window.__perm = perm;
-                const isAdmin = perm.isAdmin;
+    try {
+        const perm = await getPermissionContext();
+        window.__perm = perm;
+        const isAdmin = perm.isAdmin;
+        let activeUnitIds = [];
+        let scopeIsAll = isAdmin;
 
-                let userUnitId = null;
+        if (!isAdmin) {
+            const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+            if (userError || !user) {
+                showEmptyState('quotations-container', 'Please log in first.');
+                showEmptyState('blueforms-container', 'Please log in first.');
+                return;
+            }
 
-                if (!isAdmin) {
-                    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-                    if (userError || !user) {
-                        showEmptyState('quotations-container', 'Please log in first.');
-                        showEmptyState('blueforms-container', 'Please log in first.');
-                        return;
-                    }
+            // Dept Head / Pemangku KJ -> nampak semua unit
+            if (perm.canActDept) {
+                scopeIsAll = true;
+            } else {
+                const unitIdSet = new Set();
 
-                    const { data: assignment, error: assignError } = await supabaseClient
-                        .from('staff_unit_assignment')
-                        .select('unit_id')
+                // 1. Unit yang di-assign terus (guna .eq('active', true) supaya konsisten dgn tech page)
+                const { data: assignments, error: assignError } = await supabaseClient
+                    .from('staff_unit_assignment')
+                    .select('unit_id')
+                    .eq('staff_id', user.id)
+                    .eq('active', true);
+
+                if (assignError) throw assignError;
+                (assignments || []).forEach(a => unitIdSet.add(a.unit_id));
+
+                // 2. Ketua Seksyen / Pemangku Ketua Seksyen -> semua unit bawah seksyen dia
+                if (perm.canActSection) {
+                    const { data: secAssignments, error: secError } = await supabaseClient
+                        .from('staff_section_assignment')
+                        .select('section_id')
                         .eq('staff_id', user.id)
-                        .maybeSingle();
+                        .eq('is_acting', true);
+                    // NOTE: tukar 'is_acting' -> column sebenar kalau Ketua Seksyen tetap
+                    // tak guna is_acting=true (contoh guna 'active' utk row biasa)
 
-                    if (assignError) throw assignError;
-                    if (!assignment || !assignment.unit_id) {
-                        showEmptyState('quotations-container', 'Your account has not been assigned to any unit.');
-                        showEmptyState('blueforms-container', 'Your account has not been assigned to any unit.');
-                        return;
+                    if (!secError && secAssignments && secAssignments.length > 0) {
+                        const sectionIds = secAssignments.map(s => s.section_id);
+                        const { data: sectionUnits, error: unitErr } = await supabaseClient
+                            .from('units')
+                            .select('id')
+                            .in('section_id', sectionIds);
+                        if (!unitErr && sectionUnits) {
+                            sectionUnits.forEach(u => unitIdSet.add(u.id));
+                        }
                     }
-
-                    userUnitId = assignment.unit_id;
                 }
 
-                let quotationsQueryBuilder = supabaseClient
-                    .from('quotations')
-                    .select(`
-                        id,
-                        work_id,
-                        status,
-                        contract_id,
-                        pdf_url,
-                        contract!inner (id, contract_name, contract_code, unit_id)
-                    `)
-                    .eq('status', 'QUOTATION');
-                if (!isAdmin) quotationsQueryBuilder = quotationsQueryBuilder.eq('contract.unit_id', userUnitId);
+                activeUnitIds = [...unitIdSet];
 
-                const { data: quotationOrders, error: qError } = await quotationsQueryBuilder;
+                if (activeUnitIds.length === 0) {
+                    showEmptyState('quotations-container', 'Your account has not been assigned to any unit.');
+                    showEmptyState('blueforms-container', 'Your account has not been assigned to any unit.');
+                    return;
+                }
+            }
+        }
 
-                if (qError) throw qError;
+        let quotationsQueryBuilder = supabaseClient
+            .from('quotations')
+            .select(`
+                id,
+                work_id,
+                status,
+                contract_id,
+                pdf_url,
+                contract!inner (id, contract_name, contract_code, unit_id)
+            `)
+            .eq('status', 'QUOTATION');
+        if (!scopeIsAll) quotationsQueryBuilder = quotationsQueryBuilder.in('contract.unit_id', activeUnitIds);
 
-                let blueformQueryBuilder = supabaseClient
-                    .from('work_orders')
-                    .select(`
-                        id,
-                        work_id,
-                        status,
-                        sequence_no,
-                        contract_id,
-                        district,
-                        contract!inner (id, contract_name, contract_code, unit_id)
-                    `)
-                    .eq('status', 'BLUEFORM');
-                if (!isAdmin) blueformQueryBuilder = blueformQueryBuilder.eq('contract.unit_id', userUnitId);
+        const { data: quotationOrders, error: qError } = await quotationsQueryBuilder;
+        if (qError) throw qError;
 
-                const { data: blueformOrders, error: wError } = await blueformQueryBuilder;
+        let blueformQueryBuilder = supabaseClient
+            .from('work_orders')
+            .select(`
+                id,
+                work_id,
+                status,
+                sequence_no,
+                contract_id,
+                district,
+                contract!inner (id, contract_name, contract_code, unit_id)
+            `)
+            .eq('status', 'BLUEFORM');
+        if (!scopeIsAll) blueformQueryBuilder = blueformQueryBuilder.in('contract.unit_id', activeUnitIds);
 
-                if (wError) throw wError;
+        const { data: blueformOrders, error: wError } = await blueformQueryBuilder;
+        if (wError) throw wError;
 
                 const { data: allQuotes, error: allQError } = await supabaseClient
                     .from('quotations')
