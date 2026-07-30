@@ -155,7 +155,7 @@
 
 // ============ ROLE / PERMISSION CONTEXT (KONGSI SEMUA PAGE) ============
 const ACT_ROLES = {
-    TECH: ['JURUTEKNIK', 'JURUTEKNIK KANAN', 'EKSEKUTIF'],
+    TECH: ['JURUTEKNIK', 'JURUTEKNIK KANAN', 'EKSEKUTIF', 'EKSEKUTIF KANAN'],
     UNIT_EXEC: ['EKSEKUTIF', 'EKSEKUTIF KANAN'],
     SECTION_HEAD: ['KETUA SEKSYEN'],
     DEPT_HEAD: ['KETUA JABATAN']
@@ -229,7 +229,16 @@ async function getPermissionContext() {
                 // AKSES VIEW DIBUKA UNTUK SEMUA STAFF YANG LOG MASUK.
                 // Tindakan (approve/reject) tetap disekat ikut perm.canActDept semasa render.
 
-                const { data: allUnits } = await supabaseClient.from('units').select('id, unit_name');
+                const { data: allSections, error: sectionsErr } = await supabaseClient
+                    .from('me_sections')
+                    .select('id, section_name');
+                if (sectionsErr) console.error('Failed to load sections:', sectionsErr.message);
+                const sectionsPreset = allSections || [];
+
+                const { data: allUnits, error: unitsErr } = await supabaseClient
+                    .from('units')
+                    .select('id, unit_name, section_id');
+                if (unitsErr) console.error('Failed to load units:', unitsErr.message);
                 const unitsPreset = allUnits || [];
 
                 const { data: workOrders, error } = await supabaseClient
@@ -252,7 +261,7 @@ async function getPermissionContext() {
                     workOrders.forEach(item => { item.mapped_pdf_url = quoteMap[item.work_id] || null; });
                 }
 
-                renderUnitContractView('table-dept-container', unitsPreset, workOrders, perm.canActDept, {
+                renderSectionUnitContractView('table-dept-container', sectionsPreset, unitsPreset, workOrders, perm.canActDept, {
                     approveStatus: 'APP-HOD',
                     rejectStatus: 'HOD-REJ',
                     emptyMsg: 'Awaiting Section Head / HOS approval.'
@@ -284,124 +293,167 @@ function toggleAccordion(contentId, iconId) {
             }
         }
 
-        // ============ UNIT -> CONTRACT ACCORDION (ikut style Executive) ============
-        function renderUnitContractView(containerId, units, orders, canAct, opts) {
+        // ============ SECTION -> UNIT -> CONTRACT ACCORDION ============
+        function renderSectionUnitContractView(containerId, sections, units, orders, canAct, opts) {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
 
-            const unitsMap = {};
-            (units || []).forEach(u => { unitsMap[u.id] = { id: u.id, name: u.unit_name || 'Unit', contracts: {} }; });
-
-            (orders || []).forEach(item => {
-                const c = Array.isArray(item.contract) ? item.contract[0] : item.contract;
-                const unitId = c?.unit_id || 'UNKNOWN';
-                if (!unitsMap[unitId]) unitsMap[unitId] = { id: unitId, name: 'Unit Lain', contracts: {} };
-                const cId = c?.id || item.contract_id || 'UNKNOWN-C';
-                if (!unitsMap[unitId].contracts[cId]) {
-                    unitsMap[unitId].contracts[cId] = { id: cId, code: c?.contract_code || 'No Code', name: c?.contract_name || 'No Name', orders: [] };
-                }
-                unitsMap[unitId].contracts[cId].orders.push(item);
+            // 1. Bina rangka Seksyen -> Unit (preset, walaupun tiada data lagi)
+            const sectionsMap = {};
+            (sections || []).forEach(s => {
+                sectionsMap[s.id] = { id: s.id, name: s.section_name || 'Seksyen', units: {} };
             });
 
-            const unitList = Object.values(unitsMap).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-            if (unitList.length === 0) {
+            const unitToSection = {};
+            (units || []).forEach(u => {
+                unitToSection[u.id] = (u.section_id !== null && u.section_id !== undefined) ? u.section_id : 'UNKNOWN-SEC';
+                const secId = unitToSection[u.id];
+                if (!sectionsMap[secId]) sectionsMap[secId] = { id: secId, name: 'Seksyen Lain', units: {} };
+                sectionsMap[secId].units[u.id] = { id: u.id, name: u.unit_name || 'Unit', contracts: {} };
+            });
+
+            // 2. Isi data kontrak ke dalam unit yang berkenaan
+            (orders || []).forEach(item => {
+                const c = Array.isArray(item.contract) ? item.contract[0] : item.contract;
+                const unitId = c?.unit_id || 'UNKNOWN-UNIT';
+                let secId = unitToSection[unitId];
+                if (secId === undefined) secId = 'UNKNOWN-SEC';
+
+                if (!sectionsMap[secId]) sectionsMap[secId] = { id: secId, name: 'Seksyen Lain', units: {} };
+                if (!sectionsMap[secId].units[unitId]) sectionsMap[secId].units[unitId] = { id: unitId, name: 'Unit Lain', contracts: {} };
+
+                const cId = c?.id || item.contract_id || 'UNKNOWN-C';
+                const unitObj = sectionsMap[secId].units[unitId];
+                if (!unitObj.contracts[cId]) {
+                    unitObj.contracts[cId] = { id: cId, code: c?.contract_code || 'No Code', name: c?.contract_name || 'No Name', orders: [] };
+                }
+                unitObj.contracts[cId].orders.push(item);
+            });
+
+            const sectionList = Object.values(sectionsMap).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            if (sectionList.length === 0) {
                 container.innerHTML = `<div class="text-center py-8 text-gray-400 text-xs italic">${opts.emptyMsg}</div>`;
                 return;
             }
 
             const renderedSeqs = new Set();
 
-            unitList.forEach(unit => {
-                const contracts = Object.values(unit.contracts);
-                const totalItems = contracts.reduce((s, c) => s + c.orders.length, 0);
+            sectionList.forEach(section => {
+                const unitList = Object.values(section.units).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                const totalSectionItems = unitList.reduce((s, u) => s + Object.values(u.contracts).reduce((s2, c) => s2 + c.orders.length, 0), 0);
 
-                let unitHtml = `
-                    <div class="flex items-center gap-2 mb-2 px-1 pt-1">
-                        <i class="fa-solid fa-sitemap text-gray-400 text-sm"></i>
-                        <h3 class="text-sm font-extrabold text-gray-700 uppercase tracking-wide">${unit.name}</h3>
-                        <span class="text-[10px] bg-gray-100 text-gray-500 font-bold px-2 py-0.5 rounded-full">${totalItems} item</span>
+                const sectionWrap = document.createElement('div');
+                sectionWrap.className = 'mb-6 bg-indigo-50/40 border border-indigo-100 rounded-xl p-3';
+
+                sectionWrap.innerHTML = `
+                    <div class="flex items-center gap-2 mb-3 px-1">
+                        <i class="fa-solid fa-building text-indigo-500"></i>
+                        <h2 class="text-sm font-extrabold text-indigo-800 uppercase tracking-wide">${section.name}</h2>
+                        <span class="text-[10px] bg-indigo-600 text-white font-bold px-2 py-0.5 rounded-full">${totalSectionItems} item</span>
                     </div>
                 `;
 
-                if (contracts.length === 0) {
-                    unitHtml += `
-                        <div class="text-center py-4 text-gray-400 text-xs italic bg-gray-50 rounded-lg border border-dashed border-gray-300 mb-4">
-                            <i class="fa-solid fa-inbox block text-lg mb-1 text-gray-300"></i> ${opts.emptyMsg}
-                        </div>`;
-                } else {
-                    contracts.forEach(contract => {
-                        const seqGroups = buildSequenceGroups(contract.orders);
-                        const accId = `acc-${containerId}-${String(contract.id).replace(/[^a-zA-Z0-9]/g, '-')}`;
-                        const iconId = `icon-${accId}`;
-
-                        unitHtml += `
-                            <div class="bg-gray-50 rounded-lg border border-gray-200 shadow-xs mb-3 overflow-hidden">
-                                <button type="button" onclick="toggleAccordion('${accId}','${iconId}')"
-                                        class="w-full bg-amber-50 hover:bg-amber-100/80 border-amber-200 px-3 py-2.5 flex items-center justify-between gap-2 transition-colors cursor-pointer text-left border-b">
-                                    <div class="flex items-center gap-2 min-w-0 flex-1">
-                                        <span class="bg-amber-600 text-white text-[10px] px-1.5 py-0.5 rounded font-mono shadow-xs shrink-0">${contract.code}</span>
-                                        <span class="font-bold text-gray-800 text-xs leading-tight break-words">${contract.name}</span>
-                                    </div>
-                                    <div class="flex items-center gap-2 shrink-0">
-                                        <span class="text-[11px] bg-white text-gray-600 border border-gray-300 font-semibold px-2 py-0.5 rounded-full whitespace-nowrap shadow-2xs">${contract.orders.length}</span>
-                                        <i id="${iconId}" class="fa-solid fa-chevron-down text-gray-500 text-xs transition-transform duration-200"></i>
-                                    </div>
-                                </button>
-                                <div id="${accId}" class="hidden overflow-x-auto bg-white transition-all duration-200">
-                                    <table class="min-w-full divide-y divide-gray-200 text-xs">
-                                        <thead class="bg-gray-50">
-                                            <tr>
-                                                <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Work ID</th>
-                                                <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider w-40">Reference</th>
-                                                <th class="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="bg-white divide-y divide-gray-200">
-                        `;
-
-                        contract.orders.forEach(item => {
-                            const seq = (item.sequence_no || '').trim();
-                            const groupKey = seq ? getBlueformGroupKey(item) : null;
-                            const dedupeKey = groupKey ? `${contract.id}::${groupKey}` : null;
-                            const isFirstInGroup = !dedupeKey || !renderedSeqs.has(dedupeKey);
-
-                            let fullSetBtnHtml;
-                            if (isFirstInGroup) {
-                                if (dedupeKey) renderedSeqs.add(dedupeKey);
-                                const groupItems = groupKey ? (seqGroups[groupKey] || [item]) : [item];
-                                const countLabel = groupItems.length > 1 ? ` (${groupItems.length})` : '';
-                                const serializedGroup = encodeURIComponent(JSON.stringify(groupItems));
-                                fullSetBtnHtml = `
-                                    <button onclick="previewFullSet('${serializedGroup}')" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-2.5 py-1 rounded-lg text-[11px] shadow-xs cursor-pointer inline-flex items-center gap-1 transition-all">
-                                        <i class="fa-solid fa-print"></i> Blueform${countLabel}
-                                    </button>`;
-                            } else {
-                                fullSetBtnHtml = `<span class="text-[10px] text-gray-400 italic">Refer to first row seq ${seq}</span>`;
-                            }
-
-                            const actionHtml = canAct ? `
-                                <div class="inline-flex items-center gap-1">
-                                    <button onclick="processAction('${item.work_id}', '${opts.rejectStatus}')" class="text-white px-2 py-1 rounded bg-red-600 hover:bg-red-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Reject"><i class="fa-solid fa-xmark"></i></button>
-                                    <button onclick="processAction('${item.work_id}', '${opts.approveStatus}')" class="text-white px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Approve"><i class="fa-solid fa-check"></i></button>
-                                </div>
-                            ` : `<span class="text-[10px] text-gray-400 italic font-semibold px-1"><i class="fa-solid fa-eye mr-1"></i>View Only</span>`;
-
-                            unitHtml += `
-                                <tr class="hover:bg-gray-50 transition-colors">
-                                    <td class="px-3 py-2.5 whitespace-nowrap font-mono text-gray-900 font-medium text-left">${item.work_id}${seq ? ` <span class="text-gray-400 text-[11px]">(${seq})</span>` : ''}</td>
-                                    <td class="px-3 py-2.5 whitespace-nowrap text-center">${fullSetBtnHtml}</td>
-                                    <td class="px-3 py-2.5 whitespace-nowrap text-right">${actionHtml}</td>
-                                </tr>`;
-                        });
-
-                        unitHtml += `</tbody></table></div></div>`;
-                    });
+                if (unitList.length === 0) {
+                    const noUnitDiv = document.createElement('div');
+                    noUnitDiv.className = 'text-center py-3 text-gray-400 text-xs italic bg-white rounded-lg border border-dashed border-gray-300';
+                    noUnitDiv.textContent = 'Tiada unit berdaftar di bawah seksyen ini.';
+                    sectionWrap.appendChild(noUnitDiv);
                 }
 
-                const unitBlock = document.createElement('div');
-                unitBlock.className = 'mb-4';
-                unitBlock.innerHTML = unitHtml;
-                container.appendChild(unitBlock);
+                unitList.forEach(unit => {
+                    const contracts = Object.values(unit.contracts);
+                    const totalItems = contracts.reduce((s, c) => s + c.orders.length, 0);
+
+                    let unitHtml = `
+                        <div class="flex items-center gap-2 mb-2 px-1 pt-1">
+                            <i class="fa-solid fa-sitemap text-gray-400 text-sm"></i>
+                            <h3 class="text-sm font-extrabold text-gray-700 uppercase tracking-wide">${unit.name}</h3>
+                            <span class="text-[10px] bg-gray-100 text-gray-500 font-bold px-2 py-0.5 rounded-full">${totalItems} item</span>
+                        </div>
+                    `;
+
+                    if (contracts.length === 0) {
+                        unitHtml += `
+                            <div class="text-center py-4 text-gray-400 text-xs italic bg-white rounded-lg border border-dashed border-gray-300 mb-4">
+                                <i class="fa-solid fa-inbox block text-lg mb-1 text-gray-300"></i> ${opts.emptyMsg}
+                            </div>`;
+                    } else {
+                        contracts.forEach(contract => {
+                            const seqGroups = buildSequenceGroups(contract.orders);
+                            const accId = `acc-${containerId}-${String(section.id)}-${String(unit.id)}-${String(contract.id)}`.replace(/[^a-zA-Z0-9]/g, '-');
+                            const iconId = `icon-${accId}`;
+
+                            unitHtml += `
+                                <div class="bg-gray-50 rounded-lg border border-gray-200 shadow-xs mb-3 overflow-hidden">
+                                    <button type="button" onclick="toggleAccordion('${accId}','${iconId}')"
+                                            class="w-full bg-amber-50 hover:bg-amber-100/80 border-amber-200 px-3 py-2.5 flex items-center justify-between gap-2 transition-colors cursor-pointer text-left border-b">
+                                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                                            <span class="bg-amber-600 text-white text-[10px] px-1.5 py-0.5 rounded font-mono shadow-xs shrink-0">${contract.code}</span>
+                                            <span class="font-bold text-gray-800 text-xs leading-tight break-words">${contract.name}</span>
+                                        </div>
+                                        <div class="flex items-center gap-2 shrink-0">
+                                            <span class="text-[11px] bg-white text-gray-600 border border-gray-300 font-semibold px-2 py-0.5 rounded-full whitespace-nowrap shadow-2xs">${contract.orders.length}</span>
+                                            <i id="${iconId}" class="fa-solid fa-chevron-down text-gray-500 text-xs transition-transform duration-200"></i>
+                                        </div>
+                                    </button>
+                                    <div id="${accId}" class="hidden overflow-x-auto bg-white transition-all duration-200">
+                                        <table class="min-w-full divide-y divide-gray-200 text-xs">
+                                            <thead class="bg-gray-50">
+                                                <tr>
+                                                    <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Work ID</th>
+                                                    <th class="px-3 py-2 text-center font-medium text-gray-500 uppercase tracking-wider w-40">Reference</th>
+                                                    <th class="px-3 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="bg-white divide-y divide-gray-200">
+                            `;
+
+                            contract.orders.forEach(item => {
+                                const seq = (item.sequence_no || '').trim();
+                                const groupKey = seq ? getBlueformGroupKey(item) : null;
+                                const dedupeKey = groupKey ? `${contract.id}::${groupKey}` : null;
+                                const isFirstInGroup = !dedupeKey || !renderedSeqs.has(dedupeKey);
+
+                                let fullSetBtnHtml;
+                                if (isFirstInGroup) {
+                                    if (dedupeKey) renderedSeqs.add(dedupeKey);
+                                    const groupItems = groupKey ? (seqGroups[groupKey] || [item]) : [item];
+                                    const countLabel = groupItems.length > 1 ? ` (${groupItems.length})` : '';
+                                    const serializedGroup = encodeURIComponent(JSON.stringify(groupItems));
+                                    fullSetBtnHtml = `
+                                        <button onclick="previewFullSet('${serializedGroup}')" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-2.5 py-1 rounded-lg text-[11px] shadow-xs cursor-pointer inline-flex items-center gap-1 transition-all">
+                                            <i class="fa-solid fa-print"></i> Blueform${countLabel}
+                                        </button>`;
+                                } else {
+                                    fullSetBtnHtml = `<span class="text-[10px] text-gray-400 italic">Refer to first row seq ${seq}</span>`;
+                                }
+
+                                const actionHtml = canAct ? `
+                                    <div class="inline-flex items-center gap-1">
+                                        <button onclick="processAction('${item.work_id}', '${opts.rejectStatus}')" class="text-white px-2 py-1 rounded bg-red-600 hover:bg-red-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Reject"><i class="fa-solid fa-xmark"></i></button>
+                                        <button onclick="processAction('${item.work_id}', '${opts.approveStatus}')" class="text-white px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Approve"><i class="fa-solid fa-check"></i></button>
+                                    </div>
+                                ` : `<span class="text-[10px] text-gray-400 italic font-semibold px-1"><i class="fa-solid fa-eye mr-1"></i>View Only</span>`;
+
+                                unitHtml += `
+                                    <tr class="hover:bg-gray-50 transition-colors">
+                                        <td class="px-3 py-2.5 whitespace-nowrap font-mono text-gray-900 font-medium text-left">${item.work_id}${seq ? ` <span class="text-gray-400 text-[11px]">(${seq})</span>` : ''}</td>
+                                        <td class="px-3 py-2.5 whitespace-nowrap text-center">${fullSetBtnHtml}</td>
+                                        <td class="px-3 py-2.5 whitespace-nowrap text-right">${actionHtml}</td>
+                                    </tr>`;
+                            });
+
+                            unitHtml += `</tbody></table></div></div>`;
+                        });
+                    }
+
+                    const unitBlock = document.createElement('div');
+                    unitBlock.className = 'mb-4';
+                    unitBlock.innerHTML = unitHtml;
+                    sectionWrap.appendChild(unitBlock);
+                });
+
+                container.appendChild(sectionWrap);
             });
         }
 
