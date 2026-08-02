@@ -40,10 +40,10 @@ class AppSidebar extends HTMLElement {
                         Dashboard-Approvals <span class="arrow">▼</span>
                     </a>
                     <div class="submenu" id="quotationMenu">
-                        <a href="app-tech.html" class="menu-link">Initiate</a>
-                        <a href="app-exec.html" class="menu-link">Prepare</a>
-                        <a href="app-sect.html" class="menu-link">Inspect</a>
-                        <a href="app-dept.html" class="menu-link">Approve</a>
+                        <a href="app-tech.html" class="menu-link">Initialisation</a>
+                        <a href="app-exec.html" class="menu-link">Preparation</a>
+                        <a href="app-sect.html" class="menu-link">Inspection</a>
+                        <a href="app-dept.html" class="menu-link">Approval</a>
                     </div>
                 </div>
 
