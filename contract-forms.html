@@ -1206,7 +1206,7 @@
     }
 
     function extractWorkIdBase(id){
-        const m = (id || '').match(/^([CK] \d+)([A-Z]?)$/);
+        const m = (id || '').match(/^([CK]\d+)([A-Z]?)$/);
         return m ? { base: m[1], suffix: m[2] } : null;
     }
 
@@ -1549,7 +1549,12 @@
                 group.forEach(w=>{ workIdCardDataMap[w.work_id]={ location: w.location || "", description: w.description || "", section_category: structuredClone(w.section_category || {}) }; });
 
                 document.getElementById("w_id_rows_container").innerHTML=""; w_workIdRowCounter=0;
-                group.forEach(w=>{ const split = (w.work_id || "").split(" "); addWorkIdRow('w', split[0] || "C", split[1] || ""); });
+                group.forEach(w=>{ 
+                    const m= (w.work_id || "").trim().match(/^([CK])(\d+)([A-Z?)$/i);
+                    const prefix = (m && m[1]) ? m[1].toUpperCase() : "C";
+                    const num = m ? m[2] : "";
+                    addWorkIdRow('w', prefix, num);
+                });
 
                 document.getElementById("w_qpb_date").value = group[0].qpb_date || "";
                 const district = document.getElementById("w_dist"); if(!district.value) district.value = group[0].district || "";
