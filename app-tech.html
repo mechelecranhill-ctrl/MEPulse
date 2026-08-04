@@ -2191,20 +2191,34 @@ async function qActionDeleteQuotation() {
                 }
 
                 const quotationWorkIds = quotationData.map(q => q.work_id).filter(Boolean);
-                let workOrderWorkIdSet = new Set();
+                let workOrderMap = {};
                 if (quotationWorkIds.length > 0) {
                     const { data: matchingWOs, error: matchError } = await supabaseClient
                         .from('work_orders')
-                        .select('work_id')
+                        .select('work_id, status, reject_reason, revision_in_progress')
                         .in('work_id', quotationWorkIds);
 
                     if (!matchError && matchingWOs) {
-                        workOrderWorkIdSet = new Set(matchingWOs.map(w => w.work_id));
+                        matchingWOs.forEach(w => { workOrderMap[w.work_id] = w; });
                     }
                 }
 
+                const BF_REJ_STATUSES = ['EXEC-REJ', 'HOS-REJ', 'HOD-REJ'];
+
                 const filteredQuotationData = quotationData.filter(q => {
-                    if (q.status === 'QUO-APP' && workOrderWorkIdSet.has(q.work_id)) return false;
+                    if (q.status === 'QUO-APP') {
+                        const wo = workOrderMap[q.work_id];
+                        if (wo) {
+                            if (BF_REJ_STATUSES.includes(wo.status)) {
+                                // Blueform ditolak -> quotation ini kekal dipaparkan, bawa sekali remarks blueform
+                                q.blueform_status = wo.status;
+                                q.blueform_reject_reason = wo.reject_reason;
+                                q.blueform_revision_in_progress = wo.revision_in_progress;
+                                return true;
+                            }
+                            return false; // Blueform wujud & tidak ditolak -> sembunyikan seperti biasa
+                        }
+                    }
                     return true;
                 });
 
@@ -2312,7 +2326,9 @@ async function qActionDeleteQuotation() {
                     let statusBadge = '';
                     let reasonText = item.reject_reason ? item.reject_reason : 'No notes.';
 
-                    if (item.status === 'QUO-APP' || item.status === 'APP-HOD') {
+                    if (item.blueform_reject_reason) {
+                        statusBadge = `<span class="bg-red-100 text-red-800 text-[9px] font-extrabold px-1 py-0.5 rounded border border-red-200 block text-center truncate" title="${item.blueform_status}"><i class="fa-solid fa-xmark mr-0.5"></i>${item.blueform_status}</span>`;
+                    } else if (item.status === 'QUO-APP' || item.status === 'APP-HOD') {
                         statusBadge = `<span class="bg-emerald-100 text-emerald-800 text-[9px] font-extrabold px-1 py-0.5 rounded border border-emerald-200 block text-center truncate" title="${item.status}"><i class="fa-solid fa-check mr-0.5"></i>APP-HOD</span>`;
                     } else if (item.status === 'QUOTATION') {
                         statusBadge = `<span class="bg-amber-100 text-amber-800 text-[9px] font-extrabold px-1 py-0.5 rounded border border-amber-200 block text-center truncate" title="${item.status}"><i class="fa-solid fa-clock mr-0.5"></i>Pending</span>`;
@@ -2324,7 +2340,20 @@ async function qActionDeleteQuotation() {
                     let finalPdfUrl = (type === 'QUOTATION') ? item.pdf_url : item.mapped_pdf_url;
                     let remarkContent = '';
 
-                    if (item.status.includes('REJ') && item.reject_reason) {
+                    if (item.blueform_reject_reason) {
+                        const techCanManage2 = !!(window.__techPerm && window.__techPerm.canManageTech);
+                        const revisionBadge = item.blueform_revision_in_progress
+                            ? `<span class="text-amber-600 text-[9px] font-bold inline-flex items-center gap-0.5 mt-0.5"><i class="fa-solid fa-pen"></i> Resubmission in progress...</span>`
+                            : (techCanManage2
+                                ? `<button onclick="startRevision('BLUEFORM','${escapeJs(item.work_id)}')" class="text-[9px] text-blue-600 underline mt-0.5 cursor-pointer bg-transparent border-none p-0">Start resubmission</button>`
+                                : `<span class="text-[9px] text-gray-400 italic">View Only</span>`);
+                        remarkContent = `
+                            <div class="text-red-700 font-medium text-[10px] truncate" title="[${item.blueform_status}] ${item.blueform_reject_reason}">
+                                ${item.blueform_reject_reason}
+                            </div>
+                            ${revisionBadge}
+                        `;
+                    } else if (item.status.includes('REJ') && item.reject_reason) {
                         const techCanManage2 = !!(window.__techPerm && window.__techPerm.canManageTech);
                         const revisionBadge = item.revision_in_progress
                             ? `<span class="text-amber-600 text-[9px] font-bold inline-flex items-center gap-0.5 mt-0.5"><i class="fa-solid fa-pen"></i> Resubmission in progress...</span>`
@@ -2342,7 +2371,7 @@ async function qActionDeleteQuotation() {
                     } else {
                         remarkContent = `<span class="text-gray-400 italic text-[10px] truncate block">${type === 'QUOTATION' ? 'Ready for Blueform' : 'Completed'}</span>`;
                     }
-
+                    
                     if (type === 'QUOTATION') {
                         // Simpan rujukan item ini untuk fungsi drag & drop (Quotation -> Blueform)
                         techQuotationItemsById[item.id] = item;
