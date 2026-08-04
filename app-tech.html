@@ -694,6 +694,7 @@ let tqModeSaveAsNew = false;
 let tqLastWorkIdNum = '';
 let tqPendingSubmitEvent = null;
 let tqCurrentSuffix = '';
+        let tqOriginalRowForSaveAsNew = null;
 
 function tqResetDetectState() {
     clearTimeout(tqDetectTimer);
@@ -703,6 +704,7 @@ function tqResetDetectState() {
     tqLastWorkIdNum = '';
     tqPendingSubmitEvent = null;
     tqCurrentSuffix = '';
+    tqOriginalRowForSaveAsNew = null;
     const dateInput = document.getElementById('tq_qpb_date');
     
     if(dateInput){
@@ -726,8 +728,9 @@ function tqResetDetectState() {
         }
 
         function closeQuotationModal() {
-            document.getElementById('quotationModalOverlay').classList.add('hidden');
-        }
+    document.getElementById('quotationModalOverlay').classList.add('hidden');
+    tqResetDetectState();
+}
 
         function resetQuotationModalForm() {
             document.getElementById('techQuotationForm').reset();
@@ -915,16 +918,11 @@ function tqConfirmOverwrite() {
     tqCloseDetectModal();
 }
 
-async function tqConfirmSaveAsNew() {
+function tqConfirmSaveAsNew() {
     if(!tqPendingDetect){ tqCloseDetectModal(); return; }
     const row = tqPendingDetect;
 
-    try {
-        await archiveQuotationRow(row);
-        await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${row.id}`, { method: 'DELETE', headers: qHeaders });
-    } catch(err) {
-        console.error('Failed to archive old quotation for Save as New:', err);
-    }
+    tqOriginalRowForSaveAsNew = row;
 
     tqOverwriteMode = false;
     tqModeSaveAsNew = true;
@@ -1265,7 +1263,18 @@ async function tqDoSubmit(e) {
     const originalBtnText = submitBtn.innerHTML;
     submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
 
-    try {
+        try {
+        // Save as New: archive & delete the OLD row now — only at actual submit time.
+        if(tqModeSaveAsNew && tqOriginalRowForSaveAsNew){
+            try {
+                await archiveQuotationRow(tqOriginalRowForSaveAsNew);
+                await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${tqOriginalRowForSaveAsNew.id}`, { method: 'DELETE', headers: qHeaders });
+            } catch(err) {
+                console.error('Failed to archive old quotation for Save as New:', err);
+            }
+            tqOriginalRowForSaveAsNew = null;
+        }
+
     // Auto-cancel blueform lama yang rejected (EXEC-REJ/HOS-REJ/HOD-REJ) di bawah Work ID yang
     // sama - supaya bila quotation ni diluluskan semula (QUO-APP), dashboard tak "warisi" status
     // rejected dari blueform lama yang dah tak relevan.
