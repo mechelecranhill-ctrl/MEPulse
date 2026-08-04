@@ -1982,6 +1982,406 @@ function woHandleRowPointerMove(e) {
 function woHandleRowPointerUp() { clearTimeout(woHoldTimer); }
 function woHandleRowPointerCancel() { clearTimeout(woHoldTimer); }
 
+function openWoActionModal(item) {
+    woActionCurrentItem = item;
+    document.getElementById('woActionModalWorkId').textContent = `${item.work_id} — ${item.status}`;
+    const body = document.getElementById('woActionModalBody');
+    const isRejStatus = ['EXEC-REJ', 'HOS-REJ', 'HOD-REJ'].includes(item.status);
+    const isAppHod = item.status === 'APP-HOD';
+
+    let html = '';
+    if (isRejStatus) {
+        html += `
+            <button type="button" onclick="woActionCancelBlueform()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-ban mr-1"></i>CANCEL WORK ORDER
+            </button>
+            <button type="button" onclick="woActionProcessResubmit()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-rotate mr-1"></i>PROCESS RESUBMIT
+            </button>
+        `;
+    } else if (isAppHod) {
+        html += `
+            <button type="button" onclick="woActionApprove()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-check"></i></i>APPROVED
+            </button>
+        `;
+    } else {
+        html = '<p class="text-xs text-gray-400 italic">No action available for this status.</p>';
+    }
+
+    body.innerHTML = html;
+    document.getElementById('woActionModalOverlay').classList.remove('hidden');
+}
+
+function closeWoActionModal() {
+    document.getElementById('woActionModalOverlay').classList.add('hidden');
+    woActionCurrentItem = null;
+}
+
+async function woActionCancelBlueform() {
+    if (!woActionCurrentItem) return;
+    const item = woActionCurrentItem;
+    if (!confirm(`Confirm CANCEL blueform ${item.work_id}?`)) return;
+
+    try {
+        const res = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${item.id}`, { headers: qHeaders });
+        const rows = await res.json();
+        if (!rows || rows.length === 0) throw new Error('Record not found.');
+        const rec = rows[0];
+
+        const originalWorkId = rec.work_id;
+        const reasonForQuotation = rec.reject_reason || 'Blueform dibatalkan (CANCEL).';
+
+        const zeroedBreakdown = {};
+        Object.keys(rec.section_category || {}).forEach(sec => {
+            zeroedBreakdown[sec] = { amt: 0, extra: 0 };
+        });
+
+        const patchRes = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${rec.id}`, {
+            method: 'PATCH',
+            headers: qHeaders,
+            body: JSON.stringify({
+                work_id: `${originalWorkId}-CNX`,
+                status: 'CANCEL',
+                section_category: zeroedBreakdown,
+                additional: 0,
+                amount_spent: 0
+            })
+        });
+        if (!patchRes.ok) throw new Error(`HTTP ${patchRes.status}`);
+
+        // Sync balik ke quotation asal (guna work_id SEBELUM ditukar -CNX)
+        try {
+            const quoPatchRes = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(originalWorkId)}`, {
+                method: 'PATCH',
+                headers: qHeaders,
+                body: JSON.stringify({
+                    status: 'QUO-REJ',
+                    reject_reason: reasonForQuotation,
+                    revision_in_progress: false
+                })
+            });
+            if (!quoPatchRes.ok) {
+                console.error(`Failed to sync quotation status for ${originalWorkId}: HTTP ${quoPatchRes.status}`);
+            }
+        } catch (quoErr) {
+            console.error('Failed to sync quotation status after cancel:', quoErr);
+        }
+
+        closeWoActionModal();
+        fetchTechnicianDashboard();
+    } catch (err) {
+        console.error('Failed to cancel blueform:', err);
+        alert('Failed to cancel blueform: ' + err.message);
+    }
+}
+
+async function woActionProcessResubmit() {
+    if (!woActionCurrentItem) return;
+    const workId = woActionCurrentItem.work_id;
+    closeWoActionModal();
+    await openBlueformModalForResubmit(workId);
+}
+
+async function openBlueformModalForResubmit(workId) {
+    openBlueformModal();
+    if (blueformUnitsReadyPromise) await blueformUnitsReadyPromise;
+
+    try {
+        const woRes = await fetch(`${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}&select=contract_id`, { headers: qHeaders });
+        const woRows = await woRes.json();
+        const contractId = woRows?.[0]?.contract_id;
+
+        if (contractId) {
+            const cRes = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}&select=unit_id`, { headers: qHeaders });
+            const cRows = await cRes.json();
+            const unitId = cRows?.[0]?.unit_id;
+
+            if (unitId) {
+                document.getElementById('wo_unit_id').value = unitId;
+                await woLoadContractsByUnit();
+            }
+            document.getElementById('wo_contract_id').value = contractId;
+            woOnContractSelect();
+        }
+    } catch (err) {
+        console.error('Failed to preload contract for resubmission:', err);
+    }
+
+    document.getElementById('wo_id_rows_container').innerHTML = '';
+    wo_workIdRowCounter = 0;
+    const m = workId.trim().match(/^([CK])?\s*(\d+)\s*([A-Z]?)$/i);
+    const prefix = (m && m[1]) ? m[1].toUpperCase() : 'C';
+    const num = m ? m[2] : '';
+    const suffix = m ? (m[3] || '').toUpperCase() : '';
+    woAddWorkIdRow(prefix, num, suffix);
+    woRenderWorkIdCards();
+    woLastWorkIdNum = ''; // reset supaya woAutoDetectWork() PASTI trigger walaupun value sama
+    woAutoDetectWork();
+}
+
+async function woActionApprove() {
+    if (!woActionCurrentItem) return;
+    const item = woActionCurrentItem;
+    if (!confirm(`Confirm APPROVED for ${item.work_id}?`)) return;
+
+    try {
+        const { error } = await supabaseClient
+            .from('work_orders')
+            .update({ status: 'APPROVED' })
+            .eq('id', item.id);
+        if (error) throw error;
+
+        closeWoActionModal();
+        fetchTechnicianDashboard();
+    } catch (err) {
+        console.error('Failed to approve blueform:', err);
+        alert('Failed to approve blueform: ' + err.message);
+    }
+}
+        // ============================================================
+// QUOTATION ROW HOLD-TO-DELETE (QUO-REJ only)
+// ============================================================
+let qRowHoldTimer = null;
+let qRowHoldStartXY = null;
+let qRowHoldMoved = false;
+const Q_ROW_HOLD_MS = 480;
+const Q_ROW_HOLD_MOVE_THRESHOLD = 10;
+let qActionCurrentItem = null;
+
+function qHandleRowHoldPointerDown(e, encodedItem) {
+    if (e.target.closest('a, button')) return;
+    qRowHoldStartXY = { x: e.clientX, y: e.clientY };
+    qRowHoldMoved = false;
+    clearTimeout(qRowHoldTimer);
+
+    const item = JSON.parse(decodeURIComponent(encodedItem));
+    qRowHoldTimer = setTimeout(() => {
+        if (qRowHoldMoved) return;
+        if (navigator.vibrate) navigator.vibrate(35);
+        openQActionModal(item);
+    }, Q_ROW_HOLD_MS);
+}
+
+function qHandleRowHoldPointerMove(e) {
+    if (!qRowHoldStartXY) return;
+    const dx = e.clientX - qRowHoldStartXY.x;
+    const dy = e.clientY - qRowHoldStartXY.y;
+    if (Math.hypot(dx, dy) > Q_ROW_HOLD_MOVE_THRESHOLD) {
+        qRowHoldMoved = true;
+        clearTimeout(qRowHoldTimer);
+    }
+}
+
+function qHandleRowHoldPointerUp() { clearTimeout(qRowHoldTimer); }
+function qHandleRowHoldPointerCancel() { clearTimeout(qRowHoldTimer); }
+
+function openQActionModal(item) {
+    qActionCurrentItem = item;
+    document.getElementById('qActionModalWorkId').textContent = `${item.work_id} — ${item.status}`;
+    const body = document.getElementById('qActionModalBody');
+
+    let html = '';
+    if (item.status === 'QUO-REJ') {
+        html += `
+            <button type="button" onclick="qActionDeleteQuotation()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+                <i class="fa-solid fa-trash mr-1"></i>DELETE
+            </button>
+        `;
+    } else {
+        html = '<p class="text-xs text-gray-400 italic">No action available for this status.</p>';
+    }
+
+    body.innerHTML = html;
+    document.getElementById('qActionModalOverlay').classList.remove('hidden');
+}
+
+function closeQActionModal() {
+    document.getElementById('qActionModalOverlay').classList.add('hidden');
+    qActionCurrentItem = null;
+}
+
+async function qActionDeleteQuotation() {
+    if (!qActionCurrentItem) return;
+    const item = qActionCurrentItem;
+    if (!confirm(`Confirm DELETE quotation ${item.work_id}? This action cannot be undone.`)) return;
+
+    try {
+        const res = await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${item.id}`, { headers: qHeaders });
+        const rows = await res.json();
+        if (!rows || rows.length === 0) throw new Error('Record not found.');
+        const rec = rows[0];
+
+        // 1. Padam fail dari Cloudflare R2 (jika ada pdf_url)
+        if (rec.pdf_url) {
+            try {
+                const workerBaseUrl = "https://uploader.mech-elec-ranhill.workers.dev";
+                let objectKey = rec.pdf_url;
+                if (objectKey.startsWith(workerBaseUrl)) {
+                    objectKey = objectKey.substring(workerBaseUrl.length + 1); // buang base URL + '/'
+                }
+
+                const delRes = await fetch(`${workerBaseUrl}/delete?filename=${encodeURIComponent(objectKey)}`, {
+                    method: 'DELETE'
+                });
+                if (!delRes.ok) {
+                    console.warn(`R2 delete returned HTTP ${delRes.status} for "${objectKey}". Worker route/param may differ from assumption — verify uploader.js.`);
+                }
+            } catch (r2Err) {
+                console.error('Failed to delete file from Cloudflare R2:', r2Err);
+                // Teruskan padam rekod Supabase walaupun R2 gagal, supaya tidak "stuck"
+            }
+        }
+
+        // 2. Padam rekod dari Supabase
+        const supaDelRes = await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${item.id}`, {
+            method: 'DELETE', headers: qHeaders
+        });
+        if (!supaDelRes.ok) throw new Error(`HTTP ${supaDelRes.status}`);
+
+        closeQActionModal();
+        fetchTechnicianDashboard();
+    } catch (err) {
+        console.error('Failed to delete quotation:', err);
+        alert('Failed to delete quotation: ' + err.message);
+    }
+}
+
+        async function woCancelOldRecordsForSaveAsNew(contractId, workIds) {
+            for(const oldWorkId of workIds){
+                try {
+                    const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(oldWorkId)}`, { headers: qHeaders });
+                    const rows = await res.json();
+                    if(!rows || rows.length === 0) continue;
+                    const rec = rows[0];
+
+                    const zeroedBreakdown = {};
+                    Object.keys(rec.section_category || {}).forEach(sec => {
+                        zeroedBreakdown[sec] = { amt: 0, extra: 0 };
+                    });
+
+                    await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${rec.id}`, {
+                        method: 'PATCH',
+                        headers: qHeaders,
+                        body: JSON.stringify({
+                            work_id: `${oldWorkId}-CNX`,
+                            status: 'CANCEL',
+                            section_category: zeroedBreakdown,
+                            additional: 0,
+                            amount_spent: 0
+                        })
+                    });
+                } catch(err) {
+                    console.error('Failed to cancel old record:', oldWorkId, err);
+                }
+            }
+        }
+
+        async function woSyncQuotationFromBlueform(workId, payload) {
+    try {
+        const qPayload = {
+            district: payload.district,
+            location: payload.location,
+            description: payload.description,
+            section_category: payload.section_category,
+            additional: payload.additional,
+            amount_spent: payload.amount_spent
+        };
+        const res = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(workId)}`, {
+            method: 'PATCH',
+            headers: qHeaders,
+            body: JSON.stringify(qPayload)
+        });
+        if (!res.ok) {
+            console.error(`Failed to sync quotation data for ${workId}: HTTP ${res.status}`);
+        }
+    } catch (err) {
+        console.error('Failed to sync quotation data from blueform overwrite:', err);
+    }
+}
+
+        async function woSubmitBlueform(e) {
+            e.preventDefault();
+            if (!window.__techPerm?.canManageTech) { alert('Anda tiada kebenaran untuk membuat Blueform.'); return; }
+
+            const isOverwriteMode = woOriginalLoadedWorkIds.length > 0 && !!woCurrentWorkSequenceNo && !woModeSaveAsNew;
+            const dateInput = document.getElementById('wo_qpb_date');
+            const originalDate = dateInput.dataset.originalDate || '';
+            const currentDateVal = dateInput.value;
+
+            // Jika percubaan tukar tarikh dilakukan semasa Overwrite
+            if(isOverwriteMode && originalDate && originalDate !== currentDateVal){
+                woPendingSubmitEvent = e;
+                document.getElementById('woDateChangeModalOverlay').classList.remove('hidden');
+                return;
+            }
+
+            await woDoSubmit(e);
+        }
+
+        function woCancelDateChange() {
+            document.getElementById('woDateChangeModalOverlay').classList.add('hidden');
+            woPendingSubmitEvent = null;
+        }
+
+        async function woRevertDateAndProceed() {
+            document.getElementById('woDateChangeModalOverlay').classList.add('hidden');
+            const dateInput = document.getElementById('wo_qpb_date');
+            if(dateInput.dataset.originalDate){
+                dateInput.value = dateInput.dataset.originalDate;
+            }
+            const e = woPendingSubmitEvent;
+            woPendingSubmitEvent = null;
+            if(e) await woDoSubmit(e);
+        }
+
+        async function woDoSubmit(e) {
+            const contractId = document.getElementById('wo_contract_id').value;
+            const districtSelected = document.getElementById('wo_dist').value;
+            const contractOpt = document.getElementById('wo_contract_id').selectedOptions[0];
+
+            if(!contractId || !districtSelected || !contractOpt){ alert('Please complete the contract and district!'); return; }
+
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.innerHTML;
+            submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+
+            try {
+                const areaMapping = contractOpt.dataset.area || '';
+                const districtsMapping = contractOpt.dataset.dist || '';
+                const areaCodes = areaMapping.split(',').map(s => s.trim().toUpperCase());
+                const districts = districtsMapping.split(',').map(s => s.trim().toUpperCase());
+                const index = districts.indexOf(districtSelected.trim().toUpperCase());
+                let areaCode = (index !== -1 && areaCodes[index]) ? areaCodes[index] : 'WO';
+
+                const currentWorkIds = woGetCurrentWorkIdsFromRows();
+                if(currentWorkIds.length === 0){ alert('Please enter at least one Work Order ID!'); return; }
+
+                // Jika mod Save as New -> jangan batalkan rekod lama dahulu. Simpan senarai
+                // untuk dibatalkan HANYA selepas rekod baharu berjaya disimpan.
+                let idsToCancelForSaveAsNew = [];
+                if(woModeSaveAsNew){
+                    idsToCancelForSaveAsNew = [...woOriginalLoadedWorkIds];
+                    woCurrentWorkSequenceNo = null; // Teruskan dengan menjana Sequence baharu
+                    woOriginalLoadedWorkIds = [];
+                }
+
+                let sequenceToUse = woCurrentWorkSequenceNo;
+                const originalDistrict = document.getElementById('wo_dist').dataset.originalDistrict || '';
+                if(originalDistrict && originalDistrict.trim().toUpperCase() !== districtSelected.trim().toUpperCase()){
+                    woCurrentWorkSequenceNo = null; sequenceToUse = null;
+                }
+
+                if(!sequenceToUse){
+                    const seqRes = await fetch(`${SB_URL}/rest/v1/work_orders?select=sequence_no&contract_id=eq.${contractId}`, { headers: qHeaders });
+                    const seqData = await seqRes.json();
+                    let max = 0;
+                    seqData.forEach(r => {
+                        if(!r.sequence_no || !r.sequence_no.startsWith(areaCode)) return;
+                        const num = parseInt(r.sequence_no.replace(areaCode, ''));
+                        if(num > max) max = num;
+                    });
+                    sequenceToUse = areaCode + String(max + 1).padStart(3, '0');
                     woCurrentWorkSequenceNo = sequenceToUse;
                 }
 
@@ -2920,8 +3320,3 @@ sectionHtml += `
     
 </body>
 </html>
-            <button type="button" onclick="woActionProcessResubmit()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
-                <i class="fa-solid fa-rotate mr-1"></i>PROCESS RESUBMIT
-            </button>
-        `;
-    } else if (isAppHod) {
