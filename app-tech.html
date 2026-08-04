@@ -635,21 +635,6 @@ function applyTechPermissionUI(perm) {
                 console.error("Failed to archive rejected quotation:", err);
             }
         }
-        
-        async function startRevision(type, workId) {
-            const table = type === 'QUOTATION' ? 'quotations' : 'work_orders';
-            try {
-                const { error } = await supabaseClient   
-                    .from(table)
-                    .update({ revision_in_progress: true })
-                    .eq('work_id', workId);
-                if (error) throw error;
-                fetchTechnicianDashboard();
-            } catch (err) {
-                console.error('Failed to mark revision:', err.message);
-                alert('Failed to mark revision status: ' + err.message);
-            }
-        }
 
         // ============ QUOTATION MODAL LOGIC ============
         let quotationModalInitialized = false;
@@ -1595,7 +1580,44 @@ async function woActionProcessResubmit() {
     if (!woActionCurrentItem) return;
     const workId = woActionCurrentItem.work_id;
     closeWoActionModal();
-    await startRevision('BLUEFORM', workId);
+    await openBlueformModalForResubmit(workId);
+}
+
+async function openBlueformModalForResubmit(workId) {
+    openBlueformModal();
+    if (blueformUnitsReadyPromise) await blueformUnitsReadyPromise;
+
+    try {
+        const woRes = await fetch(`${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}&select=contract_id`, { headers: qHeaders });
+        const woRows = await woRes.json();
+        const contractId = woRows?.[0]?.contract_id;
+
+        if (contractId) {
+            const cRes = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}&select=unit_id`, { headers: qHeaders });
+            const cRows = await cRes.json();
+            const unitId = cRows?.[0]?.unit_id;
+
+            if (unitId) {
+                document.getElementById('wo_unit_id').value = unitId;
+                await woLoadContractsByUnit();
+            }
+            document.getElementById('wo_contract_id').value = contractId;
+            woOnContractSelect();
+        }
+    } catch (err) {
+        console.error('Failed to preload contract for resubmission:', err);
+    }
+
+    document.getElementById('wo_id_rows_container').innerHTML = '';
+    wo_workIdRowCounter = 0;
+    const m = workId.trim().match(/^([CK])?\s*(\d+)\s*([A-Z]?)$/i);
+    const prefix = (m && m[1]) ? m[1].toUpperCase() : 'C';
+    const num = m ? m[2] : '';
+    const suffix = m ? (m[3] || '').toUpperCase() : '';
+    woAddWorkIdRow(prefix, num, suffix);
+    woRenderWorkIdCards();
+    woLastWorkIdNum = ''; // reset supaya woAutoDetectWork() PASTI trigger walaupun value sama
+    woAutoDetectWork();
 }
 
 async function woActionApprove() {
@@ -1889,7 +1911,6 @@ async function qActionDeleteQuotation() {
                         if(isRejected){
                             patchPayload.status = 'BLUEFORM';
                             patchPayload.reject_reason = null;
-                            patchPayload.revision_in_progress = false;
                         }
 
                         await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`, {
@@ -2056,7 +2077,6 @@ async function qActionDeleteQuotation() {
                         section_category: tqBreakdown,
                         additional: tqAdditionalTotal,
                         amount_spent: tqTotalAmount + tqAdditionalTotal,
-                        revision_in_progress: false,
                         reject_reason: null
                     };
 
@@ -2156,7 +2176,7 @@ async function qActionDeleteQuotation() {
         let quotationsQuery = supabaseClient
             .from('quotations')
             .select(`
-                    id, work_id, status, contract_id, pdf_url, reject_reason, revision_in_progress, action_date,
+                    id, work_id, status, contract_id, pdf_url, reject_reason, action_date,
                     district, location, description, section_category,
                     contract!inner (id, contract_name, contract_code, unit_id)
             `)
@@ -2166,7 +2186,7 @@ async function qActionDeleteQuotation() {
         let blueformQuery = supabaseClient
             .from('work_orders')
             .select(`
-                    id, work_id, status, sequence_no, contract_id, district, reject_reason, revision_in_progress,
+                    id, work_id, status, sequence_no, contract_id, district, reject_reason,
                     contract!inner (id, contract_name, contract_code, unit_id)
             `)
             .in('status', ['APP-HOD', 'EXEC-REJ', 'HOS-REJ', 'HOD-REJ']); 
@@ -2195,7 +2215,7 @@ async function qActionDeleteQuotation() {
                 if (quotationWorkIds.length > 0) {
                     const { data: matchingWOs, error: matchError } = await supabaseClient
                         .from('work_orders')
-                        .select('work_id, status, reject_reason, revision_in_progress')
+                        .select('work_id, status, reject_reason')
                         .in('work_id', quotationWorkIds);
 
                     if (!matchError && matchingWOs) {
@@ -2213,7 +2233,6 @@ async function qActionDeleteQuotation() {
                                 // Blueform ditolak -> quotation ini kekal dipaparkan, bawa sekali remarks blueform
                                 q.blueform_status = wo.status;
                                 q.blueform_reject_reason = wo.reject_reason;
-                                q.blueform_revision_in_progress = wo.revision_in_progress;
                                 return true;
                             }
                             return false; // Blueform wujud & tidak ditolak -> sembunyikan seperti biasa
@@ -2341,36 +2360,34 @@ async function qActionDeleteQuotation() {
                     let remarkContent = '';
 
                     if (item.blueform_reject_reason) {
-                        const techCanManage2 = !!(window.__techPerm && window.__techPerm.canManageTech);
-                        const revisionBadge = item.blueform_revision_in_progress
-                            ? `<span class="text-amber-600 text-[9px] font-bold inline-flex items-center gap-0.5 mt-0.5"><i class="fa-solid fa-pen"></i> Resubmission in progress...</span>`
-                            : (techCanManage2
-                                ? `<button onclick="startRevision('BLUEFORM','${escapeJs(item.work_id)}')" class="text-[9px] text-blue-600 underline mt-0.5 cursor-pointer bg-transparent border-none p-0">Start resubmission</button>`
-                                : `<span class="text-[9px] text-gray-400 italic">View Only</span>`);
-                        remarkContent = `
-                            <div class="text-red-700 font-medium text-[10px] truncate" title="[${item.blueform_status}] ${item.blueform_reject_reason}">
-                                ${item.blueform_reject_reason}
-                            </div>
-                            ${revisionBadge}
-                        `;
-                    } else if (item.status.includes('REJ') && item.reject_reason) {
-                        const techCanManage2 = !!(window.__techPerm && window.__techPerm.canManageTech);
-                        const revisionBadge = item.revision_in_progress
-                            ? `<span class="text-amber-600 text-[9px] font-bold inline-flex items-center gap-0.5 mt-0.5"><i class="fa-solid fa-pen"></i> Resubmission in progress...</span>`
-                            : (techCanManage2
-                                ? `<button onclick="startRevision('${type}','${escapeJs(item.work_id)}')" class="text-[9px] text-blue-600 underline mt-0.5 cursor-pointer bg-transparent border-none p-0">Start resubmission</button>`
-                                : `<span class="text-[9px] text-gray-400 italic">View Only</span>`);
-                        remarkContent = `
-                            <div class="text-red-700 font-medium text-[10px] truncate" title="[${item.status}] ${reasonText}">
-                                ${reasonText}
-                            </div>
-                            ${revisionBadge}
-                        `;
-                    } else if (item.status === 'QUOTATION') {
-                        remarkContent = `<span class="text-amber-600 font-medium text-[10px] truncate block"><i class="fa-solid fa-hourglass-half mr-1"></i>Awaiting Approval</span>`;
-                    } else {
-                        remarkContent = `<span class="text-gray-400 italic text-[10px] truncate block">${type === 'QUOTATION' ? 'Ready for Blueform' : 'Completed'}</span>`;
-                    }
+    const techCanManage2 = !!(window.__techPerm && window.__techPerm.canManageTech);
+    const resubmitBtn = techCanManage2
+        ? `<button onclick="openBlueformModalForResubmit('${escapeJs(item.work_id)}')" class="text-[9px] text-blue-600 underline mt-0.5 cursor-pointer bg-transparent border-none p-0">Start resubmission</button>`
+        : `<span class="text-[9px] text-gray-400 italic">View Only</span>`;
+    remarkContent = `
+        <div class="text-red-700 font-medium text-[10px] truncate" title="[${item.blueform_status}] ${item.blueform_reject_reason}">
+            ${item.blueform_reject_reason}
+        </div>
+        ${resubmitBtn}
+    `;
+} else if (item.status.includes('REJ') && item.reject_reason) {
+    const techCanManage2 = !!(window.__techPerm && window.__techPerm.canManageTech);
+    const resubmitBtn = techCanManage2
+        ? (type === 'BLUEFORM'
+            ? `<button onclick="openBlueformModalForResubmit('${escapeJs(item.work_id)}')" class="text-[9px] text-blue-600 underline mt-0.5 cursor-pointer bg-transparent border-none p-0">Start resubmission</button>`
+            : `<button onclick="openQuotationModal()" class="text-[9px] text-blue-600 underline mt-0.5 cursor-pointer bg-transparent border-none p-0">Start resubmission</button>`)
+        : `<span class="text-[9px] text-gray-400 italic">View Only</span>`;
+    remarkContent = `
+        <div class="text-red-700 font-medium text-[10px] truncate" title="[${item.status}] ${reasonText}">
+            ${reasonText}
+        </div>
+        ${resubmitBtn}
+    `;
+} else if (item.status === 'QUOTATION') {
+    remarkContent = `<span class="text-amber-600 font-medium text-[10px] truncate block"><i class="fa-solid fa-hourglass-half mr-1"></i>Awaiting Approval</span>`;
+} else {
+    remarkContent = `<span class="text-gray-400 italic text-[10px] truncate block">${type === 'QUOTATION' ? 'Ready for Blueform' : 'Completed'}</span>`;
+}
                     
                     if (type === 'QUOTATION') {
                         // Simpan rujukan item ini untuk fungsi drag & drop (Quotation -> Blueform)
