@@ -1022,6 +1022,39 @@ async function archiveQuotationRow(row) {
         console.error("Failed to archive quotation row:", err);
     }
 }
+        async function tqCancelStaleRejectedWorkOrder(workId) {
+    try {
+        const res = await fetch(`${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}&select=*`, { headers: qHeaders });
+        const rows = await res.json();
+        if (!rows || rows.length === 0) return;
+
+        for (const rec of rows) {
+            if (!['EXEC-REJ', 'HOS-REJ', 'HOD-REJ'].includes(rec.status)) continue;
+
+            const zeroedBreakdown = {};
+            Object.keys(rec.section_category || {}).forEach(sec => {
+                zeroedBreakdown[sec] = { amt: 0, extra: 0 };
+            });
+
+            const patchRes = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${rec.id}`, {
+                method: 'PATCH',
+                headers: qHeaders,
+                body: JSON.stringify({
+                    work_id: `${rec.work_id}-CNX`,
+                    status: 'CANCEL',
+                    section_category: zeroedBreakdown,
+                    additional: 0,
+                    amount_spent: 0
+                })
+            });
+            if (!patchRes.ok) {
+                console.error(`Failed to auto-cancel stale rejected work_order (id=${rec.id}) for work_id ${workId}: HTTP ${patchRes.status}`);
+            }
+        }
+    } catch (err) {
+        console.error('Failed to cancel stale rejected work_order for quotation resubmission:', err);
+    }
+}
 
         function assignFileToInput(inputEl, file) {
             const dt = new DataTransfer();
@@ -1226,9 +1259,14 @@ async function tqDoSubmit(e) {
     submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
 
     try {
-        // Overwrite mode: JANGAN archive - kekalkan record sedia ada, terus timpa.
-        // Save as New / entry baharu: guna safety-net archive lama (kalau ada QUO-REJ tertinggal).
-        if(!tqOverwriteMode){
+    // Auto-cancel blueform lama yang rejected (EXEC-REJ/HOS-REJ/HOD-REJ) di bawah Work ID yang
+    // sama - supaya bila quotation ni diluluskan semula (QUO-APP), dashboard tak "warisi" status
+    // rejected dari blueform lama yang dah tak relevan.
+    await tqCancelStaleRejectedWorkOrder(primaryWorkId);
+
+    // Overwrite mode: JANGAN archive - kekalkan record sedia ada, terus timpa.
+    // Save as New / entry baharu: guna safety-net archive lama (kalau ada QUO-REJ tertinggal).
+    if(!tqOverwriteMode){
             try {
                 const rejCheckRes = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(primaryWorkId)}&status=eq.QUO-REJ&select=*`, { headers: qHeaders });
                 const rejRows = await rejCheckRes.json();
