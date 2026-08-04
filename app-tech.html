@@ -468,13 +468,16 @@
         <div id="tqDetectModalBody" class="space-y-3"></div>
     </div>
     <div class="p-5 border-t border-gray-100 flex flex-col gap-2 sticky bottom-0 bg-white rounded-b-2xl">
-        <button type="button" onclick="tqConfirmOverwrite()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
-            <i class="fa-solid fa-rotate mr-1"></i>Overwrite Data
-        </button>
-        <button type="button" onclick="tqConfirmSaveAsNew()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
-            <i class="fa-solid fa-file-circle-plus mr-1"></i>Save as New
-        </button>
-    </div>
+    <button type="button" onclick="tqConfirmOverwrite()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+        <i class="fa-solid fa-rotate mr-1"></i>Overwrite Data
+    </button>
+    <button type="button" onclick="tqConfirmSaveAsNew()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+        <i class="fa-solid fa-file-circle-plus mr-1"></i>Save as New
+    </button>
+    <button type="button" onclick="tqConfirmAdditionalWorks()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+        <i class="fa-solid fa-plus-circle mr-1"></i>Additional Works
+    </button>
+</div>
   </div>
 </div>
 
@@ -682,31 +685,32 @@ function applyTechPermissionUI(perm) {
         }
 
         // ============ QUOTATION MODAL LOGIC ============
-        let quotationModalInitialized = false;
-        let tqCurrentContractSections = {};
         let tqDetectTimer = null;
-        let tqPendingDetect = null;
-        let tqOverwriteMode = false;
-        let tqModeSaveAsNew = false;
-        let tqLastWorkIdNum = '';
-        let tqPendingSubmitEvent = null;
+let tqPendingDetect = null;
+let tqOverwriteMode = false;
+let tqModeSaveAsNew = false;
+let tqLastWorkIdNum = '';
+let tqPendingSubmitEvent = null;
+let tqCurrentSuffix = '';
 
-        function tqResetDetectState() {
-            clearTimeout(tqDetectTimer);
-            tqPendingDetect = null;
-            tqOverwriteMode = false;
-            tqModeSaveAsNew = false;
-            tqLastWorkIdNum = '';
-            tqPendingSubmitEvent = null; 
-            const dateInput = document.getElementById('tq_qpb_date');
-            
-            if(dateInput){
-                dateInput.removeAttribute('disabled');
-                delete dateInput.dataset.originalDate;
-                dateInput.title = ''; 
-            }
-        }
-
+function tqResetDetectState() {
+    clearTimeout(tqDetectTimer);
+    tqPendingDetect = null;
+    tqOverwriteMode = false;
+    tqModeSaveAsNew = false;
+    tqLastWorkIdNum = '';
+    tqPendingSubmitEvent = null;
+    tqCurrentSuffix = '';
+    const dateInput = document.getElementById('tq_qpb_date');
+    
+    if(dateInput){
+        dateInput.removeAttribute('disabled');
+        delete dateInput.dataset.originalDate;
+        dateInput.title = ''; 
+    }
+    const badge = document.getElementById('tq_id_suffix_badge');
+    if(badge){ badge.textContent = ''; badge.classList.add('hidden'); }
+}
         function normalizeWorkId(raw){
             raw = (raw || '').trim().toUpperCase();
             const match = raw.match(/^([CK])?\s*(\d+)\s*([A-Z]?)$/);
@@ -827,6 +831,12 @@ function applyTechPermissionUI(perm) {
     const workId = normalizeWorkId(`${prefix}${num}`);
     if(workId === tqLastWorkIdNum) return;
     tqLastWorkIdNum = workId;
+
+    // Base Work ID berubah -> suffix "Additional Works" sebelum ni dah tak relevan
+    tqCurrentSuffix = '';
+    const badge = document.getElementById('tq_id_suffix_badge');
+    if(badge){ badge.textContent = ''; badge.classList.add('hidden'); }
+
     clearTimeout(tqDetectTimer);
 
     tqDetectTimer = setTimeout(async () => {
@@ -928,6 +938,53 @@ async function tqConfirmSaveAsNew() {
     document.getElementById('tq_location_text').value = locSplit.rest;
     document.getElementById('tq_description').value = row.description || '';
     tqRenderBreakdown(row.section_category || {});
+
+    tqCloseDetectModal();
+}
+        async function tqGetNextSuffixLetter(contractId, prefix, num) {
+    try {
+        const res = await fetch(`${SB_URL}/rest/v1/quotations?contract_id=eq.${contractId}&select=work_id`, { headers: qHeaders });
+        const rows = await res.json();
+        const base = `${prefix}${num}`;
+        const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const pattern = new RegExp(`^${escapedBase}([A-Z])$`);
+        let usedLetters = [];
+        (rows || []).forEach(r => {
+            const m = (r.work_id || '').trim().toUpperCase().match(pattern);
+            if(m) usedLetters.push(m[1]);
+        });
+        for(let i = 0; i < 26; i++){
+            const letter = String.fromCharCode(65 + i);
+            if(!usedLetters.includes(letter)) return letter;
+        }
+        return 'Z';
+    } catch(e) {
+        console.error('Failed to determine next suffix (quotation):', e);
+        return 'A';
+    }
+}
+
+async function tqConfirmAdditionalWorks() {
+    if(!tqPendingDetect){ tqCloseDetectModal(); return; }
+
+    const contractId = document.getElementById('tq_contract_id').value;
+    const prefix = document.getElementById('tq_id_prefix').value;
+    const num = document.getElementById('tq_id_num').value.trim();
+
+    // Rekod lama TIDAK dibatalkan (beza dgn Save as New) - sequence quotation asal kekal.
+    tqOverwriteMode = false;
+    tqModeSaveAsNew = false;
+
+    const letter = await tqGetNextSuffixLetter(contractId, prefix, num);
+    tqCurrentSuffix = letter;
+
+    const badge = document.getElementById('tq_id_suffix_badge');
+    if(badge){ badge.textContent = letter; badge.classList.remove('hidden'); }
+
+    const dateInput = document.getElementById('tq_qpb_date');
+    dateInput.removeAttribute('disabled');
+    delete dateInput.dataset.originalDate;
+    dateInput.title = '';
 
     tqCloseDetectModal();
 }
@@ -1155,7 +1212,7 @@ async function tqDoSubmit(e) {
     const prefix = document.getElementById('tq_id_prefix').value;
     const num = document.getElementById('tq_id_num').value.trim();
     if(!num){ alert('Please enter a Work Order ID!'); return; }
-    const primaryWorkId = normalizeWorkId(`${prefix}${num}`);
+    const primaryWorkId = normalizeWorkId(`${prefix}${num}`) + tqCurrentSuffix;
 
     if(!contractId){ alert('Please select a Contract!'); return; }
 
