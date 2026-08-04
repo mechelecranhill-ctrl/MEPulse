@@ -2236,6 +2236,29 @@ async function qActionDeleteQuotation() {
             }
         }
 
+        async function woSyncQuotationFromBlueform(workId, payload) {
+    try {
+        const qPayload = {
+            district: payload.district,
+            location: payload.location,
+            description: payload.description,
+            section_category: payload.section_category,
+            additional: payload.additional,
+            amount_spent: payload.amount_spent
+        };
+        const res = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(workId)}`, {
+            method: 'PATCH',
+            headers: qHeaders,
+            body: JSON.stringify(qPayload)
+        });
+        if (!res.ok) {
+            console.error(`Failed to sync quotation data for ${workId}: HTTP ${res.status}`);
+        }
+    } catch (err) {
+        console.error('Failed to sync quotation data from blueform overwrite:', err);
+    }
+}
+
         async function woSubmitBlueform(e) {
             e.preventDefault();
             if (!window.__techPerm?.canManageTech) { alert('Anda tiada kebenaran untuk membuat Blueform.'); return; }
@@ -2380,6 +2403,10 @@ async function qActionDeleteQuotation() {
                             method: 'POST', headers: qHeaders, body: JSON.stringify(payload)
                         });
                     }
+
+                    // Sync balik ke quotation yang sepadan (work_id sama) supaya location,
+                    // description, cost breakdown & jumlah tetap konsisten dgn blueform terkini.
+                    await woSyncQuotationFromBlueform(workIdValue, payload);
                 }
 
                 for(const removedId of woOriginalLoadedWorkIds.filter(id => !currentWorkIds.includes(id))){
