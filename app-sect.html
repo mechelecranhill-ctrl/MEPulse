@@ -258,78 +258,87 @@ async function getPermissionContext() {
                 let activeUnitIds = null;
 
                 if (!isAdmin) {
-                    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-                    if (userError || !user) {
-                        showEmptyRow('Please log in first.');
-                        return;
-                    }
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    if (userError || !user) {
+        showEmptyRow('Please log in first.');
+        return;
+    }
 
-                    // 1. Assignment TERUS ke seksyen (Ketua Seksyen / Pemangku Ketua Seksyen)
-                    const { data: sectionAssignments, error: assError } = await supabaseClient
-                        .from('staff_section_assignment')
-                        .select('section_id')
-                        .eq('staff_id', user.id)
-                        .eq('active', true);
+    // Ketua Jabatan / Pemangku KJ -> setaraf admin, nampak SEMUA unit walaupun
+    // tiada rekod assignment di staff_section_assignment / staff_unit_assignment.
+    if (perm.canActDept) {
+        const { data: allUnits } = await supabaseClient.from('units').select('id, unit_name');
+        unitsPreset = allUnits || [];
+    } else {
+        // 1. Assignment TERUS ke seksyen (Ketua Seksyen / Pemangku Ketua Seksyen)
+        const { data: sectionAssignments, error: assError } = await supabaseClient
+            .from('staff_section_assignment')
+            .select('section_id')
+            .eq('staff_id', user.id)
+            .eq('active', true);
 
-                    if (assError) throw assError;
-                    let activeSectionIds = (sectionAssignments || []).map(a => a.section_id);
+        if (assError) throw assError;
+        let activeSectionIds = (sectionAssignments || []).map(a => a.section_id);
 
-                    // 2. Assignment ke UNIT (Juruteknik / Eksekutif / Eksekutif Kanan) ->
-                    //    derive seksyen dari unit tersebut, sebab unit tergolong dalam seksyen.
-                    const { data: unitAssignments, error: unitAssignError } = await supabaseClient
-                        .from('staff_unit_assignment')
-                        .select('unit_id')
-                        .eq('staff_id', user.id)
-                        .eq('active', true);
+        // 2. Assignment ke UNIT (Juruteknik / Eksekutif / Eksekutif Kanan) ->
+        //    derive seksyen dari unit tersebut, sebab unit tergolong dalam seksyen.
+        const { data: unitAssignments, error: unitAssignError } = await supabaseClient
+            .from('staff_unit_assignment')
+            .select('unit_id')
+            .eq('staff_id', user.id)
+            .eq('active', true);
 
-                    if (unitAssignError) throw unitAssignError;
-                    const assignedUnitIds = (unitAssignments || []).map(a => a.unit_id);
+        if (unitAssignError) throw unitAssignError;
+        const assignedUnitIds = (unitAssignments || []).map(a => a.unit_id);
 
-                    if (assignedUnitIds.length > 0) {
-                        const { data: unitsForSection, error: unitsForSectionErr } = await supabaseClient
-                            .from('units')
-                            .select('id, section_id')
-                            .in('id', assignedUnitIds);
+        if (assignedUnitIds.length > 0) {
+            const { data: unitsForSection, error: unitsForSectionErr } = await supabaseClient
+                .from('units')
+                .select('id, section_id')
+                .in('id', assignedUnitIds);
 
-                        if (unitsForSectionErr) throw unitsForSectionErr;
-                        (unitsForSection || []).forEach(u => {
-                            if (u.section_id && !activeSectionIds.includes(u.section_id)) {
-                                activeSectionIds.push(u.section_id);
-                            }
-                        });
-                    }
-
-                    if (activeSectionIds.length === 0) {
-                        showEmptyRow('Your account has not been assigned to any section or unit.');
-                        return;
-                    }
-
-                    const { data: unitsInSection, error: unitsError } = await supabaseClient
-                        .from('units')
-                        .select('id, unit_name')
-                        .in('section_id', activeSectionIds);
-
-                    if (unitsError) throw unitsError;
-                    unitsPreset = unitsInSection || [];
-                    activeUnitIds = unitsPreset.map(u => u.id);
-
-                    if (activeUnitIds.length === 0) {
-                        showEmptyRow('No units registered under your section.');
-                        return;
-                    }
-                } else {
-                    const { data: allUnits } = await supabaseClient.from('units').select('id, unit_name');
-                    unitsPreset = allUnits || [];
+            if (unitsForSectionErr) throw unitsForSectionErr;
+            (unitsForSection || []).forEach(u => {
+                if (u.section_id && !activeSectionIds.includes(u.section_id)) {
+                    activeSectionIds.push(u.section_id);
                 }
+            });
+        }
 
-                let workOrdersQuery = supabaseClient
-                    .from('work_orders')
-                    .select(`
-                        id, work_id, status, sequence_no, district,
-                        contract!inner (id, contract_name, contract_code, unit_id)
-                    `)
-                    .eq('status', 'APP-EXEC');
-                if (!isAdmin) workOrdersQuery = workOrdersQuery.in('contract.unit_id', activeUnitIds);
+        if (activeSectionIds.length === 0) {
+            showEmptyRow('Your account has not been assigned to any section or unit.');
+            return;
+        }
+
+        const { data: unitsInSection, error: unitsError } = await supabaseClient
+            .from('units')
+            .select('id, unit_name')
+            .in('section_id', activeSectionIds);
+
+        if (unitsError) throw unitsError;
+        unitsPreset = unitsInSection || [];
+
+        if (unitsPreset.length === 0) {
+            showEmptyRow('No units registered under your section.');
+            return;
+        }
+    }
+} else {
+    const { data: allUnits } = await supabaseClient.from('units').select('id, unit_name');
+    unitsPreset = allUnits || [];
+}
+
+                const scopeIsAll = isAdmin || (perm && perm.canActDept);
+const activeUnitIds = unitsPreset.map(u => u.id);
+
+let workOrdersQuery = supabaseClient
+    .from('work_orders')
+    .select(`
+        id, work_id, status, sequence_no, district,
+        contract!inner (id, contract_name, contract_code, unit_id)
+    `)
+    .eq('status', 'APP-EXEC');
+if (!scopeIsAll) workOrdersQuery = workOrdersQuery.in('contract.unit_id', activeUnitIds);
 
                 const { data: workOrders, error } = await workOrdersQuery;
                 if (error) throw error;
