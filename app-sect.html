@@ -149,6 +149,41 @@
         <div id="bulkPagesContainer" style="display:flex; flex-direction:column; align-items:center; gap:20px; padding:10px 0;"></div>
     </div>
 
+    <div id="customConfirmModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[9999] p-4 transition-all duration-200">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden transform scale-95 transition-transform duration-200 border border-gray-100">
+        <div id="modalBanner" class="p-6 flex justify-center items-center">
+            <div id="modalIconContainer" class="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-md text-2xl">
+                <i id="modalIcon" class="fa-solid"></i>
+            </div>
+        </div>
+        <div class="p-6">
+            <div class="text-center">
+                <h3 id="modalTitle" class="text-lg font-bold text-gray-900 mb-2">Confirm Action</h3>
+                <p id="modalMessage" class="text-sm text-gray-500 mb-4 leading-relaxed">Are you sure you want to proceed with this decision?</p>
+            </div>
+
+            <div id="rejectReasonSection" class="hidden mb-5">
+                <label for="rejectReasonInput" class="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1.5 text-left">
+                    Rejection Reason <span class="text-red-500">*</span>
+                </label>
+                <textarea id="rejectReasonInput" rows="3" 
+                          class="w-full text-xs p-3 border border-gray-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-red-500/20 focus:border-red-500 placeholder:text-gray-400 bg-gray-50 resize-none transition-all"
+                          placeholder="Please specify the reason for rejection here..."></textarea>
+                <p id="rejectErrorMsg" class="hidden text-[11px] text-red-600 mt-1 font-medium"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Rejection reason is required.</p>
+            </div>
+            
+            <div class="flex gap-3 justify-center">
+                <button onclick="closeConfirmModal()" class="flex-1 px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-sm transition-colors cursor-pointer">
+                    Cancel
+                </button>
+                <button id="modalConfirmBtn" class="flex-1 px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-all shadow-md cursor-pointer">
+                    Yes, Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
     <script src="blueform.js"></script>
     <script>
         const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
@@ -437,12 +472,11 @@ function toggleAccordion(contentId, iconId) {
                             }
 
                             const actionHtml = canAct ? `
-                                <div class="inline-flex items-center gap-1">
-                                    <button onclick="processAction('${item.work_id}', '${opts.rejectStatus}')" class="text-white px-2 py-1 rounded bg-red-600 hover:bg-red-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Reject"><i class="fa-solid fa-xmark"></i></button>
-                                    <button onclick="processAction('${item.work_id}', '${opts.approveStatus}')" class="text-white px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Approve"><i class="fa-solid fa-check"></i></button>
-                                </div>
+                            <div class="inline-flex items-center gap-1">
+                            <button onclick="openConfirmModal('${item.work_id}', '${opts.rejectStatus}', 'REJECT')" class="text-white px-2 py-1 rounded bg-red-600 hover:bg-red-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Reject"><i class="fa-solid fa-xmark"></i></button>
+                            <button onclick="openConfirmModal('${item.work_id}', '${opts.approveStatus}', 'APPROVE')" class="text-white px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Approve"><i class="fa-solid fa-check"></i></button>
+                            </div>
                             ` : `<span class="text-[10px] text-gray-400 italic font-semibold px-1"><i class="fa-solid fa-eye mr-1"></i>View Only</span>`;
-
                             unitHtml += `
                                 <tr class="hover:bg-gray-50 transition-colors">
                                     <td class="px-3 py-2.5 whitespace-nowrap font-mono text-gray-900 font-medium text-left">${item.work_id}${seq ? ` <span class="text-gray-400 text-[11px]">(${seq})</span>` : ''}</td>
@@ -568,45 +602,104 @@ function toggleAccordion(contentId, iconId) {
         }
 
         // Handles both Approve and Reject (with a reason) status changes
-        async function processAction(workId, nextStatus) {
-            const perm = window.__lastPerm;
-            if (perm && !perm.canActSection) { alert('Anda tiada kebenaran untuk membuat tindakan ini (View Only).'); return; }
-            let updatePayload = { status: nextStatus };
-            
-            if (nextStatus === 'HOS-REJ') {
-                const reason = prompt("Please enter the rejection reason:");
-                if (reason === null) return; // Cancel action if the prompt is dismissed
-                if (!reason.trim()) {
-                    alert("A rejection reason is required!");
-                    return;
-                }
-                updatePayload.reject_reason = reason.trim();
-            } else {
-                if (!confirm(`Are you sure you want to change the status of Work ID: ${workId} to ${nextStatus}?`)) return;
-                updatePayload.reject_reason = null;
+        function openConfirmModal(workId, nextStatus, mode) {
+    const perm = window.__lastPerm;
+    if (perm && !perm.canActSection) { alert('Anda tiada kebenaran untuk membuat tindakan ini (View Only).'); return; }
 
-                if (nextStatus === 'APP-HOS') {
-                    const stamps = await mergeApprovalStamp('work_orders', workId, 'section_head');
-                    if (stamps) updatePayload.approval_stamps = stamps;
-                }
-            }
+    const modal = document.getElementById('customConfirmModal');
+    const banner = document.getElementById('modalBanner');
+    const iconContainer = document.getElementById('modalIconContainer');
+    const icon = document.getElementById('modalIcon');
+    const title = document.getElementById('modalTitle');
+    const msg = document.getElementById('modalMessage');
+    const confirmBtn = document.getElementById('modalConfirmBtn');
+    const reasonSection = document.getElementById('rejectReasonSection');
+    const reasonInput = document.getElementById('rejectReasonInput');
+    const errorMsg = document.getElementById('rejectErrorMsg');
 
-            try {
-                const { error } = await supabaseClient
-                    .from('work_orders')
-                    .update(updatePayload)
-                    .eq('work_id', workId);
+    reasonInput.value = '';
+    errorMsg.classList.add('hidden');
+    reasonInput.classList.remove('border-red-500', 'focus:ring-red-500/20');
 
-                if (error) throw error;
+    const isReject = mode === 'REJECT';
 
-                alert(`Successfully updated to status ${nextStatus}!`);
-                fetchDashboard();
+    if (isReject) {
+        reasonSection.classList.remove('hidden');
+        banner.className = "p-5 bg-red-50 text-red-600 flex justify-center items-center border-b border-red-100";
+        iconContainer.className = "w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md text-xl text-red-600";
+        icon.className = "fa-solid fa-ban";
+        title.innerText = "Reject Blueform";
+        msg.innerHTML = `Confirm rejection for <span class="font-mono font-bold text-gray-800">${workId}</span>. Status will change to <span class="text-red-600 font-bold">${nextStatus}</span>.`;
+        confirmBtn.className = "flex-1 px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-all shadow-md bg-red-600 hover:bg-red-700 cursor-pointer";
+    } else {
+        reasonSection.classList.add('hidden');
+        banner.className = "p-5 bg-amber-50 text-amber-600 flex justify-center items-center border-b border-amber-100";
+        iconContainer.className = "w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md text-xl text-amber-600";
+        icon.className = "fa-solid fa-check-double";
+        title.innerText = "Approve Blueform";
+        msg.innerHTML = `Approve Blueform <span class="font-mono font-bold text-gray-800">${workId}</span>? Status will change to <span class="text-amber-600 font-bold">${nextStatus}</span>.`;
+        confirmBtn.className = "flex-1 px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-all shadow-md bg-amber-600 hover:bg-amber-700 cursor-pointer";
+    }
 
-            } catch (err) {
-                console.error("Error during processing:", err.message);
-                alert("Failed to update status: " + err.message);
+    confirmBtn.onclick = async () => {
+        let reasonText = null;
+        if (isReject) {
+            reasonText = reasonInput.value.trim();
+            if (!reasonText) {
+                errorMsg.classList.remove('hidden');
+                reasonInput.classList.add('border-red-500');
+                reasonInput.focus();
+                return;
             }
         }
+        closeConfirmModal();
+        await executeStatusUpdate(workId, nextStatus, reasonText);
+    };
+
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        modal.firstElementChild.classList.remove('scale-95');
+        modal.firstElementChild.classList.add('scale-100');
+    }, 10);
+}
+
+function closeConfirmModal() {
+    const modal = document.getElementById('customConfirmModal');
+    modal.firstElementChild.classList.remove('scale-100');
+    modal.firstElementChild.classList.add('scale-95');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+    }, 150);
+}
+
+async function executeStatusUpdate(workId, nextStatus, reason = null) {
+    let updatePayload = { status: nextStatus };
+
+    if (nextStatus === 'HOS-REJ') {
+        updatePayload.reject_reason = reason;
+    } else {
+        updatePayload.reject_reason = null;
+        if (nextStatus === 'APP-HOS') {
+            const stamps = await mergeApprovalStamp('work_orders', workId, 'section_head');
+            if (stamps) updatePayload.approval_stamps = stamps;
+        }
+    }
+
+    try {
+        const { error } = await supabaseClient
+            .from('work_orders')
+            .update(updatePayload)
+            .eq('work_id', workId);
+
+        if (error) throw error;
+
+        fetchDashboard();
+
+    } catch (err) {
+        console.error("Error during processing:", err.message);
+        alert("Failed to update status: " + err.message);
+    }
+}
 
         window.onload = fetchDashboard;
     </script>
