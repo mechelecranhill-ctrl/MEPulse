@@ -288,7 +288,7 @@
                     <select id="tq_id_prefix" class="text-sm border border-gray-300 rounded-lg p-2.5" style="width:80px;flex-shrink:0;">
                         <option value="C">C</option><option value="K">K</option>
                     </select>
-                    <input type="text" id="tq_id_num" placeholder="123456" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+                    <input type="text" id="tq_id_num" placeholder="123456" required class="w-full text-sm border border-gray-300 rounded-lg p-2.5" oninput="this.value=this.value.replace(/[^0-9]/g,''); tqAutoDetectWork();">
                 </div>
             </div>
             <div>
@@ -455,6 +455,51 @@
         </div>
       </div>
     </div>
+
+    <!-- QUOTATION DETECT MODAL -->
+<div id="tqDetectModalOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[9999] p-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-center p-5 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10">
+        <h3 class="text-base font-bold text-gray-800"><i class="fa-solid fa-triangle-exclamation text-amber-500 mr-2"></i>Existing Quotation Detected</h3>
+        <button type="button" onclick="tqCancelDetectModal()" class="text-gray-400 hover:text-gray-600 cursor-pointer"><i class="fa-solid fa-xmark text-lg"></i></button>
+    </div>
+    <div class="p-5">
+        <p class="text-xs text-gray-500 mb-3">This Work Order ID already exists with existing data:</p>
+        <div id="tqDetectModalBody" class="space-y-3"></div>
+    </div>
+    <div class="p-5 border-t border-gray-100 flex flex-col gap-2 sticky bottom-0 bg-white rounded-b-2xl">
+        <button type="button" onclick="tqConfirmOverwrite()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+            <i class="fa-solid fa-rotate mr-1"></i>Overwrite Data
+        </button>
+        <button type="button" onclick="tqConfirmSaveAsNew()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+            <i class="fa-solid fa-file-circle-plus mr-1"></i>Save as New
+        </button>
+    </div>
+  </div>
+</div>
+
+<!-- QUOTATION DATE CHANGE CONFIRMATION MODAL -->
+<div id="tqDateChangeModalOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[9999] p-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full">
+    <div class="p-5 border-b border-gray-100">
+        <h3 class="text-base font-bold text-gray-800"><i class="fa-solid fa-triangle-exclamation text-amber-500 mr-2"></i>Date Change Not Allowed in Overwrite Mode</h3>
+    </div>
+    <div class="p-5">
+        <p class="text-xs text-gray-500">
+            You are in Overwrite mode. Changing the date is not permitted.
+            If you wish to change the date, please use the <strong>Save as New</strong> option instead.
+        </p>
+    </div>
+    <div class="p-5 border-t border-gray-100 flex flex-col gap-2">
+        <button type="button" onclick="tqRevertDateAndProceed()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+            <i class="fa-solid fa-rotate-left mr-1"></i>Revert to Original Date & Overwrite
+        </button>
+        <button type="button" onclick="tqCancelDateChange()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer">
+            Cancel
+        </button>
+    </div>
+  </div>
+</div>
 
     <!-- BLUEFORM ROW ACTION MODAL (Hold-to-open) -->
 <div id="woActionModalOverlay" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[9999] p-4">
@@ -639,6 +684,28 @@ function applyTechPermissionUI(perm) {
         // ============ QUOTATION MODAL LOGIC ============
         let quotationModalInitialized = false;
         let tqCurrentContractSections = {};
+        let tqDetectTimer = null;
+        let tqPendingDetect = null;
+        let tqOverwriteMode = false;
+        let tqModeSaveAsNew = false;
+        let tqLastWorkIdNum = '';
+        let tqPendingSubmitEvent = null;
+
+        function tqResetDetectState() {
+            clearTimeout(tqDetectTimer);
+            tqPendingDetect = null;
+            tqOverwriteMode = false;
+            tqModeSaveAsNew = false;
+            tqLastWorkIdNum = '';
+            tqPendingSubmitEvent = null; 
+            const dateInput = document.getElementById('tq_qpb_date');
+            
+            if(dateInput){
+                dateInput.removeAttribute('disabled');
+                delete dateInput.dataset.originalDate;
+                dateInput.title = ''; 
+            }
+        }
 
         function normalizeWorkId(raw){
             raw = (raw || '').trim().toUpperCase();
@@ -662,9 +729,10 @@ function applyTechPermissionUI(perm) {
             document.getElementById('tq_dist').innerHTML = '<option value="">Choose Contract First</option>';
             document.getElementById('tq_pdf_url').value = '';
             tqCurrentContractSections = {};
-            tqRenderBreakdown();
-            clearSelectedFile();
-            document.getElementById('tq_upload_status').classList.add('hidden');
+            tqRenderBreakdown();     
+            clearSelectedFile();   
+            document.getElementById('tq_upload_status').classList.add('hidden'); 
+            tqResetDetectState();
         }
 
         async function tqFetchUnits() {
@@ -709,6 +777,7 @@ function applyTechPermissionUI(perm) {
             }
             tqCurrentContractSections = (opt && opt.dataset.b) ? JSON.parse(opt.dataset.b) : {};
             tqRenderBreakdown();
+            tqResetDetectState();
         }
 
         function tqRenderBreakdown(saved = {}) {
@@ -748,6 +817,152 @@ function applyTechPermissionUI(perm) {
             const el = document.getElementById('tq_total_display');
             if(el) el.innerText = `RM ${total.toLocaleString(undefined,{minimumFractionDigits:2})}`;
         }
+
+        function tqAutoDetectWork() {
+    const contractId = document.getElementById('tq_contract_id').value;
+    const prefix = document.getElementById('tq_id_prefix').value;
+    const num = document.getElementById('tq_id_num').value.trim();
+    if(!contractId || !num) return;
+
+    const workId = normalizeWorkId(`${prefix}${num}`);
+    if(workId === tqLastWorkIdNum) return;
+    tqLastWorkIdNum = workId;
+    clearTimeout(tqDetectTimer);
+
+    tqDetectTimer = setTimeout(async () => {
+        try {
+            const res = await fetch(`${SB_URL}/rest/v1/quotations?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workId)}&select=*`, { headers: qHeaders });
+            const rows = await res.json();
+            if(!Array.isArray(rows) || rows.length === 0) return;
+
+            tqPendingDetect = rows[0];
+            tqShowDetectModal(rows[0]);
+        } catch(err) { console.error(err); }
+    }, 400);
+}
+
+function tqShowDetectModal(row) {
+    const body = document.getElementById('tqDetectModalBody');
+    const breakdown = row.section_category || {};
+    let html = `
+        <div class="bg-gray-50 border border-gray-200 rounded-xl p-3">
+            <div class="flex justify-between items-center mb-2">
+                <span class="inline-block bg-amber-100 text-amber-800 text-[11px] font-bold px-2 py-0.5 rounded-full">${row.work_id}</span>
+                <span class="text-[10px] text-gray-400">${row.location || ''}</span>
+            </div>
+            <div class="space-y-1">
+    `;
+    Object.keys(breakdown).sort().forEach(sec => {
+        const desc = (tqCurrentContractSections[sec] && tqCurrentContractSections[sec].desc) || '';
+        const amt = Number(breakdown[sec].amt || 0);
+        const extra = Number(breakdown[sec].extra || 0);
+        html += `
+            <div class="flex justify-between items-start text-[11px] border-b border-gray-100 pb-1">
+                <div class="pr-2">
+                    <span class="font-bold text-gray-600">${sec}</span>
+                    <span class="block text-[9px] text-gray-400">${desc}</span>
+                </div>
+                <div class="text-right flex-shrink-0">
+                    <span class="block font-semibold text-gray-800">RM ${amt.toLocaleString('en-MY',{minimumFractionDigits:2})}</span>
+                    ${extra ? `<span class="block text-[9px] text-gray-400">+RM ${extra.toLocaleString('en-MY',{minimumFractionDigits:2})} prov.</span>` : ''}
+                </div>
+            </div>
+        `;
+    });
+    html += `</div></div>`;
+    body.innerHTML = html;
+    document.getElementById('tqDetectModalOverlay').classList.remove('hidden');
+}
+
+function tqConfirmOverwrite() {
+    if(!tqPendingDetect) return;
+    const row = tqPendingDetect;
+
+    tqOverwriteMode = true;
+    tqModeSaveAsNew = false;
+
+    const locSplit = splitLocationPreset(row.location || '');
+    document.getElementById('tq_location_prefix').value = locSplit.prefix;
+    document.getElementById('tq_location_text').value = locSplit.rest;
+    document.getElementById('tq_description').value = row.description || '';
+    tqRenderBreakdown(row.section_category || {});
+
+    const distSel = document.getElementById('tq_dist');
+    if(row.district){
+        const target = row.district.trim().toUpperCase();
+        const matchOpt = Array.from(distSel.options).find(o => o.value.trim().toUpperCase() === target);
+        if(matchOpt) distSel.value = matchOpt.value;
+    }
+
+    const dateInput = document.getElementById('tq_qpb_date');
+    dateInput.value = row.qpd_date || '';
+    dateInput.dataset.originalDate = row.qpd_date || '';
+    dateInput.setAttribute('disabled', 'disabled');
+    dateInput.title = "Date cannot be changed in Overwrite mode. Use 'Save as New' if date needs to be changed.";
+
+    tqCloseDetectModal();
+}
+
+async function tqConfirmSaveAsNew() {
+    if(!tqPendingDetect){ tqCloseDetectModal(); return; }
+    const row = tqPendingDetect;
+
+    try {
+        await archiveQuotationRow(row);
+        await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${row.id}`, { method: 'DELETE', headers: qHeaders });
+    } catch(err) {
+        console.error('Failed to archive old quotation for Save as New:', err);
+    }
+
+    tqOverwriteMode = false;
+    tqModeSaveAsNew = true;
+
+    const dateInput = document.getElementById('tq_qpb_date');
+    dateInput.removeAttribute('disabled');
+    dateInput.value = '';
+    delete dateInput.dataset.originalDate;
+    dateInput.title = '';
+
+    const locSplit = splitLocationPreset(row.location || '');
+    document.getElementById('tq_location_prefix').value = locSplit.prefix;
+    document.getElementById('tq_location_text').value = locSplit.rest;
+    document.getElementById('tq_description').value = row.description || '';
+    tqRenderBreakdown(row.section_category || {});
+
+    tqCloseDetectModal();
+}
+
+function tqCancelDetectModal() {
+    if(tqPendingDetect){
+        document.getElementById('tq_id_num').value = '';
+        tqLastWorkIdNum = '';
+    }
+    tqCloseDetectModal();
+}
+
+function tqCloseDetectModal() {
+    document.getElementById('tqDetectModalOverlay').classList.add('hidden');
+    tqPendingDetect = null;
+}
+
+async function archiveQuotationRow(row) {
+    try {
+        await fetch(`${SB_URL}/rest/v1/quotations_history`, {
+            method: 'POST',
+            headers: qHeaders,
+            body: JSON.stringify({
+                work_id: row.work_id,
+                contract_id: row.contract_id,
+                status: row.status,
+                pdf_url: row.pdf_url,
+                reject_reason: row.reject_reason,
+                action_date: row.action_date || new Date().toISOString()
+            })
+        });
+    } catch(err) {
+        console.error("Failed to archive quotation row:", err);
+    }
+}
 
         function assignFileToInput(inputEl, file) {
             const dt = new DataTransfer();
@@ -901,6 +1116,153 @@ async function stampQuotationPdf(file, qpdDateStr) {
             preview.classList.add('hidden');
             preview.classList.remove('flex');
         }
+        async function tqSubmitQuotation(e) {
+    e.preventDefault();
+    if (!window.__techPerm?.canManageTech) { alert('Anda tiada kebenaran untuk sediakan quotation.'); return; }
+
+    const dateInput = document.getElementById('tq_qpb_date');
+    const originalDate = dateInput.dataset.originalDate || '';
+    const currentDateVal = dateInput.value;
+
+    if(tqOverwriteMode && originalDate && originalDate !== currentDateVal){
+        tqPendingSubmitEvent = e;
+        document.getElementById('tqDateChangeModalOverlay').classList.remove('hidden');
+        return;
+    }
+
+    await tqDoSubmit(e);
+}
+
+function tqCancelDateChange() {
+    document.getElementById('tqDateChangeModalOverlay').classList.add('hidden');
+    tqPendingSubmitEvent = null;
+}
+
+async function tqRevertDateAndProceed() {
+    document.getElementById('tqDateChangeModalOverlay').classList.add('hidden');
+    const dateInput = document.getElementById('tq_qpb_date');
+    if(dateInput.dataset.originalDate){
+        dateInput.value = dateInput.dataset.originalDate;
+    }
+    const e = tqPendingSubmitEvent;
+    tqPendingSubmitEvent = null;
+    if(e) await tqDoSubmit(e);
+}
+
+async function tqDoSubmit(e) {
+    const contractOpt = document.getElementById('tq_contract_id').selectedOptions[0];
+    const contractId = document.getElementById('tq_contract_id').value;
+    const prefix = document.getElementById('tq_id_prefix').value;
+    const num = document.getElementById('tq_id_num').value.trim();
+    if(!num){ alert('Please enter a Work Order ID!'); return; }
+    const primaryWorkId = normalizeWorkId(`${prefix}${num}`);
+
+    if(!contractId){ alert('Please select a Contract!'); return; }
+
+    const unitSelect = document.getElementById('tq_unit_id');
+    const unitText = unitSelect.options[unitSelect.selectedIndex]?.text || '';
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn.innerHTML;
+    submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+
+    try {
+        // Overwrite mode: JANGAN archive - kekalkan record sedia ada, terus timpa.
+        // Save as New / entry baharu: guna safety-net archive lama (kalau ada QUO-REJ tertinggal).
+        if(!tqOverwriteMode){
+            try {
+                const rejCheckRes = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(primaryWorkId)}&status=eq.QUO-REJ&select=*`, { headers: qHeaders });
+                const rejRows = await rejCheckRes.json();
+                for (const rejRow of rejRows) {
+                    const actionDate = rejRow.action_date || new Date().toISOString();
+                    await archiveRejectedQuotation(primaryWorkId, actionDate);
+
+                    const delRes = await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${rejRow.id}`, { method: 'DELETE', headers: qHeaders });
+                    if (!delRes.ok) {
+                        console.error(`Failed to delete old QUO-REJ row (id=${rejRow.id}) for work_id ${primaryWorkId}: HTTP ${delRes.status}`);
+                    }
+                }
+            } catch (archiveErr) {
+                console.error("Failed to archive old rejected quotation:", archiveErr);
+            }
+        }
+
+        // Burn cop DITERIMA (tarikh guna qpd_date) sebelum upload
+        try {
+            const originalFile = document.getElementById('tq_pdf_file').files[0];
+            const qpdDateVal = document.getElementById('tq_qpb_date').value;
+            if(originalFile && qpdDateVal){
+                const stampedFile = await stampQuotationPdf(originalFile, qpdDateVal);
+                assignFileToInput(document.getElementById('tq_pdf_file'), stampedFile);
+            }
+        } catch(stampErr) {
+            console.error('Gagal proses cop DITERIMA:', stampErr);
+        }
+
+        await uploadQuotationToR2('tq_pdf_file', primaryWorkId, unitText, 'tq_upload_status', 'tq_pdf_url');
+
+        const generatedPdfUrl = document.getElementById('tq_pdf_url').value;
+        if(!generatedPdfUrl) {
+            alert("Cloud upload process failed. Supabase data was not saved.");
+            return;
+        }
+
+        const tqDistrict = document.getElementById('tq_dist').value;
+        const tqLocPrefix = document.getElementById('tq_location_prefix').value;
+        const tqLocText = (document.getElementById('tq_location_text').value || '').trim();
+        const tqLocation = joinLocationPreset(tqLocPrefix, tqLocText).toUpperCase();
+        const tqDescription = (document.getElementById('tq_description').value || '').toUpperCase();
+
+        const tqBreakdown = {};
+        let tqTotalAmount = 0, tqAdditionalTotal = 0;
+        document.querySelectorAll('#tq_breakdown_container .tq_sec_amt').forEach(i => {
+            const sec = i.dataset.sec;
+            const base = parseFloat(i.dataset.rawValue || 0);
+            const extraInput = document.querySelector(`#tq_breakdown_container .tq_sec_extra[data-sec="${sec}"]`);
+            const extra = parseFloat(extraInput?.dataset.rawValue || 0);
+            tqBreakdown[sec] = { amt: base, extra: extra };
+            tqTotalAmount += base; tqAdditionalTotal += extra;
+        });
+
+        const payload = {
+            work_id: primaryWorkId,
+            contract_id: contractId,
+            status: 'QUOTATION',
+            pdf_url: generatedPdfUrl,
+            qpd_date: document.getElementById('tq_qpb_date').value || null,
+            district: tqDistrict,
+            location: tqLocation,
+            description: tqDescription,
+            section_category: tqBreakdown,
+            additional: tqAdditionalTotal,
+            amount_spent: tqTotalAmount + tqAdditionalTotal,
+            reject_reason: null
+        };
+
+        const res = await fetch(`${SB_URL}/rest/v1/quotations?on_conflict=work_id`, {
+            method: 'POST',
+            headers: { ...qHeaders, 'Prefer': 'resolution=merge-duplicates,return=representation' },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            alert(`Quotation & document successfully recorded!`);
+            closeQuotationModal();
+            resetQuotationModalForm();
+            fetchTechnicianDashboard();
+        } else {
+            let errBody = null;
+            try { errBody = await res.json(); } catch(_) { }
+            console.error("Supabase insert error:", errBody);
+            alert("Failed to save quotation to database: " + (errBody?.message || errBody?.hint || `HTTP ${res.status}`));
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Error while processing quotation: " + err.message);
+    } finally {
+        submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText;
+    }
+}
 
         // ============ BLUEFORM MODAL LOGIC ============
         let blueformModalInitialized = false;
@@ -1991,9 +2353,8 @@ async function qActionDeleteQuotation() {
                 });
             }
 
-            document.getElementById('techQuotationForm')?.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                if (!window.__techPerm?.canManageTech) { alert('Anda tiada kebenaran untuk sediakan quotation.'); return; }
+            document.getElementById('techQuotationForm')?.addEventListener('submit', tqSubmitQuotation);
+            document.getElementById('tq_id_prefix')?.addEventListener('change', tqAutoDetectWork);
 
                 const contractOpt = document.getElementById('tq_contract_id').selectedOptions[0];
                 const contractId = document.getElementById('tq_contract_id').value;
