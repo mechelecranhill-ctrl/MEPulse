@@ -303,7 +303,14 @@
             </div>
             <div>
                 <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Location</label>
-                <input type="text" id="tq_location" placeholder="Location" class="w-full text-sm border border-gray-300 rounded-lg p-2.5">
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <select id="tq_location_prefix" class="text-sm border border-gray-300 rounded-lg p-2.5" style="width:120px;flex-shrink:0;">      
+                        <option value="LRA">LRA</option>          
+                        <option value="BPH">BPH</option>      
+                        <option value="RESERVOIR">RESERVOIR</option>       
+                    </select>
+                    <input type="text" id="tq_location_text" placeholder="Location" class="w-full text-sm border border-gray-300 rounded-lg p-2.5">   
+                </div>
             </div>
             <div>
                 <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Work Description</label>
@@ -1010,6 +1017,25 @@ async function stampQuotationPdf(file, qpdDateStr) {
 
         function woEscapeAttr(str){ return String(str).replace(/"/g, '&quot;'); }
 
+        // ============ LOCATION PRESET (LRA / BPH / RESERVOIR) ============
+function splitLocationPreset(raw) {
+    raw = (raw || '').trim().toUpperCase();
+    const presets = ['RESERVOIR', 'BPH', 'LRA']; // check RESERVOIR & BPH dulu sebab lebih spesifik
+    for (const p of presets) {
+        if (raw.startsWith(p)) {
+            let rest = raw.substring(p.length).trim();
+            rest = rest.replace(/^[:\-,]?\s*/, '');
+            return { prefix: p, rest: rest };
+        }
+    }
+    return { prefix: 'LRA', rest: raw };
+}
+
+function joinLocationPreset(prefix, rest) {
+    rest = (rest || '').trim();
+    return rest ? `${prefix} ${rest}` : prefix;
+}
+
         function woFormatCurrencyInput(input) {
             let digits = input.value.replace(/\D/g, '');
             if (!digits) digits = '0';
@@ -1105,7 +1131,10 @@ async function stampQuotationPdf(file, qpdDateStr) {
                 document.querySelectorAll('.wo-id-card').forEach(card => {
                     const workId = card.dataset.workId; if(!workId) return;
                     if(!woWorkIdCardDataMap[workId]) woWorkIdCardDataMap[workId] = {};
-                    woWorkIdCardDataMap[workId].location = card.querySelector('.wo_card_location')?.value || '';
+                    woWorkIdCardDataMap[workId].location = joinLocationPreset(
+                        card.querySelector('.wo_card_location_prefix')?.value || 'LRA',
+                        card.querySelector('.wo_card_location_text')?.value || ''
+                    );
                     woWorkIdCardDataMap[workId].description = card.querySelector('.wo_card_desc')?.value || '';
                     if(!woWorkIdCardDataMap[workId].section_category) woWorkIdCardDataMap[workId].section_category = {};
 
@@ -1131,11 +1160,19 @@ async function stampQuotationPdf(file, qpdDateStr) {
                 card.className = 'wo-id-card bg-gray-50 border border-gray-200 rounded-xl p-3';
                 card.dataset.workId = workId;
 
-                let html = `
-                    <span class="inline-block bg-blue-100 text-blue-800 text-[11px] font-bold px-2 py-0.5 rounded-full mb-2">${workId}</span>
-                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Location</label>
-                    <input type="text" class="wo_card_location w-full text-sm border border-gray-300 rounded-lg p-2 mb-2" value="${woEscapeAttr(saved.location || '')}" placeholder="Location">
-                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Work Description</label>
+                const locSplit = splitLocationPreset(saved.location || '');
+                let html = ` 
+    <span class="inline-block bg-blue-100 text-blue-800 text-[11px] font-bold px-2 py-0.5 rounded-full mb-2">${workId}</span> 
+    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Location</label>
+    <div style="display:flex; gap:8px; align-items:center;" class="mb-2">
+        <select class="wo_card_location_prefix text-sm border border-gray-300 rounded-lg p-2" style="width:120px;flex-shrink:0;"> 
+            <option value="LRA" ${locSplit.prefix === 'LRA' ? 'selected' : ''}>LRA</option>
+            <option value="BPH" ${locSplit.prefix === 'BPH' ? 'selected' : ''}>BPH</option>
+            <option value="RESERVOIR" ${locSplit.prefix === 'RESERVOIR' ? 'selected' : ''}>RESERVOIR</option>
+        </select>
+        <input type="text" class="wo_card_location_text w-full text-sm border border-gray-300 rounded-lg p-2" value="${woEscapeAttr(locSplit.rest)}" placeholder="Location">
+    </div>
+    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Work Description</label>
                     <textarea class="wo_card_desc w-full text-sm border border-gray-300 rounded-lg p-2 mb-2" rows="2" placeholder="Description for ${workId}">${woEscapeAttr(saved.description || '')}</textarea>
                     <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cost Breakdown</label>
                     <div class="grid grid-cols-1 gap-2">
@@ -1807,7 +1844,10 @@ async function qActionDeleteQuotation() {
                 document.querySelectorAll('#wo_id_cards_container .wo-id-card').forEach(card => {
                     const workId = card.dataset.workId; if(!workId) return;
         
-                    const location = (card.querySelector('.wo_card_location')?.value || '').toUpperCase();
+                    const location = joinLocationPreset(
+                        card.querySelector('.wo_card_location_prefix')?.value || 'LRA',
+                        card.querySelector('.wo_card_location_text')?.value || ''
+                    ).toUpperCase();
                     const description = (card.querySelector('.wo_card_desc')?.value || '').toUpperCase();
 
                     const breakdown = {};
@@ -1988,7 +2028,9 @@ async function qActionDeleteQuotation() {
                     }
 
                     const tqDistrict = document.getElementById('tq_dist').value;
-                    const tqLocation = (document.getElementById('tq_location').value || '').toUpperCase();
+                    const tqLocPrefix = document.getElementById('tq_location_prefix').value;
+                    const tqLocText = (document.getElementById('tq_location_text').value || '').trim();
+                    const tqLocation = joinLocationPreset(tqLocPrefix, tqLocText).toUpperCase();
                     const tqDescription = (document.getElementById('tq_description').value || '').toUpperCase();
 
                     const tqBreakdown = {};
