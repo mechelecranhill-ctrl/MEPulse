@@ -40,10 +40,10 @@ class AppSidebar extends HTMLElement {
                         Blueform Approvals <span class="arrow">▼</span>
                     </a>
                     <div class="submenu" id="quotationMenu">
-                        <a href="app-tech.html" class="menu-link">Initialisation</a>
+                        <a href="app-tech.html" class="menu-link">Document Preparations</a>
                         <a href="app-exec.html" class="menu-link">Request for Approval</a>
-                        <a href="app-sect.html" class="menu-link">Verification</a>
-                        <a href="app-dept.html" class="menu-link">Approval</a>
+                        <a href="app-sect.html" class="menu-link">Review & Verification</a>
+                        <a href="app-dept.html" class="menu-link">Approval Endorsement</a>
                     </div>
                 </div>
 
