@@ -1952,14 +1952,14 @@ async function woActionCancelBlueform() {
         const rec = rows[0];
 
         const originalWorkId = rec.work_id;
-        const reasonForQuotation = rec.reject_reason || 'Blueform dibatalkan (CANCEL).';
 
         const zeroedBreakdown = {};
         Object.keys(rec.section_category || {}).forEach(sec => {
             zeroedBreakdown[sec] = { amt: 0, extra: 0 };
         });
 
-        // 1. Rename row semasa jadi rekod sejarah (-CNX)
+        // Rename row semasa jadi rekod sejarah (-CNX). Tiada row baharu dicipta -
+        // work_id asal TIDAK dihidupkan semula sebagai QUO-REJ.
         const patchRes = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${rec.id}`, {
             method: 'PATCH',
             headers: qHeaders,
@@ -1973,39 +1973,6 @@ async function woActionCancelBlueform() {
         });
         if (!patchRes.ok) throw new Error(`HTTP ${patchRes.status}`);
 
-        // 2. Cipta SEMULA row work_id asal sebagai QUO-REJ, bawa balik data
-        //    quotation supaya teknisi boleh resubmit di bawah work_id sama.
-        //    Ini gantikan "sync ke table quotations berasingan" yang dah tak
-        //    wujud lagi lepas penggabungan table.
-        const revivePayload = {
-            work_id: originalWorkId,
-            contract_id: rec.contract_id,
-            status: 'QUO-REJ',
-            reject_reason: reasonForQuotation,
-            pdf_url: rec.pdf_url,
-            qpd_date: rec.qpd_date,
-            district: rec.district,
-            location: rec.location,
-            description: rec.description,
-            section_category: rec.section_category,
-            additional: rec.additional,
-            amount_spent: rec.amount_spent,
-            sequence_no: null
-        };
-
-        const reviveRes = await fetch(`${SB_URL}/rest/v1/work_orders`, {
-            method: 'POST',
-            headers: { ...qHeaders, 'Prefer': 'return=representation' },
-            body: JSON.stringify(revivePayload)
-        });
-
-        if (!reviveRes.ok) {
-            let errBody = null;
-            try { errBody = await reviveRes.json(); } catch(_) {}
-            console.error(`Failed to revive quotation for ${originalWorkId}: HTTP ${reviveRes.status}`, errBody);
-            alert(`Blueform dibatalkan, tetapi GAGAL kemaskini status quotation ke QUO-REJ: ${errBody?.message || reviveRes.status}`);
-        }
-
         closeWoActionModal();
         fetchTechnicianDashboard();
     } catch (err) {
@@ -2013,6 +1980,7 @@ async function woActionCancelBlueform() {
         alert('Failed to cancel blueform: ' + err.message);
     }
 }
+        
 async function woActionProcessResubmit() {
     if (!woActionCurrentItem) return;
     const workId = woActionCurrentItem.work_id;
