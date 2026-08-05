@@ -72,7 +72,8 @@ async function fetchGroupMembers(contractId, district, sequenceNo) {
 }
 
 // Simpan keputusan SATU work order. Kalau standalone -> terus commit.
-// Kalau grouped -> stage dulu, commit SEMUA ahli group hanya bila semua dah decide.
+// Kalau grouped -> stage dulu, commit SEMUA ahli group hanya bila semua dah decide
+// ATAU jika terdapat man-mana permohonan yang REJECTED.
 async function stageGroupDecision(workId, contractId, district, sequenceNo, nextStatus, reason, stampStage) {
     if (!sequenceNo) {
         const payload = { status: nextStatus, reject_reason: reason || null };
@@ -85,6 +86,47 @@ async function stageGroupDecision(workId, contractId, district, sequenceNo, next
         });
         return { finalized: true, waiting: false };
     }
+
+    // Update pending status & reason untuk item semasa dahulu
+    await fetch(`${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}`, {
+        method: 'PATCH', headers,
+        body: JSON.stringify({ pending_status: nextStatus, pending_reject_reason: reason || null })
+    });
+
+    const members = await fetchGroupMembers(contractId, district, sequenceNo);
+    
+    // Semak jika ADA MANA-MANA ahli yang ditolak (Rejected) atau jika SEMUA dah buat keputusan
+    const hasRejection = members.some(m => 
+        (m.work_id === workId ? nextStatus : m.pending_status || '').includes('REJ')
+    );
+    const allDecided = members.length > 0 && members.every(m => m.pending_status || m.work_id === workId);
+
+    // Jika belum semua buat keputusan DAN tiada langsung rejection, teruskan menunggu (waiting)
+    if (!allDecided && !hasRejection) return { finalized: false, waiting: true };
+
+    // Jika ada REJECTION atau SEMUA dah diluluskan, selesaikan (Finalize) SEMUA ahli dalam group ini
+    for (const m of members) {
+        const finalStatus = m.work_id === workId ? nextStatus : (m.pending_status || m.status);
+        const finalReason = m.work_id === workId ? (reason || null) : (m.pending_reject_reason || m.reject_reason || null);
+        
+        const payload = { 
+            status: finalStatus, 
+            reject_reason: finalReason, 
+            pending_status: null, 
+            pending_reject_reason: null 
+        };
+
+        if (stampStage && !String(finalStatus).includes('REJ')) {
+            const stamps = await mergeApprovalStamp('work_orders', m.work_id, stampStage);
+            if (stamps) payload.approval_stamps = stamps;
+        }
+
+        await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${m.id}`, {
+            method: 'PATCH', headers, body: JSON.stringify(payload)
+        });
+    }
+    return { finalized: true, waiting: false };
+}
 
     await fetch(`${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}`, {
         method: 'PATCH', headers,
