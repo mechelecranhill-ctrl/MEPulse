@@ -2331,32 +2331,41 @@ async function qActionDeleteQuotation() {
                 });
 
                 for(const workIdValue of currentWorkIds){
-                    const payload = perWorkIdPayload[workIdValue]; if(!payload) continue;
-                    const stamps = await mergeApprovalStamp('work_orders', workIdValue, 'tech_initial');
-                    if (stamps) payload.approval_stamps = stamps;
-                    const checkRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}`, { headers: qHeaders });
-                    const existing = await checkRes.json();
+    const payload = perWorkIdPayload[workIdValue]; if(!payload) continue;
+    const stamps = await mergeApprovalStamp('work_orders', workIdValue, 'tech_initial');
+    if (stamps) payload.approval_stamps = stamps;
+    const checkRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}`, { headers: qHeaders });
+    const existing = await checkRes.json();
 
-                    if(existing.length > 0){
-                        const existingStatus = existing[0].status || '';
-                        const isRejected = existingStatus.includes('REJ');
+    if(existing.length > 0){
+        const existingRow = existing[0];
+        const existingStatus = existingRow.status || '';
+        const isRejected = existingStatus.includes('REJ');
 
-                        const patchPayload = { ...payload, sequence_no: sequenceToUse, district: districtSelected };
+        const patchPayload = { ...payload, sequence_no: sequenceToUse, district: districtSelected };
 
-                        if(isRejected){
-                            patchPayload.status = 'BLUEFORM';
-                            patchPayload.reject_reason = null;
-                        }
+        if(isRejected){
+            patchPayload.status = 'BLUEFORM';
+            patchPayload.reject_reason = null;
+        }
 
-                        await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`, {
-                            method: 'PATCH', headers: qHeaders, body: JSON.stringify(patchPayload)
-                        });
-                    } else {
-                        await fetch(`${SB_URL}/rest/v1/work_orders`, {
-                            method: 'POST', headers: qHeaders, body: JSON.stringify(payload)
-                        });
-                    }
-                }
+        // Row ni belum pernah masuk fasa Blueform sebelum ini (masih tersimpan
+        // sebagai QUOTATION/QUO-APP/QUO-REJ, atau blueform_created_at belum diisi
+        // dari data lama) - catat tarikh Blueform dicipta buat kali pertama.
+        if(!existingRow.blueform_created_at){
+            patchPayload.blueform_created_at = new Date().toISOString();
+        }
+
+        await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`, {
+            method: 'PATCH', headers: qHeaders, body: JSON.stringify(patchPayload)
+        });
+    } else {
+        payload.blueform_created_at = new Date().toISOString();
+        await fetch(`${SB_URL}/rest/v1/work_orders`, {
+            method: 'POST', headers: qHeaders, body: JSON.stringify(payload)
+        });
+    }
+}
 
                 for(const removedId of woOriginalLoadedWorkIds.filter(id => !currentWorkIds.includes(id))){
                     await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(removedId)}`, { method: 'DELETE', headers: qHeaders });
