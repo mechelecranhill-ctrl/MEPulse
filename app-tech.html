@@ -2051,21 +2051,23 @@ async function woActionCancelBlueform() {
         if (!patchRes.ok) throw new Error(`HTTP ${patchRes.status}`);
 
         // Sync balik ke quotation asal (guna work_id SEBELUM ditukar -CNX)
-        try {
-            const quoPatchRes = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(originalWorkId)}`, {
-                method: 'PATCH',
-                headers: qHeaders,
-                body: JSON.stringify({
-                    status: 'QUO-REJ',
-                    reject_reason: reasonForQuotation,
-                    revision_in_progress: false
-                })
-            });
-            if (!quoPatchRes.ok) {
-                console.error(`Failed to sync quotation status for ${originalWorkId}: HTTP ${quoPatchRes.status}`);
-            }
-        } catch (quoErr) {
-            console.error('Failed to sync quotation status after cancel:', quoErr);
+        const quoPatchRes = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(originalWorkId)}`, {
+            method: 'PATCH',
+            headers: qHeaders,
+            body: JSON.stringify({
+                status: 'QUO-REJ',
+                reject_reason: reasonForQuotation
+                // 'revision_in_progress' dibuang - column ini kemungkinan tidak wujud
+                // dalam table quotations dan menyebabkan SELURUH PATCH gagal (400),
+                // jadi status quotation tak berubah dari QUO-APP.
+            })
+        });
+
+        if (!quoPatchRes.ok) {
+            let errBody = null;
+            try { errBody = await quoPatchRes.json(); } catch(_) {}
+            console.error(`Failed to sync quotation status for ${originalWorkId}: HTTP ${quoPatchRes.status}`, errBody);
+            alert(`Blueform dibatalkan, tetapi GAGAL kemaskini status quotation ke QUO-REJ: ${errBody?.message || quoPatchRes.status}`);
         }
 
         closeWoActionModal();
