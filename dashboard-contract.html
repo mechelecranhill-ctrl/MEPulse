@@ -612,7 +612,7 @@
     try {
         const [resW, resI] = await Promise.all([
             // 1. Abaikan status CANCEL, REJ, EXEC-REJ, HOS-REJ, dan HOD-REJ dari senarai Work Orders
-            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}&status=not.in.(CANCEL,REJ,EXEC-REJ,HOS-REJ,HOD-REJ)&select=interim_no,section_category,status`, { headers }),
+            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}&status=not.in.(CANCEL,REJ,EXEC-REJ,HOS-REJ,HOD-REJ,QUOTATION,QUO-APP,QUO-REJ)&select=interim_no,section_category,status`, { headers }),
             
             // 2. Ambil data interims/claims yang berkaitan
             fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${currentContract.id}&order=date_received.asc&select=claim_breakdown`, { headers })
@@ -620,7 +620,6 @@
 
         let rawWO = await resW.json();
         
-        // Penyesuaian: Mengubah huruf / penandaan status 'Claimed' kepada 'CLAIMED' sekiranya wujud
         currentWO = rawWO.map(wo => {
             if (wo.status && wo.status.toLowerCase() === 'claimed') {
                 wo.status = 'CLAIMED';
