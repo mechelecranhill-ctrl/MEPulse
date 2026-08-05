@@ -662,7 +662,7 @@ function applyTechPermissionUI(perm) {
 
         async function archiveRejectedQuotation(workId, actionDate) {
             try {
-                const checkRes = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(workId)}&status=eq.QUO-REJ`, { headers: qHeaders });
+                const checkRes = await fetch(`${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}&status=eq.QUO-REJ`, { headers: qHeaders });
                 const rows = await checkRes.json();
                 if (rows && rows.length > 0) {
                     const row = rows[0];
@@ -858,7 +858,7 @@ function tqResetDetectState() {
 
     tqDetectTimer = setTimeout(async () => {
         try {
-            const res = await fetch(`${SB_URL}/rest/v1/quotations?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workId)}&select=*`, { headers: qHeaders });
+            const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workId)}&status=in.(QUOTATION,QUO-APP,QUO-REJ)&select=*`, { headers: qHeaders });
             const rows = await res.json();
             if(!Array.isArray(rows) || rows.length === 0) return;
 
@@ -962,7 +962,7 @@ function tqConfirmSaveAsNew() {
 }
         async function tqGetNextSuffixLetter(contractId, prefix, num) {
     try {
-        const res = await fetch(`${SB_URL}/rest/v1/quotations?contract_id=eq.${contractId}&select=work_id`, { headers: qHeaders });
+        const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&select=work_id`, { headers: qHeaders });
         const rows = await res.json();
         const base = `${prefix}${num}`;
         const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1021,24 +1021,6 @@ function tqCloseDetectModal() {
     tqPendingDetect = null;
 }
 
-async function archiveQuotationRow(row) {
-    try {
-        await fetch(`${SB_URL}/rest/v1/quotations_history`, {
-            method: 'POST',
-            headers: qHeaders,
-            body: JSON.stringify({
-                work_id: row.work_id,
-                contract_id: row.contract_id,
-                status: row.status,
-                pdf_url: row.pdf_url,
-                reject_reason: row.reject_reason,
-                action_date: row.action_date || new Date().toISOString()
-            })
-        });
-    } catch(err) {
-        console.error("Failed to archive quotation row:", err);
-    }
-}
         async function tqCancelStaleRejectedWorkOrder(workId) {
     try {
         const res = await fetch(`${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}&select=*`, { headers: qHeaders });
@@ -1275,33 +1257,26 @@ async function tqDoSubmit(e) {
     const originalBtnText = submitBtn.innerHTML;
     submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
 
-        try {
-    // Auto-cancel blueform lama yang rejected (EXEC-REJ/HOS-REJ/HOD-REJ) di bawah Work ID yang
-    // sama - supaya bila quotation ni diluluskan semula (QUO-APP), dashboard tak "warisi" status
-    // rejected dari blueform lama yang dah tak relevan.
-    await tqCancelStaleRejectedWorkOrder(primaryWorkId);
+    try {
+        await tqCancelStaleRejectedWorkOrder(primaryWorkId);
 
-    // Overwrite mode: JANGAN archive - kekalkan record sedia ada, terus timpa.
-    // Save as New / entry baharu: guna safety-net archive lama (kalau ada QUO-REJ tertinggal).
-    if(!tqOverwriteMode){
+        // Overwrite mode: JANGAN archive - kekalkan record sedia ada, terus timpa.
+        if(!tqOverwriteMode){
             try {
-                const rejCheckRes = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(primaryWorkId)}&status=eq.QUO-REJ&select=*`, { headers: qHeaders });
+                const rejCheckRes = await fetch(`${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(primaryWorkId)}&status=eq.QUO-REJ&select=*`, { headers: qHeaders });
                 const rejRows = await rejCheckRes.json();
                 for (const rejRow of rejRows) {
                     const actionDate = rejRow.action_date || new Date().toISOString();
                     await archiveRejectedQuotation(primaryWorkId, actionDate);
-
-                    const delRes = await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${rejRow.id}`, { method: 'DELETE', headers: qHeaders });
-                    if (!delRes.ok) {
-                        console.error(`Failed to delete old QUO-REJ row (id=${rejRow.id}) for work_id ${primaryWorkId}: HTTP ${delRes.status}`);
-                    }
+                    // TIADA DELETE di sini - work_orders.work_id unique, upsert
+                    // (on_conflict=work_id) di bawah akan terus TIMPA row QUO-REJ
+                    // ini dengan data quotation baharu (row sama, id tetap sama).
                 }
             } catch (archiveErr) {
                 console.error("Failed to archive old rejected quotation:", archiveErr);
             }
         }
 
-        // Burn cop DITERIMA (tarikh guna qpd_date) sebelum upload
         try {
             const originalFile = document.getElementById('tq_pdf_file').files[0];
             const qpdDateVal = document.getElementById('tq_qpb_date').value;
@@ -1338,6 +1313,8 @@ async function tqDoSubmit(e) {
             tqTotalAmount += base; tqAdditionalTotal += extra;
         });
 
+        // Payload terus ke work_orders. sequence_no/interim_no SENGAJA tidak
+        // disentuh - hanya diisi bila row naik taraf ke BLUEFORM (Fasa 1).
         const payload = {
             work_id: primaryWorkId,
             contract_id: contractId,
@@ -1353,24 +1330,13 @@ async function tqDoSubmit(e) {
             reject_reason: null
         };
 
-        const res = await fetch(`${SB_URL}/rest/v1/quotations?on_conflict=work_id`, {
+        const res = await fetch(`${SB_URL}/rest/v1/work_orders?on_conflict=work_id`, {
             method: 'POST',
             headers: { ...qHeaders, 'Prefer': 'resolution=merge-duplicates,return=representation' },
             body: JSON.stringify(payload)
         });
 
         if (res.ok) {
-            // Only now — after the new quotation is confirmed saved — remove the old one.
-            if(tqModeSaveAsNew && tqOriginalRowForSaveAsNew){
-                try {
-                    await archiveQuotationRow(tqOriginalRowForSaveAsNew);
-                    await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${tqOriginalRowForSaveAsNew.id}`, { method: 'DELETE', headers: qHeaders });
-                } catch(err) {
-                    console.error('Failed to archive/delete old quotation after successful Save as New:', err);
-                }
-                tqOriginalRowForSaveAsNew = null;
-            }
-
             alert(`Quotation & document successfully recorded!`);
             closeQuotationModal();
             resetQuotationModalForm();
@@ -1388,7 +1354,6 @@ async function tqDoSubmit(e) {
         submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText;
     }
 }
-
         // ============ BLUEFORM MODAL LOGIC ============
         let blueformModalInitialized = false;
         let blueformUnitsReadyPromise = null;
@@ -1715,9 +1680,10 @@ function joinLocationPreset(prefix, rest) {
                     const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&or=(${filter})&select=*`, { headers: qHeaders });
                     const matches = await res.json();
                     if(!Array.isArray(matches) || matches.length === 0) {
-                        await woAutofillFromQuotations(currentIds);
-                        return;
-                    }
+    // Tiada rekod langsung untuk Work ID ni (bukan quotation, bukan
+    // blueform) - biarkan borang kosong untuk diisi baharu.
+    return;
+}
 
                     const sequenceNo = matches[0].sequence_no;
                     const groupRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&sequence_no=eq.${encodeURIComponent(sequenceNo)}&select=*`, { headers: qHeaders });
@@ -1728,50 +1694,6 @@ function joinLocationPreset(prefix, rest) {
                     woShowDetectModal(group);
                 } catch(err) { console.error(err); }
             }, 400);
-        }
-
-        async function woAutofillFromQuotations(workIds) {
-            try {
-                const filter = workIds.map(id => `work_id.eq.${encodeURIComponent(id)}`).join(',');
-                const res = await fetch(`${SB_URL}/rest/v1/quotations?or=(${filter})&select=work_id,district,location,description,section_category`, { headers: qHeaders });
-                const quotes = await res.json();
-                if(!Array.isArray(quotes) || quotes.length === 0) return;
-
-                let districtToSet = null;
-                quotes.forEach(q => {
-                    const hasData = q.location || q.description || (q.section_category && Object.keys(q.section_category).length > 0);
-                    if(!woWorkIdCardDataMap[q.work_id] && hasData){
-                        woWorkIdCardDataMap[q.work_id] = {
-                            location: q.location || '',
-                            description: q.description || '',
-                            section_category: structuredClone(q.section_category || {})
-                        };
-                    }
-                    if(!districtToSet && q.district) districtToSet = q.district;
-                });
-
-                // Padankan district ikut nilai (case/space-insensitive), bukan sekadar assign
-                // terus yang boleh gagal senyap jika format tidak sepadan 100%.
-                const distSel = document.getElementById('wo_dist');
-                if(distSel && !distSel.value && districtToSet){
-                    const target = districtToSet.trim().toUpperCase();
-                    const matchOpt = Array.from(distSel.options).find(o => o.value.trim().toUpperCase() === target);
-                    if(matchOpt){
-                        distSel.value = matchOpt.value;
-                    } else {
-                        const opt = document.createElement('option');
-                        opt.value = districtToSet;
-                        opt.text = districtToSet + ' (dari quotation)';
-                        distSel.appendChild(opt);
-                        distSel.value = districtToSet;
-                        console.warn(`District "${districtToSet}" dari quotation tiada dalam senarai district kontrak semasa.`);
-                    }
-                }
-
-                woRenderWorkIdCards(true);
-            } catch(err) {
-                console.error('Failed to autofill blueform from quotations:', err);
-            }
         }
 
         function woShowDetectModal(group) {
@@ -2037,6 +1959,7 @@ async function woActionCancelBlueform() {
             zeroedBreakdown[sec] = { amt: 0, extra: 0 };
         });
 
+        // 1. Rename row semasa jadi rekod sejarah (-CNX)
         const patchRes = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${rec.id}`, {
             method: 'PATCH',
             headers: qHeaders,
@@ -2050,24 +1973,37 @@ async function woActionCancelBlueform() {
         });
         if (!patchRes.ok) throw new Error(`HTTP ${patchRes.status}`);
 
-        // Sync balik ke quotation asal (guna work_id SEBELUM ditukar -CNX)
-        const quoPatchRes = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(originalWorkId)}`, {
-            method: 'PATCH',
-            headers: qHeaders,
-            body: JSON.stringify({
-                status: 'QUO-REJ',
-                reject_reason: reasonForQuotation
-                // 'revision_in_progress' dibuang - column ini kemungkinan tidak wujud
-                // dalam table quotations dan menyebabkan SELURUH PATCH gagal (400),
-                // jadi status quotation tak berubah dari QUO-APP.
-            })
+        // 2. Cipta SEMULA row work_id asal sebagai QUO-REJ, bawa balik data
+        //    quotation supaya teknisi boleh resubmit di bawah work_id sama.
+        //    Ini gantikan "sync ke table quotations berasingan" yang dah tak
+        //    wujud lagi lepas penggabungan table.
+        const revivePayload = {
+            work_id: originalWorkId,
+            contract_id: rec.contract_id,
+            status: 'QUO-REJ',
+            reject_reason: reasonForQuotation,
+            pdf_url: rec.pdf_url,
+            qpd_date: rec.qpd_date,
+            district: rec.district,
+            location: rec.location,
+            description: rec.description,
+            section_category: rec.section_category,
+            additional: rec.additional,
+            amount_spent: rec.amount_spent,
+            sequence_no: null
+        };
+
+        const reviveRes = await fetch(`${SB_URL}/rest/v1/work_orders`, {
+            method: 'POST',
+            headers: { ...qHeaders, 'Prefer': 'return=representation' },
+            body: JSON.stringify(revivePayload)
         });
 
-        if (!quoPatchRes.ok) {
+        if (!reviveRes.ok) {
             let errBody = null;
-            try { errBody = await quoPatchRes.json(); } catch(_) {}
-            console.error(`Failed to sync quotation status for ${originalWorkId}: HTTP ${quoPatchRes.status}`, errBody);
-            alert(`Blueform dibatalkan, tetapi GAGAL kemaskini status quotation ke QUO-REJ: ${errBody?.message || quoPatchRes.status}`);
+            try { errBody = await reviveRes.json(); } catch(_) {}
+            console.error(`Failed to revive quotation for ${originalWorkId}: HTTP ${reviveRes.status}`, errBody);
+            alert(`Blueform dibatalkan, tetapi GAGAL kemaskini status quotation ke QUO-REJ: ${errBody?.message || reviveRes.status}`);
         }
 
         closeWoActionModal();
@@ -2077,7 +2013,6 @@ async function woActionCancelBlueform() {
         alert('Failed to cancel blueform: ' + err.message);
     }
 }
-
 async function woActionProcessResubmit() {
     if (!woActionCurrentItem) return;
     const workId = woActionCurrentItem.work_id;
@@ -2209,7 +2144,7 @@ async function qActionDeleteQuotation() {
     if (!confirm(`Confirm DELETE quotation ${item.work_id}? This action cannot be undone.`)) return;
 
     try {
-        const res = await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${item.id}`, { headers: qHeaders });
+        const res = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${item.id}`, { headers: qHeaders });
         const rows = await res.json();
         if (!rows || rows.length === 0) throw new Error('Record not found.');
         const rec = rows[0];
@@ -2236,9 +2171,7 @@ async function qActionDeleteQuotation() {
         }
 
         // 2. Padam rekod dari Supabase
-        const supaDelRes = await fetch(`${SB_URL}/rest/v1/quotations?id=eq.${item.id}`, {
-            method: 'DELETE', headers: qHeaders
-        });
+        const supaDelRes = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${item.id}`, { method: 'DELETE', headers: qHeaders });
         if (!supaDelRes.ok) throw new Error(`HTTP ${supaDelRes.status}`);
 
         closeQActionModal();
@@ -2278,29 +2211,6 @@ async function qActionDeleteQuotation() {
                 }
             }
         }
-
-        async function woSyncQuotationFromBlueform(workId, payload) {
-    try {
-        const qPayload = {
-            district: payload.district,
-            location: payload.location,
-            description: payload.description,
-            section_category: payload.section_category,
-            additional: payload.additional,
-            amount_spent: payload.amount_spent
-        };
-        const res = await fetch(`${SB_URL}/rest/v1/quotations?work_id=eq.${encodeURIComponent(workId)}`, {
-            method: 'PATCH',
-            headers: qHeaders,
-            body: JSON.stringify(qPayload)
-        });
-        if (!res.ok) {
-            console.error(`Failed to sync quotation data for ${workId}: HTTP ${res.status}`);
-        }
-    } catch (err) {
-        console.error('Failed to sync quotation data from blueform overwrite:', err);
-    }
-}
 
         async function woSubmitBlueform(e) {
             e.preventDefault();
@@ -2448,10 +2358,6 @@ async function qActionDeleteQuotation() {
                             method: 'POST', headers: qHeaders, body: JSON.stringify(payload)
                         });
                     }
-
-                    // Sync balik ke quotation yang sepadan (work_id sama) supaya location,
-                    // description, cost breakdown & jumlah tetap konsisten dgn blueform terkini.
-                    await woSyncQuotationFromBlueform(workIdValue, payload);
                 }
 
                 for(const removedId of woOriginalLoadedWorkIds.filter(id => !currentWorkIds.includes(id))){
@@ -2553,13 +2459,11 @@ async function qActionDeleteQuotation() {
 
             const currentStaffId = user.id;
 
-            // Dept Head / Pemangku KJ -> nampak semua unit (setaraf admin utk skop data)
             if (perm.canActDept) {
                 scopeIsAll = true;
             } else {
                 const unitIdSet = new Set();
 
-                // 1. Unit yang di-assign terus
                 const { data: assignments, error: assError } = await supabaseClient
                     .from('staff_unit_assignment')
                     .select('unit_id')
@@ -2568,14 +2472,12 @@ async function qActionDeleteQuotation() {
                 if (assError) throw assError;
                 (assignments || []).forEach(a => unitIdSet.add(a.unit_id));
 
-                // 2. Ketua Seksyen / Pemangku Ketua Seksyen -> semua unit bawah seksyen dia
                 if (perm.canActSection) {
                     const { data: secAssignments, error: secError } = await supabaseClient
                         .from('staff_section_assignment')
                         .select('section_id')
                         .eq('staff_id', currentStaffId)
                         .eq('active', true);
-                    // NOTE: tukar 'is_acting' -> 'active' kalau column sebenar bukan is_acting
 
                     if (!secError && secAssignments && secAssignments.length > 0) {
                         const sectionIds = secAssignments.map(s => s.section_id);
@@ -2599,87 +2501,36 @@ async function qActionDeleteQuotation() {
             }
         }
 
-        // Prepare Queries
-        let quotationsQuery = supabaseClient
-            .from('quotations')
-            .select(`
-                    id, work_id, status, contract_id, pdf_url, reject_reason, action_date,
-                    district, location, description, section_category,
-                    contract!inner (id, contract_name, contract_code, unit_id)
-            `)
-            .in('status', ['QUOTATION', 'QUO-APP', 'QUO-REJ']);
-        if (!scopeIsAll) quotationsQuery = quotationsQuery.in('contract.unit_id', activeUnitIds);
-
-        let blueformQuery = supabaseClient
+        // SATU query untuk kedua-dua seksyen - selepas penggabungan table,
+        // semua peringkat status hidup dalam work_orders sahaja.
+        let woQuery = supabaseClient
             .from('work_orders')
             .select(`
-                    id, work_id, status, sequence_no, contract_id, district, reject_reason,
+                    id, work_id, status, contract_id, pdf_url, reject_reason, action_date,
+                    district, location, description, section_category, sequence_no,
                     contract!inner (id, contract_name, contract_code, unit_id)
             `)
-            .in('status', ['APP-HOD', 'EXEC-REJ', 'HOS-REJ', 'HOD-REJ']); 
-        if (!scopeIsAll) blueformQuery = blueformQuery.in('contract.unit_id', activeUnitIds);
+            .in('status', ['QUOTATION', 'QUO-APP', 'QUO-REJ', 'APP-HOD', 'EXEC-REJ', 'HOS-REJ', 'HOD-REJ']);
+        if (!scopeIsAll) woQuery = woQuery.in('contract.unit_id', activeUnitIds);
 
-                const [qResult, bResult] = await Promise.all([quotationsQuery, blueformQuery]);
+        const { data: allRows, error: woError } = await woQuery;
+        if (woError) throw woError;
 
-                if (qResult.error) throw qResult.error;
-                if (bResult.error) throw bResult.error;
+        const QUO_STATUSES = ['QUOTATION', 'QUO-APP', 'QUO-REJ'];
+        const quotationData = (allRows || []).filter(r => QUO_STATUSES.includes(r.status));
+        const blueformData = (allRows || []).filter(r => !QUO_STATUSES.includes(r.status));
 
-                const quotationData = qResult.data || [];
-                const blueformData = bResult.data || [];
+        techQuotationItemsById = {};
+        qCancelSelectionMode();
 
-                const { data: crossQuotes, error: crossQError } = await supabaseClient
-                    .from('quotations')
-                    .select('work_id, pdf_url');
-                    
-                if (!crossQError && crossQuotes) {
-                    const quoteMap = {};
-                    crossQuotes.forEach(q => { if (q.work_id) quoteMap[q.work_id] = q.pdf_url; });
-                    blueformData.forEach(item => { item.mapped_pdf_url = quoteMap[item.work_id] || null; });
-                }
+        renderTechnicianSection('quotations-container', quotationData, 'QUOTATION');
+        renderTechnicianSection('blueforms-container', blueformData, 'BLUEFORM');
 
-                const quotationWorkIds = quotationData.map(q => q.work_id).filter(Boolean);
-                let workOrderMap = {};
-                if (quotationWorkIds.length > 0) {
-                    const { data: matchingWOs, error: matchError } = await supabaseClient
-                        .from('work_orders')
-                        .select('work_id, status, reject_reason')
-                        .in('work_id', quotationWorkIds);
-
-                    if (!matchError && matchingWOs) {
-                        matchingWOs.forEach(w => { workOrderMap[w.work_id] = w; });
-                    }
-                }
-
-                const BF_REJ_STATUSES = ['EXEC-REJ', 'HOS-REJ', 'HOD-REJ'];
-
-                const filteredQuotationData = quotationData.filter(q => {
-                    if (q.status === 'QUO-APP') {
-                        const wo = workOrderMap[q.work_id];
-                        if (wo) {
-                            if (BF_REJ_STATUSES.includes(wo.status)) {
-                                // Blueform ditolak -> quotation ini kekal dipaparkan, bawa sekali remarks blueform
-                                q.blueform_status = wo.status;
-                                q.blueform_reject_reason = wo.reject_reason;
-                                return true;
-                            }
-                            return false; // Blueform wujud & tidak ditolak -> sembunyikan seperti biasa
-                        }
-                    }
-                    return true;
-                });
-
-                // Reset state seretan/pilihan setiap kali dashboard dimuat semula
-                techQuotationItemsById = {};
-                qCancelSelectionMode();
-
-                renderTechnicianSection('quotations-container', filteredQuotationData, 'QUOTATION');
-                renderTechnicianSection('blueforms-container', blueformData, 'BLUEFORM');
-
-            } catch (err) {
-                console.error("Error loading technician dashboard:", err.message);
-                alert("Failed to load dashboard data: " + err.message);
-            }
-        }
+    } catch (err) {
+        console.error("Error loading technician dashboard:", err.message);
+        alert("Failed to load dashboard data: " + err.message);
+    }
+}
 
         function formatActionDate(isoString) {
             if (!isoString) return '';
@@ -2772,7 +2623,7 @@ async function qActionDeleteQuotation() {
                     let statusBadge = '';
                     let reasonText = item.reject_reason ? item.reject_reason : 'No notes.';
 
-                    if (item.blueform_reject_reason) {
+                    if (item.status === 'QUO-APP' || item.status === 'APP-HOD') {
                         statusBadge = `<span class="bg-red-100 text-red-800 text-[9px] font-extrabold px-1 py-0.5 rounded border border-red-200 block text-center truncate" title="${item.blueform_status}"><i class="fa-solid fa-xmark mr-0.5"></i>${item.blueform_status}</span>`;
                     } else if (item.status === 'QUO-APP' || item.status === 'APP-HOD') {
                         statusBadge = `<span class="bg-emerald-100 text-emerald-800 text-[9px] font-extrabold px-1 py-0.5 rounded border border-emerald-200 block text-center truncate" title="${item.status}"><i class="fa-solid fa-check mr-0.5"></i>APP-HOD</span>`;
@@ -2783,16 +2634,10 @@ async function qActionDeleteQuotation() {
                     }
 
                     const actionDateLabel = (type === 'QUOTATION') ? formatActionDate(item.action_date) : '';
-                    let finalPdfUrl = (type === 'QUOTATION') ? item.pdf_url : item.mapped_pdf_url;
+                    let finalPdfUrl = item.pdf_url;
                     let remarkContent = '';
 
-                    if (item.blueform_reject_reason) {
-    remarkContent = `
-        <div class="text-red-700 font-medium text-[10px]" title="[${item.blueform_status}]">
-            ${item.blueform_reject_reason}
-        </div>
-    `;
-} else if (item.status.includes('REJ') && item.reject_reason) {
+                    if (item.status.includes('REJ') && item.reject_reason) {
     remarkContent = `
         <div class="text-red-700 font-medium text-[10px]" title="[${item.status}]">
             ${reasonText}
@@ -2968,7 +2813,7 @@ sectionHtml += `
                 if (seq && currentContractId && typeof buildBlueformDataGroup === 'function') {
                     const { data: siblingWOs } = await supabaseClient
                         .from('work_orders')
-                        .select('id, work_id, sequence_no, district')
+                        .select('id, work_id, sequence_no, district, pdf_url')
                         .eq('contract_id', currentContractId);
 
                     const currentDistrict = (item.district || '').trim().toUpperCase();
@@ -2978,27 +2823,18 @@ sectionHtml += `
                     );
 
                     if (groupMembers.length > 1) {
-                        const groupIds = groupMembers.map(g => g.id);
-                        payload = await buildBlueformDataGroup(groupIds);
-                        
-                        const groupWorkIds = groupMembers.map(g => g.work_id);
-                        const { data: quotes } = await supabaseClient
-                            .from('quotations')
-                            .select('work_id, pdf_url')
-                            .in('work_id', groupWorkIds);
-                        
-                        if (quotes) {
-                            linkedPdfs = quotes.map(q => q.pdf_url).filter(url => url);
-                        }
-                    }
+    const groupIds = groupMembers.map(g => g.id);
+    payload = await buildBlueformDataGroup(groupIds);
+    linkedPdfs = groupMembers.map(g => g.pdf_url).filter(Boolean);
+}
                 }
 
                 if (!payload) {
-                    if (typeof buildBlueformData === 'function') {
-                        payload = await buildBlueformData(item.id);
-                        if (item.mapped_pdf_url) linkedPdfs.push(item.mapped_pdf_url);
-                    }
-                }
+    if (typeof buildBlueformData === 'function') {
+        payload = await buildBlueformData(item.id);
+        if (item.pdf_url) linkedPdfs.push(item.pdf_url);
+    }
+}
 
                 if (payload && typeof buildBlueformHTML === 'function') {
                     compositeHtml += buildBlueformHTML(payload);
@@ -3254,56 +3090,58 @@ sectionHtml += `
         }
 
         async function startBlueformFromQuotations(items) {
-            openBlueformModal();
-            if (blueformUnitsReadyPromise) await blueformUnitsReadyPromise;
+    openBlueformModal();
+    if (blueformUnitsReadyPromise) await blueformUnitsReadyPromise;
 
-            const first = items[0];
-            const contractData = Array.isArray(first.contract) ? first.contract[0] : first.contract;
-            const unitId = contractData?.unit_id;
-            const contractId = first.contract_id;
+    const first = items[0];
+    const contractData = Array.isArray(first.contract) ? first.contract[0] : first.contract;
+    const unitId = contractData?.unit_id;
+    const contractId = first.contract_id;
 
-            if (unitId) {
-                document.getElementById('wo_unit_id').value = unitId;
-                await woLoadContractsByUnit();
-            }
-            if (contractId) {
-                document.getElementById('wo_contract_id').value = contractId;
-                woOnContractSelect(); // ini reset rows ke 1 baris kosong dahulu
-            }
+    if (unitId) {
+        document.getElementById('wo_unit_id').value = unitId;
+        await woLoadContractsByUnit();
+    }
+    if (contractId) {
+        document.getElementById('wo_contract_id').value = contractId;
+        woOnContractSelect();
+    }
 
-            // Bina semula baris Work ID ikut quotation yang diseret
-            document.getElementById('wo_id_rows_container').innerHTML = '';
-            wo_workIdRowCounter = 0;
-            const workIds = [];
-            items.forEach(item => {
-                const m = (item.work_id || '').trim().match(/^([CK])?\s*(\d+)\s*([A-Z]?)$/i);
-                const prefix = (m && m[1]) ? m[1].toUpperCase() : 'C';
-                const num = m ? m[2] : '';
-                if (!num) return;
-                woAddWorkIdRow(prefix, num, '');
-                workIds.push(`${prefix}${num}`);
-            });
-            if (document.getElementById('wo_id_rows_container').children.length === 0) woAddWorkIdRow();
+    document.getElementById('wo_id_rows_container').innerHTML = '';
+    wo_workIdRowCounter = 0;
+    const workIds = [];
+    items.forEach(item => {
+        const m = (item.work_id || '').trim().match(/^([CK])?\s*(\d+)\s*([A-Z]?)$/i);
+        const prefix = (m && m[1]) ? m[1].toUpperCase() : 'C';
+        const num = m ? m[2] : '';
+        const suffix = m ? (m[3] || '').toUpperCase() : '';
+        if (!num) return;
+        woAddWorkIdRow(prefix, num, suffix);
+        workIds.push(item.work_id);
 
-            // Set district terus dari quotation yang diseret (lebih tepat dari auto-detect umum)
-            if (first.district) {
-                const distSel = document.getElementById('wo_dist');
-                const target = first.district.trim().toUpperCase();
-                const matchOpt = Array.from(distSel.options).find(o => o.value.trim().toUpperCase() === target);
-                if (matchOpt) distSel.value = matchOpt.value;
-            }
+        // Item drag NI SENDIRI adalah row work_orders sedia ada (status
+        // QUOTATION/QUO-APP/QUO-REJ) - tiada perlu query berasingan lagi
+        // lepas penggabungan table.
+        woWorkIdCardDataMap[item.work_id] = {
+            location: item.location || '',
+            description: item.description || '',
+            section_category: structuredClone(item.section_category || {})
+        };
+    });
+    if (document.getElementById('wo_id_rows_container').children.length === 0) woAddWorkIdRow();
 
-            woRenderWorkIdCards();
+    if (first.district) {
+        const distSel = document.getElementById('wo_dist');
+        const target = first.district.trim().toUpperCase();
+        const matchOpt = Array.from(distSel.options).find(o => o.value.trim().toUpperCase() === target);
+        if (matchOpt) distSel.value = matchOpt.value;
+    }
 
-            // Tarik location/description/cost breakdown dari jadual quotations
-            if (workIds.length > 0) {
-                await woAutofillFromQuotations(workIds);
-            }
+    woRenderWorkIdCards(true);
 
-            // Semak jika Work ID ini sudah wujud dalam work_orders (papar modal overwrite/new/additional jika ada)
-            woAutoDetectWork();
-        }
-
+    woLastWorkIdNum = '';
+    woAutoDetectWork();
+}
         window.onload = fetchTechnicianDashboard;
 
         document.addEventListener('input', function (e) {
