@@ -841,8 +841,11 @@ async function openFullSetBundle(idsStr) {
             ? await buildBlueformData(ids[0])
             : await buildBlueformDataGroup(ids);
 
-        const workIds = (payload.data.work_id || '').split(',').map(w => w.trim()).filter(Boolean);
-        const linkedPdfs = await fetchLinkedQuotationPdfs(workIds);
+        // pdf_url dah ada terus dalam row work_orders (allWorks sudah dimuat dalam
+        // memori) - tiada perlu lagi hit jadual quotations berasingan.
+        const linkedPdfs = ids
+            .map(id => (allWorks.find(w => String(w.id) === String(id)) || {}).pdf_url)
+            .filter(Boolean);
 
         container.innerHTML = buildBlueformHTML(payload);
 
@@ -914,8 +917,12 @@ async function bulkDownloadBlueform() {
             const bfEl = wrap.firstElementChild;
             if (bfEl) container.appendChild(bfEl);
 
-            const workIds = (payload.data.work_id || '').split(',').map(w => w.trim()).filter(Boolean);
-            const linkedPdfs = await fetchLinkedQuotationPdfs(workIds);
+            const workIdList = (payload.data.work_id || '').split(',').map(w => w.trim()).filter(Boolean);
+// Cari pdf_url terus dari allWO (dah dimuat dalam fungsi ni) - tiada perlu lagi
+// jadual quotations berasingan.
+const linkedPdfs = workIdList
+    .map(wid => (allWO.find(w => (w.work_id || '').trim() === wid) || {}).pdf_url)
+    .filter(Boolean);
 
             if (linkedPdfs.length > 0) {
                 for (const pdfUrl of [...new Set(linkedPdfs)]) {
@@ -1068,13 +1075,16 @@ async function loadSingleContract(id){
         document.getElementById('viewSubtitle').innerText = c.contract_name;
         document.getElementById('tableWrapper').style.display = 'block';
         const [woRes, intRes] = await Promise.all([
-            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}`, { headers }),
-            fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${id}&order=date_received.asc`, { headers })
-        ]);
-        allWorks = await woRes.json();
-        const interims = await intRes.json();
-        renderTable(allWorks, true);
-        buildInterimMatrix(c, interims, allWorks, c.vo_breakdown || {});
+    fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}`, { headers }),
+    fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${id}&order=date_received.asc`, { headers })
+]);
+const rawWorks = await woRes.json();
+// Halaman ni untuk Usage Schedule (BLUEFORM ke atas) - fasa quotation
+// (QUOTATION / QUO-APP / QUO-REJ) belum sesuai dipaparkan di sini lagi.
+allWorks = rawWorks.filter(w => !['QUOTATION', 'QUO-APP', 'QUO-REJ'].includes((w.status || '').toUpperCase().trim()));
+const interims = await intRes.json();
+renderTable(allWorks, true);
+buildInterimMatrix(c, interims, allWorks, c.vo_breakdown || {});
         generateDistrictTabs(allWorks);
         filterDistrict('ALL', document.querySelector('.district-tab'));
     }catch(e){ console.error(e); }
@@ -1309,15 +1319,16 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
     const interimCount = interims.length;
     const sectionNames = Object.keys(sections);
 
-    // KEMAS KINI LOGIK PENAPISAN PENDING WORK ORDERS:
-    // Abai jika ditanda interim_no, atau berstatus CLAIMED, CANCEL, atau mengandungi REJ (EXEC-REJ, REJ-HOS, HOD-REJ)
     const pendingWO = workorders.filter(w => {
-        const st = (w.status || '').toUpperCase().trim();
-        if (st === 'CLAIMED' || w.interim_no) return false;
-        if (st === 'CANCEL') return false;
-        if (st.includes('REJ')) return false;
-        return true;
-    });
+    const st = (w.status || '').toUpperCase().trim();
+    if (st === 'CLAIMED' || w.interim_no) return false;
+    if (st === 'CANCEL') return false;
+    if (st.includes('REJ')) return false;
+    // Fasa quotation (QUOTATION / QUO-APP) belum lagi jadi Blueform - jangan
+    // tolak baki kontrak lagi buat rekod di fasa ni.
+    if (st === 'QUOTATION' || st === 'QUO-APP') return false;
+    return true;
+});
 
     const ongoingBase = {};
     const ongoingExtra = {};
