@@ -137,9 +137,10 @@ function sortWOChronological(woArray, districtPriority) {
         const d2 = new Date(b.qpb_date || "1900-01-01");
         if (d1.getTime() !== d2.getTime()) return d1 - d2;
 
-        // 2. created_at
-        const t1 = new Date(a.created_at || "1900-01-01");
-        const t2 = new Date(b.created_at || "1900-01-01");
+        // 2. blueform_created_at (tarikh Blueform sebenar dicipta) - fallback ke
+        // created_at untuk rekod lama yang belum ada blueform_created_at diisi.
+        const t1 = new Date(a.blueform_created_at || a.created_at || "1900-01-01");
+        const t2 = new Date(b.blueform_created_at || b.created_at || "1900-01-01");
         if (t1.getTime() !== t2.getTime()) return t1 - t2;
 
         // 3. district priority (ikut susunan dalam contract.area_code / districtPriority)
@@ -153,7 +154,6 @@ function sortWOChronological(woArray, districtPriority) {
         return (a.sequence_no || '').localeCompare(b.sequence_no || '');
     });
 }
-
 function buildInterimDateMap(allInterims){
     const map = new Map();
     (allInterims || []).forEach(int => {
