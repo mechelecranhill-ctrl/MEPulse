@@ -285,23 +285,15 @@ async function getPermissionContext() {
                 const { data: workOrders, error } = await supabaseClient
                     .from('work_orders')
                     .select(`
-                        id, work_id, status, sequence_no, district,
+                        id, work_id, status, sequence_no, district, pdf_url,
                         contract (id, contract_name, contract_code, unit_id)
                     `)
                     .eq('status', 'APP-HOS');
 
                 if (error) throw error;
 
-                const { data: allQuotes, error: quoteError } = await supabaseClient
-                    .from('quotations')
-                    .select('work_id, pdf_url');
-
-                if (!quoteError && allQuotes) {
-                    const quoteMap = {};
-                    allQuotes.forEach(q => { if (q.work_id) quoteMap[q.work_id] = q.pdf_url; });
-                    workOrders.forEach(item => { item.mapped_pdf_url = quoteMap[item.work_id] || null; });
-                }
-
+                workOrders.forEach(item => { item.mapped_pdf_url = item.pdf_url || null; });
+                
                 renderSectionUnitContractView('table-dept-container', sectionsPreset, unitsPreset, workOrders, perm.canActDept, {
                     approveStatus: 'APP-HOD',
                     rejectStatus: 'HOD-REJ',
