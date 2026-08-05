@@ -197,13 +197,13 @@ async function buildBlueformData(id, sharedData = null) {
         localDistrictPriority = sharedData.localDistrictPriority;
     } else {
         const [interimRes, woRes, areaRes] = await Promise.all([
-            fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=date_received.asc`, { headers }),
-            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}`, { headers }),
-            fetch(`${SB_URL}/rest/v1/contract?id=eq.${c.id}&select=area_code`, { headers })
+           fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=date_received.asc`, { headers }),
+           fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}&status=not.in.(QUOTATION,QUO-APP,QUO-REJ)`, { headers }),
+           fetch(`${SB_URL}/rest/v1/contract?id=eq.${c.id}&select=area_code`, { headers })
         ]);
-        allInterims = await interimRes.json();
-        allWO = await woRes.json();
-        const areaRows = await areaRes.json();
+       allInterims = await interimRes.json();
+       allWO = await woRes.json(); 
+       const areaRows = await areaRes.json();
 
         localDistrictPriority = {};
         (areaRows[0]?.area_code || '').split(',')
@@ -372,7 +372,7 @@ const combinedDesc = uniqueDescriptions.join(', ');
     } else {
         const [interimRes, woRes, areaRes] = await Promise.all([
             fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=date_received.asc`, { headers }),
-            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}`, { headers }),
+            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}&status=not.in.(QUOTATION,QUO-APP,QUO-REJ)`, { headers }),
             fetch(`${SB_URL}/rest/v1/contract?id=eq.${c.id}&select=area_code`, { headers })
         ]);
         allInterims = await interimRes.json();
@@ -812,9 +812,9 @@ async function bulkDownloadBlueform() {
     const contractId = currentContractId;
     try {
         const [interimRes, woRes, areaRes] = await Promise.all([
-            fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=date_received.asc`, { headers }),
-            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}`, { headers }),
-            fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}&select=area_code`, { headers })
+           fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=date_received.asc`, { headers }),
+           fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&status=not.in.(QUOTATION,QUO-APP,QUO-REJ)`, { headers }),
+           fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}&select=area_code`, { headers })
         ]);
         const allInterims = await interimRes.json();
         const allWO = await woRes.json();
