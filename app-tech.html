@@ -1953,6 +1953,32 @@ async function woActionCancelBlueform() {
 
         const originalWorkId = rec.work_id;
 
+        // work_id -CNX mesti unik (work_orders.work_id ada unique constraint).
+        // Jika -CNX asal dah wujud (contoh: pernah di-cancel sebelum ini), cari
+        // nombor suffix seterusnya (-CNX-1, -CNX-2, dst) supaya PATCH tidak
+        // kena HTTP 409.
+        let cnxWorkId = `${originalWorkId}-CNX`;
+        const dupCheckRes = await fetch(`${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(cnxWorkId)}&select=id`, { headers: qHeaders });
+        const dupRows = await dupCheckRes.json();
+        if (Array.isArray(dupRows) && dupRows.length > 0) {
+            const escapedBase = `${originalWorkId}-CNX`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const pattern = new RegExp(`^${escapedBase}-(\\d+)$`);
+
+            const allCnxRes = await fetch(`${SB_URL}/rest/v1/work_orders?work_id=like.${encodeURIComponent(originalWorkId + '-CNX%')}&select=work_id`, { headers: qHeaders });
+            const allCnxRows = await allCnxRes.json();
+
+            let maxNum = 0;
+            (allCnxRows || []).forEach(r => {
+                const m = (r.work_id || '').match(pattern);
+                if (m) {
+                    const n = parseInt(m[1]);
+                    if (n > maxNum) maxNum = n;
+                }
+            });
+
+            cnxWorkId = `${originalWorkId}-CNX-${maxNum + 1}`;
+        }
+
         const zeroedBreakdown = {};
         Object.keys(rec.section_category || {}).forEach(sec => {
             zeroedBreakdown[sec] = { amt: 0, extra: 0 };
@@ -1964,14 +1990,18 @@ async function woActionCancelBlueform() {
             method: 'PATCH',
             headers: qHeaders,
             body: JSON.stringify({
-                work_id: `${originalWorkId}-CNX`,
+                work_id: cnxWorkId,
                 status: 'CANCEL',
                 section_category: zeroedBreakdown,
                 additional: 0,
                 amount_spent: 0
             })
         });
-        if (!patchRes.ok) throw new Error(`HTTP ${patchRes.status}`);
+        if (!patchRes.ok) {
+            let errBody = null;
+            try { errBody = await patchRes.json(); } catch(_) {}
+            throw new Error(errBody?.message || `HTTP ${patchRes.status}`);
+        }
 
         closeWoActionModal();
         fetchTechnicianDashboard();
