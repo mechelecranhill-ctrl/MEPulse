@@ -354,6 +354,7 @@ let blueformQueryBuilder = supabaseClient
         contract_id,
         district,
         pdf_url,
+        pending_status,
         contract!inner (id, contract_name, contract_code, unit_id)
     `)
     .eq('status', 'BLUEFORM');
@@ -515,8 +516,12 @@ renderSection('blueforms-container', blueformOrders, 'BLUEFORM', perm);
                             fullSetBtnHtml = `<span class="text-[10px] text-gray-400 italic">Refer to first row seq ${seq}</span>`;
                         }
 
-                        let actionButtonsHtml = perm.canActUnit ? `
-                            <div class="inline-flex items-center gap-1">
+                        const isPendingGroup = !!item.pending_status;
+    let actionButtonsHtml = !perm.canActUnit
+        ? `<span class="text-[10px] text-gray-400 italic font-semibold px-1"><i class="fa-solid fa-eye mr-1"></i>View Only</span>`
+        : isPendingGroup
+        ? `<span class="text-[10px] text-amber-600 italic font-semibold px-1"><i class="fa-solid fa-hourglass-half mr-1"></i>Menunggu kawan sequence</span>`
+        : `<div class="inline-flex items-center gap-1">
                                 <button onclick="openConfirmModal('${item.work_id}', 'EXEC-REJ', 'REJECT-BF')" 
                                         class="text-white px-2 py-1 rounded bg-red-600 hover:bg-red-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Reject Blueform">
                                     <i class="fa-solid fa-xmark"></i>
@@ -786,24 +791,14 @@ renderSection('blueforms-container', blueformOrders, 'BLUEFORM', perm);
                         
                     if (error) throw error;
                 } else {
-                    const updatePayload = { status: nextStatus };
-                    if (reason !== null) updatePayload.reject_reason = reason;
-
-                    if (nextStatus === 'APP-EXEC') {
-                        const stamps = await mergeApprovalStamp('work_orders', workId, 'exec_signature');
-                        if (stamps) updatePayload.approval_stamps = stamps;
-                    }
-
-                    const { error } = await supabaseClient
-                        .from('work_orders')
-                        .update(updatePayload)
-                        .eq('work_id', workId);
-                        
-                    if (error) throw error;
-                }
-
-                fetchDashboard();
-
+    const stampStage = nextStatus === 'APP-EXEC' ? 'exec_signature' : null;
+    const result = await stageGroupDecisionByWorkId(workId, nextStatus, reason, stampStage);
+    if (result.waiting) {
+        alert('Keputusan disimpan. Menunggu Work Order lain dalam sequence yang sama diputuskan dahulu.');
+    }
+}
+fetchDashboard();
+                
             } catch (err) {
                 console.error("Error updating status:", err.message);
                 alert("Failed to update status: " + err.message);
