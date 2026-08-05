@@ -333,7 +333,7 @@ const activeUnitIds = unitsPreset.map(u => u.id);
 let workOrdersQuery = supabaseClient
     .from('work_orders')
     .select(`
-        id, work_id, status, sequence_no, district,
+        id, work_id, status, sequence_no, district, pdf_url,
         contract!inner (id, contract_name, contract_code, unit_id)
     `)
     .eq('status', 'APP-EXEC');
@@ -342,9 +342,7 @@ if (!scopeIsAll) workOrdersQuery = workOrdersQuery.in('contract.unit_id', active
                 const { data: workOrders, error } = await workOrdersQuery;
                 if (error) throw error;
 
-                const { data: allQuotes, error: quoteError } = await supabaseClient
-                    .from('quotations')
-                    .select('work_id, pdf_url');
+                workOrders.forEach(item => { item.mapped_pdf_url = item.pdf_url || null; });
 
                 if (!quoteError && allQuotes) {
                     const quoteMap = {};
