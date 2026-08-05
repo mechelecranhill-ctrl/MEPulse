@@ -61,6 +61,70 @@ async function mergeApprovalStamp(table, workId, stageKey) {
     }
 }
 
+// Ambil semua ahli group (Work Order yang sama sequence_no + district + contract)
+async function fetchGroupMembers(contractId, district, sequenceNo) {
+    if (!sequenceNo) return [];
+    const res = await fetch(
+        `${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&district=eq.${encodeURIComponent(district)}&sequence_no=eq.${encodeURIComponent(sequenceNo)}&select=*`,
+        { headers }
+    );
+    return await res.json();
+}
+
+// Simpan keputusan SATU work order. Kalau standalone -> terus commit.
+// Kalau grouped -> stage dulu, commit SEMUA ahli group hanya bila semua dah decide.
+async function stageGroupDecision(workId, contractId, district, sequenceNo, nextStatus, reason, stampStage) {
+    if (!sequenceNo) {
+        const payload = { status: nextStatus, reject_reason: reason || null };
+        if (stampStage && !String(nextStatus).includes('REJ')) {
+            const stamps = await mergeApprovalStamp('work_orders', workId, stampStage);
+            if (stamps) payload.approval_stamps = stamps;
+        }
+        await fetch(`${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}`, {
+            method: 'PATCH', headers, body: JSON.stringify(payload)
+        });
+        return { finalized: true, waiting: false };
+    }
+
+    await fetch(`${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}`, {
+        method: 'PATCH', headers,
+        body: JSON.stringify({ pending_status: nextStatus, pending_reject_reason: reason || null })
+    });
+
+    const members = await fetchGroupMembers(contractId, district, sequenceNo);
+    const allDecided = members.length > 0 && members.every(m => m.pending_status || m.work_id === workId);
+    // pastikan row semasa dikira sudah decide (kalau fetch tadi masih data lama sebelum PATCH commit)
+    const reallyAllDecided = members.every(m => m.work_id === workId ? true : !!m.pending_status);
+
+    if (!allDecided || !reallyAllDecided) return { finalized: false, waiting: true };
+
+    for (const m of members) {
+        const finalStatus = m.work_id === workId ? nextStatus : m.pending_status;
+        const finalReason = m.work_id === workId ? (reason || null) : (m.pending_reject_reason || null);
+        const payload = { status: finalStatus, reject_reason: finalReason, pending_status: null, pending_reject_reason: null };
+        if (stampStage && !String(finalStatus).includes('REJ')) {
+            const stamps = await mergeApprovalStamp('work_orders', m.work_id, stampStage);
+            if (stamps) payload.approval_stamps = stamps;
+        }
+        await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${m.id}`, {
+            method: 'PATCH', headers, body: JSON.stringify(payload)
+        });
+    }
+    return { finalized: true, waiting: false };
+}
+
+// Wrapper: cari contract_id/district/sequence_no dari work_id dulu, then stage.
+async function stageGroupDecisionByWorkId(workId, nextStatus, reason, stampStage) {
+    const res = await fetch(
+        `${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}&select=id,contract_id,district,sequence_no`,
+        { headers }
+    );
+    const rows = await res.json();
+    if (!rows || rows.length === 0) throw new Error('Work order tidak dijumpai: ' + workId);
+    const row = rows[0];
+    return stageGroupDecision(workId, row.contract_id, row.district, row.sequence_no, nextStatus, reason, stampStage);
+}
+
 // Selesaikan staff_id -> signature/initial image untuk semua stamp dalam satu record
 async function resolveStampImages(approvalStamps) {
     const stamps = approvalStamps || {};
