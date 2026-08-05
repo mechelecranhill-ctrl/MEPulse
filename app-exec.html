@@ -329,55 +329,47 @@ async function getPermissionContext() {
         }
 
         let quotationsQueryBuilder = supabaseClient
-            .from('quotations')
-            .select(`
-                id,
-                work_id,
-                status,
-                contract_id,
-                pdf_url,
-                contract!inner (id, contract_name, contract_code, unit_id)
-            `)
-            .eq('status', 'QUOTATION');
-        if (!scopeIsAll) quotationsQueryBuilder = quotationsQueryBuilder.in('contract.unit_id', activeUnitIds);
+    .from('work_orders')
+    .select(`
+        id,
+        work_id,
+        status,
+        contract_id,
+        pdf_url,
+        contract!inner (id, contract_name, contract_code, unit_id)
+    `)
+    .eq('status', 'QUOTATION');
+if (!scopeIsAll) quotationsQueryBuilder = quotationsQueryBuilder.in('contract.unit_id', activeUnitIds);
 
-        const { data: quotationOrders, error: qError } = await quotationsQueryBuilder;
-        if (qError) throw qError;
+const { data: quotationOrders, error: qError } = await quotationsQueryBuilder;
+if (qError) throw qError;
 
-        let blueformQueryBuilder = supabaseClient
-            .from('work_orders')
-            .select(`
-                id,
-                work_id,
-                status,
-                sequence_no,
-                contract_id,
-                district,
-                contract!inner (id, contract_name, contract_code, unit_id)
-            `)
-            .eq('status', 'BLUEFORM');
-        if (!scopeIsAll) blueformQueryBuilder = blueformQueryBuilder.in('contract.unit_id', activeUnitIds);
+let blueformQueryBuilder = supabaseClient
+    .from('work_orders')
+    .select(`
+        id,
+        work_id,
+        status,
+        sequence_no,
+        contract_id,
+        district,
+        pdf_url,
+        contract!inner (id, contract_name, contract_code, unit_id)
+    `)
+    .eq('status', 'BLUEFORM');
+if (!scopeIsAll) blueformQueryBuilder = blueformQueryBuilder.in('contract.unit_id', activeUnitIds);
 
-        const { data: blueformOrders, error: wError } = await blueformQueryBuilder;
-        if (wError) throw wError;
+const { data: blueformOrders, error: wError } = await blueformQueryBuilder;
+if (wError) throw wError;
 
-                const { data: allQuotes, error: allQError } = await supabaseClient
-                    .from('quotations')
-                    .select('work_id, pdf_url');
-                    
-                if (!allQError && allQuotes) {
-                    const quoteMap = {};
-                    allQuotes.forEach(q => {
-                        if (q.work_id) quoteMap[q.work_id] = q.pdf_url;
-                    });
+// pdf_url sudah wujud terus pada row work_orders yang sama (quotation & blueform
+// kini satu rekod) - tiada perlu lagi query jadual quotations berasingan.
+blueformOrders.forEach(item => {
+    item.mapped_pdf_url = item.pdf_url || null;
+});
 
-                    blueformOrders.forEach(item => {
-                        item.mapped_pdf_url = quoteMap[item.work_id] || null;
-                    });
-                }
-
-                renderSection('quotations-container', quotationOrders, 'QUOTATION', perm);
-                renderSection('blueforms-container', blueformOrders, 'BLUEFORM', perm);
+renderSection('quotations-container', quotationOrders, 'QUOTATION', perm);
+renderSection('blueforms-container', blueformOrders, 'BLUEFORM', perm);
 
             } catch (err) {
                 console.error("Error fetching data:", err.message);
@@ -788,7 +780,7 @@ async function getPermissionContext() {
                     updatePayload.action_date = new Date().toISOString();
 
                     const { error } = await supabaseClient
-                        .from('quotations')
+                        .from('work_orders')
                         .update(updatePayload)
                         .eq('work_id', workId);
                         
