@@ -641,6 +641,22 @@ function applyTechPermissionUI(perm) {
             return String(str).replace(/'/g, "\\'");
         }
 
+function getOrderedSectionKeys(availableKeys, selectedSectionsOrder) {
+            const allKeys = Array.from(new Set(availableKeys));
+            let orderList = [];
+            if (Array.isArray(selectedSectionsOrder)) {
+                orderList = selectedSectionsOrder;
+            } else if (selectedSectionsOrder && typeof selectedSectionsOrder === 'object') {
+                orderList = Object.keys(selectedSectionsOrder);
+            }
+            if (orderList.length > 0) {
+                const ordered = orderList.filter(sec => allKeys.includes(sec));
+                const leftover = allKeys.filter(k => !ordered.includes(k)).sort();
+                return [...ordered, ...leftover]; // seksyen lama yang tiada dalam selected_sections tetap dipaparkan di hujung
+            }
+            return allKeys.sort();
+        }
+
         function getBlueformGroupKey(item) {
             const seq = (item.sequence_no || '').trim();
             const district = (item.district || '').trim().toUpperCase();
@@ -687,6 +703,7 @@ function applyTechPermissionUI(perm) {
         // ============ QUOTATION MODAL LOGIC ============
         let quotationModalInitialized = false;
 let tqCurrentContractSections = {};
+let tqCurrentSelectedSections = [];
 let tqDetectTimer = null;
 let tqPendingDetect = null;
 let tqOverwriteMode = false;
@@ -793,7 +810,8 @@ function tqResetDetectState() {
                 });
             }
             tqCurrentContractSections = (opt && opt.dataset.b) ? JSON.parse(opt.dataset.b) : {};
-            tqRenderBreakdown();
+    tqCurrentSelectedSections = (opt && opt.dataset.selSections) ? JSON.parse(opt.dataset.selSections) : [];
+    tqRenderBreakdown();
             tqResetDetectState();
         }
 
@@ -809,7 +827,7 @@ function tqResetDetectState() {
             }
 
             let html = '';
-            sections.sort().forEach(sec => {
+            getOrderedSectionKeys(sections, tqCurrentSelectedSections).forEach(sec => {
                 const desc = tqCurrentContractSections[sec].desc || '';
                 const data = saved[sec] || {};
                 const amt = Number(data.amt || 0);
@@ -1369,6 +1387,7 @@ async function tqDoSubmit(e) {
         let woOriginalLoadedWorkIds = [];
         let woCurrentWorkSequenceNo = null;
         let woCurrentContractSections = {};
+        let woCurrentSelectedSections = [];
         let woWorkIdCardDataMap = {};
         let woLastWorkIdNum = '';
         let woDetectTimer = null;
@@ -1457,7 +1476,8 @@ async function tqDoSubmit(e) {
                 });
             }
             woCurrentContractSections = (opt && opt.dataset.b) ? JSON.parse(opt.dataset.b) : {};
-            woRenderWorkIdCards();
+    woCurrentSelectedSections = (opt && opt.dataset.selSections) ? JSON.parse(opt.dataset.selSections) : [];
+    woRenderWorkIdCards();
             document.getElementById('wo_dist').dataset.originalDistrict = '';
         }
 
