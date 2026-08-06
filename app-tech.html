@@ -643,20 +643,21 @@ function applyTechPermissionUI(perm) {
 
 function getOrderedSectionKeys(availableKeys, selectedSectionsOrder) {
             const allKeys = Array.from(new Set(availableKeys));
-            let orderList = [];
-            if (Array.isArray(selectedSectionsOrder)) {
-                orderList = selectedSectionsOrder;
-            } else if (selectedSectionsOrder && typeof selectedSectionsOrder === 'object') {
-                orderList = Object.keys(selectedSectionsOrder);
+            let allowList = null;
+            if (Array.isArray(selectedSectionsOrder) && selectedSectionsOrder.length > 0) {
+                allowList = selectedSectionsOrder;
+            } else if (selectedSectionsOrder && typeof selectedSectionsOrder === 'object' && Object.keys(selectedSectionsOrder).length > 0) {
+                allowList = Object.keys(selectedSectionsOrder);
             }
-            if (orderList.length > 0) {
-                const ordered = orderList.filter(sec => allKeys.includes(sec));
-                const leftover = allKeys.filter(k => !ordered.includes(k)).sort();
-                return [...ordered, ...leftover]; // seksyen lama yang tiada dalam selected_sections tetap dipaparkan di hujung
+            if (allowList) {
+                // Hanya seksyen dalam selected_sections dipaparkan (yang lain di-hide terus).
+                // Susunan ikut abjad key (A, B, C ... G), BUKAN ikut turutan dalam array selected_sections.
+                return allKeys.filter(k => allowList.includes(k)).sort();
             }
+            // Fallback: kalau selected_sections kosong/null utk kontrak ni, papar semua seksyen (abjad)
+            // — supaya borang tak kosong utk kontrak lama yang belum diisi selected_sections.
             return allKeys.sort();
         }
-
         function getBlueformGroupKey(item) {
             const seq = (item.sequence_no || '').trim();
             const district = (item.district || '').trim().toUpperCase();
@@ -755,7 +756,8 @@ function tqResetDetectState() {
             document.getElementById('tq_dist').innerHTML = '<option value="">Choose Contract First</option>';
             document.getElementById('tq_pdf_url').value = '';
             tqCurrentContractSections = {};
-            tqRenderBreakdown();     
+            tqCurrentSelectedSections = [];
+            tqRenderBreakdown();    
             clearSelectedFile();   
             document.getElementById('tq_upload_status').classList.add('hidden'); 
             tqResetDetectState();
@@ -905,7 +907,7 @@ function tqShowDetectModal(row) {
             </div>
             <div class="space-y-1">
     `;
-    Object.keys(breakdown).sort().forEach(sec => {
+    getOrderedSectionKeys(Object.keys(breakdown), tqCurrentSelectedSections).forEach(sec => {
         const desc = (tqCurrentContractSections[sec] && tqCurrentContractSections[sec].desc) || '';
         const amt = Number(breakdown[sec].amt || 0);
         const extra = Number(breakdown[sec].extra || 0);
@@ -1413,6 +1415,7 @@ async function tqDoSubmit(e) {
             document.getElementById('wo_contract_id').innerHTML = '<option value="">Choose Unit First</option>';
             document.getElementById('wo_dist').innerHTML = '<option value="">Choose Contract First</option>';
             woCurrentContractSections = {};
+            woCurrentSelectedSections = [];
             woResetWorkIdRows();
             woModeSaveAsNew = false;
             const dateInput = document.getElementById('wo_qpb_date');
@@ -1738,7 +1741,7 @@ function joinLocationPreset(prefix, rest) {
                         </div>
                         <div class="space-y-1">
                 `;
-                Object.keys(breakdown).sort().forEach(sec => {
+                getOrderedSectionKeys(Object.keys(breakdown), woCurrentSelectedSections).forEach(sec => {
                     const desc = (woCurrentContractSections[sec] && woCurrentContractSections[sec].desc) || '';
                     const amt = Number(breakdown[sec].amt || 0);
                     const extra = Number(breakdown[sec].extra || 0);
