@@ -760,16 +760,24 @@ function tqResetDetectState() {
             if(!unitId){ contractSelect.innerHTML = '<option value="">Choose Unit First</option>'; return; }
             contractSelect.innerHTML = '<option value="">Loading...</option>';
             try {
-                const res = await fetch(`${SB_URL}/rest/v1/contract?select=id,contract_code,district,contract_sections_breakdown&unit_id=eq.${unitId}`, { headers: qHeaders });
-                const data = await res.json();
-                contractSelect.innerHTML = '<option value="">Choose Contract</option>';
-                data.forEach(c => {
-                    const opt = document.createElement('option');
-                    opt.value = c.id; opt.text = c.contract_code;
-                    opt.dataset.b = JSON.stringify(c.contract_sections_breakdown);
-                    opt.dataset.dist = (c.district || '').toUpperCase();
-                    contractSelect.appendChild(opt);
-                });
+                const res = await fetch(`${SB_URL}/rest/v1/contract?select=id,contract_code,district,contract_sections_breakdown,contract_start,selected_sections&unit_id=eq.${unitId}`, { headers: qHeaders });
+        const data = await res.json();
+
+        data.sort((a, b) => {
+            const dateA = a.contract_start ? new Date(a.contract_start).getTime() : 0;
+            const dateB = b.contract_start ? new Date(b.contract_start).getTime() : 0;
+            return dateA - dateB;
+        });
+
+        contractSelect.innerHTML = '<option value="">Choose Contract</option>';
+        data.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id; opt.text = c.contract_code;
+            opt.dataset.b = JSON.stringify(c.contract_sections_breakdown);
+            opt.dataset.dist = (c.district || '').toUpperCase();
+            opt.dataset.selSections = JSON.stringify(c.selected_sections || []);
+            contractSelect.appendChild(opt);
+        });
             } catch(e) { console.error(e); }
         }
 
@@ -1421,14 +1429,15 @@ async function tqDoSubmit(e) {
                 });
 
                 contractSelect.innerHTML = '<option value="">Choose Contract</option>';
-                data.forEach(c => {
-                    const opt = document.createElement('option');
-                    opt.value = c.id; opt.text = c.contract_code;
-                    opt.dataset.b = JSON.stringify(c.contract_sections_breakdown);
-                    opt.dataset.dist = (c.district || '').toUpperCase();
-                    opt.dataset.area = c.area_code;
-                    contractSelect.appendChild(opt);
-                });
+        data.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id; opt.text = c.contract_code;
+            opt.dataset.b = JSON.stringify(c.contract_sections_breakdown);
+            opt.dataset.dist = (c.district || '').toUpperCase();
+            opt.dataset.area = c.area_code;
+            opt.dataset.selSections = JSON.stringify(c.selected_sections || []);
+            contractSelect.appendChild(opt);
+        });
             } catch(e) { console.error(e); }
         }
 
