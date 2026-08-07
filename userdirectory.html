@@ -583,78 +583,97 @@ body {
 <script>
 const API_URL = 'https://me-connect-api.mech-elec-ranhill.workers.dev';
 
-const headers={
-    'Content-Type':'application/json'
+const headers = {
+    'Content-Type': 'application/json'
 };
 
-const hierarki={
-    "KETUA JABATAN":1,
-    "KETUA SEKSYEN":2,
-    "EKSEKUTIF KANAN":3,
-    "EKSEKUTIF":4,
-    "JURUTEKNIK":5,
-    "PENYELIA PENTADBIRAN":6,
-    "PEMBANTU PENTADBIRAN":7,
-    "KERANI":8
+const hierarki = {
+    "KETUA JABATAN": 1,
+    "KETUA SEKSYEN": 2,
+    "EKSEKUTIF KANAN": 3,
+    "EKSEKUTIF": 4,
+    "JURUTEKNIK": 5,
+    "PENYELIA PENTADBIRAN": 6,
+    "PEMBANTU PENTADBIRAN": 7,
+    "KERANI": 8
 };
 
-let staffData=[];
-let unitData=[];
-let sectionData=[];
-let staffSectionAssignments=[];
-let staffUnitAssignments=[];
-let currentTargetStaff=null;
-let deptHeadAssignments=[];
+let staffData = [];
+let unitData = [];
+let sectionData = [];
+let staffSectionAssignments = [];
+let staffUnitAssignments = [];
+let currentTargetStaff = null;
+let deptHeadAssignments = [];
 
-async function loadDeptHead(){
-    let res=await fetch(`${API_URL}/department-head`);
+let selectedSections = new Set();
+let selectedUnits = new Set();
+let currentSignatureBase64 = null;
+let currentInitialBase64 = null;
+let editingStaff = null;
+let currentActingType = null;
+let currentActingTargetId = null;
+
+window.onload = async () => {
+    try {
+        await loadUnits();
+        await loadSections();
+        await loadAssignments();
+        await loadDeptHead();
+        await loadStaff();
+        populatePositionDropdown();
+    } catch (err) {
+        console.error("Ralat semasa memuatkan data awal:", err);
+    }
+};
+
+async function loadDeptHead() {
+    let res = await fetch(`${API_URL}/department-head`);
     let raw = await res.json();
-    // D1 simpan is_acting sebagai 0/1, tukar ke true/false supaya sepadan dengan logik sedia ada
     deptHeadAssignments = raw.map(r => ({ ...r, staff_id: Number(r.staff_id), is_acting: r.is_acting === 1 || r.is_acting === true }));
 }
 
-async function loadUnits(){
-    let res=await fetch(`${API_URL}/units`);
+async function loadUnits() {
+    let res = await fetch(`${API_URL}/units`);
     let raw = await res.json();
     unitData = raw.map(r => ({ ...r, id: Number(r.id), section_id: Number(r.section_id) }));
 }
 
-async function loadSections(){
-    let res=await fetch(`${API_URL}/me-sections`);
+async function loadSections() {
+    let res = await fetch(`${API_URL}/me-sections`);
     let raw = await res.json();
     sectionData = raw.map(r => ({ ...r, id: Number(r.id) }));
 }
 
-async function loadAssignments(){
-    let res1=await fetch(`${API_URL}/staff-section-assignment`);
+async function loadAssignments() {
+    let res1 = await fetch(`${API_URL}/staff-section-assignment`);
     let raw1 = await res1.json();
     staffSectionAssignments = raw1.map(r => ({ ...r, staff_id: Number(r.staff_id), section_id: Number(r.section_id), is_acting: r.is_acting === 1 || r.is_acting === true }));
 
-    let res2=await fetch(`${API_URL}/staff-unit-assignment`);
+    let res2 = await fetch(`${API_URL}/staff-unit-assignment`);
     let raw2 = await res2.json();
     staffUnitAssignments = raw2.map(r => ({ ...r, staff_id: Number(r.staff_id), unit_id: Number(r.unit_id), is_acting: r.is_acting === 1 || r.is_acting === true }));
 }
 
-async function loadStaff(){
-    let res=await fetch(`${API_URL}/staff`);
+async function loadStaff() {
+    let res = await fetch(`${API_URL}/staff`);
     let raw = await res.json();
     staffData = raw.map(r => ({ ...r, id: Number(r.id) }));
     renderStaff();
 }
 
-function toggleCard(el, evt){
-    if(evt.target.closest(".action-group")) return;
+function toggleCard(el, evt) {
+    if (evt.target.closest(".action-group")) return;
     el.classList.toggle("expanded");
 }
 
-function staffCardHtml(s, isActing = false, actingType = "", targetId = null){
+function staffCardHtml(s, isActing = false, actingType = "", targetId = null) {
     let avatarHtml = `<i class="fa-solid fa-user"></i>`;
     let safeName = s.name ? s.name.replace(/'/g, "\\'") : "";
     let positionUpper = s.position ? s.position.toUpperCase() : "";
     let isKJ = positionUpper === "KETUA JABATAN";
 
     let leftLineColor = "rgba(0,0,0,0.04)"; 
-    
     if (isActing) {
         leftLineColor = "var(--accent-orange)"; 
     } else if (isKJ) {
@@ -688,7 +707,7 @@ function staffCardHtml(s, isActing = false, actingType = "", targetId = null){
             <p><i class="fa fa-id-badge"></i> ${s.employee_id||'-'}</p>
             <p><i class="fa fa-phone"></i> ${s.phone_no||'-'}</p>
             <p><i class="fa fa-envelope"></i> ${s.email||'-'}</p>
-            <div class="action-group">
+            <div class="action-group" onclick="event.stopPropagation()">
                 ${isActing ? `
                     <button class="icon-btn" style="background:var(--accent-red);" onclick="removeActing('${actingType}', '${targetId}', '${s.id}', event)" title="Gugurkan Pemangku">
                         <i class="fa fa-user-minus"></i>
@@ -712,11 +731,11 @@ function staffCardHtml(s, isActing = false, actingType = "", targetId = null){
     `;
 }
 
-function sortByHierarki(a,b){
-    return ((hierarki[a.position]||99) - (hierarki[b.position]||99));
+function sortByHierarki(a, b) {
+    return ((hierarki[a.position] || 99) - (hierarki[b.position] || 99));
 }
 
-function renderStaff(){
+function renderStaff() {
     let keyword = document.getElementById("searchStaff").value.toLowerCase();
 
     function emptyCardHtml(position, type, targetId = null) {
@@ -731,7 +750,7 @@ function renderStaff(){
                     <p style="color: #8e8e93; font-weight: 600;">${position}</p>
                 </div>
             </div>
-            <div class="action-group" style="margin-top: 10px;">
+            <div class="action-group" style="margin-top: 10px;" onclick="event.stopPropagation()">
                 <button class="icon-btn acting-btn" onclick="openActingModal('${type}', '${targetId}', '${position}')" title="Lantik Pemangku Dari Senarai Staff" style="width: auto; padding: 0 10px; gap: 4px;">
                     <i class="fa fa-user-plus"></i> Pemangku
                 </button>
@@ -742,7 +761,6 @@ function renderStaff(){
 
     let html = "";
 
-    // 1. KETUA JABATAN
     // 1. KETUA JABATAN
     let kjStaff = staffData.find(s => s.position?.toUpperCase() === "KETUA JABATAN");
     let actingKjRow = deptHeadAssignments.find(a => (a.is_acting === true || a.is_acting === 'true'));
@@ -841,7 +859,6 @@ function renderStaff(){
             html += `
             <div class="tree-group">
                 <div class="section-title"><i class="fa fa-building"></i> ${sec.section_name}</div>
-                
                 <div class="section-container">`;
             
             let hasHighLevelStaff = otherSecStaff.some(s => {
@@ -894,26 +911,13 @@ function renderStaff(){
     document.getElementById("staffList").innerHTML = html;
 }
 
-// DIKEMASKINI: Ditambah fungsi populatePositionDropdown() supaya data diisi terus masa load aplikasi
-window.onload=async()=>{
-    await loadUnits();
-    await loadSections();
-    await loadAssignments();
-    await loadDeptHead();
-    await loadStaff();
-    populatePositionDropdown(); 
-};
-
-let currentActingType = null;
-let currentActingTargetId = null;
-
-function openActingModal(type, targetId, positionName){
+function openActingModal(type, targetId, positionName) {
     currentActingType = type;
     currentActingTargetId = targetId;
     document.getElementById("actingTargetLabel").innerText = `Memilih pemangku sedia ada untuk jawatan: ${positionName}`;
     
     let html = "";
-    if(staffData.length === 0){
+    if (staffData.length === 0) {
         html = "<p style='text-align:center;color:var(--text-muted);font-size:13px;'>Tiada staff sedia ada dalam sistem.</p>";
     } else {
         staffData.forEach(s => {
@@ -932,24 +936,24 @@ function openActingModal(type, targetId, positionName){
     document.getElementById("actingModal").style.display = "flex";
 }
 
-function closeActingModal(){
+function closeActingModal() {
     document.getElementById("actingModal").style.display = "none";
     currentActingType = null;
     currentActingTargetId = null;
 }
 
-async function assignActingStaff(staffId){
+async function assignActingStaff(staffId) {
     let url = "";
     let body = {};
     let cleanTargetId = isNaN(currentActingTargetId) ? currentActingTargetId : Number(currentActingTargetId);
 
-    if(currentActingType === 'kj'){
+    if (currentActingType === 'kj') {
         let res = await fetch(`${API_URL}/department-head`, {
             method: "POST",
             headers,
             body: JSON.stringify({ staff_id: staffId, active: true, is_acting: true })
         });
-        if(res.ok){
+        if (res.ok) {
             closeActingModal();
             await loadDeptHead();
             renderStaff();
@@ -960,10 +964,10 @@ async function assignActingStaff(staffId){
         return;
     }
 
-    if(currentActingType === 'section'){
+    if (currentActingType === 'section') {
         url = `${API_URL}/staff-section-assignment`;
         body = { staff_id: staffId, section_id: cleanTargetId, is_acting: true };
-    } else if(currentActingType === 'unit'){
+    } else if (currentActingType === 'unit') {
         url = `${API_URL}/staff-unit-assignment`;
         body = { staff_id: staffId, unit_id: cleanTargetId, is_acting: true };
     } else {
@@ -977,7 +981,7 @@ async function assignActingStaff(staffId){
         body: JSON.stringify(body)
     });
 
-    if(res.ok){
+    if (res.ok) {
         closeActingModal();
         await loadAssignments();
         renderStaff();
@@ -987,25 +991,25 @@ async function assignActingStaff(staffId){
     }
 }
 
-async function removeActing(type, targetId, staffId, event){
-    if(event) event.stopPropagation();
-    if(!confirm("Adakah anda ingin menggugurkan status pemangku bagi jawatan ini?")) return;
+async function removeActing(type, targetId, staffId, event) {
+    if (event) event.stopPropagation();
+    if (!confirm("Adakah anda ingin menggugurkan status pemangku bagi jawatan ini?")) return;
     
     let cleanTargetId = isNaN(targetId) ? targetId : Number(targetId);
     let url = "";
     
-    if(type === 'section'){
+    if (type === 'section') {
         url = `${API_URL}/staff-section-assignment-acting?staff_id=${staffId}&section_id=${cleanTargetId}`;
-    } else if(type === 'unit'){
+    } else if (type === 'unit') {
         url = `${API_URL}/staff-unit-assignment-acting?staff_id=${staffId}&unit_id=${cleanTargetId}`;
-    } else if(type === 'kj'){
+    } else if (type === 'kj') {
         url = `${API_URL}/department-head-acting?staff_id=${staffId}`;
     }
 
     try {
         let res = await fetch(url, { method: "DELETE" });
-        if(res.ok){
-            if(type === 'kj') { await loadDeptHead(); } else { await loadAssignments(); }
+        if (res.ok) {
+            if (type === 'kj') { await loadDeptHead(); } else { await loadAssignments(); }
             renderStaff();
         } else {
             let errorData = await res.json().catch(() => ({}));
@@ -1016,17 +1020,14 @@ async function removeActing(type, targetId, staffId, event){
     }
 }
 
-let selectedSections = new Set();
-let selectedUnits = new Set();
-
-async function openAssignModal(staffId){
-    currentTargetStaff = staffData.find(x => x.id === staffId);
-    if(!currentTargetStaff) return;
+async function openAssignModal(staffId) {
+    currentTargetStaff = staffData.find(x => x.id === Number(staffId) || x.id === staffId);
+    if (!currentTargetStaff) return;
     
     document.getElementById("assignModalTitle").innerText = `Assign Penempatan: ${currentTargetStaff.name}`;
     
-    let assignedSecs = staffSectionAssignments.filter(a => a.staff_id === staffId && (!a.is_acting || a.is_acting==='false')).map(a => a.section_id);
-    let assignedUnits = staffUnitAssignments.filter(a => a.staff_id === staffId && (!a.is_acting || a.is_acting==='false')).map(a => a.unit_id);
+    let assignedSecs = staffSectionAssignments.filter(a => a.staff_id === currentTargetStaff.id && (!a.is_acting || a.is_acting === 'false')).map(a => a.section_id);
+    let assignedUnits = staffUnitAssignments.filter(a => a.staff_id === currentTargetStaff.id && (!a.is_acting || a.is_acting === 'false')).map(a => a.unit_id);
 
     selectedSections = new Set(assignedSecs.map(Number));
     selectedUnits = new Set(assignedUnits.map(Number));
@@ -1049,16 +1050,15 @@ function renderAssignOptions() {
             let isSecChecked = selectedSections.has(Number(sec.id)) ? "checked" : "";
             html += `
             <label class="modal-option-label" style="margin-bottom: 0; background: transparent; width: 100%;">
-                <input type="checkbox" class="sectionCheck" value="${sec.id}" ${isSecChecked} onchange="toggleSectionSelection(this, ${sec.id}, false)">
+                <input type="checkbox" class="sectionCheck" value="${sec.id}" ${isSecChecked} onchange="toggleSectionSelection(this, ${sec.id})">
                 <span style="font-weight: 600; color: var(--accent-blue);"><i class="fa fa-building"></i> ${sec.section_name}</span>
             </label>`;
-            
         } else {
             if (!hasUnits) {
                 let isSecChecked = selectedSections.has(Number(sec.id)) ? "checked" : "";
                 html += `
                 <label class="modal-option-label" style="margin-bottom: 0; background: transparent; width: 100%;">
-                    <input type="checkbox" class="sectionCheck" value="${sec.id}" ${isSecChecked} onchange="toggleSectionSelection(this, ${sec.id}, false)">
+                    <input type="checkbox" class="sectionCheck" value="${sec.id}" ${isSecChecked} onchange="toggleSectionSelection(this, ${sec.id})">
                     <span style="font-weight: 600;"><i class="fa fa-building"></i> ${sec.section_name} <small style="color:var(--text-muted); font-weight:normal;">(Terus ke Seksyen)</small></span>
                 </label>`;
             } else {
@@ -1071,7 +1071,6 @@ function renderAssignOptions() {
                 
                 if (isOpen) {
                     html += `<div class="unit-sub-group" style="padding: 4px 12px 10px 16px; border-top: 1px solid rgba(0,0,0,0.05); background: rgba(255,255,255,0.5);">`;
-                    
                     unitsInSection.forEach(u => {
                         let isUnitChecked = selectedUnits.has(Number(u.id)) ? "checked" : "";
                         html += `
@@ -1080,12 +1079,10 @@ function renderAssignOptions() {
                             <span><i class="fa fa-sitemap" style="color: var(--accent-blue); margin-right:4px;"></i> ${u.unit_name}</span>
                         </label>`;
                     });
-                    
                     html += `</div>`;
                 }
             }
         }
-        
         html += `</div>`;
     });
 
@@ -1117,13 +1114,13 @@ function toggleUnitSelection(checkbox, unitId) {
     }
 }
 
-async function saveAssignment(){
-    if(!currentTargetStaff) return;
+async function saveAssignment() {
+    if (!currentTargetStaff) return;
     let id = currentTargetStaff.id;
     let isKetuaSeksyen = currentTargetStaff.position?.toUpperCase() === "KETUA SEKSYEN";
 
-    await fetch(`${API_URL}/staff-section-assignment/${id}`, { method:"DELETE" });
-    await fetch(`${API_URL}/staff-unit-assignment/${id}`, { method:"DELETE" });
+    await fetch(`${API_URL}/staff-section-assignment/${id}`, { method: "DELETE" });
+    await fetch(`${API_URL}/staff-unit-assignment/${id}`, { method: "DELETE" });
 
     let finalSections = Array.from(selectedSections);
 
@@ -1135,13 +1132,13 @@ async function saveAssignment(){
     }
 
     let checkedSections = finalSections.map(secId => ({ staff_id: id, section_id: secId, is_acting: false }));
-    if(checkedSections.length){
-        await fetch(`${API_URL}/staff-section-assignment`, { method:"POST", headers, body:JSON.stringify(checkedSections) });
+    if (checkedSections.length) {
+        await fetch(`${API_URL}/staff-section-assignment`, { method: "POST", headers, body: JSON.stringify(checkedSections) });
     }
 
     let checkedUnits = Array.from(selectedUnits).map(unitId => ({ staff_id: id, unit_id: unitId, is_acting: false }));
-    if(checkedUnits.length){
-        await fetch(`${API_URL}/staff-unit-assignment`, { method:"POST", headers, body:JSON.stringify(checkedUnits) });
+    if (checkedUnits.length) {
+        await fetch(`${API_URL}/staff-unit-assignment`, { method: "POST", headers, body: JSON.stringify(checkedUnits) });
     }
 
     closeAssignModal();
@@ -1149,7 +1146,7 @@ async function saveAssignment(){
     renderStaff();
 }
 
-function closeAssignModal(){ 
+function closeAssignModal() { 
     document.getElementById("assignModal").style.display = "none"; 
     currentTargetStaff = null;
     selectedSections.clear();
@@ -1181,10 +1178,9 @@ function addNewPositionOption() {
     populatePositionDropdown(newPos);
 }
 
-let editingStaff=null;
-function addStaff(existing=null){
-    editingStaff=existing;
-    document.getElementById("modalTitle").innerHTML = existing ? "Edit Staff" : "New Staff";
+function addStaff(existing = null) {
+    editingStaff = existing;
+    document.getElementById("modalTitle").innerText = existing ? "Edit Staff" : "New Staff";
     document.getElementById("fName").value = existing?.name || "";
     document.getElementById("fEmployee").value = existing?.employee_id || "";
     document.getElementById("fPhone").value = existing?.phone_no || "";
@@ -1193,35 +1189,37 @@ function addStaff(existing=null){
     populatePositionDropdown(existing?.position || "");
 
     document.getElementById('fSignatureFile').value = '';
-    if(existing?.signature){
+    if (existing?.signature) {
         currentSignatureBase64 = existing.signature;
         showSignaturePreview(existing.signature);
     } else {
         clearSignaturePreview();
     }
+
     document.getElementById('fInitialFile').value = '';
-    if(existing?.initial){
+    if (existing?.initial) {
         currentInitialBase64 = existing.initial;
         showInitialPreview(existing.initial);
     } else {
         clearInitialPreview();
     }
-    document.getElementById("staffModal").style.display="flex";
+
+    document.getElementById("staffModal").style.display = "flex";
 }
 
-function editStaff(id){
-    let staff = staffData.find(x=>x.id===id);
-    if(staff) addStaff(staff);
+function editStaff(id) {
+    let staff = staffData.find(x => x.id === Number(id) || x.id === id);
+    if (staff) addStaff(staff);
 }
 
-function closeModal(){ document.getElementById("staffModal").style.display="none"; }
-
-    let currentSignatureBase64 = null;
+function closeModal() { 
+    document.getElementById("staffModal").style.display = "none"; 
+}
 
 function handleSignatureFileChange(input) {
     const file = input.files && input.files[0];
-    if(!file) return;
-    if(file.type !== 'image/jpeg' && file.type !== 'image/png'){ alert('Sila pilih fail JPG atau PNG sahaja.'); input.value = ''; return; }
+    if (!file) return;
+    if (file.type !== 'image/jpeg' && file.type !== 'image/png') { alert('Sila pilih fail JPG atau PNG sahaja.'); input.value = ''; return; }
     const reader = new FileReader();
     reader.onload = (e) => {
         currentSignatureBase64 = e.target.result;
@@ -1245,12 +1243,10 @@ function clearSignaturePreview() {
     document.getElementById('signaturePreviewImg').src = '';
 }
 
-    let currentInitialBase64 = null;
-
 function handleInitialFileChange(input) {
     const file = input.files && input.files[0];
-    if(!file) return;
-    if(file.type !== 'image/jpeg' && file.type !== 'image/png'){ alert('Sila pilih fail JPG atau PNG sahaja.'); input.value = ''; return; }
+    if (!file) return;
+    if (file.type !== 'image/jpeg' && file.type !== 'image/png') { alert('Sila pilih fail JPG atau PNG sahaja.'); input.value = ''; return; }
     const reader = new FileReader();
     reader.onload = (e) => {
         currentInitialBase64 = e.target.result;
@@ -1274,7 +1270,13 @@ function clearInitialPreview() {
     document.getElementById('initialPreviewImg').src = '';
 }
 
-async function saveStaff(){
+async function saveStaff() {
+    let fName = document.getElementById("fName");
+    let fEmail = document.getElementById("fEmail");
+    let fPhone = document.getElementById("fPhone");
+    let fEmployee = document.getElementById("fEmployee");
+    let fPosition = document.getElementById("fPosition");
+
     let trimmedName = fName.value ? fName.value.trim() : "";
     let trimmedEmail = fEmail.value ? fEmail.value.trim() : "";
     let trimmedPhone = fPhone.value ? fPhone.value.trim() : "";
@@ -1296,49 +1298,37 @@ async function saveStaff(){
         initial: currentInitialBase64
     };
     
-    if(!body.name || !body.position){ alert("Nama dan Jawatan wajib diisi."); return; }
+    if (!body.name || !body.position) { 
+        alert("Nama dan Jawatan wajib diisi."); 
+        return; 
+    }
 
-let res;
+    let res;
     let treatAsNew = !editingStaff;
     let savedStaffId = null;
 
-    if(treatAsNew){
-        // ==========================================
-        // SITUASI 1: PENDAFTARAN STAFF BARU
-        // Worker API sekarang jana ID baharu secara automatik (MAX(id)+1
-        // dikira di sisi server), jadi frontend tak perlu buat pengiraan sendiri.
-        // ==========================================
-        res = await fetch(`${API_URL}/staff`, { method:"POST", headers, body:JSON.stringify(body) });
-
-        if(res && res.ok){
+    if (treatAsNew) {
+        res = await fetch(`${API_URL}/staff`, { method: "POST", headers, body: JSON.stringify(body) });
+        if (res && res.ok) {
             const resultData = await res.json().catch(() => ({}));
             savedStaffId = resultData.id;
         }
-
     } else {
-        // ==========================================
-        // SITUASI 2: EDIT STAFF (KEMAS KINI)
-        // ==========================================
         savedStaffId = editingStaff.id;
-
         res = await fetch(`${API_URL}/staff/${editingStaff.id}`, { 
-            method:"PATCH", 
+            method: "PATCH", 
             headers, 
-            body:JSON.stringify(body) 
+            body: JSON.stringify(body) 
         });
     }
 
-    if(!res || !res.ok){ 
+    if (!res || !res.ok) { 
         let dbErr = res ? await res.json().catch(() => ({})) : {};
         alert("Gagal menyimpan data ke database: " + (dbErr.error || "Ralat tidak diketahui.")); 
         return; 
     }
 
-    // =========================================================
-    // SINKRONISASI OTOMATIK KE JADUAL department_head
-    // =========================================================
     if (selectedPosition && selectedPosition.toUpperCase() === "KETUA JABATAN") {
-        // Masukkan / Kemaskini status dalam jadual department_head
         await fetch(`${API_URL}/department-head`, {
             method: "POST",
             headers,
@@ -1348,7 +1338,6 @@ let res;
             })
         });
     } else {
-        // Jika jawatan BUKAN Ketua Jabatan (mungkin ditukar), padam rekod dari department_head jika ada
         await fetch(`${API_URL}/department-head/${savedStaffId}`, {
             method: "DELETE"
         });
@@ -1359,12 +1348,13 @@ let res;
     await loadStaff();
 }
 
-async function deleteStaff(id,name){
-    if(!confirm(`PADAM ${name}?`)) return;
-    await fetch(`${API_URL}/staff/${id}`, { method:"DELETE" });
-    loadStaff();
+async function deleteStaff(id, name) {
+    if (!confirm(`PADAM ${name}?`)) return;
+    await fetch(`${API_URL}/staff/${id}`, { method: "DELETE" });
+    await loadStaff();
     await loadAssignments();
 }
 </script>
+
 </body>
 </html>
