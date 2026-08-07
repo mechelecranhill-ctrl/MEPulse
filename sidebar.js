@@ -2,7 +2,7 @@ class AppSidebar extends HTMLElement {
     connectedCallback() { 
         const staffName = localStorage.getItem("staff_name") || "USER";
         const staffRole = localStorage.getItem("role") || "STAFF";
-        const staffAvatar = localStorage.getItem("staff_avatar") || "";
+        const staffAvatar = localStorage.getItem("avatar_url") || "";
 
         const avatarHtml = staffAvatar
             ? `<img src="${staffAvatar}" alt="Profile">`
