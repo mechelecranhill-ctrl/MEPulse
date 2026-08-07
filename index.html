@@ -341,8 +341,7 @@ body::before{
     </div>
 
 <script>
-    const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
-    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
+    const API_URL = 'https://me-connect-api.mech-elec-ranhill.workers.dev';
 
 let staffData = [];
 
@@ -374,11 +373,9 @@ async function loadStaff() {
             return;
         }
 
-        // 2. Jika tiada cache atau dah luput, baru tarik dari Supabase
-        console.log("Tarik data baru dari Supabase...");
-        const res = await fetch(SB_URL + '/rest/v1/staff?select=*', {
-            headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-        });
+        // 2. Jika tiada cache atau dah luput, baru tarik dari Worker API
+        console.log("Tarik data baru dari Worker API...");
+        const res = await fetch(API_URL + '/staff');
         staffData = await res.json();
 
         // 3. Simpan data baru ke dalam cache
@@ -464,33 +461,21 @@ document.getElementById('attendanceForm').onsubmit = async (e) => {
     btn.innerText = "Mengemaskini...";
 
     try {
-        const checkRes = await fetch(
-`${SB_URL}/rest/v1/attendance?name=eq.${nama}&start_date=eq.${t1}`,
-{
-    headers:{
-        'apikey':SB_KEY,
-        'Authorization':'Bearer '+SB_KEY
-    }
-});
-        const existing = await checkRes.json();
+        const checkRes = await fetch(API_URL + '/attendance');
+        const allAtt = await checkRes.json();
+        const existing = allAtt.filter(a =>
+            (a.name || '').toUpperCase().trim() === nama.toUpperCase().trim() &&
+            a.start_date === t1
+        );
 
         if (existing.length > 0) {
             const sahkan = confirm(`REKOD UNTUK ${nama.toUpperCase()} PADA ${t1} SUDAH ADA. GANTI?`);
             if (!sahkan) { btn.disabled = false; btn.innerText = "Hantar Rekod"; return; }
-            await fetch(
-`${SB_URL}/rest/v1/attendance?name=eq.${nama}&start_date=eq.${t1}`,
-{
-    method:'DELETE',
-    headers:{
-        'apikey':SB_KEY,
-        'Authorization':'Bearer '+SB_KEY
-    }
-});
         }
 
-        const res = await fetch(SB_URL + '/rest/v1/attendance', {
+        const res = await fetch(API_URL + '/attendance', {
             method: 'POST',
-            headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
     name: nama,
     position: jawatan,
