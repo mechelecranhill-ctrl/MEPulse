@@ -677,6 +677,7 @@ window.sbClient = window.sbClient || supabase.createClient(SB_URL, SB_KEY);
 const sbClient = window.sbClient;
 
 async function login(){
+
     const employeeId = document.getElementById("username").value.trim();
     const pass = document.getElementById("password").value.trim();
 
@@ -685,115 +686,69 @@ async function login(){
         return;
     }
 
+    // Akaun Admin
     if(employeeId === "@dm1n" && pass === "@AnakAnakSyurga1"){
+
         localStorage.setItem("loggedIn","true");
-        localStorage.setItem("userId", "@dm1n");
-        localStorage.setItem("role", "admin");
-        localStorage.setItem("staff_name", "System Admin");
-        localStorage.setItem("me_user", employeeId);
-        localStorage.setItem("lastActivity", Date.now());
-        localStorage.removeItem("sessionExpired");
+        localStorage.setItem("staff_id",0);
+        localStorage.setItem("userId","@dm1n");
+        localStorage.setItem("employee_id","@dm1n");
+        localStorage.setItem("staff_name","System Admin");
+        localStorage.setItem("role","Administrator");
+        localStorage.setItem("avatar_url","");
+        localStorage.setItem("me_user","@dm1n");
+        localStorage.setItem("lastActivity",Date.now());
+
         window.location.href = "sections.html";
         return;
     }
 
-    try {
-        const { data: lookupData, error: lookupError } = await sbClient
-            .from('staff')
-            .select('email')
-            .eq('employee_id', employeeId)
+    try{
+
+        const { data: staffData, error } = await sbClient
+            .from("staff")
+            .select("*")
+            .eq("employee_id", employeeId)
+            .eq("password", pass)
             .single();
 
-        if (lookupError || !lookupData || !lookupData.email) {
-            alert("User not exists");
-            return;
-        }
-
-        const staffEmail = lookupData.email;
-
-        const { data: authData, error: authError } = await sbClient.auth.signInWithPassword({
-            email: staffEmail,
-            password: pass
-        });
-
-        if (authError) {
-            console.error("Supabase auth error:", authError);
-            alert("Gagal Login: " + authError.message);
-            return;
-        }
-
-        const { data: staffData, error: staffError } = await sbClient
-            .from('staff')
-            .select('*')
-            .eq('id', authData.user.id)
-            .single();
-
-        if (staffError || !staffData) {
-            alert("Data profil kakitangan tidak ditemui.");
+        if(error || !staffData){
+            alert("Employee ID atau Password tidak sah.");
             return;
         }
 
         localStorage.setItem("loggedIn","true");
-        localStorage.setItem("userId", staffData.employee_id);
-        localStorage.setItem("role", staffData.position);
-        localStorage.setItem("staff_name", staffData.name);
-        localStorage.setItem("staff_avatar", staffData.avatar_url || "");
-        localStorage.setItem("me_user", staffData.employee_id);
-        localStorage.setItem("lastActivity", Date.now());
-        localStorage.removeItem("sessionExpired");
-
-        if (authData.session && authData.session.access_token) {
-            localStorage.setItem("supabase_token", authData.session.access_token);
-        }
+        localStorage.setItem("staff_id",staffData.id);
+        localStorage.setItem("userId",staffData.employee_id);
+        localStorage.setItem("employee_id",staffData.employee_id);
+        localStorage.setItem("staff_name",staffData.name);
+        localStorage.setItem("role",staffData.position || "");
+        localStorage.setItem("avatar_url",staffData.avatar_url || "");
+        localStorage.setItem("phone_no",staffData.phone_no || "");
+        localStorage.setItem("initial",staffData.initial || "");
+        localStorage.setItem("signature",staffData.signature || "");
+        localStorage.setItem("me_user",staffData.employee_id);
+        localStorage.setItem("lastActivity",Date.now());
 
         window.location.href = "sections.html";
 
-    } catch(err){
+    }catch(err){
+
         console.error(err);
-        alert("Server error");
+        alert("Server Error");
+
     }
+
 }
 
-async function forgotPassword(){
-    const employeeId = prompt("Masukkan Employee ID anda untuk reset password:");
+function forgotPassword(){
 
-    if(!employeeId || !employeeId.trim()){
-        return;
-    }
+    alert(
+`Lupa Password?
 
-    const empId = employeeId.trim();
+Sila hubungi Administrator untuk menetapkan semula password anda.`
+    );
 
-    try {
-        const { data: lookupData, error: lookupError } = await sbClient
-            .from('staff')
-            .select('email')
-            .eq('employee_id', empId)
-            .single();
-
-        if (lookupError || !lookupData || !lookupData.email) {
-            alert("Employee ID tidak dijumpai. Sila hubungi admin.");
-            return;
-        }
-
-        const staffEmail = lookupData.email;
-
-        const { error: resetError } = await sbClient.auth.resetPasswordForEmail(
-            staffEmail,
-            { redirectTo: window.location.origin + window.location.pathname.replace(/login\.html$/, "") + "reset-password.html" }
-        );
-
-        if (resetError) {
-            console.error("Reset password error:", resetError);
-            alert("Gagal hantar email reset: " + resetError.message);
-            return;
-        }
-
-        alert("Email reset password telah dihantar ke " + staffEmail + ". Sila semak inbox (dan folder spam).");
-
-    } catch(err){
-        console.error(err);
-        alert("Server error");
-    }
 }
 
 window.addEventListener("load", () => {
