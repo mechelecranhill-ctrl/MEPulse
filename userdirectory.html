@@ -1294,53 +1294,34 @@ async function saveStaff(){
     
     if(!body.name || !body.position){ alert("Nama dan Jawatan wajib diisi."); return; }
 
-    let res;
+let res;
     let treatAsNew = !editingStaff;
-    let hasEmailInput = emailValue !== null;
     let savedStaffId = null;
 
     if(treatAsNew){
         // ==========================================
         // SITUASI 1: PENDAFTARAN STAFF BARU
+        // Supabase Auth tidak lagi digunakan. staff.id ialah integer
+        // tanpa default, jadi ID baharu dijana secara manual (MAX(id)+1).
         // ==========================================
-        if (hasEmailInput) {
-            let auth = await fetch(`${SB_URL}/auth/v1/signup`, {
-                method:"POST", headers, body:JSON.stringify({ email:body.email, password:"StaffPassword123!" })
-            });
-            let authData = await auth.json().catch(() => ({}));
-            if(!auth.ok){ 
-                alert("Gagal mendaftar Supabase Auth: " + (authData.msg || authData.message)); 
-                return; 
-            }
-            body.id = authData.id || authData.user?.id;
-        } else {
-            body.id = crypto.randomUUID();
+        try {
+            const maxRes = await fetch(`${SB_URL}/rest/v1/staff?select=id&order=id.desc&limit=1`, { headers });
+            const maxRows = await maxRes.json();
+            const maxId = (Array.isArray(maxRows) && maxRows.length > 0) ? Number(maxRows[0].id) : 0;
+            body.id = (Number.isFinite(maxId) ? maxId : 0) + 1;
+        } catch (e) {
+            alert("Gagal menjana ID staff baharu: " + e.message);
+            return;
         }
 
         savedStaffId = body.id;
         res = await fetch(`${SB_URL}/rest/v1/staff`, { method:"POST", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(body) });
-    
+
     } else {
         // ==========================================
         // SITUASI 2: EDIT STAFF (KEMAS KINI)
         // ==========================================
-        let isEmailNewlyAdded = (!editingStaff.email || editingStaff.email.trim() === "") && hasEmailInput;
-
-        if (isEmailNewlyAdded) {
-            let auth = await fetch(`${SB_URL}/auth/v1/signup`, {
-                method:"POST", headers, body:JSON.stringify({ email:body.email, password:"StaffPassword123!" })
-            });
-            let authData = await auth.json().catch(() => ({}));
-
-            if(!auth.ok){
-                alert("Gagal mendaftar Supabase Auth untuk emel baru: " + (authData.msg || authData.message));
-                return;
-            }
-
-            body.id = authData.id || authData.user?.id;
-        }
-
-        savedStaffId = body.id || editingStaff.id;
+        savedStaffId = editingStaff.id;
 
         res = await fetch(`${SB_URL}/rest/v1/staff?id=eq.${editingStaff.id}`, { 
             method:"PATCH", 
