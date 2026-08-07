@@ -111,8 +111,7 @@
 </div>
 
 <script>
-    const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
-    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
+    const API_URL = "https://me-connect-api.mech-elec-ranhill.workers.dev";
 
     async function fetchAllStatus(forceRefresh = false) {
         const list = document.getElementById('mainList');
@@ -152,20 +151,16 @@
                 console.log("Menggunakan data staf dari cache browser...");
                 allStaff = JSON.parse(cachedData);
             } else {
-                console.log("Tarik data staf terkini dari Supabase...");
-                const resS = await fetch(SB_URL + '/rest/v1/staff?select=*', {
-                    headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-                });
+                console.log("Tarik data staf terkini dari Worker API...");
+                const resS = await fetch(API_URL + '/staff');
                 allStaff = await resS.json();
                 
                 localStorage.setItem(CACHE_KEY, JSON.stringify(allStaff));
                 localStorage.setItem(CACHE_TIME_KEY, now.toString());
             }
 
-            console.log("Tarik status ketiadaan live terkini dari Supabase...");
-            const resA = await fetch(SB_URL + '/rest/v1/attendance?select=*', {
-                headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-            });
+            console.log("Tarik status ketiadaan live terkini dari Worker API...");
+            const resA = await fetch(API_URL + '/attendance');
             const allAtt = await resA.json();
 
             const sekarang = new Date();
@@ -246,14 +241,8 @@
     try {
 
         const res = await fetch(
-            `${SB_URL}/rest/v1/attendance?id=eq.${id}`,
-            {
-                method: 'DELETE',
-                headers: {
-                    apikey: SB_KEY,
-                    Authorization: 'Bearer ' + SB_KEY
-                }
-            }
+            `${API_URL}/attendance/${id}`,
+            { method: 'DELETE' }
         );
 
         if (!res.ok) {
