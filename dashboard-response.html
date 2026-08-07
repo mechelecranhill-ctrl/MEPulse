@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ms">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -136,8 +136,8 @@
 </div>
 
 <script>
-    const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
-    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
+    // Gantikan dengan URL Cloudflare Worker anda (cth: https://attendance-api.nama-anda.workers.dev)
+    const WORKER_URL = "https://nama-worker-anda.workers.dev";
 
     async function loadDesktopData() {
         const tbody = document.getElementById('tableBody');
@@ -145,9 +145,10 @@
         const stats = document.getElementById('statsInfo');
 
         try {
-            const res = await fetch(SB_URL + '/rest/v1/attendance?select=*&order=created_at.desc', {
-                headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-            });
+            // Memanggil endpoint /attendance dari Cloudflare Worker yang berhubung dengan D1
+            const res = await fetch(`${WORKER_URL}/attendance`);
+            if (!res.ok) throw new Error('Network response was not ok');
+            
             const data = await res.json();
             
             overlay.style.display = 'none';
@@ -158,29 +159,32 @@
                 const isCuti = ((item.reason || "").toUpperCase().match(/CUTI|SAKIT|HALFDAY/));
                 const badgeClass = isCuti ? "bg-red" : "bg-blue";
                 
-                const logDate = new Date(item.created_at).toLocaleString('ms-MY');
+                const logDate = item.created_at 
+                    ? new Date(item.created_at).toLocaleString('ms-MY') 
+                    : '-';
 
                 const row = `
-    <tr>
-        <td style="font-weight:bold; color:#000;">
-            ${(item.name || "").toUpperCase()}
-        </td>
-        <td>${item.position || ""}</td>
-        <td>
-            <span class="badge ${badgeClass}">
-                ${(item.reason || "").toUpperCase()}
-            </span>
-        </td>
-        <td>${item.start_date || ""}</td>
-        <td>${item.end_date || ""}</td>
-        <td class="timestamp">${logDate}</td>
-    </tr>
-`;
+                    <tr>
+                        <td style="font-weight:bold; color:#000;">
+                            ${(item.name || "").toUpperCase()}
+                        </td>
+                        <td>${item.position || "-"}</td>
+                        <td>
+                            <span class="badge ${badgeClass}">
+                                ${(item.reason || "-").toUpperCase()}
+                            </span>
+                        </td>
+                        <td>${item.start_date || "-"}</td>
+                        <td>${item.end_date || "-"}</td>
+                        <td class="timestamp">${logDate}</td>
+                    </tr>
+                `;
                 tbody.innerHTML += row;
             });
 
         } catch (err) {
             overlay.innerHTML = "<span style='color:red;'>DATABASE ERROR. UNABLE TO RETRIEVE DATA</span>";
+            console.error(err);
         }
     }
 
