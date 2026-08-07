@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="ms">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>M&E CONNECT TV</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-        <style>
+    <style>
         @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;700&family=Outfit:wght@500;700;900&display=swap');
 
         :root { 
@@ -134,14 +134,12 @@
         .s-hadir { background: var(--accent-green); } 
         .s-kerja { background: var(--accent-blue); } 
         .s-cuti { background: var(--accent-red); }
-
     </style>
-
 </head>
 <body>
 
 <div class="sidebar">
-    <div class="brand"><h1>M&E CONNECT TV</h1></div>
+    <div class="brand"><h1>ME CONNECT TV</h1></div>
     <div class="clock-section">
         <div id="liveClock">00:00</div>
         <div id="todayDate">...</div>
@@ -154,14 +152,23 @@
 </div>
 
 <div class="main-panel">
-    <div id="mainList">Retrieving</div>
+    <div id="mainList">Retrieving...</div>
 </div>
 
 <script>
-    const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
-    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
+    // Gantikan URL di bawah dengan domain Cloudflare Worker anda
+    const WORKER_URL = "https://me-connect-api.workers.dev";
 
-    const HIERARKI = { 'KETUA JABATAN': 1, 'KETUA SEKSYEN': 2, 'EKSEKUTIF KANAN': 3, 'EKSEKUTIF': 4, 'JURUTEKNIK': 5, 'PENYELIA PENTADBIRAN': 6, 'PEMBANTU PENTADBIRAN': 7, 'KERANI': 8 };
+    const HIERARKI = { 
+        'KETUA JABATAN': 1, 
+        'KETUA SEKSYEN': 2, 
+        'EKSEKUTIF KANAN': 3, 
+        'EKSEKUTIF': 4, 
+        'JURUTEKNIK': 5, 
+        'PENYELIA PENTADBIRAN': 6, 
+        'PEMBANTU PENTADBIRAN': 7, 
+        'KERANI': 8 
+    };
 
     function getShortForm(sebab) {
         if (!sebab) return "HADIR";
@@ -179,16 +186,24 @@
     async function updateUI() {
         const list = document.getElementById('mainList');
         try {
+            // Memanggil laluan /staff dan /attendance daripada Cloudflare Worker
             const [rS, rA] = await Promise.all([
-                fetch(`${SB_URL}/rest/v1/staff?select=*`, { headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` } }),
-                fetch(`${SB_URL}/rest/v1/attendance?select=*`, { headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` } })
+                fetch(`${WORKER_URL}/staff`),
+                fetch(`${WORKER_URL}/attendance`)
             ]);
+
+            if (!rS.ok || !rA.ok) throw new Error("Gagal mengambil data daripada API");
+
             const staff = await rS.json();
             const att = await rA.json();
             const sekarang = new Date();
             const hariIni = new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate());
 
-            staff.sort((a, b) => (HIERARKI[a.position?.toUpperCase()] || 99) - (HIERARKI[b.position?.toUpperCase()] || 99) || a.name.localeCompare(b.name));
+            staff.sort((a, b) => {
+                const posA = a.position || a.jawatan || "";
+                const posB = b.position || b.jawatan || "";
+                return (HIERARKI[posA.toUpperCase()] || 99) - (HIERARKI[posB.toUpperCase()] || 99) || a.name.localeCompare(b.name);
+            });
 
             let htmlOutput = "";
             let counts = { hadir: 0, kerja: 0, cuti: 0 };
@@ -196,7 +211,7 @@
             staff.forEach((s, index) => {
                 const sNama = (s.name || "").toUpperCase().trim();
                 const record = att.find(a => {
-                    if(!a.start_date || !a.end_date) return false;
+                    if (!a.start_date || !a.end_date) return false;
                     const tM = a.start_date.split('-');
                     const tA = a.end_date.split('-');
                     const dM = new Date(tM[0], tM[1]-1, tM[2]);
@@ -208,7 +223,7 @@
                 let cls = "hadir";
 
                 if (record) {
-                    const sebabRaw = record.reason.toUpperCase();
+                    const sebabRaw = (record.reason || "").toUpperCase();
                     statusText = getShortForm(record.reason);
                     
                     if (sebabRaw.includes("CUTI") || sebabRaw.includes("HALFDAY")) {
@@ -220,11 +235,13 @@
                 counts[cls]++;
 
                 const delay = index * 0.04;
+                const jawatanPapar = s.jawatan || s.position || "";
+                
                 htmlOutput += `
                     <div class="staf-card c-${cls}" style="animation-delay: ${delay}s">
                         <div class="staf-info">
                             <div class="staf-nama">${sNama}</div>
-                            <div class="staf-jawatan">${(s.jawatan||"").toUpperCase()}</div>
+                            <div class="staf-jawatan">${jawatanPapar.toUpperCase()}</div>
                         </div>
                         <div class="badge b-${cls}">${statusText}</div>
                     </div>`;
@@ -234,7 +251,10 @@
             document.getElementById('countHadir').innerText = counts.hadir;
             document.getElementById('countKerja').innerText = counts.kerja;
             document.getElementById('countCuti').innerText = counts.cuti;
-        } catch (e) { console.error("Ralat:", e); }
+        } catch (e) { 
+            console.error("Ralat:", e); 
+            list.innerHTML = `<div style="color:red; font-weight:bold;">RALAT CAPAIAN DATA</div>`;
+        }
     }
 
     function clock() {
