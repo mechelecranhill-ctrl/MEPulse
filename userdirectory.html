@@ -581,12 +581,9 @@ body {
 </div>
 
 <script>
-const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co'; 
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
+const API_URL = 'https://me-connect-api.mech-elec-ranhill.workers.dev';
 
 const headers={
-    apikey:SB_KEY,
-    Authorization:'Bearer '+SB_KEY,
     'Content-Type':'application/json'
 };
 
@@ -610,30 +607,34 @@ let currentTargetStaff=null;
 let deptHeadAssignments=[];
 
 async function loadDeptHead(){
-    let res=await fetch(`${SB_URL}/rest/v1/department_head?select=staff_id,active,is_acting`, {headers});
-    deptHeadAssignments = await res.json();
+    let res=await fetch(`${API_URL}/department-head`);
+    let raw = await res.json();
+    // D1 simpan is_acting sebagai 0/1, tukar ke true/false supaya sepadan dengan logik sedia ada
+    deptHeadAssignments = raw.map(r => ({ ...r, is_acting: r.is_acting === 1 || r.is_acting === true }));
 }
 
 async function loadUnits(){
-    let res=await fetch(`${SB_URL}/rest/v1/units?select=id,unit_name,section_id,me_sections(section_name)`, {headers});
+    let res=await fetch(`${API_URL}/units`);
     unitData=await res.json();
 }
 
 async function loadSections(){
-    let res=await fetch(`${SB_URL}/rest/v1/me_sections?select=id,section_name`, {headers});
+    let res=await fetch(`${API_URL}/me-sections`);
     sectionData=await res.json();
 }
 
 async function loadAssignments(){
-    let res1=await fetch(`${SB_URL}/rest/v1/staff_section_assignment?select=staff_id,section_id,is_acting`, {headers});
-    staffSectionAssignments = await res1.json();
+    let res1=await fetch(`${API_URL}/staff-section-assignment`);
+    let raw1 = await res1.json();
+    staffSectionAssignments = raw1.map(r => ({ ...r, is_acting: r.is_acting === 1 || r.is_acting === true }));
 
-    let res2=await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?select=staff_id,unit_id,is_acting`, {headers});
-    staffUnitAssignments = await res2.json();
+    let res2=await fetch(`${API_URL}/staff-unit-assignment`);
+    let raw2 = await res2.json();
+    staffUnitAssignments = raw2.map(r => ({ ...r, is_acting: r.is_acting === 1 || r.is_acting === true }));
 }
 
 async function loadStaff(){
-    let res=await fetch(`${SB_URL}/rest/v1/staff?select=id,name,position,employee_id,phone_no,email,signature,initial`, {headers});
+    let res=await fetch(`${API_URL}/staff`);
     staffData=await res.json();
     renderStaff();
 }
@@ -940,9 +941,9 @@ async function assignActingStaff(staffId){
     let cleanTargetId = isNaN(currentActingTargetId) ? currentActingTargetId : Number(currentActingTargetId);
 
     if(currentActingType === 'kj'){
-        let res = await fetch(`${SB_URL}/rest/v1/department_head?on_conflict=staff_id`, {
+        let res = await fetch(`${API_URL}/department-head`, {
             method: "POST",
-            headers: { ...headers, "Prefer": "resolution=merge-duplicates,return=minimal" },
+            headers,
             body: JSON.stringify({ staff_id: staffId, active: true, is_acting: true })
         });
         if(res.ok){
@@ -957,10 +958,10 @@ async function assignActingStaff(staffId){
     }
 
     if(currentActingType === 'section'){
-        url = `${SB_URL}/rest/v1/staff_section_assignment`;
+        url = `${API_URL}/staff-section-assignment`;
         body = { staff_id: staffId, section_id: cleanTargetId, is_acting: true };
     } else if(currentActingType === 'unit'){
-        url = `${SB_URL}/rest/v1/staff_unit_assignment`;
+        url = `${API_URL}/staff-unit-assignment`;
         body = { staff_id: staffId, unit_id: cleanTargetId, is_acting: true };
     } else {
         closeActingModal();
@@ -969,7 +970,7 @@ async function assignActingStaff(staffId){
 
     let res = await fetch(url, {
         method: "POST",
-        headers: { ...headers, "Prefer": "return=minimal" },
+        headers,
         body: JSON.stringify(body)
     });
 
@@ -991,15 +992,15 @@ async function removeActing(type, targetId, staffId, event){
     let url = "";
     
     if(type === 'section'){
-        url = `${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${staffId}&section_id=eq.${cleanTargetId}&is_acting=eq.true`;
+        url = `${API_URL}/staff-section-assignment-acting?staff_id=${staffId}&section_id=${cleanTargetId}`;
     } else if(type === 'unit'){
-        url = `${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${staffId}&unit_id=eq.${cleanTargetId}&is_acting=eq.true`;
+        url = `${API_URL}/staff-unit-assignment-acting?staff_id=${staffId}&unit_id=${cleanTargetId}`;
     } else if(type === 'kj'){
-        url = `${SB_URL}/rest/v1/department_head?staff_id=eq.${staffId}&is_acting=eq.true`;
+        url = `${API_URL}/department-head-acting?staff_id=${staffId}`;
     }
 
     try {
-        let res = await fetch(url, { method: "DELETE", headers });
+        let res = await fetch(url, { method: "DELETE" });
         if(res.ok){
             if(type === 'kj') { await loadDeptHead(); } else { await loadAssignments(); }
             renderStaff();
@@ -1118,8 +1119,8 @@ async function saveAssignment(){
     let id = currentTargetStaff.id;
     let isKetuaSeksyen = currentTargetStaff.position?.toUpperCase() === "KETUA SEKSYEN";
 
-    await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${id}&is_acting=eq.false`, { method:"DELETE", headers });
-    await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${id}&is_acting=eq.false`, { method:"DELETE", headers });
+    await fetch(`${API_URL}/staff-section-assignment/${id}`, { method:"DELETE" });
+    await fetch(`${API_URL}/staff-unit-assignment/${id}`, { method:"DELETE" });
 
     let finalSections = Array.from(selectedSections);
 
@@ -1132,12 +1133,12 @@ async function saveAssignment(){
 
     let checkedSections = finalSections.map(secId => ({ staff_id: id, section_id: secId, is_acting: false }));
     if(checkedSections.length){
-        await fetch(`${SB_URL}/rest/v1/staff_section_assignment`, { method:"POST", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(checkedSections) });
+        await fetch(`${API_URL}/staff-section-assignment`, { method:"POST", headers, body:JSON.stringify(checkedSections) });
     }
 
     let checkedUnits = Array.from(selectedUnits).map(unitId => ({ staff_id: id, unit_id: unitId, is_acting: false }));
     if(checkedUnits.length){
-        await fetch(`${SB_URL}/rest/v1/staff_unit_assignment`, { method:"POST", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(checkedUnits) });
+        await fetch(`${API_URL}/staff-unit-assignment`, { method:"POST", headers, body:JSON.stringify(checkedUnits) });
     }
 
     closeAssignModal();
@@ -1301,21 +1302,15 @@ let res;
     if(treatAsNew){
         // ==========================================
         // SITUASI 1: PENDAFTARAN STAFF BARU
-        // Supabase Auth tidak lagi digunakan. staff.id ialah integer
-        // tanpa default, jadi ID baharu dijana secara manual (MAX(id)+1).
+        // Worker API sekarang jana ID baharu secara automatik (MAX(id)+1
+        // dikira di sisi server), jadi frontend tak perlu buat pengiraan sendiri.
         // ==========================================
-        try {
-            const maxRes = await fetch(`${SB_URL}/rest/v1/staff?select=id&order=id.desc&limit=1`, { headers });
-            const maxRows = await maxRes.json();
-            const maxId = (Array.isArray(maxRows) && maxRows.length > 0) ? Number(maxRows[0].id) : 0;
-            body.id = (Number.isFinite(maxId) ? maxId : 0) + 1;
-        } catch (e) {
-            alert("Gagal menjana ID staff baharu: " + e.message);
-            return;
-        }
+        res = await fetch(`${API_URL}/staff`, { method:"POST", headers, body:JSON.stringify(body) });
 
-        savedStaffId = body.id;
-        res = await fetch(`${SB_URL}/rest/v1/staff`, { method:"POST", headers:{...headers, "Prefer":"return=minimal"}, body:JSON.stringify(body) });
+        if(res && res.ok){
+            const resultData = await res.json().catch(() => ({}));
+            savedStaffId = resultData.id;
+        }
 
     } else {
         // ==========================================
@@ -1323,16 +1318,16 @@ let res;
         // ==========================================
         savedStaffId = editingStaff.id;
 
-        res = await fetch(`${SB_URL}/rest/v1/staff?id=eq.${editingStaff.id}`, { 
+        res = await fetch(`${API_URL}/staff/${editingStaff.id}`, { 
             method:"PATCH", 
-            headers:{...headers, "Prefer":"return=minimal"}, 
+            headers, 
             body:JSON.stringify(body) 
         });
     }
 
     if(!res || !res.ok){ 
         let dbErr = res ? await res.json().catch(() => ({})) : {};
-        alert("Gagal menyimpan data ke database: " + (dbErr.message || "Ralat tidak diketahui.")); 
+        alert("Gagal menyimpan data ke database: " + (dbErr.error || "Ralat tidak diketahui.")); 
         return; 
     }
 
@@ -1341,12 +1336,9 @@ let res;
     // =========================================================
     if (selectedPosition && selectedPosition.toUpperCase() === "KETUA JABATAN") {
         // Masukkan / Kemaskini status dalam jadual department_head
-        await fetch(`${SB_URL}/rest/v1/department_head`, {
+        await fetch(`${API_URL}/department-head`, {
             method: "POST",
-            headers: { 
-                ...headers, 
-                "Prefer": "resolution=merge-duplicates,return=minimal" 
-            },
+            headers,
             body: JSON.stringify({ 
                 staff_id: savedStaffId, 
                 active: true 
@@ -1354,9 +1346,8 @@ let res;
         });
     } else {
         // Jika jawatan BUKAN Ketua Jabatan (mungkin ditukar), padam rekod dari department_head jika ada
-        await fetch(`${SB_URL}/rest/v1/department_head?staff_id=eq.${savedStaffId}`, {
-            method: "DELETE",
-            headers: headers
+        await fetch(`${API_URL}/department-head/${savedStaffId}`, {
+            method: "DELETE"
         });
     }
 
@@ -1367,7 +1358,7 @@ let res;
 
 async function deleteStaff(id,name){
     if(!confirm(`PADAM ${name}?`)) return;
-    await fetch(`${SB_URL}/rest/v1/staff?id=eq.${id}`, { method:"DELETE", headers });
+    await fetch(`${API_URL}/staff/${id}`, { method:"DELETE" });
     loadStaff();
     await loadAssignments();
 }
