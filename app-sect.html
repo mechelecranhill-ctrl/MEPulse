@@ -212,35 +212,36 @@ async function getPermissionContext() {
     }
 
     try {
-        const { data: { user } } = await supabaseClient.auth.getUser();
-        if (!user) return ctx;
-        ctx.userId = user.id;
+        const staffIdRaw = localStorage.getItem('staff_id');
+        const staffId = staffIdRaw !== null ? Number(staffIdRaw) : null;
+        if (staffId === null || Number.isNaN(staffId)) return ctx;
+        ctx.userId = staffId;
 
         try {
-            const sRes = await fetch(`${SB_URL}/rest/v1/staff?id=eq.${user.id}&select=position`, { headers: _permHeaders });
+            const sRes = await fetch(`${SB_URL}/rest/v1/staff?id=eq.${staffId}&select=position`, { headers: _permHeaders });
             const sRows = await sRes.json();
             ctx.position = (sRows[0]?.position || '').trim().toUpperCase();
         } catch (e) { console.error('Failed to load staff position:', e); }
 
         try {
-            const uRes = await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${user.id}&is_acting=eq.true&select=unit_id`, { headers: _permHeaders });
+            const uRes = await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${staffId}&is_acting=eq.true&select=unit_id`, { headers: _permHeaders });
             ctx.isActingUnitExec = (await uRes.json()).length > 0;
         } catch (e) {}
 
         try {
-            const secRes = await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${user.id}&is_acting=eq.true&select=section_id`, { headers: _permHeaders });
+            const secRes = await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${staffId}&is_acting=eq.true&select=section_id`, { headers: _permHeaders });
             ctx.isActingSectionHead = (await secRes.json()).length > 0;
         } catch (e) {}
 
         try {
-            const dRes = await fetch(`${SB_URL}/rest/v1/department_head?staff_id=eq.${user.id}&active=eq.true&select=is_acting`, { headers: _permHeaders });
+            const dRes = await fetch(`${SB_URL}/rest/v1/department_head?staff_id=eq.${staffId}&active=eq.true&select=is_acting`, { headers: _permHeaders });
             ctx.isDeptHeadActive = (await dRes.json()).length > 0;
         } catch (e) {}
 
         ctx.canManageTech = ACT_ROLES.TECH.includes(ctx.position);
         ctx.canActUnit = ACT_ROLES.UNIT_EXEC.includes(ctx.position) || ctx.isActingUnitExec;
         ctx.canActSection = ACT_ROLES.SECTION_HEAD.includes(ctx.position) || ctx.isActingSectionHead;
-        ctx.canActDept = ACT_ROLES.DEPT_HEAD.includes(ctx.position) || ctx.isDeptHeadActive; // covers Pemangku KJ (row aktif dgn is_acting)
+        ctx.canActDept = ACT_ROLES.DEPT_HEAD.includes(ctx.position) || ctx.isDeptHeadActive;
     } catch (err) {
         console.error('Permission context error:', err);
     }
@@ -257,23 +258,21 @@ async function getPermissionContext() {
                 let unitsPreset = [];
 
                 if (!isAdmin) {
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    if (userError || !user) {
+    const staffIdRaw = localStorage.getItem('staff_id');
+    const currentStaffId = staffIdRaw !== null ? Number(staffIdRaw) : null;
+    if (currentStaffId === null || Number.isNaN(currentStaffId)) {
         showEmptyRow('Please log in first.');
         return;
     }
 
-    // Ketua Jabatan / Pemangku KJ -> setaraf admin, nampak SEMUA unit walaupun
-    // tiada rekod assignment di staff_section_assignment / staff_unit_assignment.
     if (perm.canActDept) {
         const { data: allUnits } = await supabaseClient.from('units').select('id, unit_name');
         unitsPreset = allUnits || [];
     } else {
-        // 1. Assignment TERUS ke seksyen (Ketua Seksyen / Pemangku Ketua Seksyen)
         const { data: sectionAssignments, error: assError } = await supabaseClient
             .from('staff_section_assignment')
             .select('section_id')
-            .eq('staff_id', user.id)
+            .eq('staff_id', currentStaffId)
             .eq('active', true);
 
         if (assError) throw assError;
@@ -284,7 +283,7 @@ async function getPermissionContext() {
         const { data: unitAssignments, error: unitAssignError } = await supabaseClient
             .from('staff_unit_assignment')
             .select('unit_id')
-            .eq('staff_id', user.id)
+            .eq('staff_id', currentStaffId)
             .eq('active', true);
 
         if (unitAssignError) throw unitAssignError;
