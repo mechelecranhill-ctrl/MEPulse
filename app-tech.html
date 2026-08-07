@@ -19,7 +19,7 @@
         }
     </script>
 
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="sidebar.css">
 
     <script src="session.js"></script>
     <script src="sidebar.js" defer></script>
@@ -590,41 +590,41 @@ async function getPermissionContext() {
     }
 
     try {
-        const { data: { user } } = await supabaseClient.auth.getUser();
-        if (!user) return ctx;
-        ctx.userId = user.id;
+        const staffIdRaw = localStorage.getItem('staff_id');
+        const staffId = staffIdRaw !== null ? Number(staffIdRaw) : null;
+        if (staffId === null || Number.isNaN(staffId)) return ctx;
+        ctx.userId = staffId;
 
         try {
-            const sRes = await fetch(`${SB_URL}/rest/v1/staff?id=eq.${user.id}&select=position`, { headers: _permHeaders });
+            const sRes = await fetch(`${SB_URL}/rest/v1/staff?id=eq.${staffId}&select=position`, { headers: _permHeaders });
             const sRows = await sRes.json();
             ctx.position = (sRows[0]?.position || '').trim().toUpperCase();
         } catch (e) { console.error('Failed to load staff position:', e); }
 
         try {
-            const uRes = await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${user.id}&is_acting=eq.true&select=unit_id`, { headers: _permHeaders });
+            const uRes = await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${staffId}&is_acting=eq.true&select=unit_id`, { headers: _permHeaders });
             ctx.isActingUnitExec = (await uRes.json()).length > 0;
         } catch (e) {}
 
         try {
-            const secRes = await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${user.id}&is_acting=eq.true&select=section_id`, { headers: _permHeaders });
+            const secRes = await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${staffId}&is_acting=eq.true&select=section_id`, { headers: _permHeaders });
             ctx.isActingSectionHead = (await secRes.json()).length > 0;
         } catch (e) {}
 
         try {
-            const dRes = await fetch(`${SB_URL}/rest/v1/department_head?staff_id=eq.${user.id}&active=eq.true&select=is_acting`, { headers: _permHeaders });
+            const dRes = await fetch(`${SB_URL}/rest/v1/department_head?staff_id=eq.${staffId}&active=eq.true&select=is_acting`, { headers: _permHeaders });
             ctx.isDeptHeadActive = (await dRes.json()).length > 0;
         } catch (e) {}
 
         ctx.canManageTech = ACT_ROLES.TECH.includes(ctx.position);
         ctx.canActUnit = ACT_ROLES.UNIT_EXEC.includes(ctx.position) || ctx.isActingUnitExec;
         ctx.canActSection = ACT_ROLES.SECTION_HEAD.includes(ctx.position) || ctx.isActingSectionHead;
-        ctx.canActDept = ACT_ROLES.DEPT_HEAD.includes(ctx.position) || ctx.isDeptHeadActive; // covers Pemangku KJ (row aktif dgn is_acting)
+        ctx.canActDept = ACT_ROLES.DEPT_HEAD.includes(ctx.position) || ctx.isDeptHeadActive;
     } catch (err) {
         console.error('Permission context error:', err);
     }
     return ctx;
 }
-
 function applyTechPermissionUI(perm) {
             const canManage = !!perm.canManageTech;
             const addQuoBtn = document.querySelector('#quotation-section button[onclick="openQuotationModal()"]');
@@ -2496,15 +2496,14 @@ async function qActionDeleteQuotation() {
         let scopeIsAll = isAdmin;
 
         if (!isAdmin) {
-            const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+            const staffIdRaw = localStorage.getItem('staff_id');
+            const currentStaffId = staffIdRaw !== null ? Number(staffIdRaw) : null;
 
-            if (userError || !user) {
+            if (currentStaffId === null || Number.isNaN(currentStaffId)) {
                 showEmptyState('quotations-container', 'Please log in first.');
                 showEmptyState('blueforms-container', 'Please log in first.');
                 return;
             }
-
-            const currentStaffId = user.id;
 
             if (perm.canActDept) {
                 scopeIsAll = true;
@@ -2811,7 +2810,7 @@ sectionHtml += `
             if (!popup) {
                 popup = document.createElement('div');
                 popup.id = 'contractNamePopup';
-                popup.style.cssText = 'position:fixed; z-index:99999; background:#111827; color:#fff; font-size:11px; font-weight:600; padding:6px 10px; border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,.3); max-width:220px; pointer-events:none; opacity:0; transition:opacity .15s ease;';
+                popup.sidebar.cssText = 'position:fixed; z-index:99999; background:#111827; color:#fff; font-size:11px; font-weight:600; padding:6px 10px; border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,.3); max-width:220px; pointer-events:none; opacity:0; transition:opacity .15s ease;';
                 document.body.appendChild(popup);
             }
 
