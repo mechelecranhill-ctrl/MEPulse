@@ -26,21 +26,6 @@ if (localStorage.getItem("loggedIn") === "true" && !localStorage.getItem("lastAc
     localStorage.setItem("lastActivity", Date.now());
 }
 
-// PENAMBAHBAIKAN: Selagi pengguna aktif, Supabase akan hantar token baharu 
-// sebelum token lama mati (setiap 1 jam). Kita tangkap & simpan token fresh itu.
-if (window.sbClient) {
-    window.sbClient.auth.onAuthStateChange((event, session) => {
-        if (session && session.access_token) {
-            localStorage.setItem("supabase_token", session.access_token);
-            // Kemas kini aktiviti juga sebab ada interaksi dengan server
-            if (localStorage.getItem("loggedIn") === "true") {
-                localStorage.setItem("lastActivity", Date.now());
-            }
-        }
-    });
-}
-
-
 /* =========================
    CHECK LOGIN GUARD
 ========================= */
@@ -277,7 +262,6 @@ function clearAuthStates() {
     localStorage.removeItem("loggedIn");
     localStorage.removeItem("lastActivity");
     localStorage.removeItem("sessionExpired");
-    localStorage.removeItem("supabase_token"); // TAMBAH BARIS INI: Buang token keselamatan apabila keluar
 }
 
 /* =========================
