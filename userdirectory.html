@@ -1424,29 +1424,28 @@ async function saveStaff() {
 }
 
 async function deleteStaff(id, name) {
-    showConfirm("Delete Record", `Adakah anda pasti untuk memadam ${name}?`, async () => {
+    showConfirm("Delete Record", `Are you sure you want to delete ${name}?`, async () => {
         try {
-            // 1. Padam rekod hubungan secara turutan dengan AWAIT yang lengkap
-            await fetch(`${API_URL}/staff-section-assignment/${id}`, { method: "DELETE" });
-            await fetch(`${API_URL}/staff-unit-assignment/${id}`, { method: "DELETE" });
-            await fetch(`${API_URL}/department-head/${id}`, { method: "DELETE" });
-
-            // 2. Padam rekod staf utama selepas rekod hubungan selesai dipadam
-            let res = await fetch(`${API_URL}/staff/${id}`, { method: "DELETE" });
+            // CALL ONLY THIS SINGLE ENDPOINT.
+            // The backend Worker safely deletes child records (assignments/dept head) automatically.
+            let res = await fetch(`${API_URL}/staff/${id}`, { 
+                method: "DELETE" 
+            });
 
             if (res.ok) {
-                // Refresh data terkini
-                await loadAssignments();
-                await loadDeptHead();
-                await loadStaff();
-                showAlert("Berjaya", "Rekod staf berjaya dipadam.");
+                // Refresh views after successful deletion
+                if (typeof loadAssignments === "function") await loadAssignments();
+                if (typeof loadDeptHead === "function") await loadDeptHead();
+                if (typeof loadStaff === "function") await loadStaff();
+                
+                showAlert("Success", "Staff record deleted successfully.");
             } else {
                 let errData = await res.json().catch(() => ({}));
-                showAlert("Delete Error", `Gagal memadam staf: ${errData.message || res.statusText || 'Ralat tidak diketahui'}`);
+                showAlert("Delete Error", `Failed to delete staff: ${errData.error || res.statusText}`);
             }
         } catch (err) {
             console.error("Delete staff error:", err);
-            showAlert("System Error", "Ralat sambungan semasa memadam rekod.");
+            showAlert("System Error", "Connection error while deleting record.");
         }
     });
 }
