@@ -789,8 +789,8 @@ function staffCardHtml(s, isActing = false, actingType = "", targetId = null) {
                     <button class="icon-btn edit-btn" onclick="editStaff('${s.id}')">
                         <i class="fa fa-pen"></i>
                     </button>
-                    <button class="icon-btn delete-btn" onclick="deleteStaff('${s.id}','${safeName}')">
-                        <i class="fa fa-trash"></i>
+                    <button class="icon-btn delete-btn" onclick="deleteStaff('${s.id}', decodeURIComponent('${encodeURIComponent(s.name || '')}'))">
+                    <i class="fa fa-trash"></i>
                     </button>
                 `}
             </div>
@@ -1424,27 +1424,29 @@ async function saveStaff() {
 }
 
 async function deleteStaff(id, name) {
-    showConfirm("Delete Record", `Are you sure you want to delete ${name}?`, async () => {
+    showConfirm("Delete Record", `Adakah anda pasti untuk memadam ${name}?`, async () => {
         try {
-            // 1. Delete all relational assignments first and wait for them to finish
+            // 1. Padam rekod hubungan secara turutan dengan AWAIT yang lengkap
             await fetch(`${API_URL}/staff-section-assignment/${id}`, { method: "DELETE" });
             await fetch(`${API_URL}/staff-unit-assignment/${id}`, { method: "DELETE" });
             await fetch(`${API_URL}/department-head/${id}`, { method: "DELETE" });
 
-            // 2. Delete the main staff profile
+            // 2. Padam rekod staf utama selepas rekod hubungan selesai dipadam
             let res = await fetch(`${API_URL}/staff/${id}`, { method: "DELETE" });
 
             if (res.ok) {
-                await loadStaff();
+                // Refresh data terkini
                 await loadAssignments();
                 await loadDeptHead();
-                showAlert("Success", "Staff record deleted successfully.");
+                await loadStaff();
+                showAlert("Berjaya", "Rekod staf berjaya dipadam.");
             } else {
                 let errData = await res.json().catch(() => ({}));
-                showAlert("Delete Error", `Failed to delete staff: ${errData.message || res.statusText}`);
+                showAlert("Delete Error", `Gagal memadam staf: ${errData.message || res.statusText || 'Ralat tidak diketahui'}`);
             }
         } catch (err) {
-            showAlert("System Error", "Error completing delete operation. Check backend logs.");
+            console.error("Delete staff error:", err);
+            showAlert("System Error", "Ralat sambungan semasa memadam rekod.");
         }
     });
 }
