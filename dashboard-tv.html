@@ -156,28 +156,36 @@
 </div>
 
 <script>
-        const API_URL = "https://me-connect-api.mech-elec-ranhill.workers.dev";
+    const API_URL = "https://me-connect-api.mech-elec-ranhill.workers.dev";
 
     const HIERARKI = { 
+        'HEAD OF DEPARTMENT': 1,
         'KETUA JABATAN': 1, 
+        'HEAD OF SECTION': 2,
         'KETUA SEKSYEN': 2, 
+        'SENIOR EXECUTIVE': 3,
         'EKSEKUTIF KANAN': 3, 
+        'EXECUTIVE': 4,
         'EKSEKUTIF': 4, 
+        'TECHNICIAN': 5,
         'JURUTEKNIK': 5, 
+        'ADMINISTRATIVE SUPERVISOR': 6,
         'PENYELIA PENTADBIRAN': 6, 
+        'ADMINISTRATIVE ASSISTANT': 7,
         'PEMBANTU PENTADBIRAN': 7, 
+        'CLERK': 8,
         'KERANI': 8 
     };
 
     function getShortForm(sebab) {
-        if (!sebab) return "HADIR";
+        if (!sebab) return "PRESENT";
         const s = sebab.toUpperCase();
         
-        if (s.includes("FIELD") || s.includes("LAPANGAN")) return "ONSITE";
+        if (s.includes("FIELD") || s.includes("LAPANGAN") || s.includes("ONSITE")) return "ONSITE";
         if (s.includes("FACTORY") || s.includes("FAT")) return "FAT";
-        if (s.includes("MESYUARAT")) return "MEETING";
-        if (s.includes("CUTI REHAT") || s.includes("SAKIT")) return "OFF/MC";
-        if (s.includes("SEPARUH") || s.includes("HALFDAY")) return "HALFDAY";
+        if (s.includes("MEETING") || s.includes("MESYUARAT")) return "MEETING";
+        if (s.includes("LEAVE") || s.includes("CUTI") || s.includes("MC") || s.includes("SAKIT")) return "OFF/MC";
+        if (s.includes("HALF") || s.includes("HALFDAY") || s.includes("SEPARUH")) return "HALFDAY";
         
         return s.length > 9 ? s.substring(0, 9) : s;
     }
@@ -185,13 +193,12 @@
     async function updateUI() {
         const list = document.getElementById('mainList');
         try {
-            // Memanggil laluan /staff dan /attendance daripada Cloudflare Worker
             const [rS, rA] = await Promise.all([
                 fetch(`${API_URL}/staff`),
                 fetch(`${API_URL}/attendance`)
             ]);
 
-            if (!rS.ok || !rA.ok) throw new Error("Gagal mengambil data daripada API");
+            if (!rS.ok || !rA.ok) throw new Error("Failed to retrieve data from API");
 
             const staff = await rS.json();
             const att = await rA.json();
@@ -218,14 +225,14 @@
                     return (a.name || "").toUpperCase().trim() === sNama && hariIni >= dM && hariIni <= dA;
                 });
 
-                let statusText = "HADIR";
+                let statusText = "PRESENT";
                 let cls = "hadir";
 
                 if (record) {
                     const sebabRaw = (record.reason || "").toUpperCase();
                     statusText = getShortForm(record.reason);
                     
-                    if (sebabRaw.includes("CUTI") || sebabRaw.includes("HALFDAY")) {
+                    if (sebabRaw.includes("CUTI") || sebabRaw.includes("LEAVE") || sebabRaw.includes("SAKIT") || sebabRaw.includes("MC") || sebabRaw.includes("HALFDAY")) {
                         cls = "cuti";
                     } else {
                         cls = "kerja";
@@ -234,7 +241,7 @@
                 counts[cls]++;
 
                 const delay = index * 0.04;
-                const jawatanPapar = s.jawatan || s.position || "";
+                const jawatanPapar = s.position || s.jawatan || "";
                 
                 htmlOutput += `
                     <div class="staf-card c-${cls}" style="animation-delay: ${delay}s">
@@ -251,8 +258,8 @@
             document.getElementById('countKerja').innerText = counts.kerja;
             document.getElementById('countCuti').innerText = counts.cuti;
         } catch (e) { 
-            console.error("Ralat:", e); 
-            list.innerHTML = `<div style="color:red; font-weight:bold;">RALAT CAPAIAN DATA</div>`;
+            console.error("Error:", e); 
+            list.innerHTML = `<div style="color:red; font-weight:bold; grid-column: span 3; text-align: center; padding-top: 20px;">DATA ACCESS ERROR</div>`;
         }
     }
 
@@ -260,7 +267,7 @@
         const c = document.getElementById('liveClock');
         const d = document.getElementById('todayDate');
         if(c) c.innerText = new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
-        if(d) d.innerText = new Date().toLocaleDateString('ms-MY', {weekday:'long', day:'numeric', month:'long'}).toUpperCase();
+        if(d) d.innerText = new Date().toLocaleDateString('en-US', {weekday:'long', day:'numeric', month:'long'}).toUpperCase();
     }
 
     setInterval(updateUI, 60000); 
