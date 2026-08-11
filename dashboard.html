@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ms">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,7 +8,7 @@
     <style>
         body {
             background: #a1c4fd;
-            font-family: 'SF Pro Display', sans-serif, Arial;
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
             margin: 0; padding: 20px;
             color: #1d1d1f;
         }
@@ -53,7 +53,6 @@
 
         .btn-group { display: flex; gap: 8px; align-items: center; }
 
-        /* UBAH DI SINI: Hanya ikon sahaja, tiada kotak/bulatan latar belakang */
         .refresh-btn { 
             background: none; 
             border: none;
@@ -80,6 +79,40 @@
         }
 
         h2 { margin: 10px 0 0 0; letter-spacing: 1px; font-size: 20px; }
+
+        /* Custom Modal Styling */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(4px);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000;
+            opacity: 0; visibility: hidden;
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+        }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal-box {
+            background: rgba(255, 255, 255, 0.95);
+            width: 85%; max-width: 320px;
+            border-radius: 20px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            transform: scale(0.9);
+            transition: transform 0.2s ease;
+        }
+        .modal-overlay.active .modal-box { transform: scale(1); }
+        .modal-title { font-size: 16px; font-weight: bold; margin-bottom: 8px; color: #1d1d1f; }
+        .modal-desc { font-size: 13px; color: #666; margin-bottom: 20px; line-height: 1.4; }
+        .modal-buttons { display: flex; gap: 10px; }
+        .modal-btn {
+            flex: 1; padding: 12px; border: none; border-radius: 12px;
+            font-size: 14px; font-weight: bold; cursor: pointer;
+        }
+        .modal-btn-confirm { background: #FF3B30; color: white; }
+        .modal-btn-cancel { background: #E5E5EA; color: #1d1d1f; }
+        .modal-btn-ok { background: #007AFF; color: white; width: 100%; }
     </style>
 </head>
 <body>
@@ -110,8 +143,59 @@
     <div id="mainList">Retrieving Attendance Lists</div>
 </div>
 
+<!-- CUSTOM MODAL HTML -->
+<div id="customModal" class="modal-overlay">
+    <div class="modal-box">
+        <div id="modalTitle" class="modal-title">Notice</div>
+        <div id="modalDesc" class="modal-desc">Message content goes here.</div>
+        <div id="modalButtons" class="modal-buttons"></div>
+    </div>
+</div>
+
 <script>
     const API_URL = "https://me-connect-api.mech-elec-ranhill.workers.dev";
+
+    // Custom Popup Dialog Handler
+    function showModal(title, text, type = 'alert', onConfirm = null) {
+        const modal = document.getElementById('customModal');
+        const mTitle = document.getElementById('modalTitle');
+        const mDesc = document.getElementById('modalDesc');
+        const mBtns = document.getElementById('modalButtons');
+
+        mTitle.innerText = title;
+        mDesc.innerText = text;
+        mBtns.innerHTML = '';
+
+        if (type === 'confirm') {
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'modal-btn modal-btn-cancel';
+            cancelBtn.innerText = 'Cancel';
+            cancelBtn.onclick = closeModal;
+
+            const confirmBtn = document.createElement('button');
+            confirmBtn.className = 'modal-btn modal-btn-confirm';
+            confirmBtn.innerText = 'Confirm';
+            confirmBtn.onclick = () => {
+                closeModal();
+                if (onConfirm) onConfirm();
+            };
+
+            mBtns.appendChild(cancelBtn);
+            mBtns.appendChild(confirmBtn);
+        } else {
+            const okBtn = document.createElement('button');
+            okBtn.className = 'modal-btn modal-btn-ok';
+            okBtn.innerText = 'OK';
+            okBtn.onclick = closeModal;
+            mBtns.appendChild(okBtn);
+        }
+
+        modal.classList.add('active');
+    }
+
+    function closeModal() {
+        document.getElementById('customModal').classList.remove('active');
+    }
 
     async function fetchAllStatus(forceRefresh = false) {
         const list = document.getElementById('mainList');
@@ -138,7 +222,7 @@
             const ONE_DAY = 24 * 60 * 60 * 1000;
 
             if (forceRefresh) {
-                console.log("Memadam cache staf lama secara paksa...");
+                console.log("Clearing outdated staff cache...");
                 localStorage.removeItem(CACHE_KEY);
                 localStorage.removeItem(CACHE_TIME_KEY);
             }
@@ -148,10 +232,10 @@
             const now = new Date().getTime();
 
             if (cachedData && cachedTime && (now - cachedTime < ONE_DAY)) {
-                console.log("Menggunakan data staf dari cache browser...");
+                console.log("Using staff data from browser cache...");
                 allStaff = JSON.parse(cachedData);
             } else {
-                console.log("Tarik data staf terkini dari Worker API...");
+                console.log("Fetching latest staff data from Worker API...");
                 const resS = await fetch(API_URL + '/staff');
                 allStaff = await resS.json();
                 
@@ -159,7 +243,7 @@
                 localStorage.setItem(CACHE_TIME_KEY, now.toString());
             }
 
-            console.log("Tarik status ketiadaan live terkini dari Worker API...");
+            console.log("Fetching live absence status from Worker API...");
             const resA = await fetch(API_URL + '/attendance');
             const allAtt = await resA.json();
 
@@ -191,19 +275,19 @@
                     return hariIni >= tMula && hariIni <= tAkhir;
                 });
 
-                let sText = "HADIR";
+                let sText = "PRESENT";
                 let sClass = "status-hadir";
                 let sSub = (staf.position || "").toUpperCase();
                 let deleteButtonHtml = "";
 
                 if (record) {
-                    sText = (record.reason || "LUAR").toUpperCase();
-                    sClass = (sText.includes("CUTI") || sText.includes("SAKIT") || sText.includes("HALFDAY")) ? "status-cuti" : "status-kerja";
-                    sSub = sSub + " • SEHINGGA: " + record.end_date;
+                    sText = (record.reason || "OFFSITE").toUpperCase();
+                    sClass = (sText.includes("CUTI") || sText.includes("SAKIT") || sText.includes("LEAVE") || sText.includes("HALFDAY")) ? "status-cuti" : "status-kerja";
+                    sSub = sSub + " • UNTIL: " + record.end_date;
 
                     deleteButtonHtml = `
-                        <button class="delete-btn" onclick="padamRekod('${record.id}')">
-                            <i class="fa-solid fa-xmark"></i> HADIR
+                        <button class="delete-btn" onclick="padamRekod('${record.id}', '${sNama}')">
+                            <i class="fa-solid fa-xmark"></i> PRESENT
                         </button>`;
                 }
 
@@ -221,11 +305,11 @@
             });
 
             if (forceRefresh && icon && btn) {
-                alert("✅ Senarai staf & rekod kehadiran telah dikemas kini!");
+                showModal("Success", "Staff list & attendance records updated successfully!");
             }
 
         } catch (err) {
-            list.innerHTML = "<div style='color:red; text-align:center;'>RALAT: " + err.message.toUpperCase() + "</div>";
+            list.innerHTML = "<div style='color:red; text-align:center;'>ERROR: " + err.message.toUpperCase() + "</div>";
         } finally {
             if (icon && btn) {
                 btn.disabled = false;
@@ -234,33 +318,36 @@
         }
     }
 
-    async function padamRekod(id) {
+    function padamRekod(id, name) {
+        showModal(
+            "Confirm Action",
+            `Are you sure ${name} is now PRESENT?`,
+            'confirm',
+            async () => {
+                try {
+                    const res = await fetch(
+                        `${API_URL}/attendance/${id}`,
+                        { method: 'DELETE' }
+                    );
 
-    if (!confirm("ADAKAH ANDA PASTI PEKERJA INI TELAH HADIR?")) return;
+                    if (!res.ok) {
+                        const err = await res.text();
+                        throw new Error(err);
+                    }
 
-    try {
+                    showModal("Success", "Record deleted. Status updated to PRESENT.");
+                    fetchAllStatus(false);
 
-        const res = await fetch(
-            `${API_URL}/attendance/${id}`,
-            { method: 'DELETE' }
+                } catch (err) {
+                    console.error(err);
+                    showModal("Error", "Failed to delete record: " + err.message);
+                }
+            }
         );
-
-        if (!res.ok) {
-            const err = await res.text();
-            throw new Error(err);
-        }
-
-        alert("REKOD DIPADAM. STATUS KEMBALI KEPADA HADIR.");
-        fetchAllStatus(false);
-
-    } catch (err) {
-        console.error(err);
-        alert("RALAT: " + err.message);
     }
-}
 
     const opsi = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-    document.getElementById('todayDate').innerText = new Date().toLocaleDateString('ms-MY', opsi).toUpperCase();
+    document.getElementById('todayDate').innerText = new Date().toLocaleDateString('en-US', opsi).toUpperCase();
 
     window.onload = () => fetchAllStatus(false);
 </script>
