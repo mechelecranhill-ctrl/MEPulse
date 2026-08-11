@@ -1423,28 +1423,28 @@ async function saveStaff() {
     await loadStaff();
 }
 
-/* Delete Staff Logic Fix */
 async function deleteStaff(id, name) {
-    showConfirm("Delete Record", `Are you sure you want to delete the record for ${name}?`, async () => {
+    showConfirm("Delete Record", `Are you sure you want to delete ${name}?`, async () => {
         try {
-            // Remove linked assignments first
-            await fetch(`${API_URL}/staff-section-assignment/${id}`, { method: "DELETE" }).catch(() => {});
-            await fetch(`${API_URL}/staff-unit-assignment/${id}`, { method: "DELETE" }).catch(() => {});
-            await fetch(`${API_URL}/department-head/${id}`, { method: "DELETE" }).catch(() => {});
+            // 1. Delete all relational assignments first and wait for them to finish
+            await fetch(`${API_URL}/staff-section-assignment/${id}`, { method: "DELETE" });
+            await fetch(`${API_URL}/staff-unit-assignment/${id}`, { method: "DELETE" });
+            await fetch(`${API_URL}/department-head/${id}`, { method: "DELETE" });
 
-            // Delete main staff profile
+            // 2. Delete the main staff profile
             let res = await fetch(`${API_URL}/staff/${id}`, { method: "DELETE" });
 
             if (res.ok) {
                 await loadStaff();
                 await loadAssignments();
                 await loadDeptHead();
+                showAlert("Success", "Staff record deleted successfully.");
             } else {
                 let errData = await res.json().catch(() => ({}));
                 showAlert("Delete Error", `Failed to delete staff: ${errData.message || res.statusText}`);
             }
         } catch (err) {
-            showAlert("System Error", "Failed to contact server to delete record.");
+            showAlert("System Error", "Error completing delete operation. Check backend logs.");
         }
     });
 }
