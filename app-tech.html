@@ -2982,18 +2982,6 @@ function createContractNamePopup() {
     `;
 
     document.body.appendChild(popup);
-
-    // Jangan tutup bila mouse masuk popup
-    popup.addEventListener('mouseenter', () => {
-        if (!contractNamePopupLocked) {
-            popup.style.opacity = '1';
-            popup.style.visibility = 'visible';
-        }
-    });
-
-    contractNamePopup = popup;
-
-    return popup;
 }
 
 
@@ -3074,7 +3062,7 @@ function handleContractBadgeClick(e, encodedName) {
     const badge = e.currentTarget;
     const name = decodeURIComponent(encodedName || '');
 
-    // Kalau popup sedang LOCKED pada badge yang sama
+    // Click kali kedua → tutup
     if (
         contractNamePopupLocked &&
         contractNamePopupAnchor === badge
@@ -3083,25 +3071,22 @@ function handleContractBadgeClick(e, encodedName) {
         return;
     }
 
-    // CLICK = lock popup
+    // Click pertama → LOCK
     showContractNamePopup(
         badge,
         name,
         true
     );
 }
-        document.addEventListener('mouseover', (e) => {
-
+document.addEventListener('mouseenter', (e) => {
     const badge = e.target.closest('.contract-code-badge');
 
     if (!badge) return;
 
-    // Kalau popup sudah dikunci dengan click,
-    // jangan overwrite
+    // Kalau sudah locked melalui click, jangan ubah
     if (contractNamePopupLocked) return;
 
     const encodedName = badge.dataset.contractName;
-
     if (!encodedName) return;
 
     showContractNamePopup(
@@ -3109,31 +3094,19 @@ function handleContractBadgeClick(e, encodedName) {
         decodeURIComponent(encodedName),
         false
     );
-});
+}, true);
 
 
-document.addEventListener('mouseout', (e) => {
-
+document.addEventListener('mouseleave', (e) => {
     const badge = e.target.closest('.contract-code-badge');
 
     if (!badge) return;
 
-    // Kalau locked, jangan tutup
-    if (contractNamePopupLocked) return;
-
-    const related = e.relatedTarget;
-
-    // Kalau mouse masuk popup, biarkan terbuka
-    if (
-        related &&
-        related.closest &&
-        related.closest('#contractNamePopup')
-    ) {
-        return;
+    // Hanya hover popup → tutup bila keluar
+    if (!contractNamePopupLocked) {
+        hideContractNamePopup(true);
     }
-
-    hideContractNamePopup();
-});
+}, true);
 
         // ============ PDF -> IMAGE PAGE RENDERING ============
         async function renderPdfPagesAsElements(pdfUrl) {
