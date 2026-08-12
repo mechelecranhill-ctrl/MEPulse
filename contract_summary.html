@@ -29,9 +29,19 @@
 </div>
 
 <script>
-const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
-const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
+/*
+ * ============================================================
+ * CLOUDFLARE WORKER API
+ * ============================================================
+ * Semua data kini diambil melalui Cloudflare Worker.
+ * Gantikan URL ini dengan URL Worker sebenar anda.
+ */
+const API_URL = 'https://YOUR-WORKER.workers.dev';
+
+const headers = {
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation'
+};
 const params = new URLSearchParams(window.location.search);
 const contractId = params.get('id');
 
@@ -55,12 +65,12 @@ async function startAutoDownload() {
     
     try {
         const [conRes, intRes, woRes] = await Promise.all([
-            fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}`, { headers }),
-            fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=created_at.asc`, { headers }),
+            fetch(`${API_URL}/rest/v1/contract?id=eq.${contractId}`, { headers }),
+            fetch(`${API_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=created_at.asc`, { headers }),
             // 1. PENAPIS DITAMBAHBAIK:
             // - status=not.ilike.*REJ* -> Membuang sebarang status yang ada 'REJ' (EXEC-REJ, HOS-REJ, HOD-REJ, REJ, etc.)
             // - status=neq.CANCEL      -> Membuang status CANCEL
-            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&status=not.ilike.*REJ*&status=neq.CANCEL`, { headers })
+            fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&status=not.ilike.*REJ*&status=neq.CANCEL`, { headers })
         ]);
 
         const contracts = await conRes.json();
@@ -79,7 +89,7 @@ async function startAutoDownload() {
             const c = contracts[0];
             let unitName = "UNIT";
             try {
-                const unitRes = await fetch(`${SB_URL}/rest/v1/units?id=eq.${c.unit_id}`, { headers });
+                const unitRes = await fetch(`${API_URL}/rest/v1/units?id=eq.${c.unit_id}`, { headers });
                 const units = await unitRes.json();
                 if (units && units.length > 0) unitName = units[0].unit_name;
             } catch (e) {}
