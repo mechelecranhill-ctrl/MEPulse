@@ -185,7 +185,13 @@
 }
 .stamp-footer .line-1 { margin-bottom: 0.5mm; }
 
-/* Contract name hanya dipaparkan melalui hover / popup */
+/* =====================================================
+   CONTRACT CODE / CONTRACT NAME POPUP
+   - Contract name hidden from accordion header
+   - Desktop: hover = temporary popup
+   - Desktop/mobile: click/tap = locked popup
+   - Popup is appended to body so accordion overflow cannot clip it
+===================================================== */
 .contract-name-label {
     display: none !important;
 }
@@ -193,30 +199,11 @@
 .contract-code-badge {
     position: relative;
     cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
-.contract-code-badge:hover::after {
-    content: attr(data-contract-name);
-    position: absolute;
-    left: 0;
-    top: calc(100% + 6px);
-    z-index: 99999;
-
-    background: #111827;
-    color: #fff;
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 1.4;
-
-    padding: 6px 9px;
-    border-radius: 7px;
-    white-space: normal;
-    width: max-content;
-    max-width: 320px;
-
-    box-shadow: 0 8px 20px rgba(0,0,0,.25);
-    pointer-events: none;
-}
+/* Global popup is created by JavaScript. No ::after tooltip here. */
         /* ============ TOAST POPUP (bukan alert dialog) ============ */
 #appToastContainer {
     position: fixed;
@@ -2939,174 +2926,191 @@ sectionHtml += `
             }
         }
 
+        /* =====================================================
+           CONTRACT NAME POPUP
+           ===================================================== */
         let contractNamePopup = null;
-let contractNamePopupLocked = false;
-let contractNamePopupAnchor = null;
+        let contractNamePopupLocked = false;
+        let contractNamePopupAnchor = null;
 
-function createContractNamePopup() {
-    if (contractNamePopup) return contractNamePopup;
+        function createContractNamePopup() {
+            if (contractNamePopup && document.body.contains(contractNamePopup)) {
+                return contractNamePopup;
+            }
 
-    const popup = document.createElement('div');
+            const popup = document.createElement('div');
+            popup.id = 'contractNamePopup';
 
-    popup.id = 'contractNamePopup';
+            popup.style.cssText = `
+                position: fixed;
+                z-index: 999999;
+                background: #111827;
+                color: #fff;
+                font-size: 11px;
+                font-weight: 600;
+                line-height: 1.4;
+                padding: 7px 10px;
+                border-radius: 8px;
+                box-shadow: 0 8px 25px rgba(0,0,0,.25);
+                max-width: min(320px, calc(100vw - 16px));
+                width: max-content;
+                box-sizing: border-box;
+                opacity: 0;
+                visibility: hidden;
+                pointer-events: none;
+                transition: opacity .15s ease, transform .15s ease;
+                transform: translateY(-3px);
+            `;
 
-    popup.style.cssText = `
-        position: fixed;
-        z-index: 999999;
+            document.body.appendChild(popup);
+            contractNamePopup = popup;
+            return popup;
+        }
 
-        background: #111827;
-        color: white;
+        function positionContractNamePopup(anchorEl) {
+            const popup = createContractNamePopup();
+            if (!anchorEl || !popup) return;
 
-        font-size: 11px;
-        font-weight: 600;
-        line-height: 1.4;
+            const rect = anchorEl.getBoundingClientRect();
 
-        padding: 7px 10px;
-        border-radius: 8px;
+            // Reset first so the browser can calculate the real popup size.
+            popup.style.left = '0px';
+            popup.style.top = '0px';
 
-        box-shadow: 0 8px 25px rgba(0,0,0,.25);
+            const popupRect = popup.getBoundingClientRect();
+            const gap = 7;
+            const edge = 8;
 
-        max-width: 320px;
-        width: max-content;
+            let left = rect.left;
+            let top = rect.bottom + gap;
 
-        opacity: 0;
-        visibility: hidden;
+            // Keep popup inside viewport horizontally.
+            if (left + popupRect.width > window.innerWidth - edge) {
+                left = window.innerWidth - popupRect.width - edge;
+            }
+            left = Math.max(edge, left);
 
-        transition:
-            opacity .15s ease,
-            transform .15s ease;
+            // Prefer below. If there is not enough room, put it above.
+            if (top + popupRect.height > window.innerHeight - edge) {
+                top = rect.top - popupRect.height - gap;
+            }
 
-        transform: translateY(-3px);
+            // Final vertical safety.
+            top = Math.max(edge, top);
+            if (top + popupRect.height > window.innerHeight - edge) {
+                top = Math.max(edge, window.innerHeight - popupRect.height - edge);
+            }
 
-        pointer-events: auto;
-    `;
+            popup.style.left = `${left}px`;
+            popup.style.top = `${top}px`;
+        }
 
-    document.body.appendChild(popup);
-}
+        function showContractNamePopup(anchorEl, contractName, locked = false) {
+            const popup = createContractNamePopup();
+            if (!anchorEl || !popup) return;
 
+            contractNamePopupAnchor = anchorEl;
+            contractNamePopupLocked = !!locked;
+            popup.textContent = contractName || 'No contract name';
 
-function positionContractNamePopup(anchorEl) {
+            positionContractNamePopup(anchorEl);
 
-    const popup = createContractNamePopup();
+            popup.style.opacity = '1';
+            popup.style.visibility = 'visible';
+            popup.style.transform = 'translateY(0)';
+        }
 
-    const rect = anchorEl.getBoundingClientRect();
+        function hideContractNamePopup(force = false) {
+            // A clicked/locked popup must not be closed by hover-out.
+            if (contractNamePopupLocked && !force) return;
+            if (!contractNamePopup) return;
 
-    // Reset dulu supaya width boleh dikira
-    popup.style.left = '0px';
-    popup.style.top = '0px';
+            contractNamePopup.style.opacity = '0';
+            contractNamePopup.style.visibility = 'hidden';
+            contractNamePopup.style.transform = 'translateY(-3px)';
 
-    const popupRect = popup.getBoundingClientRect();
+            contractNamePopupLocked = false;
+            contractNamePopupAnchor = null;
+        }
 
-    let left = rect.left;
+        function handleContractBadgeClick(e, encodedName) {
+            e.stopPropagation();
 
-    // Jangan keluar kanan screen
-    if (left + popupRect.width > window.innerWidth - 8) {
-        left = window.innerWidth - popupRect.width - 8;
-    }
+            const badge = e.currentTarget;
+            const name = decodeURIComponent(encodedName || '');
 
-    // Jangan keluar kiri
-    left = Math.max(8, left);
+            // Click/tap the same code again = unlock + close.
+            if (contractNamePopupLocked && contractNamePopupAnchor === badge) {
+                hideContractNamePopup(true);
+                return;
+            }
 
-    let top = rect.bottom + 7;
+            // Click/tap = locked until the code is clicked again or user clicks elsewhere.
+            showContractNamePopup(badge, name, true);
+        }
 
-    // Kalau bawah tak cukup ruang,
-    // letak popup di atas contract code
-    if (top + popupRect.height > window.innerHeight - 8) {
-        top = rect.top - popupRect.height - 7;
-    }
+        // Desktop hover only. Touch devices use click/tap instead.
+        document.addEventListener('pointerover', (e) => {
+            if (e.pointerType !== 'mouse') return;
 
-    // Final safety
-    top = Math.max(8, top);
+            const badge = e.target.closest('.contract-code-badge');
+            if (!badge) return;
 
-    popup.style.left = `${left}px`;
-    popup.style.top = `${top}px`;
-}
+            const fromInsideBadge = e.relatedTarget && badge.contains(e.relatedTarget);
+            if (fromInsideBadge) return;
 
+            // Do not disturb a popup that was locked by click.
+            if (contractNamePopupLocked) return;
 
-function showContractNamePopup(anchorEl, contractName, locked = false) {
+            const encodedName = badge.dataset.contractName;
+            if (!encodedName) return;
 
-    const popup = createContractNamePopup();
+            showContractNamePopup(
+                badge,
+                decodeURIComponent(encodedName),
+                false
+            );
+        });
 
-    contractNamePopupAnchor = anchorEl;
-    contractNamePopupLocked = locked;
+        // Desktop hover popup closes immediately when the pointer leaves the code.
+        document.addEventListener('pointerout', (e) => {
+            if (e.pointerType !== 'mouse') return;
 
-    popup.textContent = contractName || 'No contract name';
+            const badge = e.target.closest('.contract-code-badge');
+            if (!badge) return;
 
-    positionContractNamePopup(anchorEl);
+            const goingInsideBadge = e.relatedTarget && badge.contains(e.relatedTarget);
+            if (goingInsideBadge) return;
 
-    popup.style.opacity = '1';
-    popup.style.visibility = 'visible';
-    popup.style.transform = 'translateY(0)';
-}
+            // Locked popup stays open after click.
+            if (contractNamePopupLocked) return;
 
+            if (contractNamePopupAnchor === badge) {
+                hideContractNamePopup(true);
+            }
+        });
 
-function hideContractNamePopup(force = false) {
+        // Click anywhere else closes a locked popup.
+        document.addEventListener('click', (e) => {
+            if (!contractNamePopup || contractNamePopup.style.visibility !== 'visible') return;
+            if (e.target.closest('.contract-code-badge')) return;
+            if (e.target.closest('#contractNamePopup')) return;
 
-    if (contractNamePopupLocked && !force) return;
+            hideContractNamePopup(true);
+        });
 
-    if (!contractNamePopup) return;
+        // Keep a locked popup aligned when the page/accordion is scrolled or resized.
+        window.addEventListener('scroll', () => {
+            if (contractNamePopupLocked && contractNamePopupAnchor) {
+                positionContractNamePopup(contractNamePopupAnchor);
+            }
+        }, true);
 
-    contractNamePopup.style.opacity = '0';
-    contractNamePopup.style.visibility = 'hidden';
-    contractNamePopup.style.transform = 'translateY(-3px)';
-
-    contractNamePopupLocked = false;
-    contractNamePopupAnchor = null;
-}
-
-
-function handleContractBadgeClick(e, encodedName) {
-
-    e.stopPropagation();
-
-    const badge = e.currentTarget;
-    const name = decodeURIComponent(encodedName || '');
-
-    // Click kali kedua → tutup
-    if (
-        contractNamePopupLocked &&
-        contractNamePopupAnchor === badge
-    ) {
-        hideContractNamePopup(true);
-        return;
-    }
-
-    // Click pertama → LOCK
-    showContractNamePopup(
-        badge,
-        name,
-        true
-    );
-}
-document.addEventListener('mouseenter', (e) => {
-    const badge = e.target.closest('.contract-code-badge');
-
-    if (!badge) return;
-
-    // Kalau sudah locked melalui click, jangan ubah
-    if (contractNamePopupLocked) return;
-
-    const encodedName = badge.dataset.contractName;
-    if (!encodedName) return;
-
-    showContractNamePopup(
-        badge,
-        decodeURIComponent(encodedName),
-        false
-    );
-}, true);
-
-
-document.addEventListener('mouseleave', (e) => {
-    const badge = e.target.closest('.contract-code-badge');
-
-    if (!badge) return;
-
-    // Hanya hover popup → tutup bila keluar
-    if (!contractNamePopupLocked) {
-        hideContractNamePopup(true);
-    }
-}, true);
+        window.addEventListener('resize', () => {
+            if (contractNamePopupLocked && contractNamePopupAnchor) {
+                positionContractNamePopup(contractNamePopupAnchor);
+            }
+        });
 
         // ============ PDF -> IMAGE PAGE RENDERING ============
         async function renderPdfPagesAsElements(pdfUrl) {
