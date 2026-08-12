@@ -7,10 +7,10 @@
    CARA GUNA:
    1. Letak <link rel="stylesheet" href="blueform.css"> di <head>
    2. Letak <script src="blueform.js"></script> SEBELUM
-      script page (supaya SB_URL/SB_KEY/headers tersedia dulu)
-   3. Pastikan page TIDAK declare semula `const SB_URL`,
-      `const SB_KEY`, atau `const headers` — sebab dah di-declare
-      global kat sini. Kalau page lama ada declare balik, buang je.
+      script page (supaya API_URL/headers tersedia dulu)
+   3. Pastikan page TIDAK declare semula `const API_URL` atau
+      `const headers` — sebab dah di-declare global kat sini.
+      Kalau page lama ada declare balik, buang je.
    4. Pastikan page ada `let currentContractId = ...;` (global)
       sebelum panggil bulkDownloadBlueform(), sebab function tu
       rujuk currentContractId terus.
@@ -22,15 +22,8 @@
       akan check/uncheck semua .bf-checkbox sekaligus.
    ============================================================ */
 
-const SB_URL = 'https://ywmsvowroxzhrjwrhsru.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks';
-const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
-
-let _bfSupabaseClient = null;
-function getBfSupabaseClient(){
-    if(!_bfSupabaseClient) _bfSupabaseClient = supabase.createClient(SB_URL, SB_KEY);
-    return _bfSupabaseClient;
-}
+const API_URL = 'https://me-connect-api.mech-elec-ranhill.workers.dev';
+const headers = { 'Content-Type': 'application/json' };
 
 function formatShortDate(dateStr){
     if(!dateStr) return '';
@@ -42,18 +35,22 @@ function formatShortDate(dateStr){
 // Baca approval_stamps sedia ada (kalau ada), gabung dengan stage baharu.
 // Return null untuk @dm1n (admin tak ada staff_id/signature sendiri) — bila
 // null, caller kena SKIP terus set approval_stamps supaya stamp lama tak kena wipe.
+//
+// NOTA MIGRASI: staff yang log masuk sekarang dikenal pasti melalui
+// localStorage.getItem('staff_id') (diset di login.html selepas panggil
+// POST /login pada Worker), BUKAN lagi Supabase Auth.
 async function mergeApprovalStamp(table, workId, stageKey) {
     try {
         const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
         if (isAdmin) return null;
 
-        const { data: { user } } = await getBfSupabaseClient().auth.getUser();
-        if (!user) return null;
+        const staffId = localStorage.getItem('staff_id');
+        if (!staffId) return null;
 
-        const res = await fetch(`${SB_URL}/rest/v1/${table}?work_id=eq.${encodeURIComponent(workId)}&select=approval_stamps`, { headers });
+        const res = await fetch(`${API_URL}/rest/v1/${table}?work_id=eq.${encodeURIComponent(workId)}&select=approval_stamps`, { headers });
         const rows = await res.json();
         const stamps = (rows[0] && rows[0].approval_stamps) ? { ...rows[0].approval_stamps } : {};
-        stamps[stageKey] = { staff_id: user.id, date: new Date().toISOString().slice(0, 10) };
+        stamps[stageKey] = { staff_id: staffId, date: new Date().toISOString().slice(0, 10) };
         return stamps;
     } catch (e) {
         console.error('Gagal merge approval stamp:', e);
@@ -66,7 +63,7 @@ async function fetchGroupMembers(contractId, district, sequenceNo) {
     if (!sequenceNo) return [];
 
     const res = await fetch(
-        `${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&district=eq.${encodeURIComponent(district)}&sequence_no=eq.${encodeURIComponent(sequenceNo)}&select=*`,
+        `${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&district=eq.${encodeURIComponent(district)}&sequence_no=eq.${encodeURIComponent(sequenceNo)}&select=*`,
         { headers }
     );
 
@@ -94,7 +91,7 @@ async function stageGroupDecision(workId, contractId, district, sequenceNo, next
         }
 
         await fetch(
-            `${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}`,
+            `${API_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}`,
             {
                 method: 'PATCH',
                 headers,
@@ -110,7 +107,7 @@ async function stageGroupDecision(workId, contractId, district, sequenceNo, next
 
     // Simpan keputusan semasa dahulu
     await fetch(
-        `${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}`,
+        `${API_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}`,
         {
             method: 'PATCH',
             headers,
@@ -151,7 +148,7 @@ async function stageGroupDecision(workId, contractId, district, sequenceNo, next
         }
 
         await fetch(
-            `${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}`,
+            `${API_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}`,
             {
                 method: 'PATCH',
                 headers,
@@ -221,7 +218,7 @@ async function stageGroupDecision(workId, contractId, district, sequenceNo, next
         }
 
         await fetch(
-            `${SB_URL}/rest/v1/work_orders?id=eq.${m.id}`,
+            `${API_URL}/rest/v1/work_orders?id=eq.${m.id}`,
             {
                 method: 'PATCH',
                 headers,
@@ -239,7 +236,7 @@ async function stageGroupDecision(workId, contractId, district, sequenceNo, next
 // Wrapper: cari contract_id/district/sequence_no dari work_id dulu, then stage.
 async function stageGroupDecisionByWorkId(workId, nextStatus, reason, stampStage) {
     const res = await fetch(
-        `${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}&select=id,contract_id,district,sequence_no`,
+        `${API_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}&select=id,contract_id,district,sequence_no`,
         { headers }
     );
     const rows = await res.json();
@@ -256,7 +253,7 @@ async function resolveStampImages(approvalStamps) {
     if (staffIds.length === 0) return images;
 
     try {
-        const res = await fetch(`${SB_URL}/rest/v1/staff?id=in.(${staffIds.join(',')})&select=id,signature,initial`, { headers });
+        const res = await fetch(`${API_URL}/rest/v1/staff?id=in.(${staffIds.join(',')})&select=id,signature,initial`, { headers });
         const staffRows = await res.json();
         const staffMap = {};
         staffRows.forEach(s => { staffMap[s.id] = s; });
@@ -364,7 +361,7 @@ function formatRM(v){
 
 async function buildBlueformData(id, sharedData = null) {
 
-    const res = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}&select=*,contract(*,units(unit_name))`, { headers });
+    const res = await fetch(`${API_URL}/rest/v1/work_orders?id=eq.${id}&select=*,contract(*,units(unit_name))`, { headers });
     const result = await res.json();
     const data = result[0];
 
@@ -384,9 +381,9 @@ async function buildBlueformData(id, sharedData = null) {
         localDistrictPriority = sharedData.localDistrictPriority;
     } else {
         const [interimRes, woRes, areaRes] = await Promise.all([
-           fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=date_received.asc`, { headers }),
-           fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}&status=not.in.(QUOTATION,QUO-APP,QUO-REJ)`, { headers }),
-           fetch(`${SB_URL}/rest/v1/contract?id=eq.${c.id}&select=area_code`, { headers })
+           fetch(`${API_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=date_received.asc`, { headers }),
+           fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${c.id}&status=not.in.(QUOTATION,QUO-APP,QUO-REJ)`, { headers }),
+           fetch(`${API_URL}/rest/v1/contract?id=eq.${c.id}&select=area_code`, { headers })
         ]);
        allInterims = await interimRes.json();
        allWO = await woRes.json(); 
@@ -513,7 +510,7 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
 
     const woResults = await Promise.all(
         ids.map(id =>
-            fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}&select=*,contract(*,units(unit_name))`, { headers })
+            fetch(`${API_URL}/rest/v1/work_orders?id=eq.${id}&select=*,contract(*,units(unit_name))`, { headers })
                 .then(r => r.json()).then(r => r[0])
         )
     );
@@ -558,9 +555,9 @@ const combinedDesc = uniqueDescriptions.join(', ');
         localDistrictPriority = sharedData.localDistrictPriority;
     } else {
         const [interimRes, woRes, areaRes] = await Promise.all([
-            fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=date_received.asc`, { headers }),
-            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${c.id}&status=not.in.(QUOTATION,QUO-APP,QUO-REJ)`, { headers }),
-            fetch(`${SB_URL}/rest/v1/contract?id=eq.${c.id}&select=area_code`, { headers })
+            fetch(`${API_URL}/rest/v1/interims?contract_id=eq.${c.id}&order=date_received.asc`, { headers }),
+            fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${c.id}&status=not.in.(QUOTATION,QUO-APP,QUO-REJ)`, { headers }),
+            fetch(`${API_URL}/rest/v1/contract?id=eq.${c.id}&select=area_code`, { headers })
         ]);
         allInterims = await interimRes.json();
         allWO = await woRes.json();
@@ -999,9 +996,9 @@ async function bulkDownloadBlueform() {
     const contractId = currentContractId;
     try {
         const [interimRes, woRes, areaRes] = await Promise.all([
-           fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=date_received.asc`, { headers }),
-           fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&status=not.in.(QUOTATION,QUO-APP,QUO-REJ)`, { headers }),
-           fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}&select=area_code`, { headers })
+           fetch(`${API_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=date_received.asc`, { headers }),
+           fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&status=not.in.(QUOTATION,QUO-APP,QUO-REJ)`, { headers }),
+           fetch(`${API_URL}/rest/v1/contract?id=eq.${contractId}&select=area_code`, { headers })
         ]);
         const allInterims = await interimRes.json();
         const allWO = await woRes.json();
@@ -1084,16 +1081,6 @@ function getBlueformGroupKey(w){
     return district + '||' + seq;
 }
 
-// Jana HTML butang blueform untuk SATU work order, ambil kira grouping.
-// - Kalau ada sequence_no & ini row pertama dalam group -> butang gabung (openBlueformGroup)
-// - Kalau ada sequence_no tapi bukan row pertama -> label "rujuk row pertama"
-// - Kalau tiada sequence_no (standalone) -> butang tunggal (openBlueform)
-//
-// seqGroups         : hasil buildSequenceGroups(workOrders)
-// renderedSeqsSet   : Set kosong yang dikongsi merentasi loop render (untuk track group mana dah papar)
-// opts.btnClass      : override tailwind/class butang (optional)
-// opts.groupLabel     : function(count) -> teks butang group (optional)
-// opts.singleLabel    : teks butang standalone (optional)
 function renderBlueformButtonHtml(item, seqGroups, renderedSeqsSet, opts = {}){
     const btnClass = opts.btnClass ||
         'text-white px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer bg-blue-600 hover:bg-blue-700 mr-2';
