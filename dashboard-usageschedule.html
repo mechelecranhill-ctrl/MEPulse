@@ -752,7 +752,7 @@ let currentContractId = null;
 // FULL SET BUNDLE (Blueform + Quotation PDF) — disamakan dengan
 // previewFullSet() di app-tech.html. Ditulis di sini (bukan
 // blueform.js) supaya blueform.js tidak disentuh langsung.
-// Bergantung pada SB_URL, headers, buildBlueformData,
+// Bergantung pada API_URL, headers, buildBlueformData,
 // buildBlueformDataGroup, buildBlueformHTML, processInBatches
 // dari blueform.js (sudah dimuatkan melalui
 // <script src="blueform.js"> di atas).
@@ -819,7 +819,7 @@ async function fetchLinkedQuotationPdfs(workIds) {
     if (!workIds || workIds.length === 0) return [];
     const filter = workIds.map(w => `work_id.eq.${encodeURIComponent(w)}`).join(',');
     try {
-        const qRes = await fetch(`${SB_URL}/rest/v1/quotations?or=(${filter})&select=work_id,pdf_url`, { headers });
+        const qRes = await fetch(`${API_URL}/rest/v1/quotations?or=(${filter})&select=work_id,pdf_url`, { headers });
         const quotes = await qRes.json();
         return (quotes || []).map(q => q.pdf_url).filter(Boolean);
     } catch (qe) {
@@ -885,9 +885,9 @@ async function bulkDownloadBlueform() {
     const contractId = currentContractId;
     try {
         const [interimRes, woRes, areaRes] = await Promise.all([
-            fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=date_received.asc`, { headers }),
-            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}`, { headers }),
-            fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}&select=area_code`, { headers })
+            fetch(`${API_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=date_received.asc`, { headers }),
+            fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}`, { headers }),
+            fetch(`${API_URL}/rest/v1/contract?id=eq.${contractId}&select=area_code`, { headers })
         ]);
         const allInterims = await interimRes.json();
         const allWO = await woRes.json();
@@ -1003,7 +1003,7 @@ document.getElementById('tableSearch').addEventListener('keyup', debounce(functi
 async function openTemplate() {
     const id = currentContractId;
     if(!id){ alert("Tiada kontrak dipilih."); return; }
-    const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, { headers });
+    const res = await fetch(`${API_URL}/rest/v1/contract?id=eq.${id}`, { headers });
     const data = await res.json();
     const contract = data[0];
     const sections = contract.contract_sections_breakdown || {};
@@ -1032,7 +1032,7 @@ async function openTemplate() {
 async function saveTemplate() {
     const id = currentContractId;
     const prefix = document.getElementById('refPrefixInput').value;
-    await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, {
+    await fetch(`${API_URL}/rest/v1/contract?id=eq.${id}`, {
         method: 'PATCH', headers,
         body: JSON.stringify({ reference: prefix })
     });
@@ -1065,7 +1065,7 @@ function sortWorkOrders(data, areaPriority){
 async function loadSingleContract(id){
     currentContractId = id;
     try{
-        const res = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`, { headers });
+        const res = await fetch(`${API_URL}/rest/v1/contract?id=eq.${id}`, { headers });
         const data = await res.json();
         const c = data[0];
         areaPriority = {};
@@ -1075,8 +1075,8 @@ async function loadSingleContract(id){
         document.getElementById('viewSubtitle').innerText = c.contract_name;
         document.getElementById('tableWrapper').style.display = 'block';
         const [woRes, intRes] = await Promise.all([
-    fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${id}`, { headers }),
-    fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${id}&order=date_received.asc`, { headers })
+    fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${id}`, { headers }),
+    fetch(`${API_URL}/rest/v1/interims?contract_id=eq.${id}&order=date_received.asc`, { headers })
 ]);
 const rawWorks = await woRes.json();
 // Halaman ni untuk Usage Schedule (BLUEFORM ke atas) - fasa quotation
@@ -1532,7 +1532,7 @@ function openSummary(){
 
 async function updateStatus(id, status){
     try{
-        await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}`,{
+        await fetch(`${API_URL}/rest/v1/work_orders?id=eq.${id}`,{
             method:'PATCH', headers,
             body: JSON.stringify({ status: status })
         });
@@ -1548,7 +1548,7 @@ async function updateStatusGroup(idsStr, status){
     const ids = idsStr.split(',').map(id => id.trim());
     try{
         await Promise.all(ids.map(id =>
-            fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${id}`,{
+            fetch(`${API_URL}/rest/v1/work_orders?id=eq.${id}`,{
                 method:'PATCH', headers,
                 body: JSON.stringify({ status: status })
             })
