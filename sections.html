@@ -614,13 +614,12 @@ window.addEventListener("DOMContentLoaded", async () => {
     loadSections();
 });
 
-const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
-
-const headers = {
-    apikey: SB_KEY,
-    Authorization: `Bearer ${SB_KEY}`
-};
+/* ==========================================================
+   CLOUDFLARE WORKER (me-connect-api) — ganti Supabase
+   Tukar API_URL di bawah ikut URL Worker sebenar awak
+   (contoh: https://me-connect-api.<account>.workers.dev)
+   ========================================================== */
+const API_URL = "https://me-connect-api.mech-elec-ranhill.workers.dev";
 
 async function fetchAllRows(url) {
     let all = [];
@@ -628,7 +627,7 @@ async function fetchAllRows(url) {
     const pageSize = 1000;
     while (true) {
         const res = await fetch(url, {
-            headers: { ...headers, Range: `${from}-${from + pageSize - 1}` }
+            headers: { Range: `${from}-${from + pageSize - 1}` }
         });
         const chunk = await res.json();
         all = all.concat(chunk);
@@ -911,9 +910,9 @@ openBtn.addEventListener("click", (e) => {
 async function loadSections(){
     try {
         const [sections, allInterims, allWOs] = await Promise.all([
-            fetch(`${SB_URL}/rest/v1/me_sections?select=*,units(*,contract(id,contract_code,contract_name,contract_start,contract_end,contract_sum,contract_sections_breakdown,vo_breakdown))`, { headers }).then(r => r.json()),
-            fetchAllRows(`${SB_URL}/rest/v1/interims?select=contract_id,claim_breakdown`),
-            fetchAllRows(`${SB_URL}/rest/v1/work_orders?select=contract_id,interim_no,section_category,additional,status`)
+            fetch(`${API_URL}/rest/v1/me_sections?select=*,units(*,contract(id,contract_code,contract_name,contract_start,contract_end,contract_sum,contract_sections_breakdown,vo_breakdown))`).then(r => r.json()),
+            fetchAllRows(`${API_URL}/rest/v1/interims?select=contract_id,claim_breakdown`),
+            fetchAllRows(`${API_URL}/rest/v1/work_orders?select=contract_id,interim_no,section_category,additional,status`)
         ]);
 
         contractClaimCache = {};
