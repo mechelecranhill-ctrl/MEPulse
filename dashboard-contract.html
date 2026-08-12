@@ -350,6 +350,7 @@
         #selectedSectionContainer { flex: 1; overflow-y: auto; padding-right: 5px; }
         .sel-chip { display: inline-block; padding: 4px 10px; border-radius: 12px; background: #e5e5ea; margin: 3px; font-size: 10px; cursor: pointer; font-weight: 600; }
         .sel-chip.active { background: var(--ios-blue); color: white; }
+        .selector-warning { font-size: 10px; color: var(--ios-red); font-weight: 700; margin-bottom: 8px; line-height: 1.4; }
 
         @media (min-width: 769px) {
             .fab:hover {
@@ -426,6 +427,7 @@
                             <button id="manageBtn" class="manage-btn" onclick="toggleSelector()"><i class="fa fa-cog"></i> Setting</button>
                         </div>
                         <div id="sectionSelector" style="display:none; background: #f9f9fb; padding: 10px; border-radius: 15px; margin-bottom: 10px; border: 1px dashed #ccc;">
+                            <div class="selector-warning">* Sections selected here will be used as the displayed sections in the Blueform.</div>
                             <div id="fullSectionList"></div>
                         </div>
                         <div id="selectedSectionContainer"></div>
@@ -446,18 +448,11 @@
     let searchTimeout = null;
     const cacheContracts = {}; 
 
-    // Fungsi dinamik untuk mengesahkan hak akses admin pada bila-bila masa
-    function checkAdminPermissions() {
-        const userRole = (localStorage.getItem("role") || "").toLowerCase();
-        return userRole === "admin" || userRole === "@dm1n";
-    }
-
-    // Kemaskini elemen UI berkaitan admin
+    // Setting sekarang dibuka untuk semua pengguna (bukan admin-only lagi)
     function updateAdminUI() {
-        const isAdmin = checkAdminPermissions();
         const btn = document.getElementById("manageBtn");
         if (btn) {
-            btn.style.display = isAdmin ? "inline-block" : "none";
+            btn.style.display = "inline-block";
         }
     }
 
@@ -636,8 +631,7 @@
         if(!currentContract) return;
 
         try {
-            updateAdminUI(); // Pastikan tombol Setting dikemas kini perannya setiap kali UI di-render
-            const isAdmin = checkAdminPermissions();
+            updateAdminUI();
 
             const sections = currentContract.contract_sections_breakdown || {};
             const start = new Date(currentContract.contract_start);
@@ -700,7 +694,6 @@
                             <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">
                                 ${s}: ${sections[s].desc || s}
                             </div>
-                            ${isAdmin ? `<i class="fa fa-times-circle" style="color:#ccc; cursor:pointer;" onclick="toggleSection('${s}')"></i>` : ``}
                         </div>
                         <div class="avg-stats">
                             <div class="avg-item">BUDGET: RM ${budget.toLocaleString()}</div>
@@ -778,11 +771,6 @@
     }
 
     async function toggleSection(s) {
-        if (!checkAdminPermissions()) { 
-            alert("Access denied"); 
-            return; 
-        }
-        
         if (selectedSections.includes(s)) {
             selectedSections = selectedSections.filter(x => x !== s);
         } else {
@@ -799,10 +787,6 @@
     }
 
     function toggleSelector() {
-        if (!checkAdminPermissions()) { 
-            alert("Access denied"); 
-            return; 
-        }
         const el = document.getElementById('sectionSelector');
         el.style.display = el.style.display === 'none' ? 'block' : 'none';
     }
