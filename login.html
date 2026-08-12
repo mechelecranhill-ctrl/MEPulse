@@ -12,8 +12,6 @@
 <link rel="stylesheet"
 href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <style>
 
 html,
@@ -669,12 +667,12 @@ input{
 
 <script>
 
-const SB_URL = "https://ywmsvowroxzhrjwrhsru.supabase.co";
-
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
-
-window.sbClient = window.sbClient || supabase.createClient(SB_URL, SB_KEY);
-const sbClient = window.sbClient;
+/* ==========================================================
+   CLOUDFLARE WORKER (me-connect-api) — ganti Supabase
+   Tukar API_URL di bawah ikut URL Worker sebenar awak
+   (contoh: https://me-connect-api.<account>.workers.dev)
+   ========================================================== */
+const API_URL = "https://me-connect-api.mech-elec-ranhill.workers.dev";
 
 async function login(){
 
@@ -705,17 +703,23 @@ async function login(){
 
     try{
 
-        const { data: staffData, error } = await sbClient
-            .from("staff")
-            .select("*")
-            .eq("employee_id", employeeId)
-            .eq("password", pass)
-            .single();
+        const res = await fetch(`${API_URL}/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                employee_id: employeeId,
+                password: pass
+            })
+        });
 
-        if(error || !staffData){
-            alert("Employee ID atau Password tidak sah.");
+        const result = await res.json();
+
+        if(!res.ok || !result.success || !result.staff){
+            alert(result.error || "Employee ID atau Password tidak sah.");
             return;
         }
+
+        const staffData = result.staff;
 
         localStorage.setItem("loggedIn","true");
         localStorage.setItem("staff_id",staffData.id);
