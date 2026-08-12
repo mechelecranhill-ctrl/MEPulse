@@ -102,11 +102,61 @@
                 display: block !important;
             }
         }
+
+        /* ============ CONTRACT CODE / CONTRACT NAME POPUP ============ */
+        .contract-name-label {
+            display: none !important;
+        }
+        .contract-code-badge {
+            position: relative;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* ============ TOAST POPUP (bukan alert dialog) ============ */
+        #appToastContainer {
+            position: fixed;
+            top: calc(20px + env(safe-area-inset-top));
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+            width: 90%;
+            max-width: 380px;
+        }
+        .app-toast {
+            pointer-events: auto;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            background: #111827;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1.4;
+            padding: 12px 16px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,.25);
+            opacity: 0;
+            transform: translateY(-14px);
+            transition: opacity .25s ease, transform .25s ease;
+        }
+        .app-toast.show { opacity: 1; transform: translateY(0); }
+        .app-toast.success { background: #059669; }
+        .app-toast.error { background: #dc2626; }
+        .app-toast.info { background: #2563eb; }
+        .app-toast i { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans h-screen overflow-hidden flex flex-col relative">
 
     <app-sidebar></app-sidebar>
+
+    <div id="appToastContainer"></div>
 
     <div class="glass-header">
         <div style="text-align:center;">
@@ -192,6 +242,22 @@
             'Content-Type': 'application/json',
             'Prefer': 'return=representation'
         };
+
+        function showAppToast(message, type = 'success', duration = 3200) {
+            const container = document.getElementById('appToastContainer');
+            if (!container) { console.log(message); return; }
+            const toast = document.createElement('div');
+            toast.className = `app-toast ${type}`;
+            const icon = type === 'error' ? 'fa-circle-xmark' : (type === 'info' ? 'fa-circle-info' : 'fa-circle-check');
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i><span>${message}</span>`;
+            container.appendChild(toast);
+            requestAnimationFrame(() => toast.classList.add('show'));
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 250);
+            }, duration);
+        }
+        window.showAppToast = showAppToast;
 
         async function apiFetch(path, options = {}) {
             const opts = {
@@ -362,7 +428,7 @@ async function getPermissionContext() {
 
             } catch (err) {
                 console.error("Error loading data:", err.message);
-                alert("Failed to load data: " + err.message);
+                showAppToast("Failed to load data: " + err.message, 'error');
             }
         }
 
@@ -385,6 +451,187 @@ function toggleAccordion(contentId, iconId) {
                 icon.classList.remove('rotate-180');
             }
         }
+
+        /* =====================================================
+           CONTRACT CODE / CONTRACT NAME POPUP
+           - Contract name hidden from accordion header
+           - Desktop: hover = temporary popup
+           - Desktop/mobile: click/tap = locked popup
+           - Popup is appended to body so accordion overflow cannot clip it
+           ===================================================== */
+        let contractNamePopup = null;
+        let contractNamePopupLocked = false;
+        let contractNamePopupAnchor = null;
+
+        function createContractNamePopup() {
+            if (contractNamePopup && document.body.contains(contractNamePopup)) {
+                return contractNamePopup;
+            }
+
+            const popup = document.createElement('div');
+            popup.id = 'contractNamePopup';
+
+            popup.style.cssText = `
+                position: fixed;
+                z-index: 999999;
+                background: #111827;
+                color: #fff;
+                font-size: 11px;
+                font-weight: 600;
+                line-height: 1.4;
+                padding: 7px 10px;
+                border-radius: 8px;
+                box-shadow: 0 8px 25px rgba(0,0,0,.25);
+                max-width: min(320px, calc(100vw - 16px));
+                width: max-content;
+                box-sizing: border-box;
+                opacity: 0;
+                visibility: hidden;
+                pointer-events: none;
+                transition: opacity .15s ease, transform .15s ease;
+                transform: translateY(-3px);
+            `;
+
+            document.body.appendChild(popup);
+            contractNamePopup = popup;
+            return popup;
+        }
+
+        function positionContractNamePopup(anchorEl) {
+            const popup = createContractNamePopup();
+            if (!anchorEl || !popup) return;
+
+            const rect = anchorEl.getBoundingClientRect();
+
+            popup.style.left = '0px';
+            popup.style.top = '0px';
+
+            const popupRect = popup.getBoundingClientRect();
+            const gap = 7;
+            const edge = 8;
+
+            let left = rect.left;
+            let top = rect.bottom + gap;
+
+            if (left + popupRect.width > window.innerWidth - edge) {
+                left = window.innerWidth - popupRect.width - edge;
+            }
+            left = Math.max(edge, left);
+
+            if (top + popupRect.height > window.innerHeight - edge) {
+                top = rect.top - popupRect.height - gap;
+            }
+
+            top = Math.max(edge, top);
+            if (top + popupRect.height > window.innerHeight - edge) {
+                top = Math.max(edge, window.innerHeight - popupRect.height - edge);
+            }
+
+            popup.style.left = `${left}px`;
+            popup.style.top = `${top}px`;
+        }
+
+        function showContractNamePopup(anchorEl, contractName, locked = false) {
+            const popup = createContractNamePopup();
+            if (!anchorEl || !popup) return;
+
+            contractNamePopupAnchor = anchorEl;
+            contractNamePopupLocked = !!locked;
+            popup.textContent = contractName || 'No contract name';
+
+            positionContractNamePopup(anchorEl);
+
+            popup.style.opacity = '1';
+            popup.style.visibility = 'visible';
+            popup.style.transform = 'translateY(0)';
+        }
+
+        function hideContractNamePopup(force = false) {
+            if (contractNamePopupLocked && !force) return;
+            if (!contractNamePopup) return;
+
+            contractNamePopup.style.opacity = '0';
+            contractNamePopup.style.visibility = 'hidden';
+            contractNamePopup.style.transform = 'translateY(-3px)';
+
+            contractNamePopupLocked = false;
+            contractNamePopupAnchor = null;
+        }
+
+        function handleContractBadgeClick(e, encodedName) {
+            e.stopPropagation();
+
+            const badge = e.currentTarget;
+            const name = decodeURIComponent(encodedName || '');
+
+            if (contractNamePopupLocked && contractNamePopupAnchor === badge) {
+                hideContractNamePopup(true);
+                return;
+            }
+
+            showContractNamePopup(badge, name, true);
+        }
+
+        // Desktop hover only. Touch devices use click/tap instead.
+        document.addEventListener('pointerover', (e) => {
+            if (e.pointerType !== 'mouse') return;
+
+            const badge = e.target.closest('.contract-code-badge');
+            if (!badge) return;
+
+            const fromInsideBadge = e.relatedTarget && badge.contains(e.relatedTarget);
+            if (fromInsideBadge) return;
+
+            if (contractNamePopupLocked) return;
+
+            const encodedName = badge.dataset.contractName;
+            if (!encodedName) return;
+
+            showContractNamePopup(
+                badge,
+                decodeURIComponent(encodedName),
+                false
+            );
+        });
+
+        // Desktop hover popup closes immediately when the pointer leaves the code.
+        document.addEventListener('pointerout', (e) => {
+            if (e.pointerType !== 'mouse') return;
+
+            const badge = e.target.closest('.contract-code-badge');
+            if (!badge) return;
+
+            const goingInsideBadge = e.relatedTarget && badge.contains(e.relatedTarget);
+            if (goingInsideBadge) return;
+
+            if (contractNamePopupLocked) return;
+
+            if (contractNamePopupAnchor === badge) {
+                hideContractNamePopup(true);
+            }
+        });
+
+        // Click anywhere else closes a locked popup.
+        document.addEventListener('click', (e) => {
+            if (!contractNamePopup || contractNamePopup.style.visibility !== 'visible') return;
+            if (e.target.closest('.contract-code-badge')) return;
+            if (e.target.closest('#contractNamePopup')) return;
+
+            hideContractNamePopup(true);
+        });
+
+        // Keep a locked popup aligned when the page/accordion is scrolled or resized.
+        window.addEventListener('scroll', () => {
+            if (contractNamePopupLocked && contractNamePopupAnchor) {
+                positionContractNamePopup(contractNamePopupAnchor);
+            }
+        }, true);
+
+        window.addEventListener('resize', () => {
+            if (contractNamePopupLocked && contractNamePopupAnchor) {
+                positionContractNamePopup(contractNamePopupAnchor);
+            }
+        });
 
         // ============ SECTION -> UNIT -> CONTRACT ACCORDION ============
         function renderSectionUnitContractView(containerId, sections, units, orders, canAct, opts) {
@@ -482,8 +729,13 @@ function toggleAccordion(contentId, iconId) {
                                     <button type="button" onclick="toggleAccordion('${accId}','${iconId}')"
                                             class="w-full bg-violet-50 hover:bg-violet-100/80 border-violet-200 px-3 py-2.5 flex items-center justify-between gap-2 transition-colors cursor-pointer text-left border-b">
                                         <div class="flex items-center gap-2 min-w-0 flex-1">
-                                            <span class="bg-violet-600 text-white text-[10px] px-1.5 py-0.5 rounded font-mono shadow-xs shrink-0">${contract.code}</span>
-                                            <span class="font-bold text-gray-800 text-xs leading-tight break-words">${contract.name}</span>
+                                            <span
+                                                class="bg-violet-600 text-white text-[10px] px-1.5 py-0.5 rounded font-mono shadow-xs shrink-0 contract-code-badge"
+                                                data-contract-name="${encodeURIComponent(contract.name || '')}"
+                                                onclick="handleContractBadgeClick(event, '${encodeURIComponent(contract.name || '')}')">
+                                                ${contract.code}
+                                            </span>
+                                            <span class="font-bold text-gray-800 text-xs leading-tight break-words contract-name-label">${contract.name}</span>
                                         </div>
                                         <div class="flex items-center gap-2 shrink-0">
                                             <span class="text-[11px] bg-white text-gray-600 border border-gray-300 font-semibold px-2 py-0.5 rounded-full whitespace-nowrap shadow-2xs">${contract.orders.length}</span>
@@ -664,7 +916,7 @@ function toggleAccordion(contentId, iconId) {
         // Handles both Approve and Reject (with a reason) status changes
         function openConfirmModal(workId, nextStatus, mode) {
     const perm = window.__lastPerm;
-    if (perm && !perm.canActDept) { alert('Anda tiada kebenaran untuk membuat tindakan ini (View Only).'); return; }
+    if (perm && !perm.canActDept) { showAppToast('Anda tiada kebenaran untuk membuat tindakan ini (View Only).', 'error'); return; }
 
     const modal = document.getElementById('customConfirmModal');
     const banner = document.getElementById('modalBanner');
@@ -737,12 +989,12 @@ async function executeStatusUpdate(workId, nextStatus, reason = null) {
         const stampStage = nextStatus === 'APP-HOD' ? 'dept_head' : null;
         const result = await stageGroupDecisionByWorkId(workId, nextStatus, reason, stampStage);
         if (result.waiting) {
-            alert('Decision saved. Waiting for other Work Orders in the same sequence to be decided first.');
+            showAppToast('Decision saved. Waiting for other Work Orders in the same sequence to be decided first.', 'info');
         }
         fetchDashboard();
     } catch (err) {
         console.error("Error during processing:", err.message);
-        alert("Failed to update status: " + err.message);
+        showAppToast("Failed to update status: " + err.message, 'error');
     }
 }
         window.onload = fetchDashboard;
