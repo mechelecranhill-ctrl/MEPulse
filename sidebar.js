@@ -143,9 +143,7 @@ class AppSidebar extends HTMLElement {
 
     async loadDashboardLinks() {
         try {
-            const res = await fetch(`${SB_URL}/rest/v1/me_sections?select=id,section_name`, {
-                headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
-            });
+            const res = await fetch(`${API_URL}/rest/v1/me_sections?select=id,section_name`);
             if (!res.ok) return;
             const sections = await res.json();
             
