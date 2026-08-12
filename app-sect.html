@@ -327,16 +327,46 @@ async function getPermissionContext() {
 }
 
                 const scopeIsAll = isAdmin || (perm && perm.canActDept);
-const activeUnitIds = unitsPreset.map(u => u.id);
+                const activeUnitIds = unitsPreset.map(u => u.id);
 
-let workOrdersQuery = supabaseClient
-    .from('work_orders')
-    .select(`
-        id, work_id, status, sequence_no, district, pdf_url, pending_status,
-        contract!inner (id, contract_name, contract_code, unit_id)
-    `)
-    .eq('status', 'APP-EXEC');
-if (!scopeIsAll) workOrdersQuery = workOrdersQuery.in('contract.unit_id', activeUnitIds);
+                // ============ FIX ============
+                // Sebelum ni kod guna:
+                //   .select(`... contract!inner (id, contract_name, contract_code, unit_id)`)
+                //   .in('contract.unit_id', activeUnitIds)
+                // Worker Cloudflare custom kita TIDAK memahami modifier "!inner"
+                // dan TIDAK menyokong filter atas embedded table (key ada titik),
+                // jadi contract sentiasa jatuh "undefined" dan filter unit
+                // senyap diabaikan (non-admin nampak SEMUA unit).
+                //
+                // Fix: cari contract_id yang dibenarkan dahulu (untuk non-admin),
+                // baru tapis work_orders guna contract_id terus (column asal,
+                // bukan embedded-table filter). Select embed guna syntax mudah
+                // "contract(...)" tanpa "!inner".
+                let workOrdersQuery = supabaseClient
+                    .from('work_orders')
+                    .select(`
+                        id, work_id, status, sequence_no, district, pdf_url, pending_status,
+                        contract(id, contract_name, contract_code, unit_id)
+                    `)
+                    .eq('status', 'APP-EXEC');
+
+                if (!scopeIsAll) {
+                    const { data: allowedContracts, error: contractErr } = await supabaseClient
+                        .from('contract')
+                        .select('id')
+                        .in('unit_id', activeUnitIds);
+
+                    if (contractErr) throw contractErr;
+
+                    const allowedContractIds = (allowedContracts || []).map(c => c.id);
+
+                    if (allowedContractIds.length === 0) {
+                        showEmptyRow('No contracts under your section.');
+                        return;
+                    }
+
+                    workOrdersQuery = workOrdersQuery.in('contract_id', allowedContractIds);
+                }
 
                 const { data: workOrders, error } = await workOrdersQuery;
                 if (error) throw error;
@@ -350,8 +380,8 @@ if (!scopeIsAll) workOrdersQuery = workOrdersQuery.in('contract.unit_id', active
                 });
 
             } catch (err) {
-                console.error("Error loading data:", err.message);
-                alert("Failed to load data: " + err.message);
+                console.error("Error loading data:", err.message || err);
+                alert("Failed to load data: " + (err.message || JSON.stringify(err)));
             }
         }
 
