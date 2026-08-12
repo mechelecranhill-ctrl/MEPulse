@@ -446,15 +446,7 @@
     const role = localStorage.getItem("role");
     const isAdmin = role === "admin" || role === "@dm1n";
 
-    /* ==========================================================
-       CLOUDFLARE WORKER (me-connect-api) — ganti Supabase
-       Tukar SB_URL di bawah ikut URL Worker sebenar awak
-       (contoh: https://me-connect-api.<account>.workers.dev)
-       Nama variable 'SB_URL' dikekalkan (bukan ditukar ke API_URL)
-       supaya serasi kalau ada fail lain page ni yang masih rujuk
-       nama sama. apikey/Authorization dibuang sebab Worker tiada auth.
-       ========================================================== */
-    var SB_URL = 'https://me-connect-api.mech-elec-ranhill.workers.dev';
+    var API_URL = 'https://me-connect-api.mech-elec-ranhill.workers.dev';
     const headers = { 'Content-Type': 'application/json' };
 
     let myChart = null;
@@ -502,8 +494,8 @@
     async function fetchUnits() {
         try {
             const [secRes, unitsRes] = await Promise.all([
-                fetch(`${SB_URL}/rest/v1/me_sections?select=id`, { headers }),
-                fetch(`${SB_URL}/rest/v1/units?select=id,unit_name,section_id`, { headers })
+                fetch(`${API_URL}/rest/v1/me_sections?select=id`, { headers }),
+                fetch(`${API_URL}/rest/v1/units?select=id,unit_name,section_id`, { headers })
             ]);
             const sections = await secRes.json();
             const units = await unitsRes.json();
@@ -554,7 +546,7 @@
 
         try {
             const res = await fetch(
-                `${SB_URL}/rest/v1/contract?unit_id=eq.${unitId}&select=id,contract_code,contract_name,contract_start,contract_end,selected_sections,contract_sections_breakdown`,
+                `${API_URL}/rest/v1/contract?unit_id=eq.${unitId}&select=id,contract_code,contract_name,contract_start,contract_end,selected_sections,contract_sections_breakdown`,
                 { headers }
             );
             let data = await res.json();
@@ -619,10 +611,10 @@
     try {
         const [resW, resI] = await Promise.all([
             // 1. Abaikan status CANCEL, REJ, EXEC-REJ, HOS-REJ, dan HOD-REJ dari senarai Work Orders
-            fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}&status=not.in.(CANCEL,REJ,EXEC-REJ,HOS-REJ,HOD-REJ,QUOTATION,QUO-APP,QUO-REJ)&select=interim_no,section_category,status`, { headers }),
+            fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}&status=not.in.(CANCEL,REJ,EXEC-REJ,HOS-REJ,HOD-REJ,QUOTATION,QUO-APP,QUO-REJ)&select=interim_no,section_category,status`, { headers }),
             
             // 2. Ambil data interims/claims yang berkaitan
-            fetch(`${SB_URL}/rest/v1/interims?contract_id=eq.${currentContract.id}&order=date_received.asc&select=claim_breakdown`, { headers })
+            fetch(`${API_URL}/rest/v1/interims?contract_id=eq.${currentContract.id}&order=date_received.asc&select=claim_breakdown`, { headers })
         ]);
 
         let rawWO = await resW.json();
@@ -801,7 +793,7 @@
         
         renderUI([]);
         
-        await fetch(`${SB_URL}/rest/v1/contract?id=eq.${currentContract.id}`, {
+        await fetch(`${API_URL}/rest/v1/contract?id=eq.${currentContract.id}`, {
             method: 'PATCH',
             headers: headers,
             body: JSON.stringify({ selected_sections: selectedSections })
