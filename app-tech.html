@@ -2785,9 +2785,8 @@ async function qActionDeleteQuotation() {
                         <div class="flex items-start gap-2 min-w-0 flex-1">
                             <span
     class="${badgeBg} text-white text-[10px] px-1.5 py-0.5 rounded font-mono font-bold flex-shrink-0 shadow-xs mt-0.5 contract-code-badge"
-    data-contract-name="${String(contract.name || '').replace(/"/g, '&quot;')}"
+    data-contract-name="${encodeURIComponent(contract.name || '')}"
     onclick="handleContractBadgeClick(event, '${encodeURIComponent(contract.name || '')}')"
-    title="${String(contract.name || '').replace(/"/g, '&quot;')}"
 >
     ${contract.code}
 </span>
@@ -2940,50 +2939,201 @@ sectionHtml += `
             }
         }
 
-        function handleContractBadgeClick(e, encodedName) {
-    e.stopPropagation();
+        let contractNamePopup = null;
+let contractNamePopupLocked = false;
+let contractNamePopupAnchor = null;
 
-    const name = decodeURIComponent(encodedName || '');
+function createContractNamePopup() {
+    if (contractNamePopup) return contractNamePopup;
 
-    if (!name) return;
+    const popup = document.createElement('div');
 
-    showContractNamePopup(e.currentTarget, name);
+    popup.id = 'contractNamePopup';
+
+    popup.style.cssText = `
+        position: fixed;
+        z-index: 999999;
+
+        background: #111827;
+        color: white;
+
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1.4;
+
+        padding: 7px 10px;
+        border-radius: 8px;
+
+        box-shadow: 0 8px 25px rgba(0,0,0,.25);
+
+        max-width: 320px;
+        width: max-content;
+
+        opacity: 0;
+        visibility: hidden;
+
+        transition:
+            opacity .15s ease,
+            transform .15s ease;
+
+        transform: translateY(-3px);
+
+        pointer-events: auto;
+    `;
+
+    document.body.appendChild(popup);
+
+    // Jangan tutup bila mouse masuk popup
+    popup.addEventListener('mouseenter', () => {
+        if (!contractNamePopupLocked) {
+            popup.style.opacity = '1';
+            popup.style.visibility = 'visible';
+        }
+    });
+
+    contractNamePopup = popup;
+
+    return popup;
 }
 
-        let contractNamePopupTimer = null;
-        function showContractNamePopup(anchorEl, contractName) {
-            let popup = document.getElementById('contractNamePopup');
-            if (!popup) {
-                popup = document.createElement('div');
-                popup.id = 'contractNamePopup';
-                popup.sidebar.cssText = 'position:fixed; z-index:99999; background:#111827; color:#fff; font-size:11px; font-weight:600; padding:6px 10px; border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,.3); max-width:220px; pointer-events:none; opacity:0; transition:opacity .15s ease;';
-                document.body.appendChild(popup);
-            }
 
-            popup.textContent = contractName;
-            popup.style.left = '0px';
-            popup.style.top = '0px';
+function positionContractNamePopup(anchorEl) {
 
-            const rect = anchorEl.getBoundingClientRect();
-            const popupWidth = popup.offsetWidth;
-            let left = rect.left;
-            const maxLeft = window.innerWidth - popupWidth - 8;
-            if (left > maxLeft) left = Math.max(8, maxLeft);
+    const popup = createContractNamePopup();
 
-            popup.style.left = left + 'px';
-            popup.style.top = (rect.bottom + 6) + 'px';
-            popup.style.opacity = '1';
+    const rect = anchorEl.getBoundingClientRect();
 
-            clearTimeout(contractNamePopupTimer);
-            contractNamePopupTimer = setTimeout(() => { popup.style.opacity = '0'; }, 2200);
-        }
+    // Reset dulu supaya width boleh dikira
+    popup.style.left = '0px';
+    popup.style.top = '0px';
 
-        document.addEventListener('click', (e) => {
-            const popup = document.getElementById('contractNamePopup');
-            if (popup && popup.style.opacity === '1' && !e.target.closest('.contract-code-badge')) {
-                popup.style.opacity = '0';
-            }
-        });
+    const popupRect = popup.getBoundingClientRect();
+
+    let left = rect.left;
+
+    // Jangan keluar kanan screen
+    if (left + popupRect.width > window.innerWidth - 8) {
+        left = window.innerWidth - popupRect.width - 8;
+    }
+
+    // Jangan keluar kiri
+    left = Math.max(8, left);
+
+    let top = rect.bottom + 7;
+
+    // Kalau bawah tak cukup ruang,
+    // letak popup di atas contract code
+    if (top + popupRect.height > window.innerHeight - 8) {
+        top = rect.top - popupRect.height - 7;
+    }
+
+    // Final safety
+    top = Math.max(8, top);
+
+    popup.style.left = `${left}px`;
+    popup.style.top = `${top}px`;
+}
+
+
+function showContractNamePopup(anchorEl, contractName, locked = false) {
+
+    const popup = createContractNamePopup();
+
+    contractNamePopupAnchor = anchorEl;
+    contractNamePopupLocked = locked;
+
+    popup.textContent = contractName || 'No contract name';
+
+    positionContractNamePopup(anchorEl);
+
+    popup.style.opacity = '1';
+    popup.style.visibility = 'visible';
+    popup.style.transform = 'translateY(0)';
+}
+
+
+function hideContractNamePopup(force = false) {
+
+    if (contractNamePopupLocked && !force) return;
+
+    if (!contractNamePopup) return;
+
+    contractNamePopup.style.opacity = '0';
+    contractNamePopup.style.visibility = 'hidden';
+    contractNamePopup.style.transform = 'translateY(-3px)';
+
+    contractNamePopupLocked = false;
+    contractNamePopupAnchor = null;
+}
+
+
+function handleContractBadgeClick(e, encodedName) {
+
+    e.stopPropagation();
+
+    const badge = e.currentTarget;
+    const name = decodeURIComponent(encodedName || '');
+
+    // Kalau popup sedang LOCKED pada badge yang sama
+    if (
+        contractNamePopupLocked &&
+        contractNamePopupAnchor === badge
+    ) {
+        hideContractNamePopup(true);
+        return;
+    }
+
+    // CLICK = lock popup
+    showContractNamePopup(
+        badge,
+        name,
+        true
+    );
+}
+        document.addEventListener('mouseover', (e) => {
+
+    const badge = e.target.closest('.contract-code-badge');
+
+    if (!badge) return;
+
+    // Kalau popup sudah dikunci dengan click,
+    // jangan overwrite
+    if (contractNamePopupLocked) return;
+
+    const encodedName = badge.dataset.contractName;
+
+    if (!encodedName) return;
+
+    showContractNamePopup(
+        badge,
+        decodeURIComponent(encodedName),
+        false
+    );
+});
+
+
+document.addEventListener('mouseout', (e) => {
+
+    const badge = e.target.closest('.contract-code-badge');
+
+    if (!badge) return;
+
+    // Kalau locked, jangan tutup
+    if (contractNamePopupLocked) return;
+
+    const related = e.relatedTarget;
+
+    // Kalau mouse masuk popup, biarkan terbuka
+    if (
+        related &&
+        related.closest &&
+        related.closest('#contractNamePopup')
+    ) {
+        return;
+    }
+
+    hideContractNamePopup();
+});
 
         // ============ PDF -> IMAGE PAGE RENDERING ============
         async function renderPdfPagesAsElements(pdfUrl) {
