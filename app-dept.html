@@ -8,7 +8,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="blueform.css">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
         if (window['pdfjsLib']) {
@@ -186,7 +185,70 @@
 
     <script src="blueform.js"></script>
     <script>
-        const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+        // ============ CLOUDFLARE WORKER API HELPERS (menggantikan Supabase) ============
+        // API_URL dijangka disediakan oleh session.js
+
+        const API_HEADERS = {
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+        };
+
+        async function apiFetch(path, options = {}) {
+            const opts = {
+                ...options,
+                headers: {
+                    ...API_HEADERS,
+                    ...(options.headers || {})
+                }
+            };
+
+            const response = await fetch(`${API_URL}${path}`, opts);
+
+            if (!response.ok) {
+                let detail = '';
+                try {
+                    const contentType = response.headers.get('content-type') || '';
+                    if (contentType.includes('application/json')) {
+                        const body = await response.json();
+                        detail = body?.error || body?.message || body?.detail || JSON.stringify(body);
+                    } else {
+                        detail = await response.text();
+                    }
+                } catch (_) {}
+                throw new Error(`HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
+            }
+
+            if (response.status === 204) return null;
+
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                return await response.json();
+            }
+
+            const text = await response.text();
+            if (!text) return null;
+
+            try {
+                return JSON.parse(text);
+            } catch (_) {
+                return text;
+            }
+        }
+
+        async function apiQuery(table, query = '') {
+            return await apiFetch(`/rest/v1/${table}${query ? `?${query}` : ''}`);
+        }
+
+        function encodeValue(value) {
+            return encodeURIComponent(String(value));
+        }
+
+        function buildInFilter(values) {
+            const clean = (values || [])
+                .filter(v => v !== null && v !== undefined)
+                .map(v => String(v));
+            return `in.(${clean.join(',')})`;
+        }
 
 // ============ ROLE / PERMISSION CONTEXT (KONGSI SEMUA PAGE) ============
 const ACT_ROLES = {
@@ -200,7 +262,6 @@ const ACT_ROLES = {
 const ALLOWED_SECTION_NAMES = ['SEKSYEN SELENGGARA', 'SEKSYEN PEMATUHAN PERATURAN'];
 
 async function getPermissionContext() {
-    const _permHeaders = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
     const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
 
     const ctx = {
@@ -221,24 +282,23 @@ async function getPermissionContext() {
         ctx.userId = staffId;
 
         try {
-            const sRes = await fetch(`${SB_URL}/rest/v1/staff?id=eq.${staffId}&select=position`, { headers: _permHeaders });
-            const sRows = await sRes.json();
-            ctx.position = (sRows[0]?.position || '').trim().toUpperCase();
+            const staffRows = await apiQuery('staff', `id=eq.${encodeValue(staffId)}&select=position`);
+            ctx.position = (staffRows?.[0]?.position || '').trim().toUpperCase();
         } catch (e) { console.error('Failed to load staff position:', e); }
 
         try {
-            const uRes = await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${staffId}&is_acting=eq.true&select=unit_id`, { headers: _permHeaders });
-            ctx.isActingUnitExec = (await uRes.json()).length > 0;
+            const unitAssignments = await apiQuery('staff_unit_assignment', `staff_id=eq.${encodeValue(staffId)}&is_acting=eq.true&select=unit_id`);
+            ctx.isActingUnitExec = Array.isArray(unitAssignments) && unitAssignments.length > 0;
         } catch (e) {}
 
         try {
-            const secRes = await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${staffId}&is_acting=eq.true&select=section_id`, { headers: _permHeaders });
-            ctx.isActingSectionHead = (await secRes.json()).length > 0;
+            const sectionAssignments = await apiQuery('staff_section_assignment', `staff_id=eq.${encodeValue(staffId)}&is_acting=eq.true&select=section_id`);
+            ctx.isActingSectionHead = Array.isArray(sectionAssignments) && sectionAssignments.length > 0;
         } catch (e) {}
 
         try {
-            const dRes = await fetch(`${SB_URL}/rest/v1/department_head?staff_id=eq.${staffId}&active=eq.true&select=is_acting`, { headers: _permHeaders });
-            ctx.isDeptHeadActive = (await dRes.json()).length > 0;
+            const departmentRows = await apiQuery('department_head', `staff_id=eq.${encodeValue(staffId)}&active=eq.true&select=is_acting`);
+            ctx.isDeptHeadActive = Array.isArray(departmentRows) && departmentRows.length > 0;
         } catch (e) {}
 
         ctx.canManageTech = ACT_ROLES.TECH.includes(ctx.position);
@@ -268,30 +328,29 @@ async function getPermissionContext() {
                 // AKSES VIEW DIBUKA UNTUK SEMUA STAFF YANG LOG MASUK.
                 // Tindakan (approve/reject) tetap disekat ikut perm.canActDept semasa render.
 
-                const { data: allSections, error: sectionsErr } = await supabaseClient
-                    .from('me_sections')
-                    .select('id, section_name');
-                if (sectionsErr) console.error('Failed to load sections:', sectionsErr.message);
+                let allSections = [];
+                try {
+                    allSections = await apiQuery('me_sections', 'select=id,section_name');
+                } catch (e) {
+                    console.error('Failed to load sections:', e.message);
+                }
                 const sectionsPreset = (allSections || []).filter(s =>
                     ALLOWED_SECTION_NAMES.includes((s.section_name || '').trim().toUpperCase())
                 );
                 const allowedSectionIds = new Set(sectionsPreset.map(s => s.id));
 
-                const { data: allUnits, error: unitsErr } = await supabaseClient
-                    .from('units')
-                    .select('id, unit_name, section_id');
-                if (unitsErr) console.error('Failed to load units:', unitsErr.message);
+                let allUnits = [];
+                try {
+                    allUnits = await apiQuery('units', 'select=id,unit_name,section_id');
+                } catch (e) {
+                    console.error('Failed to load units:', e.message);
+                }
                 const unitsPreset = (allUnits || []).filter(u => allowedSectionIds.has(u.section_id));
 
-                const { data: workOrders, error } = await supabaseClient
-                    .from('work_orders')
-                    .select(`
-                        id, work_id, status, sequence_no, district, pdf_url, pending_status,
-                        contract (id, contract_name, contract_code, unit_id)
-                    `)
-                    .eq('status', 'APP-HOS');
-
-                if (error) throw error;
+                const workOrders = await apiQuery(
+                    'work_orders',
+                    `status=eq.APP-HOS&select=id,work_id,status,sequence_no,district,pdf_url,pending_status,contract(id,contract_name,contract_code,unit_id)`
+                ) || [];
 
                 workOrders.forEach(item => { item.mapped_pdf_url = item.pdf_url || null; });
                 
