@@ -8,7 +8,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="blueform.css">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -601,8 +600,58 @@
     
     <script src="blueform.js"></script>
     <script>
-        const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+        /*
+         * ============================================================
+         * CLOUDFLARE WORKER API
+         * ============================================================
+         * Semua operasi database untuk page ini melalui Cloudflare Worker.
+         * Tiada lagi Supabase client / Supabase Auth.
+         *
+         * GANTIKAN URL DI BAWAH dengan URL Worker database sebenar.
+         * ============================================================
+         */
+        const API_URL = 'https://YOUR-WORKER.workers.dev';
 
+        const apiHeaders = {
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+        };
+
+        async function apiFetch(path, options = {}) {
+            const opts = { ...options };
+            opts.headers = { ...apiHeaders, ...(options.headers || {}) };
+
+            const response = await fetch(`${API_URL}${path}`, opts);
+
+            if (!response.ok) {
+                let detail = '';
+                try {
+                    const body = await response.json();
+                    detail = body?.error || body?.message || JSON.stringify(body);
+                } catch (_) {
+                    try { detail = await response.text(); } catch (_) {}
+                }
+                throw new Error(`HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
+            }
+
+            if (response.status === 204) return null;
+
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) return await response.json();
+
+            const raw = await response.text();
+            try { return JSON.parse(raw); } catch (_) { return raw; }
+        }
+
+        function apiQuery(table, query = '') {
+            return apiFetch(`/rest/v1/${table}${query ? `?${query}` : ''}`);
+        }
+
+        function apiInFilter(values) {
+            return `in.(${(values || []).map(v => String(v)).join(',')})`;
+        }
+
+        const headers = apiHeaders;
         function showAppToast(message, type = 'success', duration = 3200) {
     const container = document.getElementById('appToastContainer');
     if (!container) { console.log(message); return; }
@@ -628,7 +677,7 @@ const ACT_ROLES = {
 };
 
 async function getPermissionContext() {
-    const _permHeaders = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' };
+    const _permHeaders = apiHeaders;
     const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
 
     const ctx = {
@@ -649,23 +698,23 @@ async function getPermissionContext() {
         ctx.userId = staffId;
 
         try {
-            const sRes = await fetch(`${SB_URL}/rest/v1/staff?id=eq.${staffId}&select=position`, { headers: _permHeaders });
+            const sRes = await fetch(`${API_URL}/rest/v1/staff?id=eq.${staffId}&select=position`, { headers: _permHeaders });
             const sRows = await sRes.json();
             ctx.position = (sRows[0]?.position || '').trim().toUpperCase();
         } catch (e) { console.error('Failed to load staff position:', e); }
 
         try {
-            const uRes = await fetch(`${SB_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${staffId}&is_acting=eq.true&select=unit_id`, { headers: _permHeaders });
+            const uRes = await fetch(`${API_URL}/rest/v1/staff_unit_assignment?staff_id=eq.${staffId}&is_acting=eq.true&select=unit_id`, { headers: _permHeaders });
             ctx.isActingUnitExec = (await uRes.json()).length > 0;
         } catch (e) {}
 
         try {
-            const secRes = await fetch(`${SB_URL}/rest/v1/staff_section_assignment?staff_id=eq.${staffId}&is_acting=eq.true&select=section_id`, { headers: _permHeaders });
+            const secRes = await fetch(`${API_URL}/rest/v1/staff_section_assignment?staff_id=eq.${staffId}&is_acting=eq.true&select=section_id`, { headers: _permHeaders });
             ctx.isActingSectionHead = (await secRes.json()).length > 0;
         } catch (e) {}
 
         try {
-            const dRes = await fetch(`${SB_URL}/rest/v1/department_head?staff_id=eq.${staffId}&active=eq.true&select=is_acting`, { headers: _permHeaders });
+            const dRes = await fetch(`${API_URL}/rest/v1/department_head?staff_id=eq.${staffId}&active=eq.true&select=is_acting`, { headers: _permHeaders });
             ctx.isDeptHeadActive = (await dRes.json()).length > 0;
         } catch (e) {}
 
@@ -693,7 +742,7 @@ function applyTechPermissionUI(perm) {
             }
         }
         
-        const qHeaders = { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+        const qHeaders = apiHeaders;
         let renderedBlueformSeqs = new Set();
 
         function escapeJs(str) {
@@ -738,11 +787,11 @@ function getOrderedSectionKeys(availableKeys, selectedSectionsOrder) {
 
         async function archiveRejectedQuotation(workId, actionDate) {
             try {
-                const checkRes = await fetch(`${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}&status=eq.QUO-REJ`, { headers: qHeaders });
+                const checkRes = await fetch(`${API_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}&status=eq.QUO-REJ`, { headers: qHeaders });
                 const rows = await checkRes.json();
                 if (rows && rows.length > 0) {
                     const row = rows[0];
-                    await fetch(`${SB_URL}/rest/v1/quotations_history`, {
+                    await fetch(`${API_URL}/rest/v1/quotations_history`, {
                         method: 'POST',
                         headers: qHeaders,
                         body: JSON.stringify({
@@ -824,7 +873,7 @@ function tqResetDetectState() {
 
         async function tqFetchUnits() {
             try {
-                const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers: qHeaders });
+                const res = await fetch(`${API_URL}/rest/v1/units?select=*`, { headers: qHeaders });
                 const units = await res.json();
                 const sel = document.getElementById('tq_unit_id');
                 sel.innerHTML = '<option value="">Choose Unit</option>';
@@ -838,7 +887,7 @@ function tqResetDetectState() {
             if(!unitId){ contractSelect.innerHTML = '<option value="">Choose Unit First</option>'; return; }
             contractSelect.innerHTML = '<option value="">Loading...</option>';
             try {
-                const res = await fetch(`${SB_URL}/rest/v1/contract?select=id,contract_code,district,contract_sections_breakdown,contract_start,selected_sections&unit_id=eq.${unitId}`, { headers: qHeaders });
+                const res = await fetch(`${API_URL}/rest/v1/contract?select=id,contract_code,district,contract_sections_breakdown,contract_start,selected_sections&unit_id=eq.${unitId}`, { headers: qHeaders });
         const data = await res.json();
 
         data.sort((a, b) => {
@@ -946,7 +995,7 @@ function tqResetDetectState() {
 
     tqDetectTimer = setTimeout(async () => {
         try {
-            const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workId)}&status=in.(QUOTATION,QUO-APP,QUO-REJ)&select=*`, { headers: qHeaders });
+            const res = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workId)}&status=in.(QUOTATION,QUO-APP,QUO-REJ)&select=*`, { headers: qHeaders });
             const rows = await res.json();
             if(!Array.isArray(rows) || rows.length === 0) return;
 
@@ -1050,7 +1099,7 @@ function tqConfirmSaveAsNew() {
 }
         async function tqGetNextSuffixLetter(contractId, prefix, num) {
     try {
-        const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&select=work_id`, { headers: qHeaders });
+        const res = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&select=work_id`, { headers: qHeaders });
         const rows = await res.json();
         const base = `${prefix}${num}`;
         const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1111,7 +1160,7 @@ function tqCloseDetectModal() {
 
         async function tqCancelStaleRejectedWorkOrder(workId) {
     try {
-        const res = await fetch(`${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}&select=*`, { headers: qHeaders });
+        const res = await fetch(`${API_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}&select=*`, { headers: qHeaders });
         const rows = await res.json();
         if (!rows || rows.length === 0) return;
 
@@ -1123,7 +1172,7 @@ function tqCloseDetectModal() {
                 zeroedBreakdown[sec] = { amt: 0, extra: 0 };
             });
 
-            const patchRes = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${rec.id}`, {
+            const patchRes = await fetch(`${API_URL}/rest/v1/work_orders?id=eq.${rec.id}`, {
                 method: 'PATCH',
                 headers: qHeaders,
                 body: JSON.stringify({
@@ -1351,7 +1400,7 @@ async function tqDoSubmit(e) {
         // Overwrite mode: JANGAN archive - kekalkan record sedia ada, terus timpa.
         if(!tqOverwriteMode){
             try {
-                const rejCheckRes = await fetch(`${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(primaryWorkId)}&status=eq.QUO-REJ&select=*`, { headers: qHeaders });
+                const rejCheckRes = await fetch(`${API_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(primaryWorkId)}&status=eq.QUO-REJ&select=*`, { headers: qHeaders });
                 const rejRows = await rejCheckRes.json();
                 for (const rejRow of rejRows) {
                     const actionDate = rejRow.action_date || new Date().toISOString();
@@ -1415,11 +1464,11 @@ async function tqDoSubmit(e) {
             section_category: tqBreakdown,
             additional: tqAdditionalTotal,
             amount_spent: tqTotalAmount + tqAdditionalTotal,
-            reject_reason: null
+            reject_reason: null,
             action_date: new Date().toISOString()
         };
 
-        const res = await fetch(`${SB_URL}/rest/v1/work_orders?on_conflict=work_id`, {
+        const res = await fetch(`${API_URL}/rest/v1/work_orders?on_conflict=work_id`, {
             method: 'POST',
             headers: { ...qHeaders, 'Prefer': 'resolution=merge-duplicates,return=representation' },
             body: JSON.stringify(payload)
@@ -1488,7 +1537,7 @@ async function tqDoSubmit(e) {
 
         async function woFetchUnits() {
             try {
-                const res = await fetch(`${SB_URL}/rest/v1/units?select=*`, { headers: qHeaders });
+                const res = await fetch(`${API_URL}/rest/v1/units?select=*`, { headers: qHeaders });
                 const units = await res.json();
                 const sel = document.getElementById('wo_unit_id');
                 sel.innerHTML = '<option value="">Choose Unit</option>';
@@ -1502,7 +1551,7 @@ async function tqDoSubmit(e) {
             if(!unitId){ contractSelect.innerHTML = '<option value="">Choose Unit First</option>'; return; }
             contractSelect.innerHTML = '<option value="">Loading...</option>';
             try {
-                const res = await fetch(`${SB_URL}/rest/v1/contract?select=*&unit_id=eq.${unitId}`, { headers: qHeaders });
+                const res = await fetch(`${API_URL}/rest/v1/contract?select=*&unit_id=eq.${unitId}`, { headers: qHeaders });
                 const data = await res.json();
 
                 data.sort((a, b) => {
@@ -1633,7 +1682,7 @@ function joinLocationPreset(prefix, rest) {
 
         async function woGetNextSuffixLetter(contractId, prefix, num) {
             try {
-                const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&select=work_id`, { headers: qHeaders });
+                const res = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&select=work_id`, { headers: qHeaders });
                 const rows = await res.json();
                 const base = `${prefix}${num}`;
                 const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1771,7 +1820,7 @@ function joinLocationPreset(prefix, rest) {
                 if(!contractId) return;
                 try {
                     const filter = currentIds.map(id => `work_id.eq.${encodeURIComponent(id)}`).join(',');
-                    const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&or=(${filter})&select=*`, { headers: qHeaders });
+                    const res = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&or=(${filter})&select=*`, { headers: qHeaders });
                     const matches = await res.json();
                     if(!Array.isArray(matches) || matches.length === 0) {
     // Tiada rekod langsung untuk Work ID ni (bukan quotation, bukan
@@ -1780,7 +1829,7 @@ function joinLocationPreset(prefix, rest) {
 }
 
                     const sequenceNo = matches[0].sequence_no;
-                    const groupRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&sequence_no=eq.${encodeURIComponent(sequenceNo)}&select=*`, { headers: qHeaders });
+                    const groupRes = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&sequence_no=eq.${encodeURIComponent(sequenceNo)}&select=*`, { headers: qHeaders });
                     const group = await groupRes.json();
                     if(!Array.isArray(group) || group.length === 0) return;
 
@@ -2040,7 +2089,7 @@ async function woActionCancelBlueform() {
     if (!confirm(`Confirm CANCEL blueform ${item.work_id}?`)) return;
 
     try {
-        const res = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${item.id}`, { headers: qHeaders });
+        const res = await fetch(`${API_URL}/rest/v1/work_orders?id=eq.${item.id}`, { headers: qHeaders });
         const rows = await res.json();
         if (!rows || rows.length === 0) throw new Error('Record not found.');
         const rec = rows[0];
@@ -2052,13 +2101,13 @@ async function woActionCancelBlueform() {
         // nombor suffix seterusnya (-CNX-1, -CNX-2, dst) supaya PATCH tidak
         // kena HTTP 409.
         let cnxWorkId = `${originalWorkId}-CNX`;
-        const dupCheckRes = await fetch(`${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(cnxWorkId)}&select=id`, { headers: qHeaders });
+        const dupCheckRes = await fetch(`${API_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(cnxWorkId)}&select=id`, { headers: qHeaders });
         const dupRows = await dupCheckRes.json();
         if (Array.isArray(dupRows) && dupRows.length > 0) {
             const escapedBase = `${originalWorkId}-CNX`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const pattern = new RegExp(`^${escapedBase}-(\\d+)$`);
 
-            const allCnxRes = await fetch(`${SB_URL}/rest/v1/work_orders?work_id=like.${encodeURIComponent(originalWorkId + '-CNX%')}&select=work_id`, { headers: qHeaders });
+            const allCnxRes = await fetch(`${API_URL}/rest/v1/work_orders?work_id=like.${encodeURIComponent(originalWorkId + '-CNX%')}&select=work_id`, { headers: qHeaders });
             const allCnxRows = await allCnxRes.json();
 
             let maxNum = 0;
@@ -2080,7 +2129,7 @@ async function woActionCancelBlueform() {
 
         // Rename row semasa jadi rekod sejarah (-CNX). Tiada row baharu dicipta -
         // work_id asal TIDAK dihidupkan semula sebagai QUO-REJ.
-        const patchRes = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${rec.id}`, {
+        const patchRes = await fetch(`${API_URL}/rest/v1/work_orders?id=eq.${rec.id}`, {
             method: 'PATCH',
             headers: qHeaders,
             body: JSON.stringify({
@@ -2117,12 +2166,12 @@ async function openBlueformModalForResubmit(workId) {
     if (blueformUnitsReadyPromise) await blueformUnitsReadyPromise;
 
     try {
-        const woRes = await fetch(`${SB_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}&select=contract_id`, { headers: qHeaders });
+        const woRes = await fetch(`${API_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}&select=contract_id`, { headers: qHeaders });
         const woRows = await woRes.json();
         const contractId = woRows?.[0]?.contract_id;
 
         if (contractId) {
-            const cRes = await fetch(`${SB_URL}/rest/v1/contract?id=eq.${contractId}&select=unit_id`, { headers: qHeaders });
+            const cRes = await fetch(`${API_URL}/rest/v1/contract?id=eq.${contractId}&select=unit_id`, { headers: qHeaders });
             const cRows = await cRes.json();
             const unitId = cRows?.[0]?.unit_id;
 
@@ -2155,11 +2204,11 @@ async function woActionApprove() {
     if (!confirm(`Confirm APPROVED for ${item.work_id}?`)) return;
 
     try {
-        const { error } = await supabaseClient
-            .from('work_orders')
-            .update({ status: 'APPROVED' })
-            .eq('id', item.id);
-        if (error) throw error;
+        await apiFetch(`/rest/v1/work_orders?id=eq.${encodeURIComponent(item.id)}`, {
+            method: 'PATCH',
+            headers: qHeaders,
+            body: JSON.stringify({ status: 'APPROVED' })
+        });
 
         closeWoActionModal();
         fetchTechnicianDashboard();
@@ -2236,7 +2285,7 @@ async function qActionDeleteQuotation() {
     if (!confirm(`Confirm DELETE quotation ${item.work_id}? This action cannot be undone.`)) return;
 
     try {
-        const res = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${item.id}`, { headers: qHeaders });
+        const res = await fetch(`${API_URL}/rest/v1/work_orders?id=eq.${item.id}`, { headers: qHeaders });
         const rows = await res.json();
         if (!rows || rows.length === 0) throw new Error('Record not found.');
         const rec = rows[0];
@@ -2263,7 +2312,7 @@ async function qActionDeleteQuotation() {
         }
 
         // 2. Padam rekod dari Supabase
-        const supaDelRes = await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${item.id}`, { method: 'DELETE', headers: qHeaders });
+        const supaDelRes = await fetch(`${API_URL}/rest/v1/work_orders?id=eq.${item.id}`, { method: 'DELETE', headers: qHeaders });
         if (!supaDelRes.ok) throw new Error(`HTTP ${supaDelRes.status}`);
 
         closeQActionModal();
@@ -2277,7 +2326,7 @@ async function qActionDeleteQuotation() {
         async function woCancelOldRecordsForSaveAsNew(contractId, workIds) {
             for(const oldWorkId of workIds){
                 try {
-                    const res = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(oldWorkId)}`, { headers: qHeaders });
+                    const res = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(oldWorkId)}`, { headers: qHeaders });
                     const rows = await res.json();
                     if(!rows || rows.length === 0) continue;
                     const rec = rows[0];
@@ -2287,7 +2336,7 @@ async function qActionDeleteQuotation() {
                         zeroedBreakdown[sec] = { amt: 0, extra: 0 };
                     });
 
-                    await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${rec.id}`, {
+                    await fetch(`${API_URL}/rest/v1/work_orders?id=eq.${rec.id}`, {
                         method: 'PATCH',
                         headers: qHeaders,
                         body: JSON.stringify({
@@ -2377,7 +2426,7 @@ async function qActionDeleteQuotation() {
                 }
 
                 if(!sequenceToUse){
-                    const seqRes = await fetch(`${SB_URL}/rest/v1/work_orders?select=sequence_no&contract_id=eq.${contractId}`, { headers: qHeaders });
+                    const seqRes = await fetch(`${API_URL}/rest/v1/work_orders?select=sequence_no&contract_id=eq.${contractId}`, { headers: qHeaders });
                     const seqData = await seqRes.json();
                     let max = 0;
                     seqData.forEach(r => {
@@ -2428,7 +2477,7 @@ async function qActionDeleteQuotation() {
     const payload = perWorkIdPayload[workIdValue]; if(!payload) continue;
     const stamps = await mergeApprovalStamp('work_orders', workIdValue, 'tech_initial');
     if (stamps) payload.approval_stamps = stamps;
-    const checkRes = await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}`, { headers: qHeaders });
+    const checkRes = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}`, { headers: qHeaders });
     const existing = await checkRes.json();
 
     if(existing.length > 0){
@@ -2450,19 +2499,19 @@ async function qActionDeleteQuotation() {
             patchPayload.blueform_created_at = new Date().toISOString();
         }
 
-        await fetch(`${SB_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`, {
+        await fetch(`${API_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`, {
             method: 'PATCH', headers: qHeaders, body: JSON.stringify(patchPayload)
         });
     } else {
         payload.blueform_created_at = new Date().toISOString();
-        await fetch(`${SB_URL}/rest/v1/work_orders`, {
+        await fetch(`${API_URL}/rest/v1/work_orders`, {
             method: 'POST', headers: qHeaders, body: JSON.stringify(payload)
         });
     }
 }
 
                 for(const removedId of woOriginalLoadedWorkIds.filter(id => !currentWorkIds.includes(id))){
-                    await fetch(`${SB_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(removedId)}`, { method: 'DELETE', headers: qHeaders });
+                    await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(removedId)}`, { method: 'DELETE', headers: qHeaders });
                 }
 
                 // Only now — after new blueform record(s) confirmed saved — cancel the
@@ -2564,29 +2613,26 @@ async function qActionDeleteQuotation() {
             } else {
                 const unitIdSet = new Set();
 
-                const { data: assignments, error: assError } = await supabaseClient
-                    .from('staff_unit_assignment')
-                    .select('unit_id')
-                    .eq('staff_id', currentStaffId)
-                    .eq('active', true);
-                if (assError) throw assError;
+                const assignments = await apiQuery(
+                    'staff_unit_assignment',
+                    `staff_id=eq.${encodeURIComponent(currentStaffId)}&active=eq.true&select=unit_id`
+                );
                 (assignments || []).forEach(a => unitIdSet.add(a.unit_id));
 
                 if (perm.canActSection) {
-                    const { data: secAssignments, error: secError } = await supabaseClient
-                        .from('staff_section_assignment')
-                        .select('section_id')
-                        .eq('staff_id', currentStaffId)
-                        .eq('active', true);
+                    const secAssignments = await apiQuery(
+                        'staff_section_assignment',
+                        `staff_id=eq.${encodeURIComponent(currentStaffId)}&active=eq.true&select=section_id`
+                    );
 
-                    if (!secError && secAssignments && secAssignments.length > 0) {
-                        const sectionIds = secAssignments.map(s => s.section_id);
-                        const { data: sectionUnits, error: unitErr } = await supabaseClient
-                            .from('units')
-                            .select('id')
-                            .in('section_id', sectionIds);
-                        if (!unitErr && sectionUnits) {
-                            sectionUnits.forEach(u => unitIdSet.add(u.id));
+                    if (secAssignments && secAssignments.length > 0) {
+                        const sectionIds = secAssignments.map(s => s.section_id).filter(v => v !== null && v !== undefined);
+                        if (sectionIds.length > 0) {
+                            const sectionUnits = await apiQuery(
+                                'units',
+                                `section_id=${apiInFilter(sectionIds)}&select=id`
+                            );
+                            (sectionUnits || []).forEach(u => unitIdSet.add(u.id));
                         }
                     }
                 }
@@ -2601,24 +2647,45 @@ async function qActionDeleteQuotation() {
             }
         }
 
-        // SATU query untuk kedua-dua seksyen - selepas penggabungan table,
-        // semua peringkat status hidup dalam work_orders sahaja.
-        let woQuery = supabaseClient
-            .from('work_orders')
-            .select(`
-                    id, work_id, status, contract_id, pdf_url, reject_reason, action_date,
-                    district, location, description, section_category, sequence_no, amount_spent,
-                    contract!inner (id, contract_name, contract_code, unit_id)
-            `)
-            .in('status', ['QUOTATION', 'QUO-APP', 'QUO-REJ', 'APP-HOD', 'EXEC-REJ', 'HOS-REJ', 'HOD-REJ']);
-        if (!scopeIsAll) woQuery = woQuery.in('contract.unit_id', activeUnitIds);
+        // Ambil work_orders melalui Cloudflare Worker.
+        // Worker REST kita tidak menyokong filter nested seperti
+        // contract.unit_id, jadi penapisan unit dibuat selepas contract
+        // dipadankan dengan setiap work order.
+        const statusFilter = 'in.(QUOTATION,QUO-APP,QUO-REJ,APP-HOD,EXEC-REJ,HOS-REJ,HOD-REJ)';
+        const allRows = await apiQuery(
+            'work_orders',
+            `status=${statusFilter}&select=id,work_id,status,contract_id,pdf_url,reject_reason,action_date,district,location,description,section_category,sequence_no,amount_spent`
+        );
 
-        const { data: allRows, error: woError } = await woQuery;
-        if (woError) throw woError;
+        const contractIds = [...new Set(
+            (allRows || []).map(r => r.contract_id).filter(v => v !== null && v !== undefined)
+        )];
+
+        let contractRows = [];
+        if (contractIds.length > 0) {
+            contractRows = await apiQuery(
+                'contract',
+                `id=${apiInFilter(contractIds)}&select=id,contract_name,contract_code,unit_id`
+            );
+        }
+
+        const contractMap = new Map((contractRows || []).map(c => [String(c.id), c]));
+
+        let allRowsScoped = (allRows || []).map(row => ({
+            ...row,
+            contract: contractMap.get(String(row.contract_id)) || null
+        }));
+
+        if (!scopeIsAll) {
+            const allowedUnitIds = new Set((activeUnitIds || []).map(v => String(v)));
+            allRowsScoped = allRowsScoped.filter(row =>
+                row.contract && allowedUnitIds.has(String(row.contract.unit_id))
+            );
+        }
 
         const QUO_STATUSES = ['QUOTATION', 'QUO-APP', 'QUO-REJ'];
-        const quotationData = (allRows || []).filter(r => QUO_STATUSES.includes(r.status));
-        const blueformData = (allRows || []).filter(r => !QUO_STATUSES.includes(r.status));
+        const quotationData = (allRowsScoped || []).filter(r => QUO_STATUSES.includes(r.status));
+        const blueformData = (allRowsScoped || []).filter(r => !QUO_STATUSES.includes(r.status));
 
         techQuotationItemsById = {};
         qCancelSelectionMode();
@@ -2959,10 +3026,10 @@ sectionHtml += `
                 const currentContractId = contractData?.id || item.contract_id;
 
                 if (seq && currentContractId && typeof buildBlueformDataGroup === 'function') {
-                    const { data: siblingWOs } = await supabaseClient
-                        .from('work_orders')
-                        .select('id, work_id, sequence_no, district, pdf_url')
-                        .eq('contract_id', currentContractId);
+                    const siblingWOs = await apiQuery(
+                        'work_orders',
+                        `contract_id=eq.${encodeURIComponent(currentContractId)}&select=id,work_id,sequence_no,district,pdf_url`
+                    );
 
                     const currentDistrict = (item.district || '').trim().toUpperCase();
                     const groupMembers = (siblingWOs || []).filter(w => 
