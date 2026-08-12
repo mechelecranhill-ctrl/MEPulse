@@ -185,10 +185,37 @@
 }
 .stamp-footer .line-1 { margin-bottom: 0.5mm; }
 
-@media (max-width: 768px) {
-    .contract-name-label {
-        display: none;
-    }
+/* Contract name hanya dipaparkan melalui hover / popup */
+.contract-name-label {
+    display: none !important;
+}
+
+.contract-code-badge {
+    position: relative;
+    cursor: pointer;
+}
+
+.contract-code-badge:hover::after {
+    content: attr(data-contract-name);
+    position: absolute;
+    left: 0;
+    top: calc(100% + 6px);
+    z-index: 99999;
+
+    background: #111827;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+
+    padding: 6px 9px;
+    border-radius: 7px;
+    white-space: normal;
+    width: max-content;
+    max-width: 320px;
+
+    box-shadow: 0 8px 20px rgba(0,0,0,.25);
+    pointer-events: none;
 }
         /* ============ TOAST POPUP (bukan alert dialog) ============ */
 #appToastContainer {
@@ -2756,8 +2783,14 @@ async function qActionDeleteQuotation() {
                 let sectionHtml = `
                     <div onclick="toggleContractAccordion('${accordionContentId}')" class="${headerBg} px-3 py-2 cursor-pointer transition-colors flex justify-between items-center gap-2">
                         <div class="flex items-start gap-2 min-w-0 flex-1">
-                            <span class="${badgeBg} text-white text-[10px] px-1.5 py-0.5 rounded font-mono font-bold flex-shrink-0 shadow-xs mt-0.5 contract-code-badge" onclick="handleContractBadgeClick(event, '${encodeURIComponent(contract.name)}')">${contract.code}</span> 
-                            <span class="contract-name-label font-bold text-gray-800 text-xs leading-snug break-words">${contract.name}</span>
+                            <span
+    class="${badgeBg} text-white text-[10px] px-1.5 py-0.5 rounded font-mono font-bold flex-shrink-0 shadow-xs mt-0.5 contract-code-badge"
+    data-contract-name="${String(contract.name || '').replace(/"/g, '&quot;')}"
+    onclick="handleContractBadgeClick(event, '${encodeURIComponent(contract.name || '')}')"
+    title="${String(contract.name || '').replace(/"/g, '&quot;')}"
+>
+    ${contract.code}
+</span>
                         </div>
                         <div class="flex items-center gap-2 flex-shrink-0">
                             <span class="text-[10px] bg-white text-gray-700 border border-gray-300 font-extrabold px-2 py-0.5 rounded-full shadow-xs">
@@ -2908,10 +2941,14 @@ sectionHtml += `
         }
 
         function handleContractBadgeClick(e, encodedName) {
-            if (window.innerWidth > 768) return; // desktop: nama dah nampak, biar accordion toggle macam biasa
-            e.stopPropagation();
-            showContractNamePopup(e.currentTarget, decodeURIComponent(encodedName));
-        }
+    e.stopPropagation();
+
+    const name = decodeURIComponent(encodedName || '');
+
+    if (!name) return;
+
+    showContractNamePopup(e.currentTarget, name);
+}
 
         let contractNamePopupTimer = null;
         function showContractNamePopup(anchorEl, contractName) {
