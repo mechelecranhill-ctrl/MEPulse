@@ -102,6 +102,29 @@
                 display: block !important;
             }
         }
+
+        /* ============ CONTRACT CODE / CONTRACT NAME POPUP ============ */
+        .contract-name-label {
+            display: none !important;
+        }
+        .contract-code-badge {
+            position: relative;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* ============ BESARKAN TEKS KECIL (DESKTOP SAHAJA) ============
+           Tak sentuh .glass-header & tajuk kad (h2 "text-xl")
+           sebab kelas-kelas tu sengaja tak disenaraikan di bawah. */
+        @media (min-width: 1024px) {
+            .text-\[8px\]  { font-size: 11px !important; }
+            .text-\[9px\]  { font-size: 12px !important; }
+            .text-\[10px\] { font-size: 13px !important; }
+            .text-\[11px\] { font-size: 14px !important; }
+            .text-xs       { font-size: 14px !important; }
+            .text-sm       { font-size: 15px !important; }
+        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans h-screen overflow-hidden flex flex-col relative">
@@ -382,10 +405,11 @@ async function getPermissionContext() {
                 const activeUnitIds = unitsPreset.map(u => u.id);
 
                 // ============ FIX ============
-                // Worker Cloudflare custom kita TIDAK sokong filter atas embedded
-                // table (contract.unit_id). Jadi cari dahulu contract_id yang
-                // dibenarkan (untuk non-admin), baru tapis work_orders guna
-                // contract_id terus (column asal, bukan embedded-table filter).
+                // Worker Cloudflare custom kita TIDAK sokong embedded resource
+                // (contract(...)) dalam select mahupun filter atas embedded table.
+                // Jadi work_orders diambil dengan contract_id sahaja (column asal),
+                // kemudian data contract diambil BERASINGAN dan digabung secara
+                // manual dalam JS - sama seperti pattern di "Request for Approval".
                 let workOrders;
 
                 if (!scopeIsAll) {
@@ -403,16 +427,38 @@ async function getPermissionContext() {
 
                     workOrders = await apiQuery(
                         'work_orders',
-                        `status=eq.APP-EXEC&contract_id=${buildInFilter(allowedContractIds)}&select=id,work_id,status,sequence_no,district,pdf_url,pending_status,contract(id,contract_name,contract_code,unit_id)`
+                        `status=eq.APP-EXEC&contract_id=${buildInFilter(allowedContractIds)}&select=id,work_id,status,sequence_no,district,pdf_url,pending_status,contract_id`
                     );
                 } else {
                     workOrders = await apiQuery(
                         'work_orders',
-                        `status=eq.APP-EXEC&select=id,work_id,status,sequence_no,district,pdf_url,pending_status,contract(id,contract_name,contract_code,unit_id)`
+                        `status=eq.APP-EXEC&select=id,work_id,status,sequence_no,district,pdf_url,pending_status,contract_id`
                     );
                 }
 
                 workOrders = workOrders || [];
+
+                // Ambil data contract secara berasingan (bukan embed), lalu gabung manual.
+                const contractIds = [...new Set(
+                    workOrders.map(o => o.contract_id).filter(v => v !== null && v !== undefined)
+                )];
+
+                let contractsData = [];
+                if (contractIds.length > 0) {
+                    contractsData = await apiQuery(
+                        'contract',
+                        `id=${buildInFilter(contractIds)}&select=id,contract_name,contract_code,unit_id`
+                    );
+                }
+
+                const contractMap = new Map(
+                    (contractsData || []).map(c => [String(c.id), c])
+                );
+
+                workOrders.forEach(item => {
+                    item.contract = contractMap.get(String(item.contract_id)) || null;
+                });
+
                 workOrders.forEach(item => { item.mapped_pdf_url = item.pdf_url || null; });
 
                 renderUnitContractView('table-sect-container', unitsPreset, workOrders, perm.canActSection, {
@@ -446,6 +492,187 @@ function toggleAccordion(contentId, iconId) {
                 icon.classList.remove('rotate-180');
             }
         }
+
+        /* =====================================================
+           CONTRACT CODE / CONTRACT NAME POPUP
+           - Contract name hidden from accordion header
+           - Desktop: hover = temporary popup
+           - Desktop/mobile: click/tap = locked popup
+           - Popup is appended to body so accordion overflow cannot clip it
+           ===================================================== */
+        let contractNamePopup = null;
+        let contractNamePopupLocked = false;
+        let contractNamePopupAnchor = null;
+
+        function createContractNamePopup() {
+            if (contractNamePopup && document.body.contains(contractNamePopup)) {
+                return contractNamePopup;
+            }
+
+            const popup = document.createElement('div');
+            popup.id = 'contractNamePopup';
+
+            popup.style.cssText = `
+                position: fixed;
+                z-index: 999999;
+                background: #111827;
+                color: #fff;
+                font-size: 11px;
+                font-weight: 600;
+                line-height: 1.4;
+                padding: 7px 10px;
+                border-radius: 8px;
+                box-shadow: 0 8px 25px rgba(0,0,0,.25);
+                max-width: min(320px, calc(100vw - 16px));
+                width: max-content;
+                box-sizing: border-box;
+                opacity: 0;
+                visibility: hidden;
+                pointer-events: none;
+                transition: opacity .15s ease, transform .15s ease;
+                transform: translateY(-3px);
+            `;
+
+            document.body.appendChild(popup);
+            contractNamePopup = popup;
+            return popup;
+        }
+
+        function positionContractNamePopup(anchorEl) {
+            const popup = createContractNamePopup();
+            if (!anchorEl || !popup) return;
+
+            const rect = anchorEl.getBoundingClientRect();
+
+            popup.style.left = '0px';
+            popup.style.top = '0px';
+
+            const popupRect = popup.getBoundingClientRect();
+            const gap = 7;
+            const edge = 8;
+
+            let left = rect.left;
+            let top = rect.bottom + gap;
+
+            if (left + popupRect.width > window.innerWidth - edge) {
+                left = window.innerWidth - popupRect.width - edge;
+            }
+            left = Math.max(edge, left);
+
+            if (top + popupRect.height > window.innerHeight - edge) {
+                top = rect.top - popupRect.height - gap;
+            }
+
+            top = Math.max(edge, top);
+            if (top + popupRect.height > window.innerHeight - edge) {
+                top = Math.max(edge, window.innerHeight - popupRect.height - edge);
+            }
+
+            popup.style.left = `${left}px`;
+            popup.style.top = `${top}px`;
+        }
+
+        function showContractNamePopup(anchorEl, contractName, locked = false) {
+            const popup = createContractNamePopup();
+            if (!anchorEl || !popup) return;
+
+            contractNamePopupAnchor = anchorEl;
+            contractNamePopupLocked = !!locked;
+            popup.textContent = contractName || 'No contract name';
+
+            positionContractNamePopup(anchorEl);
+
+            popup.style.opacity = '1';
+            popup.style.visibility = 'visible';
+            popup.style.transform = 'translateY(0)';
+        }
+
+        function hideContractNamePopup(force = false) {
+            if (contractNamePopupLocked && !force) return;
+            if (!contractNamePopup) return;
+
+            contractNamePopup.style.opacity = '0';
+            contractNamePopup.style.visibility = 'hidden';
+            contractNamePopup.style.transform = 'translateY(-3px)';
+
+            contractNamePopupLocked = false;
+            contractNamePopupAnchor = null;
+        }
+
+        function handleContractBadgeClick(e, encodedName) {
+            e.stopPropagation();
+
+            const badge = e.currentTarget;
+            const name = decodeURIComponent(encodedName || '');
+
+            if (contractNamePopupLocked && contractNamePopupAnchor === badge) {
+                hideContractNamePopup(true);
+                return;
+            }
+
+            showContractNamePopup(badge, name, true);
+        }
+
+        // Desktop hover only. Touch devices use click/tap instead.
+        document.addEventListener('pointerover', (e) => {
+            if (e.pointerType !== 'mouse') return;
+
+            const badge = e.target.closest('.contract-code-badge');
+            if (!badge) return;
+
+            const fromInsideBadge = e.relatedTarget && badge.contains(e.relatedTarget);
+            if (fromInsideBadge) return;
+
+            if (contractNamePopupLocked) return;
+
+            const encodedName = badge.dataset.contractName;
+            if (!encodedName) return;
+
+            showContractNamePopup(
+                badge,
+                decodeURIComponent(encodedName),
+                false
+            );
+        });
+
+        // Desktop hover popup closes immediately when the pointer leaves the code.
+        document.addEventListener('pointerout', (e) => {
+            if (e.pointerType !== 'mouse') return;
+
+            const badge = e.target.closest('.contract-code-badge');
+            if (!badge) return;
+
+            const goingInsideBadge = e.relatedTarget && badge.contains(e.relatedTarget);
+            if (goingInsideBadge) return;
+
+            if (contractNamePopupLocked) return;
+
+            if (contractNamePopupAnchor === badge) {
+                hideContractNamePopup(true);
+            }
+        });
+
+        // Click anywhere else closes a locked popup.
+        document.addEventListener('click', (e) => {
+            if (!contractNamePopup || contractNamePopup.style.visibility !== 'visible') return;
+            if (e.target.closest('.contract-code-badge')) return;
+            if (e.target.closest('#contractNamePopup')) return;
+
+            hideContractNamePopup(true);
+        });
+
+        // Keep a locked popup aligned when the page/accordion is scrolled or resized.
+        window.addEventListener('scroll', () => {
+            if (contractNamePopupLocked && contractNamePopupAnchor) {
+                positionContractNamePopup(contractNamePopupAnchor);
+            }
+        }, true);
+
+        window.addEventListener('resize', () => {
+            if (contractNamePopupLocked && contractNamePopupAnchor) {
+                positionContractNamePopup(contractNamePopupAnchor);
+            }
+        });
 
         // ============ UNIT -> CONTRACT ACCORDION (ikut style Executive) ============
         function renderUnitContractView(containerId, units, orders, canAct, opts) {
@@ -502,8 +729,13 @@ function toggleAccordion(contentId, iconId) {
                                 <button type="button" onclick="toggleAccordion('${accId}','${iconId}')"
                                         class="w-full bg-amber-50 hover:bg-amber-100/80 border-amber-200 px-3 py-2.5 flex items-center justify-between gap-2 transition-colors cursor-pointer text-left border-b">
                                     <div class="flex items-center gap-2 min-w-0 flex-1">
-                                        <span class="bg-amber-600 text-white text-[10px] px-1.5 py-0.5 rounded font-mono shadow-xs shrink-0">${contract.code}</span>
-                                        <span class="font-bold text-gray-800 text-xs leading-tight break-words">${contract.name}</span>
+                                        <span
+                                            class="bg-amber-600 text-white text-[10px] px-1.5 py-0.5 rounded font-mono shadow-xs shrink-0 contract-code-badge"
+                                            data-contract-name="${encodeURIComponent(contract.name || '')}"
+                                            onclick="handleContractBadgeClick(event, '${encodeURIComponent(contract.name || '')}')">
+                                            ${contract.code}
+                                        </span>
+                                        <span class="font-bold text-gray-800 text-xs leading-tight break-words contract-name-label">${contract.name}</span>
                                     </div>
                                     <div class="flex items-center gap-2 shrink-0">
                                         <span class="text-[11px] bg-white text-gray-600 border border-gray-300 font-semibold px-2 py-0.5 rounded-full whitespace-nowrap shadow-2xs">${contract.orders.length}</span>
