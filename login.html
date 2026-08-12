@@ -1,909 +1,838 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Contract Dashboard</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0" defer></script>
-    <style>
-        :root { 
-            --ios-blue: #007AFF; --ios-green: #34C759; --ios-orange: #FF9500; --ios-red: #FF3B30;
-            --dark-bg: #1c1c1e; --card-bg: #ffffff; --glass: rgba(255,255,255,0.8);
-        }
+<title>M&E Connect Sign In</title>
 
-        body { 
-            font-family: -apple-system, system-ui, sans-serif;   
-            background: linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%); 
-            margin: 0; 
-            height: 100vh; 
-            display: flex; 
-            flex-direction: column; 
-            overflow: hidden; 
-        }
-        .search-container {
-            padding: 5px 10px 10px 0;
-            flex-shrink: 0;
-        }
-        .search-box {
-            width: 100%;
-            padding: 10px 15px;
-            border-radius: 12px;
-            border: 1px solid #d1d1d6;
-            background: white;
-            font-size: 13px;
-            outline: none;
-            box-sizing: border-box;
-            transition: border-color 0.2s; 
-        }
-        .search-box:focus {
-            border-color: var(--ios-blue);
-        }
-        .mobile-usage-btn { display: none; } 
+<link rel="preload" href="Submarine.png" as="image" type="image/png">
+<link rel="preload" href="logo.svg" as="image" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css?family=Lato:300,400&display=swap" rel="stylesheet">
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
-        .glass-header { 
-            width: 100%; height: 60px; 
-            background: linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%);
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 1px 10px rgba(0,0,0,0.05); z-index: 1000; flex-shrink: 0;
-            position: relative;
-            padding: 0 60px;
-            box-sizing: border-box;
-        }
+<style>
 
-        .unit-container-wrapper {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-        }
+html,
+body{
+    margin:0;
+    padding:0;
+    width:100%;
+    height:100dvh;
+    overflow:hidden;
+    overscroll-behavior:none;
+}
 
-        .unit-container {
-            display: flex;
-            flex-wrap: wrap;         
-            justify-content: center; 
-            gap: 8px;
-            padding: 0;
-        }
+body{
+    font-family:'Lato',sans-serif;
+    background:#fff;
+}
 
-        .unit-pill { 
-            padding: 8px 16px;
-            border-radius: 15px;     
-            background: rgba(255,255,255,.2);
-            color: white;
-            border: none; 
-            cursor: pointer; 
-            font-weight: 600; 
-            font-size: 12px; 
-            white-space: nowrap; 
-            transition: background-color 0.2s, color 0.2s; 
-        }
-        .unit-pill.active { 
-            background: white;
-            color: #0b3d91; 
-        }
+.header{
+    position:relative;
+    text-align:center;
+    overflow:hidden;
 
-        @media (max-width: 768px) {
-            #panel-vendor, 
-            .next-container { 
-                display: none !important; 
-            }
+    background:
+    radial-gradient(circle at top,
+        rgba(255,255,255,.15),
+        transparent 35%),
 
-            #analysis-panel > div:first-child {
-                position: relative;
-            }
+    linear-gradient(
+        60deg,
+        #0b3d91 0%,
+        #0077b6 40%,
+        #00b4d8 100%
+    );
 
-            .mobile-usage-btn {
-                display: flex;
-                background: var(--ios-blue);
-                color: white;
-                text-decoration: none;
-                padding: 0 10px;
-                border-radius: 50%;
-                font-size: 11px;
-                font-weight: 800;
-                align-items: center;
-                justify-content: center;
-                transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-radius 0.3s ease, padding 0.3s ease;
-                will-change: width, border-radius;
-                position: absolute;
-                right: 0;
-                top: 0;
-                width: 35px;
-                height: 35px;
-                box-sizing: border-box;
-                overflow: hidden;
-                z-index: 1510;
-            }
+    color:white;
 
-            .mobile-usage-btn .btn-text {
-                opacity: 0;
-                width: 0;
-                white-space: nowrap;
-                transition: opacity 0.2s ease, margin 0.3s ease;
-                font-size: 11px;
-                letter-spacing: 0.5px;
-            }
+    overflow:visible;
+}
 
-            .mobile-usage-btn .icon-main {
-                font-size: 11px;
-                flex-shrink: 0;
-            }
+.header::before{
+    content:"";
+    position:absolute;
+    inset:0;
 
-            .mobile-usage-btn.expanded {
-                width: 105px;
-                padding: 0 12px;
-                border-radius: 10px;
-                box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
-            }
+    background:
+    radial-gradient(circle at 20% 80%,
+        rgba(255,255,255,.18),
+        transparent 25%),
 
-            .mobile-usage-btn.expanded .btn-text {
-                opacity: 1;
-                width: auto;
-                margin-right: 5px;
-            }
+    radial-gradient(circle at 80% 20%,
+        rgba(255,255,255,.10),
+        transparent 30%);
 
-            .contract-sidebar {
-                width: 100% !important;
-                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                will-change: transform;
-            }
+    filter:blur(40px);
 
-            .analysis-container {
-                position: fixed;
-                top: 60px;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                width: auto;
-                height: auto;
-                box-sizing: border-box;
-                padding: 10px;
-                background: #f2f2f7;
-                z-index: 1500;
-                transform: translateX(100%);
-                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                will-change: transform;
-                overflow-x: hidden;
-            }
+    animation:fogMove 10s ease-in-out infinite alternate;
+}
 
-            body.analysis-active .analysis-container { 
-                transform: translateX(0);
-            }
-            body.analysis-active .contract-sidebar {
-                transform: translateX(-100%);
-            }
+@keyframes fogMove{
 
-            #analysis-panel {
-                border-radius: 20px 20px 0 0 !important;
-                height: 100%; 
-                min-width: 0;
-            }
-            .health-grid {
-                grid-template-columns: 1fr !important;
-                overflow-y: auto !important; 
-                min-width: 0;
-            }
-            .chart-box {
-                min-height: 250px;
-                flex-shrink: 0; 
-                min-width: 0;
-            }
+    from{
+        transform:translateX(-30px) translateY(0);
+    }
 
-            .glass-header {
-                padding: 0 10px; 
-            }
+    to{
+        transform:translateX(30px) translateY(-20px);
+    }
 
-            .unit-container-wrapper {
-                flex: 1;
-                overflow: hidden;
-                margin: 0 50px;  
-            }
+}
 
-            .unit-container {
-                flex-wrap: nowrap;           
-                justify-content: flex-start;
-                overflow-x: auto;
-                scroll-behavior: smooth;
-                scroll-snap-type: x mandatory;
-                scrollbar-width: none;
-                padding: 0 16px;
-            }
+.flex{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    text-align:center;
+}
 
-            .unit-container::-webkit-scrollbar { display: none; }
+.inner-header{
+    position:relative;
+    z-index:20; 
+    height:65dvh;
+    width:100%;
+    margin:0;
+    padding:0;
 
-            .unit-container::before,
-            .unit-container::after {
-                display: block;
-                content: "";
-                flex: 0 0 50%;
-            }
+    flex-direction:column;
+}
 
-            .unit-pill {
-                scroll-snap-align: center;
-            }
+.login-box{
+    position:absolute;
+    top:calc(50% + 90px);
+    left:50%;
+    transform:translateX(-50%) translateY(20px);
 
-            .fab {
-                top: 12px;
-                right: 15px;
-                border-radius: 50%;
-                will-change: width, border-radius;
-            }
+    width:320px;
+    max-width:90%;
 
-            .fab.expanded {
-                width: 150px; 
-                padding: 0 12px;
-                border-radius: 10px;
-                justify-content: space-between;
-                box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
-            }
+    display:flex;
+    flex-direction:column;
+    gap:10px;
 
-            .fab.expanded .fab-text {
-                opacity: 1;
-                width: auto;
-                margin-right: 5px;
-            }
-        }
+    opacity:0;
+    pointer-events:none;
 
-        .nav-btn {
-            position: absolute;
-            background: #e5e5ea;
-            border: none;
-            height: 35px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            color: var(--ios-blue);
-            padding: 0 10px;
-        }
+    z-index:10000;
+}
+.login-box input{
+    width:100%;
+    padding:14px 16px;
 
-        .next-container {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            z-index: 2000;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px 15px;
-            border-radius: 20px;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-            border: 1px solid rgba(0, 122, 255, 0.2);
-        }
-        .next-label { font-size: 11px; font-weight: 800; color: #48484a; letter-spacing: 0.8px; text-align: right; }
-        .next-btn-circle {
-            background: var(--ios-blue);
-            border: none;
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            color: white;
-            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.4);
-        }
+    background:rgba(255,255,255,.15);
 
-        .fab { 
-            position: fixed; 
-            top: 12px; 
-            right: 20px; 
-            height: 35px; 
-            width: 35px;
-            background: var(--ios-blue); 
-            color: white; 
-            border-radius: 10px;
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            cursor: pointer; 
-            z-index: 1100;
-            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s ease;
-            overflow: hidden;
-            box-sizing: border-box;
-        }
+    border:1px solid rgba(255,255,255,.20);
 
-        .fab .fab-text {
-            opacity: 0;
-            width: 0;
-            white-space: nowrap;
-            transition: opacity 0.2s ease, margin 0.3s ease;
-            font-size: 11px;
-            font-weight: 800;
-            letter-spacing: 0.5px;
-        }
+    border-radius:14px;
 
-        .fab .icon-main {
-            font-size: 14px;
-            flex-shrink: 0;
-        }
+    color:white;
 
-        .main-wrapper { display: flex; flex: 1; overflow: hidden; padding: 10px; gap: 15px; }
-        .contract-sidebar { width: 220px; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
-        #contractList { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 5px; }
-        
-        .c-card { background: var(--card-bg); border-radius: 12px; padding: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); cursor: pointer; border: 1px solid rgba(0,0,0,0.05); }
-        .c-card.active { border-color: var(--ios-blue); background: #f0f7ff; }
-        .c-card h4 { margin: 0; font-size: 11px; color: #1c1c1e; overflow: hidden; text-overflow: ellipsis; }
-        .c-card .sub-text { font-size: 9px; color: #888; margin-top: 2px; }
+    backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);
 
-        .analysis-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-        #analysis-panel { display: none; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); flex: 1; overflow: hidden; flex-direction: column; }
+    box-sizing:border-box;
 
-        .health-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; flex: 1; overflow: hidden; margin-top: 5px; }
-        
-        .chart-box { padding: 10px; background: #f9f9fb; border-radius: 15px; flex: 1; position: relative; min-height: 0; display: flex; flex-direction: column; transform: translateZ(0); }
+    outline:none;
 
-        .section-row { background: #fff; border: 1px solid var(--ios-blue); border-radius: 12px; padding: 10px; margin-bottom: 8px; }
-        .prog-bar-bg { width: 100%; height: 8px; background: #eee; border-radius: 4px; margin-top: 5px; overflow: hidden; }
+    transition:.25s;
+}
 
-        .prog-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease-out !important; width: 0 !important; will-change: width;}
-        .avg-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 5px; }
-        .avg-item { font-size: 9px; font-weight: 600; color: #666; }
-        .manage-btn { background: #f2f2f7; border: none; padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; color: var(--ios-blue); cursor: pointer; }
-        #selectedSectionContainer { flex: 1; overflow-y: auto; padding-right: 5px; }
-        .sel-chip { display: inline-block; padding: 4px 10px; border-radius: 12px; background: #e5e5ea; margin: 3px; font-size: 10px; cursor: pointer; font-weight: 600; }
-        .sel-chip.active { background: var(--ios-blue); color: white; }
+.login-box input::placeholder{
+    color:rgba(255,255,255,.75);
+}
 
-        @media (min-width: 769px) {
-            .fab:hover {
-                width: 150px;
-                padding: 0 12px;
-                justify-content: space-between;
-                box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
-            }
-            .fab:hover .fab-text {
-                opacity: 1;
-                width: auto;
-                margin-right: 5px;
-            }
-        }
-    </style>
+.login-box input:focus{
+    border-color:rgba(255,255,255,.45);
 
-    <link rel="stylesheet" href="sidebar.css">
+    background:rgba(255,255,255,.20);
 
-    <script src="session.js" defer></script>
-    <script src="sidebar.js" defer></script>
+    box-shadow:
+        0 0 0 3px rgba(255,255,255,.10);
+}
+.password-wrapper{
+    position:relative;
+    width:100%;
+}
+
+.password-wrapper input{
+    padding-right:50px;
+}
+
+.toggle-password{
+    position:absolute;
+    right:16px;
+    top:50%;
+    transform:translateY(-50%);
+
+    width:24px;
+    height:24px;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    cursor:pointer;
+
+    color:rgba(255,255,255,.85);
+}
+.toggle-password i{
+    font-size:18px;
+    line-height:1;
+}
+.login-box button{
+    margin-top:5px;
+    border-radius:14px;
+    height:48px;
+    padding:0 16px;
+        cursor: pointer;
+
+    background: rgba(34,197,94,0.18);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+
+    border: 1px solid rgba(34,197,94,0.35);
+
+    color: rgba(0,0,0,0.85);
+    font-weight: 700;
+
+    box-shadow:
+        0 8px 25px rgba(34,197,94,0.25);
+
+    transition: .25s;
+}
+.login-box button:hover{
+    transform:translateY(-2px);
+    filter:brightness(1.08);
+}
+.login-box.show{
+    animation: fadeLogin .8s ease forwards;
+    pointer-events:auto;
+}
+@keyframes fadeLogin {
+    from {
+        opacity:0;
+        transform:translateX(-50%) translateY(30px);
+    }
+    to {
+        opacity:1;
+        transform:translateX(-50%) translateY(0);
+    }
+}
+
+.fish{
+    position:absolute;
+
+    /* Dilaraskan saiz untuk pikap supaya lebih selim/sesuai */
+    width:180px;
+    height:auto;
+
+    right:-250px;
+    top:42%;
+
+    transform:translateY(-50%);
+
+    z-index:30;
+
+    opacity:0;
+
+    filter:
+    drop-shadow(0 8px 20px rgba(0,0,0,.25));
+}
+
+.fish.start{
+    animation:
+    fishSwim 3s ease forwards;
+}
+
+@keyframes fishSwim{
+
+    0%{
+        right:-250px;
+        opacity:0;
+
+        transform:
+        translateY(-50%);
+    }
+
+    10%{
+        opacity:1;
+    }
+
+    45%{
+        right:50%;
+
+        transform:
+        translate(50%,-50%);
+    }
+
+    60%{
+        right:50%;
+        opacity:1;
+
+        transform:
+        translate(50%,-50%)
+        scale(1.05);
+    }
+
+    100%{
+        right:120%;
+        opacity:0;
+
+        transform:
+        translateY(-50%);
+    }
+
+}
+
+h1{
+    font-weight:300;
+    letter-spacing:2px;
+    font-size:48px;
+    margin-top:20px;
+
+    opacity:0;
+
+    filter:
+    drop-shadow(0 0 12px rgba(255,255,255,.35));
+}
+
+h1.start{
+    animation:
+    fadeUp 1s ease forwards;
+
+    animation-delay:2s;
+}
+
+.logo{
+    width:140px;
+    height:auto;
+
+    opacity:0;
+
+    clip-path:circle(0% at 50% 50%);
+
+    filter:
+    drop-shadow(0 0 20px rgba(255,255,255,.35))
+    drop-shadow(0 10px 25px rgba(0,0,0,.2));
+}
+
+.logo.start{
+    animation:
+    waterReveal 1.4s cubic-bezier(.2,.8,.2,1) forwards,
+    floatLogo 7s ease-in-out infinite 4s;
+
+    animation-delay:2s,4s;
+}
+@keyframes waterReveal{
+
+    0%{
+        opacity:0;
+        clip-path:circle(0% at 50% 50%);
+        filter:blur(10px);
+        transform:scale(.8);
+    }
+
+    40%{
+        opacity:1;
+    }
+
+    100%{
+        opacity:1;
+        clip-path:circle(150% at 50% 50%);
+        filter:blur(0px);
+        transform:scale(1);
+    }
+}
+
+@keyframes floatLogo{
+
+    0%{
+        transform:translateY(0px);
+    }
+
+    50%{
+        transform:translateY(-10px);
+    }
+
+    100%{
+        transform:translateY(0px);
+    }
+}
+
+.waves{
+    position:relative;
+    width:100%;
+    height:15vh;
+    margin-bottom:-7px;
+
+    min-height:100px;
+    max-height:150px;
+z-index: 1;
+}
+
+.parallax > use{
+    animation:move-forever 25s cubic-bezier(.55,.5,.45,.5) infinite;
+}
+
+.parallax > use:nth-child(1){
+    animation-delay:-2s;
+    animation-duration:7s;
+}
+
+.parallax > use:nth-child(2){
+    animation-delay:-3s;
+    animation-duration:10s;
+}
+
+.parallax > use:nth-child(3){
+    animation-delay:-4s;
+    animation-duration:13s;
+}
+
+.parallax > use:nth-child(4){
+    animation-delay:-5s;
+    animation-duration:20s;
+}
+
+@keyframes move-forever{
+
+    0%{
+        transform:translate3d(-90px,0,0);
+    }
+
+    100%{
+        transform:translate3d(85px,0,0);
+    }
+
+}
+.login-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-top: 2px;
+}
+.content{
+    position:relative;
+    height:20dvh;
+    text-align:center;
+    background:white;
+}
+
+p{
+    letter-spacing:1px;
+    font-size:14px;
+    color:#333;
+}
+
+@keyframes fadeUp{
+
+    from{
+        opacity:0;
+        transform:translateY(20px);
+    }
+
+    to{
+        opacity:1;
+        transform:translateY(0);
+    }
+
+}
+
+.back-text{
+    font-size:12px;
+    color:white;
+    opacity:0.8;
+    text-decoration:none;
+
+    display:flex;
+    align-items:center;
+    gap:6px;
+
+    cursor:pointer;
+}
+
+.back-text:hover{
+    opacity:1;
+    text-decoration:underline;
+}
+
+@media(max-width:768px){
+
+    .waves{
+        height:40px;
+        min-height:40px;
+    }
+
+    .content{
+        height:30vh;
+    }
+
+    h1{
+        font-size:24px;
+    }
+
+    .logo{
+        width:110px;
+    }
+
+}
+
+input{
+    width:100%;
+
+    margin-top:12px;
+
+    padding:12px;
+
+    border:none;
+
+    border-radius:14px;
+
+    box-sizing:border-box;
+
+    outline:none;
+}
+
+.logo-click{
+    position:relative;
+    z-index:20;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.logo-ripple{
+    position:absolute;
+
+    width:140px;
+    height:140px;
+
+    border-radius:50%;
+
+    border:2px solid rgba(255,255,255,.45);
+
+    opacity:0;
+
+    pointer-events:none;
+}
+
+.logo-ripple.start.ripple-a{
+    animation:
+    logoRipple 3s ease-out infinite;
+
+    animation-delay:3.2s;
+}
+
+.logo-ripple.start.ripple-b{
+    animation:
+    logoRipple 3s ease-out infinite;
+
+    animation-delay:4.2s;
+}
+
+@keyframes logoRipple{
+
+    0%{
+        transform:scale(.8);
+        opacity:0;
+    }
+
+    15%{
+        opacity:.6;
+    }
+
+    100%{
+        transform:scale(2.2);
+        opacity:0;
+    }
+
+}
+
+</style>
+
 </head>
+
 <body>
+<div class="header">
 
-    <app-sidebar></app-sidebar>
-    <div class="fab" id="fabBtn" onclick="handleFabClick(event)">
-        <span class="fab-text">REGISTER FORMS</span>
-        <i class="fa fa-plus icon-main"></i>
+    <div class="inner-header flex">
+        <!-- Ditukar kepada Pickup.png -->
+        <img src="Submarine.png" class="fish">
+
+        <div class="logo-click">
+
+    <div class="logo-ripple ripple-a"></div>
+    <div class="logo-ripple ripple-b"></div>
+
+    <img
+        src="logo.svg"
+        class="logo">
+
+</div>
+
+        <h1>M&E Connect</h1>
+
+<div id="loginBox" class="login-box">
+
+    <input id="username" type="text" placeholder="Employee ID">
+<div class="password-wrapper">
+    <input id="password" type="password" placeholder="Password">
+
+    <span id="togglePassword" class="toggle-password">
+        <i class="fa-solid fa-eye"></i>
+    </span>
+</div>
+
+    <div class="login-options">
+
+    <div>
+    <a href="#" onclick="goBack()" class="back-text">
+        <i class="fa fa-arrow-left"></i> Main Menu
+    </a>
+</div>
+
+    <div style="font-size:12px;">
+        <a href="#" onclick="forgotPassword()" style="color:#fff; opacity:0.8; text-decoration:none;">
+            Forgot password?
+        </a>
     </div>
 
-    <div class="glass-header">
-        <div class="unit-container-wrapper">
-            <div class="unit-container" id="unitNav"></div>
-        </div>
+</div>
+
+    <button onclick="login()">
+        Login
+    </button>
+
+</div>
+
     </div>
 
-    <div class="next-container">
-        <span class="next-label">USAGE<br>SCHEDULE</span>
-        <button class="next-btn-circle" onclick="goToUsage()">
-            <i class="fa fa-chevron-right"></i>
-        </button>
+    <div>
+
+        <svg class="waves"
+             xmlns="http://www.w3.org/2000/svg"
+             xmlns:xlink="http://www.w3.org/1999/xlink"
+             viewBox="0 24 150 28"
+             preserveAspectRatio="none"
+             shape-rendering="auto">
+
+            <defs>
+
+                <path id="gentle-wave"
+                      d="M-160 44c30 0 58-18 88-18s58 18 88 18
+                         58-18 88-18 58 18 88 18v44h-352z" />
+
+            </defs>
+
+            <g class="parallax">
+
+                <use xlink:href="#gentle-wave"
+                     x="48"
+                     y="0"
+                     fill="rgba(255,255,255,0.7)" />
+
+                <use xlink:href="#gentle-wave"
+                     x="48"
+                     y="3"
+                     fill="rgba(255,255,255,0.5)" />
+
+                <use xlink:href="#gentle-wave"
+                     x="48"
+                     y="5"
+                     fill="rgba(255,255,255,0.3)" />
+
+                <use xlink:href="#gentle-wave"
+                     x="48"
+                     y="7"
+                     fill="#ffffff" />
+
+            </g>
+
+        </svg>
+
     </div>
 
-    <div class="main-wrapper">
-        <div class="contract-sidebar">
-            <div class="search-container">
-                <input type="text" id="contractSearch" class="search-box" placeholder="Search Code/Contract" onkeyup="debouncedFilterContracts()">
-            </div>
-            <div id="contractList"></div>
-        </div>
+</div>
 
-        <div class="analysis-container">
-            <div id="analysis-panel">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #f2f2f7;">
-                    <div>
-                        <h1 id="panel-title" style="margin:0; font-size: 24px; letter-spacing: -0.5px; color: var(--ios-blue);">Analysis</h1>
-                        <p id="panel-vendor" style="margin:2px 0 0 0; color: #8e8e93; font-size: 13px; font-weight: 500;"></p>
-                    </div>
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <a href="#" class="mobile-usage-btn" id="mobileUsageBtn" onclick="handleMobileUsageClick(event)">
-                            <span class="btn-text">USAGE</span>
-                            <i class="fa fa-chevron-right icon-main"></i>
-                        </a>
-                    </div>
-                </div>
+<div class="content flex">
 
-                <div class="health-grid">
-                    <div class="chart-box">
-                        <div style="font-size: 11px; font-weight: bold; color: #666; margin-bottom: 10px;">MONTHLY AVERAGE: ACTUAL VS PLANNED (RM)</div>
-                        <canvas id="healthChart"></canvas>
-                    </div>
-                    <div style="display: flex; flex-direction: column; overflow: hidden;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; flex-shrink: 0; margin-bottom: 8px;">
-                            <h3 style="margin:0; font-size: 16px;">Sections</h3>
-                            <button id="manageBtn" class="manage-btn" onclick="toggleSelector()"><i class="fa fa-cog"></i> Setting</button>
-                        </div>
-                        <div id="sectionSelector" style="display:none; background: #f9f9fb; padding: 10px; border-radius: 15px; margin-bottom: 10px; border: 1px dashed #ccc;">
-                            <div id="fullSectionList"></div>
-                        </div>
-                        <div id="selectedSectionContainer"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
+    <p>M&E | Mechanical & Electrical Department</p>
+
+</div>
+
 <script>
-    var API_URL = 'https://me-connect-api.mech-elec-ranhill.workers.dev';
-    const headers = { 'Content-Type': 'application/json' };
 
-    let myChart = null;
-    let currentContract = null;
-    let currentWO = [];
-    let selectedSections = [];
-    let searchTimeout = null;
-    const cacheContracts = {}; 
+/* ==========================================================
+   CLOUDFLARE WORKER (me-connect-api) — ganti Supabase
+   Tukar API_URL di bawah ikut URL Worker sebenar awak
+   (contoh: https://me-connect-api.<account>.workers.dev)
+   ========================================================== */
+const API_URL = "https://me-connect-api.mech-elec-ranhill.workers.dev";
 
-    // Fungsi dinamik untuk mengesahkan hak akses admin pada bila-bila masa
-    function checkAdminPermissions() {
-        const userRole = (localStorage.getItem("role") || "").toLowerCase();
-        return userRole === "admin" || userRole === "@dm1n";
+async function login(){
+
+    const employeeId = document.getElementById("username").value.trim();
+    const pass = document.getElementById("password").value.trim();
+
+    if(!employeeId || !pass){
+        alert("Please enter Employee ID and Password.");
+        return;
     }
 
-    // Kemaskini elemen UI berkaitan admin
-    function updateAdminUI() {
-        const isAdmin = checkAdminPermissions();
-        const btn = document.getElementById("manageBtn");
-        if (btn) {
-            btn.style.display = isAdmin ? "inline-block" : "none";
-        }
+    // Akaun Admin
+    if(employeeId === "@dm1n" && pass === "@AnakAnakSyurga1"){
+
+        localStorage.setItem("loggedIn","true");
+        localStorage.setItem("staff_id",0);
+        localStorage.setItem("userId","@dm1n");
+        localStorage.setItem("employee_id","@dm1n");
+        localStorage.setItem("staff_name","System Admin");
+        localStorage.setItem("role","Administrator");
+        localStorage.setItem("avatar_url","");
+        localStorage.setItem("me_user","@dm1n");
+        localStorage.setItem("lastActivity",Date.now());
+
+        window.location.href = "sections.html";
+        return;
     }
 
-    window.onload = () => {
-        if (typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') {
-            Chart.register(ChartDataLabels);
-        }
-        updateAdminUI();
-        fetchUnits();
-    };
+    try{
 
-    function debouncedFilterContracts() {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(filterContracts, 150);
-    }
-
-    function filterContracts() {
-        const query = document.getElementById('contractSearch').value.toLowerCase();
-        const cards = document.querySelectorAll('.c-card');
-        
-        requestAnimationFrame(() => {
-            cards.forEach(card => {
-                const code = card.querySelector('h4').innerText.toLowerCase();
-                const name = card.querySelector('.sub-text').innerText.toLowerCase();
-                card.style.display = (code.includes(query) || name.includes(query)) ? 'block' : 'none';
-            });
+        const res = await fetch(`${API_URL}/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                employee_id: employeeId,
+                password: pass
+            })
         });
-    }
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const selectedSectionName = urlParams.get('section');
+        const result = await res.json();
 
-    async function fetchUnits() {
-        try {
-            const [secRes, unitsRes] = await Promise.all([
-                fetch(`${API_URL}/rest/v1/me_sections?select=id`, { headers }),
-                fetch(`${API_URL}/rest/v1/units?select=id,unit_name,section_id`, { headers })
-            ]);
-            const sections = await secRes.json();
-            const units = await unitsRes.json();
-
-            let selectedSection = null;
-            if (selectedSectionName) {
-                selectedSection = sections.find(s => s.id == selectedSectionName);
-            }
-
-            const filteredUnits = selectedSection
-                ? units.filter(u => u.section_id === selectedSection.id)
-                : units;
-
-            const nav = document.getElementById('unitNav');
-            nav.innerHTML = filteredUnits.map(u => `
-                <button class="unit-pill" id="unit-${u.id}" onclick="fetchContracts(${u.id}, this)">
-                    ${u.unit_name}
-                </button>
-            `).join('');
-
-            if (filteredUnits.length > 0) {
-                document.getElementById(`unit-${filteredUnits[0].id}`).click();
-            }
-        } catch (e) {
-            console.error("Error units:", e);
-        }
-    }
-
-    async function fetchContracts(unitId, btn) {
-        document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
-        btn.classList.add('active');
-        centerActiveUnit(btn);
-
-        document.getElementById('contractSearch').value = '';
-        document.body.classList.remove('analysis-active');
-        document.getElementById('analysis-panel').style.display = 'none';
-
-        currentContract = null;
-        currentWO = [];
-        document.getElementById('panel-title').innerText = 'Analisis';
-        document.getElementById('panel-vendor').innerText = '';
-
-        if (cacheContracts[unitId]) {
-            renderContractList(cacheContracts[unitId]);
+        if(!res.ok || !result.success || !result.staff){
+            alert(result.error || "Employee ID atau Password tidak sah.");
             return;
         }
 
-        try {
-            const res = await fetch(
-                `${API_URL}/rest/v1/contract?unit_id=eq.${unitId}&select=id,contract_code,contract_name,contract_start,contract_end,selected_sections,contract_sections_breakdown`,
-                { headers }
-            );
-            let data = await res.json();
+        const staffData = result.staff;
 
-            data.sort((a, b) => {
-                const dateDiff = new Date(a.contract_start) - new Date(b.contract_start);
-                if (dateDiff !== 0) return dateDiff;
-                return a.contract_code.localeCompare(b.contract_code, undefined, { numeric: true, sensitivity: "base" });
-            });
+        localStorage.setItem("loggedIn","true");
+        localStorage.setItem("staff_id",staffData.id);
+        localStorage.setItem("userId",staffData.employee_id);
+        localStorage.setItem("employee_id",staffData.employee_id);
+        localStorage.setItem("staff_name",staffData.name);
+        localStorage.setItem("role",staffData.position || "");
+        localStorage.setItem("avatar_url",staffData.avatar_url || "");
+        localStorage.setItem("phone_no",staffData.phone_no || "");
+        localStorage.setItem("initial",staffData.initial || "");
+        localStorage.setItem("signature",staffData.signature || "");
+        localStorage.setItem("me_user",staffData.employee_id);
+        localStorage.setItem("lastActivity",Date.now());
 
-            cacheContracts[unitId] = data;
-            renderContractList(data);
-        } catch (e) {
-            console.error("Error contracts:", e);
-        }
+        window.location.href = "sections.html";
+
+    }catch(err){
+
+        console.error(err);
+        alert("Server Error");
+
     }
 
-    function renderContractList(data) {
-        const list = document.getElementById('contractList');
-        list.innerHTML = data.map(c => `
-            <div class="c-card" id="card-${c.id}">
-                <h4>${c.contract_code}</h4>
-                <div class="sub-text">${c.contract_name}</div>
-            </div>
-        `).join('');
+}
 
-        data.forEach(c => {
-            const cardEl = document.getElementById(`card-${c.id}`);
-            if (cardEl) {
-                cardEl.addEventListener('click', () => {
-                    selectCard(c.id);
-                    openAnalysis(c);
-                });
-            }
+function forgotPassword() {
+    alert("Please contact administrator to change password");
+}
+
+window.addEventListener("load", () => {
+
+const savedUser = localStorage.getItem("me_user");
+
+if(savedUser){
+    document.getElementById("username").value = savedUser;
+}
+    const fish =
+    document.querySelector(".fish");
+
+    const logo =
+    document.querySelector(".logo");
+
+    const title =
+    document.querySelector("h1");
+
+    const ripples =
+    document.querySelectorAll(".logo-ripple");
+
+    function startAnimation(){
+
+        fish.classList.add("start");
+
+        logo.classList.add("start");
+
+        title.classList.add("start");
+
+        ripples.forEach(r => {
+            r.classList.add("start");
         });
+        setTimeout(()=>{
 
-        if (data.length > 0 && window.innerWidth > 768) {
-            selectCard(data[0].id);
-            openAnalysis(data[0]);
-        }
+            document
+            .getElementById("loginBox")
+            .classList.add("show");
+
+        },3200);
+
     }
 
-    function selectCard(id) {
-        const currentActive = document.querySelector('.c-card.active');
-        if(currentActive) currentActive.classList.remove('active');
-        const activeCard = document.getElementById(`card-${id}`);
-        if(activeCard) activeCard.classList.add('active');
+    if(fish.complete){
+
+        startAnimation();
+
+    } else {
+
+        fish.onload = startAnimation;
+
     }
 
-    async function openAnalysis(contract) {
-        const mobileBtn = document.getElementById('mobileUsageBtn');
-        if(mobileBtn) mobileBtn.classList.remove('expanded');
-        
-        document.body.classList.add('analysis-active');
-        document.getElementById('analysis-panel').style.display = 'flex';
-        document.getElementById('panel-title').innerText = contract.contract_code;
-        document.getElementById('panel-vendor').innerText = contract.contract_name;
+});
+const togglePassword =
+document.getElementById("togglePassword");
 
-        currentContract = contract;
+const passwordInput =
+document.getElementById("password");
 
-        try {
-            const [resW, resI] = await Promise.all([
-                fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}&status=not.in.(CANCEL,REJ,EXEC-REJ,HOS-REJ,HOD-REJ,QUOTATION,QUO-APP,QUO-REJ)&select=interim_no,section_category,status`, { headers }),
-                fetch(`${API_URL}/rest/v1/interims?contract_id=eq.${currentContract.id}&order=date_received.asc&select=claim_breakdown`, { headers })
-            ]);
+const icon =
+togglePassword.querySelector("i");
 
-            let rawWO = await resW.json();
-            
-            currentWO = rawWO.map(wo => {
-                if (wo.status && wo.status.toLowerCase() === 'claimed') {
-                    wo.status = 'CLAIMED';
-                }
-                return wo;
-            });
+togglePassword.addEventListener("click", () => {
 
-            const currentInterims = await resI.json();
+    if(passwordInput.type === "password"){
 
-            selectedSections = (currentContract.selected_sections && currentContract.selected_sections.length > 0) 
-                ? currentContract.selected_sections 
-                : Object.keys(currentContract.contract_sections_breakdown || {});
-            
-            renderUI(currentInterims);
-        } catch (error) { 
-            console.error("Error fetching analysis data:", error); 
-        }
+        passwordInput.type = "text";
+
+        icon.classList.remove("fa-eye");
+        icon.classList.add("fa-eye-slash");
+
+    } else {
+
+        passwordInput.type = "password";
+
+        icon.classList.remove("fa-eye-slash");
+        icon.classList.add("fa-eye");
+
     }
 
-    async function renderUI(currentInterims = []) {
-        if(!currentContract) return;
+});
 
-        try {
-            updateAdminUI(); // Pastikan tombol Setting dikemas kini perannya setiap kali UI di-render
-            const isAdmin = checkAdminPermissions();
+function goBack(){
+    window.location.href = "index.html";
+}
 
-            const sections = currentContract.contract_sections_breakdown || {};
-            const start = new Date(currentContract.contract_start);
-            const end = new Date(currentContract.contract_end);
-            const today = new Date();
-
-            const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
-            let monthsElapsed = (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()) + 1;
-            monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
-
-            document.getElementById('fullSectionList').innerHTML = Object.keys(sections).sort().map(s => `
-                <span class="sel-chip ${selectedSections.includes(s) ? 'active' : ''}" onclick="toggleSection('${s}')">${s}</span>
-            `).join('');
-
-            const mainContainer = document.getElementById('selectedSectionContainer');
-            let htmlBuilder = '';
-
-            const interimMap = {};
-            const woMap = {};
-
-            currentInterims.forEach(int => {
-                if (int.claim_breakdown) {
-                    Object.keys(int.claim_breakdown).forEach(s => {
-                        interimMap[s] = (interimMap[s] || 0) + (int.claim_breakdown[s].amt || 0);
-                    });
-                }
-            });
-
-            currentWO.forEach(wo => {
-                if (!wo.interim_no && wo.section_category) {
-                    Object.keys(wo.section_category).forEach(s => {
-                        woMap[s] = (woMap[s] || 0) + (wo.section_category[s].amt || 0);
-                    });
-                }
-            });
-
-            let labels = [], targetAvgData = [], actualAvgData = [];
-
-            selectedSections.sort().forEach(s => {
-                if(!sections[s]) return;
-                
-                const totalInterimClaim = interimMap[s] || 0;
-                const totalPendingWO = woMap[s] || 0;
-
-                const used = totalInterimClaim + totalPendingWO;
-                const budget = sections[s].amt || 0; 
-                const plannedTotalToDate = (budget / totalMonths) * monthsElapsed;
-                const variance = used - plannedTotalToDate;
-                const variancePercent = plannedTotalToDate ? (variance / plannedTotalToDate) * 100 : 0;
-                const color = used > plannedTotalToDate ? 'var(--ios-red)' : 'var(--ios-green)';
-                const progressPercent = budget ? (used / budget) * 100 : 0;
-
-                labels.push(s);
-                targetAvgData.push((budget / totalMonths).toFixed(2));
-                actualAvgData.push((used / monthsElapsed).toFixed(2));
-
-                htmlBuilder += `
-                    <div class="section-row">
-                        <div style="display:flex; justify-content:space-between; align-items:start;">
-                            <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">
-                                ${s}: ${sections[s].desc || s}
-                            </div>
-                            ${isAdmin ? `<i class="fa fa-times-circle" style="color:#ccc; cursor:pointer;" onclick="toggleSection('${s}')"></i>` : ``}
-                        </div>
-                        <div class="avg-stats">
-                            <div class="avg-item">BUDGET: RM ${budget.toLocaleString()}</div>
-                            <div class="avg-item" style="color: #8e8e93;">PLANNED: RM ${plannedTotalToDate.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
-                        </div>
-                        <div class="avg-stats">
-                            <div class="avg-item">ACTUAL: RM ${used.toLocaleString()}</div>
-                            <div class="avg-item" style="color: ${color};">VARIANCE: ${variancePercent > 0 ? '+' : ''}${variancePercent.toFixed(1)}%</div>
-                        </div>
-                        <div class="prog-bar-bg">
-                            <div class="prog-bar-fill" data-width="${Math.min(100, progressPercent)}%" style="background:${color}"></div>
-                        </div>
-                    </div>
-                `;
-            });
-
-            mainContainer.innerHTML = htmlBuilder;
-            updateChartDirect(labels, targetAvgData, actualAvgData);
-
-            requestAnimationFrame(() => {
-                document.querySelectorAll('.prog-bar-fill').forEach(bar => {
-                    bar.style.setProperty('width', bar.getAttribute('data-width'), 'important');
-                });
-            });
-
-        } catch (error) { console.error("Error processing UI:", error); }
-    }
-
-    function updateChartDirect(labels, targetAvgData, actualAvgData) {
-        const trimmedLabels = labels.map(label => label.replace(/^section\s*/i, ''));
-
-        if (myChart) {
-            myChart.data.labels = trimmedLabels;
-            myChart.data.datasets[0].data = targetAvgData;
-            myChart.data.datasets[1].data = actualAvgData;
-            myChart.update('none');
-        } else {
-            const ctx = document.getElementById('healthChart').getContext('2d');
-            myChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: trimmedLabels,
-                    datasets: [
-                        { label: 'Planned', data: targetAvgData, backgroundColor: 'rgba(200, 200, 205, 0.5)', borderRadius: 5 },
-                        { label: 'Actual', data: actualAvgData, backgroundColor: '#007AFF', borderRadius: 5 }
-                    ]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    animation: { duration: 150 },
-                    layout: {
-                        padding: { bottom: 15, top: 15 }
-                    },
-                    plugins: { 
-                        legend: { position: 'top', labels: { font: { size: 10, weight: 'bold' } } },
-                        datalabels: { anchor: 'end', align: 'top', font: { size: 9, weight: 'bold' }, formatter: (v) => v > 0 ? `RM${Math.round(v).toLocaleString()}` : '' }
-                    },
-                    scales: { 
-                        y: { beginAtZero: true }, 
-                        x: { 
-                            ticks: { 
-                                font: { size: 10, weight: 'bold' }, 
-                                maxRotation: 0, 
-                                minRotation: 0  
-                            } 
-                        } 
-                    }
-                }
-            });
-        }
-    }
-
-    function updateChart(currentInterims = []) {
-        renderUI(currentInterims);
-    }
-
-    async function toggleSection(s) {
-        if (!checkAdminPermissions()) { 
-            alert("Access denied"); 
-            return; 
-        }
-        
-        if (selectedSections.includes(s)) {
-            selectedSections = selectedSections.filter(x => x !== s);
-        } else {
-            selectedSections.push(s);
-        }
-        
-        renderUI([]);
-        
-        await fetch(`${API_URL}/rest/v1/contract?id=eq.${currentContract.id}`, {
-            method: 'PATCH',
-            headers: headers,
-            body: JSON.stringify({ selected_sections: selectedSections })
-        });
-    }
-
-    function toggleSelector() {
-        if (!checkAdminPermissions()) { 
-            alert("Access denied"); 
-            return; 
-        }
-        const el = document.getElementById('sectionSelector');
-        el.style.display = el.style.display === 'none' ? 'block' : 'none';
-    }
-
-    function handleMobileUsageClick(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        const btn = document.getElementById('mobileUsageBtn');
-        if (!btn.classList.contains('expanded')) {
-            btn.classList.add('expanded');
-        } else {
-            goToUsage();
-        }
-    }
-
-    document.addEventListener('click', (e) => {
-        const btn = document.getElementById('mobileUsageBtn');
-        if (btn && btn.classList.contains('expanded')) {
-            if (!btn.contains(e.target)) {
-                btn.classList.remove('expanded');
-            }
-        }
-    });
-
-    function goToUsage(){
-        if(!currentContract){ alert("Please choose a contract"); return; }
-        window.location.href = `dashboard-usageschedule.html?id=${currentContract.id}`;
-    }
-
-    function handleFabClick(e) {
-        if (window.innerWidth > 768) {
-            window.location.href = 'contract-forms.html';
-            return;
-        }
-
-        e.preventDefault(); 
-        e.stopPropagation(); 
-        
-        const fabBtn = document.getElementById('fabBtn');
-        if (!fabBtn.classList.contains('expanded')) {
-            const usageBtn = document.getElementById('mobileUsageBtn');
-            if(usageBtn) usageBtn.classList.remove('expanded');
-            
-            fabBtn.classList.add('expanded');
-        } else {
-            window.location.href = 'contract-forms.html';
-        }
-    }
-
-    document.addEventListener('click', (e) => {
-        const usageBtn = document.getElementById('mobileUsageBtn');
-        if (usageBtn && usageBtn.classList.contains('expanded')) {
-            if (!usageBtn.contains(e.target)) {
-                usageBtn.classList.remove('expanded');
-            }
-        }
-
-        const fabBtn = document.getElementById('fabBtn');
-        if (fabBtn && fabBtn.classList.contains('expanded')) {
-            if (!fabBtn.contains(e.target)) {
-                fabBtn.classList.remove('expanded');
-            }
-        }
-    });
-
-    function centerActiveUnit(btn) {
-        if(window.innerWidth <= 768) {
-            btn.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-        }
-    }
-
-    let touchStartX = 0;
-    let touchEndX = 0;
-    const contractSidebar = document.querySelector('.contract-sidebar');
-
-    contractSidebar.addEventListener('touchstart', e => {
-        touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
-
-    contractSidebar.addEventListener('touchend', e => {
-        touchEndX = e.changedTouches[0].screenX;
-        handleUnitSwipe();
-    }, { passive: true });
-
-    function handleUnitSwipe() {
-        if(window.innerWidth > 768) return;
-        const diff = touchStartX - touchEndX;
-        if(Math.abs(diff) < 60) return;
-
-        const units = [...document.querySelectorAll('.unit-pill')];
-        const activeIndex = units.findIndex(btn => btn.classList.contains('active'));
-        if(activeIndex === -1) return;
-
-        if(diff > 0 && activeIndex < units.length - 1) {
-            units[activeIndex + 1].click();
-        }
-        if(diff < 0 && activeIndex > 0) {
-            units[activeIndex - 1].click();
-        }
-    }
 </script>
 </body>
 </html>
