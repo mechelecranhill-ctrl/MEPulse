@@ -920,816 +920,2951 @@
     const headers = { 'Content-Type': 'application/json' };
 
     let myChart = null;
+    let usageChartInstance = null;
+
     let currentContract = null;
     let currentWO = [];
+
+    // ============================================================
+    // DATA YANG SUDAH FETCH UNTUK CONTRACT SEMASA
+    // ============================================================
+
+    let currentInterims = [];
+
     let selectedSections = [];
     let searchTimeout = null;
-    const cacheContracts = {}; 
 
-    // Setting sekarang dibuka untuk semua pengguna (bukan admin-only lagi)
+    // Cache hanya untuk page/session semasa.
+    // Refresh browser = cache hilang dan API akan fetch semula.
+    const cacheContracts = {};
+
+    let usageLoadedContractId = null;
+
+
+    // ============================================================
+    // ADMIN / SETTING UI
+    // ============================================================
+
     function updateAdminUI() {
         const btn = document.getElementById("manageBtn");
+
         if (btn) {
             btn.style.display = "inline-block";
         }
     }
 
+
+    // ============================================================
+    // PAGE LOAD
+    // ============================================================
+
     window.onload = () => {
-        if (typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') {
+
+        if (
+            typeof Chart !== 'undefined' &&
+            typeof ChartDataLabels !== 'undefined'
+        ) {
             Chart.register(ChartDataLabels);
         }
+
         updateAdminUI();
         fetchUnits();
     };
 
+
+    // ============================================================
+    // SEARCH CONTRACT
+    // ============================================================
+
     function debouncedFilterContracts() {
+
         clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(filterContracts, 150);
+
+        searchTimeout = setTimeout(
+            filterContracts,
+            150
+        );
     }
 
+
     function filterContracts() {
-        const query = document.getElementById('contractSearch').value.toLowerCase();
+
+        const input = document.getElementById('contractSearch');
+
+        if (!input) return;
+
+        const query = input.value.toLowerCase();
+
         const cards = document.querySelectorAll('.c-card');
-        
+
         requestAnimationFrame(() => {
+
             cards.forEach(card => {
-                const code = card.querySelector('h4').innerText.toLowerCase();
-                const name = card.querySelector('.sub-text').innerText.toLowerCase();
-                card.style.display = (code.includes(query) || name.includes(query)) ? 'block' : 'none';
+
+                const code =
+                    card.querySelector('h4')?.innerText.toLowerCase() || '';
+
+                const name =
+                    card.querySelector('.sub-text')?.innerText.toLowerCase() || '';
+
+                card.style.display =
+                    (code.includes(query) || name.includes(query))
+                        ? 'block'
+                        : 'none';
             });
+
         });
     }
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const selectedSectionName = urlParams.get('section');
+
+    // ============================================================
+    // URL SECTION FILTER
+    // ============================================================
+
+    const urlParams =
+        new URLSearchParams(window.location.search);
+
+    const selectedSectionName =
+        urlParams.get('section');
+
+
+    // ============================================================
+    // FETCH UNITS
+    // ============================================================
 
     async function fetchUnits() {
+
         try {
+
             const [secRes, unitsRes] = await Promise.all([
-                fetch(`${API_URL}/rest/v1/me_sections?select=id`, { headers }),
-                fetch(`${API_URL}/rest/v1/units?select=id,unit_name,section_id`, { headers })
+
+                fetch(
+                    `${API_URL}/rest/v1/me_sections?select=id`,
+                    { headers }
+                ),
+
+                fetch(
+                    `${API_URL}/rest/v1/units?select=id,unit_name,section_id`,
+                    { headers }
+                )
+
             ]);
+
+            if (!secRes.ok) {
+                throw new Error(`Sections HTTP ${secRes.status}`);
+            }
+
+            if (!unitsRes.ok) {
+                throw new Error(`Units HTTP ${unitsRes.status}`);
+            }
+
             const sections = await secRes.json();
             const units = await unitsRes.json();
 
+
             let selectedSection = null;
+
             if (selectedSectionName) {
-                selectedSection = sections.find(s => s.id == selectedSectionName);
+
+                selectedSection =
+                    sections.find(
+                        s => s.id == selectedSectionName
+                    );
             }
+
 
             const filteredUnits = selectedSection
-                ? units.filter(u => u.section_id === selectedSection.id)
+
+                ? units.filter(
+                    u => u.section_id === selectedSection.id
+                )
+
                 : units;
 
-            const nav = document.getElementById('unitNav');
+
+            const nav =
+                document.getElementById('unitNav');
+
+
             nav.innerHTML = filteredUnits.map(u => `
-                <button class="unit-pill" id="unit-${u.id}" onclick="fetchContracts(${u.id}, this)">
+
+                <button
+                    class="unit-pill"
+                    id="unit-${u.id}"
+                    onclick="fetchContracts(${u.id}, this)"
+                >
                     ${u.unit_name}
                 </button>
+
             `).join('');
 
+
             if (filteredUnits.length > 0) {
-                document.getElementById(`unit-${filteredUnits[0].id}`).click();
+
+                document
+                    .getElementById(`unit-${filteredUnits[0].id}`)
+                    .click();
             }
+
         } catch (e) {
+
             console.error("Error units:", e);
         }
     }
 
+
+    // ============================================================
+    // FETCH CONTRACTS
+    //
+    // CACHE:
+    // - hanya hidup selama page tidak direfresh
+    // - refresh = cacheContracts reset
+    // - tidak menggunakan localStorage/sessionStorage
+    // ============================================================
+
     async function fetchContracts(unitId, btn) {
-        document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
+
+        document
+            .querySelectorAll('.unit-pill')
+            .forEach(
+                p => p.classList.remove('active')
+            );
+
+
         btn.classList.add('active');
+
         centerActiveUnit(btn);
 
+
         document.getElementById('contractSearch').value = '';
+
         document.body.classList.remove('analysis-active');
-        document.getElementById('analysis-panel').style.display = 'none';
-        document.getElementById('analysis-panel').classList.remove('flipped');
+
+
+        const panel =
+            document.getElementById('analysis-panel');
+
+
+        panel.style.display = 'none';
+
+        panel.classList.remove('flipped');
+
 
         currentContract = null;
         currentWO = [];
-        document.getElementById('panel-title').innerText = 'Analisis';
-        document.getElementById('panel-vendor').innerText = '';
+        currentInterims = [];
+        selectedSections = [];
+
+        usageLoadedContractId = null;
+
+
+        document.getElementById('panel-title').innerText =
+            'Analisis';
+
+        document.getElementById('panel-vendor').innerText =
+            '';
+
+
+        // ========================================================
+        // GUNA CACHE JIKA SUDAH ADA
+        // ========================================================
 
         if (cacheContracts[unitId]) {
-            renderContractList(cacheContracts[unitId]);
+
+            renderContractList(
+                cacheContracts[unitId]
+            );
+
             return;
         }
 
+
         try {
+
             const res = await fetch(
-                `${API_URL}/rest/v1/contract?unit_id=eq.${unitId}&select=id,contract_code,contract_name,contract_start,contract_end,selected_sections,contract_sections_breakdown`,
+
+                `${API_URL}/rest/v1/contract` +
+                `?unit_id=eq.${unitId}` +
+                `&select=` +
+                `id,contract_code,contract_name,` +
+                `contract_start,contract_end,` +
+                `selected_sections,` +
+                `contract_sections_breakdown`,
+
                 { headers }
             );
+
+
+            if (!res.ok) {
+
+                throw new Error(
+                    `Contracts HTTP ${res.status}`
+                );
+            }
+
+
             let data = await res.json();
 
+
+            // Sort ikut contract start kemudian contract code
             data.sort((a, b) => {
-                const dateDiff = new Date(a.contract_start) - new Date(b.contract_start);
-                if (dateDiff !== 0) return dateDiff;
-                return a.contract_code.localeCompare(b.contract_code, undefined, { numeric: true, sensitivity: "base" });
+
+                const dateDiff =
+                    new Date(a.contract_start) -
+                    new Date(b.contract_start);
+
+
+                if (dateDiff !== 0) {
+                    return dateDiff;
+                }
+
+
+                return a.contract_code.localeCompare(
+                    b.contract_code,
+                    undefined,
+                    {
+                        numeric: true,
+                        sensitivity: "base"
+                    }
+                );
             });
 
+
+            // Simpan dalam memory sahaja
             cacheContracts[unitId] = data;
+
+
             renderContractList(data);
+
+
         } catch (e) {
-            console.error("Error contracts:", e);
+
+            console.error(
+                "Error contracts:",
+                e
+            );
         }
     }
 
+
+    // ============================================================
+    // RENDER CONTRACT LIST
+    // ============================================================
+
     function renderContractList(data) {
-        const list = document.getElementById('contractList');
+
+        const list =
+            document.getElementById('contractList');
+
+
         list.innerHTML = data.map(c => `
-            <div class="c-card" id="card-${c.id}">
+
+            <div
+                class="c-card"
+                id="card-${c.id}"
+            >
+
                 <h4>${c.contract_code}</h4>
-                <div class="sub-text">${c.contract_name}</div>
+
+                <div class="sub-text">
+                    ${c.contract_name}
+                </div>
+
             </div>
+
         `).join('');
 
+
         data.forEach(c => {
-            const cardEl = document.getElementById(`card-${c.id}`);
+
+            const cardEl =
+                document.getElementById(
+                    `card-${c.id}`
+                );
+
+
             if (cardEl) {
-                cardEl.addEventListener('click', () => {
-                    selectCard(c.id);
-                    openAnalysis(c);
-                });
+
+                cardEl.addEventListener(
+                    'click',
+                    () => {
+
+                        selectCard(c.id);
+
+                        openAnalysis(c);
+                    }
+                );
             }
+
         });
 
-        if (data.length > 0 && window.innerWidth > 768) {
+
+        // Desktop:
+        // contract pertama auto-open
+        if (
+            data.length > 0 &&
+            window.innerWidth > 768
+        ) {
+
             selectCard(data[0].id);
+
             openAnalysis(data[0]);
         }
     }
 
+
+    // ============================================================
+    // SELECT CONTRACT CARD
+    // ============================================================
+
     function selectCard(id) {
-        const currentActive = document.querySelector('.c-card.active');
-        if(currentActive) currentActive.classList.remove('active');
-        const activeCard = document.getElementById(`card-${id}`);
-        if(activeCard) activeCard.classList.add('active');
+
+        const currentActive =
+            document.querySelector('.c-card.active');
+
+
+        if (currentActive) {
+            currentActive.classList.remove('active');
+        }
+
+
+        const activeCard =
+            document.getElementById(`card-${id}`);
+
+
+        if (activeCard) {
+            activeCard.classList.add('active');
+        }
     }
 
-    async function openAnalysis(contract) {
-        const mobileBtn = document.getElementById('mobileUsageBtn');
-        if(mobileBtn) mobileBtn.classList.remove('expanded');
 
-        // Reset the card to its front (analysis) face whenever a new contract is opened
-        document.getElementById('analysis-panel').classList.remove('flipped');
+    // ============================================================
+    // OPEN ANALYSIS
+    // ============================================================
+
+    async function openAnalysis(contract) {
+
+        const mobileBtn =
+            document.getElementById('mobileUsageBtn');
+
+
+        if (mobileBtn) {
+            mobileBtn.classList.remove('expanded');
+        }
+
+
+        const panel =
+            document.getElementById('analysis-panel');
+
+
+        // Reset flip
+        panel.classList.remove('flipped');
+
+
+        // Contract baru = usage perlu fetch baru
         usageLoadedContractId = null;
-        
-        document.body.classList.add('analysis-active');
-        document.getElementById('analysis-panel').style.display = 'block';
-        document.getElementById('panel-title').innerText = contract.contract_code;
-        document.getElementById('panel-vendor').innerText = contract.contract_name;
+
+
+        document.body.classList.add(
+            'analysis-active'
+        );
+
+
+        panel.style.display = 'block';
+
+
+        document.getElementById('panel-title').innerText =
+            contract.contract_code;
+
+
+        document.getElementById('panel-vendor').innerText =
+            contract.contract_name;
+
 
         currentContract = contract;
 
+
+        // Reset data contract semasa
+        currentWO = [];
+        currentInterims = [];
+
+
         try {
-            const [resW, resI] = await Promise.all([
-                fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}&status=not.in.(CANCEL,REJ,EXEC-REJ,HOS-REJ,HOD-REJ,QUOTATION,QUO-APP,QUO-REJ)&select=interim_no,section_category,status`, { headers }),
-                fetch(`${API_URL}/rest/v1/interims?contract_id=eq.${currentContract.id}&order=date_received.asc&select=claim_breakdown`, { headers })
-            ]);
 
-            let rawWO = await resW.json();
-            
-            currentWO = rawWO.map(wo => {
-                if (wo.status && wo.status.toLowerCase() === 'claimed') {
-                    wo.status = 'CLAIMED';
-                }
-                return wo;
-            });
+            const [resW, resI] =
+                await Promise.all([
 
-            const currentInterims = await resI.json();
+                    fetch(
 
-            selectedSections = (currentContract.selected_sections && currentContract.selected_sections.length > 0) 
-                ? currentContract.selected_sections 
-                : Object.keys(currentContract.contract_sections_breakdown || {});
-            
+                        `${API_URL}/rest/v1/work_orders` +
+                        `?contract_id=eq.${currentContract.id}` +
+                        `&status=not.in.` +
+                        `(CANCEL,REJ,EXEC-REJ,HOS-REJ,HOD-REJ,QUOTATION,QUO-APP,QUO-REJ)` +
+                        `&select=interim_no,section_category,status`,
+
+                        { headers }
+                    ),
+
+
+                    fetch(
+
+                        `${API_URL}/rest/v1/interims` +
+                        `?contract_id=eq.${currentContract.id}` +
+                        `&order=date_received.asc` +
+                        `&select=claim_breakdown`,
+
+                        { headers }
+                    )
+
+                ]);
+
+
+            if (!resW.ok) {
+                throw new Error(
+                    `WO HTTP ${resW.status}`
+                );
+            }
+
+
+            if (!resI.ok) {
+                throw new Error(
+                    `Interim HTTP ${resI.status}`
+                );
+            }
+
+
+            const rawWO =
+                await resW.json();
+
+
+            currentWO =
+                rawWO.map(wo => {
+
+                    if (
+                        wo.status &&
+                        wo.status.toLowerCase() === 'claimed'
+                    ) {
+
+                        wo.status = 'CLAIMED';
+                    }
+
+                    return wo;
+                });
+
+
+            // ====================================================
+            // SIMPAN INTERIM YANG SUDAH FETCHED
+            // ====================================================
+
+            currentInterims =
+                await resI.json();
+
+
+            selectedSections =
+
+                (
+                    currentContract.selected_sections &&
+                    currentContract.selected_sections.length > 0
+                )
+
+                    ? [
+                        ...currentContract.selected_sections
+                    ]
+
+                    : Object.keys(
+                        currentContract
+                            .contract_sections_breakdown || {}
+                    );
+
+
             renderUI(currentInterims);
-        } catch (error) { 
-            console.error("Error fetching analysis data:", error); 
+
+
+        } catch (error) {
+
+            console.error(
+                "Error fetching analysis data:",
+                error
+            );
         }
     }
 
-    async function renderUI(currentInterims = []) {
-        if(!currentContract) return;
+
+    // ============================================================
+    // RENDER ANALYSIS UI
+    //
+    // IMPORTANT:
+    // currentInterims diberikan sebagai argument.
+    // Jadi toggle section tidak perlu fetch data semula.
+    // ============================================================
+
+    async function renderUI(
+        interimsData = currentInterims
+    ) {
+
+        if (!currentContract) return;
+
 
         try {
+
             updateAdminUI();
 
-            const sections = currentContract.contract_sections_breakdown || {};
-            const start = new Date(currentContract.contract_start);
-            const end = new Date(currentContract.contract_end);
-            const today = new Date();
 
-            const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
-            let monthsElapsed = (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()) + 1;
-            monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
+            const sections =
+                currentContract
+                    .contract_sections_breakdown || {};
 
-            document.getElementById('fullSectionList').innerHTML = Object.keys(sections).sort().map(s => `
-                <span class="sel-chip ${selectedSections.includes(s) ? 'active' : ''}" onclick="toggleSection('${s}')">${s}</span>
-            `).join('');
 
-            const mainContainer = document.getElementById('selectedSectionContainer');
+            const start =
+                new Date(
+                    currentContract.contract_start
+                );
+
+
+            const end =
+                new Date(
+                    currentContract.contract_end
+                );
+
+
+            const today =
+                new Date();
+
+
+            // ====================================================
+            // CONTRACT DURATION
+            // ====================================================
+
+            const totalMonths = Math.max(
+
+                1,
+
+                (
+                    (end.getFullYear() - start.getFullYear()) * 12
+                ) +
+                (
+                    end.getMonth() - start.getMonth()
+                )
+
+            );
+
+
+            let monthsElapsed =
+
+                (
+                    (today.getFullYear() - start.getFullYear()) * 12
+                ) +
+                (
+                    today.getMonth() - start.getMonth()
+                ) +
+                1;
+
+
+            monthsElapsed = Math.min(
+
+                totalMonths,
+
+                Math.max(
+                    1,
+                    monthsElapsed
+                )
+
+            );
+
+
+            // ====================================================
+            // SECTION SELECTOR
+            // ====================================================
+
+            document.getElementById(
+                'fullSectionList'
+            ).innerHTML =
+
+                Object.keys(sections)
+                    .sort()
+                    .map(s => `
+
+                        <span
+                            class="sel-chip ${
+                                selectedSections.includes(s)
+                                    ? 'active'
+                                    : ''
+                            }"
+                            onclick="toggleSection('${s}')"
+                        >
+                            ${s}
+                        </span>
+
+                    `)
+                    .join('');
+
+
+            const mainContainer =
+                document.getElementById(
+                    'selectedSectionContainer'
+                );
+
+
             let htmlBuilder = '';
 
+
+            // ====================================================
+            // INTERIM MAP
+            // ====================================================
+
             const interimMap = {};
+
+
+            (interimsData || []).forEach(int => {
+
+                if (!int.claim_breakdown) return;
+
+
+                Object.keys(
+                    int.claim_breakdown
+                ).forEach(s => {
+
+                    interimMap[s] =
+                        (
+                            interimMap[s] || 0
+                        ) +
+                        (
+                            int.claim_breakdown[s].amt || 0
+                        );
+                });
+
+            });
+
+
+            // ====================================================
+            // WO MAP
+            // ====================================================
+
             const woMap = {};
 
-            currentInterims.forEach(int => {
-                if (int.claim_breakdown) {
-                    Object.keys(int.claim_breakdown).forEach(s => {
-                        interimMap[s] = (interimMap[s] || 0) + (int.claim_breakdown[s].amt || 0);
-                    });
-                }
-            });
 
             currentWO.forEach(wo => {
-                if (!wo.interim_no && wo.section_category) {
-                    Object.keys(wo.section_category).forEach(s => {
-                        woMap[s] = (woMap[s] || 0) + (wo.section_category[s].amt || 0);
+
+                if (
+                    !wo.interim_no &&
+                    wo.section_category
+                ) {
+
+                    Object.keys(
+                        wo.section_category
+                    ).forEach(s => {
+
+                        woMap[s] =
+                            (
+                                woMap[s] || 0
+                            ) +
+                            (
+                                wo.section_category[s].amt || 0
+                            );
                     });
                 }
+
             });
 
-            let labels = [], targetAvgData = [], actualAvgData = [];
 
-            selectedSections.sort().forEach(s => {
-                if(!sections[s]) return;
-                
-                const totalInterimClaim = interimMap[s] || 0;
-                const totalPendingWO = woMap[s] || 0;
+            let labels = [];
+            let targetAvgData = [];
+            let actualAvgData = [];
 
-                const used = totalInterimClaim + totalPendingWO;
-                const budget = sections[s].amt || 0; 
-                const plannedTotalToDate = (budget / totalMonths) * monthsElapsed;
-                const variance = used - plannedTotalToDate;
-                const variancePercent = plannedTotalToDate ? (variance / plannedTotalToDate) * 100 : 0;
-                const color = used > plannedTotalToDate ? 'var(--ios-red)' : 'var(--ios-green)';
-                const progressPercent = budget ? (used / budget) * 100 : 0;
 
-                labels.push(s);
-                targetAvgData.push((budget / totalMonths).toFixed(2));
-                actualAvgData.push((used / monthsElapsed).toFixed(2));
+            // ====================================================
+            // SECTION DATA
+            // ====================================================
 
-                htmlBuilder += `
-                    <div class="section-row">
-                        <div style="display:flex; justify-content:space-between; align-items:start;">
-                            <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">
-                                ${s}: ${sections[s].desc || s}
+            selectedSections
+                .sort()
+                .forEach(s => {
+
+                    if (!sections[s]) return;
+
+
+                    const totalInterimClaim =
+                        interimMap[s] || 0;
+
+
+                    const totalPendingWO =
+                        woMap[s] || 0;
+
+
+                    const used =
+                        totalInterimClaim +
+                        totalPendingWO;
+
+
+                    const budget =
+                        sections[s].amt || 0;
+
+
+                    const plannedTotalToDate =
+                        (
+                            budget /
+                            totalMonths
+                        ) *
+                        monthsElapsed;
+
+
+                    const variance =
+                        used -
+                        plannedTotalToDate;
+
+
+                    const variancePercent =
+                        plannedTotalToDate
+                            ? (
+                                variance /
+                                plannedTotalToDate
+                            ) * 100
+                            : 0;
+
+
+                    const color =
+                        used > plannedTotalToDate
+                            ? 'var(--ios-red)'
+                            : 'var(--ios-green)';
+
+
+                    const progressPercent =
+                        budget
+                            ? (
+                                used /
+                                budget
+                            ) * 100
+                            : 0;
+
+
+                    labels.push(s);
+
+
+                    targetAvgData.push(
+                        (
+                            budget /
+                            totalMonths
+                        ).toFixed(2)
+                    );
+
+
+                    actualAvgData.push(
+                        (
+                            used /
+                            monthsElapsed
+                        ).toFixed(2)
+                    );
+
+
+                    htmlBuilder += `
+
+                        <div class="section-row">
+
+                            <div
+                                style="
+                                    display:flex;
+                                    justify-content:space-between;
+                                    align-items:start;
+                                "
+                            >
+
+                                <div
+                                    style="
+                                        font-weight:bold;
+                                        font-size:13px;
+                                        color:var(--ios-blue);
+                                    "
+                                >
+                                    ${s}: ${
+                                        sections[s].desc || s
+                                    }
+                                </div>
+
                             </div>
-                        </div>
-                        <div class="avg-stats">
-                            <div class="avg-item">BUDGET: RM ${budget.toLocaleString()}</div>
-                            <div class="avg-item" style="color: #8e8e93;">PLANNED: RM ${plannedTotalToDate.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
-                        </div>
-                        <div class="avg-stats">
-                            <div class="avg-item">ACTUAL: RM ${used.toLocaleString()}</div>
-                            <div class="avg-item" style="color: ${color};">VARIANCE: ${variancePercent > 0 ? '+' : ''}${variancePercent.toFixed(1)}%</div>
-                        </div>
-                        <div class="prog-bar-bg">
-                            <div class="prog-bar-fill" data-width="${Math.min(100, progressPercent)}%" style="background:${color}"></div>
-                        </div>
-                    </div>
-                `;
-            });
 
-            mainContainer.innerHTML = htmlBuilder;
-            updateChartDirect(labels, targetAvgData, actualAvgData);
+
+                            <div class="avg-stats">
+
+                                <div class="avg-item">
+                                    BUDGET:
+                                    RM ${budget.toLocaleString()}
+                                </div>
+
+                                <div
+                                    class="avg-item"
+                                    style="color:#8e8e93;"
+                                >
+                                    PLANNED:
+                                    RM ${
+                                        plannedTotalToDate
+                                            .toLocaleString(
+                                                undefined,
+                                                {
+                                                    maximumFractionDigits: 0
+                                                }
+                                            )
+                                    }
+                                </div>
+
+                            </div>
+
+
+                            <div class="avg-stats">
+
+                                <div class="avg-item">
+                                    ACTUAL:
+                                    RM ${used.toLocaleString()}
+                                </div>
+
+                                <div
+                                    class="avg-item"
+                                    style="color:${color};"
+                                >
+                                    VARIANCE:
+                                    ${
+                                        variancePercent > 0
+                                            ? '+'
+                                            : ''
+                                    }${variancePercent.toFixed(1)}%
+                                </div>
+
+                            </div>
+
+
+                            <div class="prog-bar-bg">
+
+                                <div
+                                    class="prog-bar-fill"
+                                    data-width="${
+                                        Math.min(
+                                            100,
+                                            progressPercent
+                                        )
+                                    }%"
+                                    style="background:${color}"
+                                ></div>
+
+                            </div>
+
+                        </div>
+
+                    `;
+                });
+
+
+            mainContainer.innerHTML =
+                htmlBuilder;
+
+
+            updateChartDirect(
+                labels,
+                targetAvgData,
+                actualAvgData
+            );
+
 
             requestAnimationFrame(() => {
-                document.querySelectorAll('.prog-bar-fill').forEach(bar => {
-                    bar.style.setProperty('width', bar.getAttribute('data-width'), 'important');
-                });
+
+                document
+                    .querySelectorAll(
+                        '.prog-bar-fill'
+                    )
+                    .forEach(bar => {
+
+                        bar.style.setProperty(
+
+                            'width',
+
+                            bar.getAttribute(
+                                'data-width'
+                            ),
+
+                            'important'
+                        );
+
+                    });
+
             });
 
-        } catch (error) { console.error("Error processing UI:", error); }
+
+        } catch (error) {
+
+            console.error(
+                "Error processing UI:",
+                error
+            );
+        }
     }
 
-    function updateChartDirect(labels, targetAvgData, actualAvgData) {
-        const trimmedLabels = labels.map(label => label.replace(/^section\s*/i, ''));
+
+    // ============================================================
+    // ANALYSIS CHART
+    // ============================================================
+
+    function updateChartDirect(
+        labels,
+        targetAvgData,
+        actualAvgData
+    ) {
+
+        const trimmedLabels =
+            labels.map(
+                label =>
+                    label.replace(
+                        /^section\s*/i,
+                        ''
+                    )
+            );
+
 
         if (myChart) {
-            myChart.data.labels = trimmedLabels;
-            myChart.data.datasets[0].data = targetAvgData;
-            myChart.data.datasets[1].data = actualAvgData;
+
+            myChart.data.labels =
+                trimmedLabels;
+
+            myChart.data.datasets[0].data =
+                targetAvgData;
+
+            myChart.data.datasets[1].data =
+                actualAvgData;
+
             myChart.update('none');
-        } else {
-            const ctx = document.getElementById('healthChart').getContext('2d');
-            myChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: trimmedLabels,
-                    datasets: [
-                        { label: 'Planned', data: targetAvgData, backgroundColor: 'rgba(200, 200, 205, 0.5)', borderRadius: 5 },
-                        { label: 'Actual', data: actualAvgData, backgroundColor: '#007AFF', borderRadius: 5 }
-                    ]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    animation: { duration: 150 },
-                    layout: {
-                        padding: { bottom: 15, top: 15 }
+
+            return;
+        }
+
+
+        const canvas =
+            document.getElementById(
+                'healthChart'
+            );
+
+
+        if (!canvas) return;
+
+
+        const ctx =
+            canvas.getContext('2d');
+
+
+        myChart = new Chart(ctx, {
+
+            type: 'bar',
+
+            data: {
+
+                labels: trimmedLabels,
+
+                datasets: [
+
+                    {
+                        label: 'Planned',
+                        data: targetAvgData,
+                        backgroundColor:
+                            'rgba(200, 200, 205, 0.5)',
+                        borderRadius: 5
                     },
-                    plugins: { 
-                        legend: { position: 'top', labels: { font: { size: 10, weight: 'bold' } } },
-                        datalabels: { anchor: 'end', align: 'top', font: { size: 9, weight: 'bold' }, formatter: (v) => v > 0 ? `RM${Math.round(v).toLocaleString()}` : '' }
-                    },
-                    scales: { 
-                        y: { beginAtZero: true }, 
-                        x: { 
-                            ticks: { 
-                                font: { size: 10, weight: 'bold' }, 
-                                maxRotation: 0, 
-                                minRotation: 0  
-                            } 
-                        } 
+
+                    {
+                        label: 'Actual',
+                        data: actualAvgData,
+                        backgroundColor: '#007AFF',
+                        borderRadius: 5
                     }
+
+                ]
+            },
+
+
+            options: {
+
+                responsive: true,
+
+                maintainAspectRatio: false,
+
+                animation: {
+                    duration: 150
+                },
+
+
+                layout: {
+
+                    padding: {
+                        bottom: 15,
+                        top: 15
+                    }
+
+                },
+
+
+                plugins: {
+
+                    legend: {
+
+                        position: 'top',
+
+                        labels: {
+                            font: {
+                                size: 10,
+                                weight: 'bold'
+                            }
+                        }
+
+                    },
+
+
+                    datalabels: {
+
+                        anchor: 'end',
+
+                        align: 'top',
+
+                        font: {
+                            size: 9,
+                            weight: 'bold'
+                        },
+
+                        formatter: (v) =>
+
+                            v > 0
+                                ? `RM${Math.round(v).toLocaleString()}`
+                                : ''
+
+                    }
+
+                },
+
+
+                scales: {
+
+                    y: {
+                        beginAtZero: true
+                    },
+
+
+                    x: {
+
+                        ticks: {
+
+                            font: {
+                                size: 10,
+                                weight: 'bold'
+                            },
+
+                            maxRotation: 0,
+
+                            minRotation: 0
+                        }
+
+                    }
+
                 }
-            });
-        }
-    }
 
-    function updateChart(currentInterims = []) {
-        renderUI(currentInterims);
-    }
+            }
 
-    async function toggleSection(s) {
-        if (selectedSections.includes(s)) {
-            selectedSections = selectedSections.filter(x => x !== s);
-        } else {
-            selectedSections.push(s);
-        }
-        
-        renderUI([]);
-        
-        await fetch(`${API_URL}/rest/v1/contract?id=eq.${currentContract.id}`, {
-            method: 'PATCH',
-            headers: headers,
-            body: JSON.stringify({ selected_sections: selectedSections })
         });
     }
 
-    function toggleSelector() {
-        const el = document.getElementById('sectionSelector');
-        el.style.display = el.style.display === 'none' ? 'block' : 'none';
+
+    function updateChart(
+        currentInterimsData = currentInterims
+    ) {
+
+        renderUI(currentInterimsData);
     }
 
+
+    // ============================================================
+    // TOGGLE SECTION
+    //
+    // BUG FIX:
+    // Tidak lagi renderUI([]).
+    //
+    // Data interim yang sudah fetch akan dikekalkan.
+    // ============================================================
+
+    async function toggleSection(s) {
+
+        if (!currentContract) return;
+
+
+        if (selectedSections.includes(s)) {
+
+            selectedSections =
+                selectedSections.filter(
+                    x => x !== s
+                );
+
+        } else {
+
+            selectedSections.push(s);
+        }
+
+
+        // Guna data yang sudah fetch
+        renderUI(currentInterims);
+
+
+        try {
+
+            const res = await fetch(
+
+                `${API_URL}/rest/v1/contract?id=eq.${currentContract.id}`,
+
+                {
+                    method: 'PATCH',
+
+                    headers: headers,
+
+                    body: JSON.stringify({
+                        selected_sections:
+                            selectedSections
+                    })
+                }
+
+            );
+
+
+            if (!res.ok) {
+
+                throw new Error(
+                    `PATCH contract HTTP ${res.status}`
+                );
+            }
+
+
+            // Update object contract semasa juga
+            currentContract.selected_sections =
+                [
+                    ...selectedSections
+                ];
+
+
+            // Update object dalam cache
+            Object.keys(cacheContracts)
+                .forEach(unitId => {
+
+                    const list =
+                        cacheContracts[unitId];
+
+                    if (!Array.isArray(list)) return;
+
+
+                    const cached =
+                        list.find(
+                            c =>
+                                c.id ===
+                                currentContract.id
+                        );
+
+
+                    if (cached) {
+
+                        cached.selected_sections =
+                            [
+                                ...selectedSections
+                            ];
+                    }
+
+                });
+
+
+        } catch (error) {
+
+            console.error(
+                "Error saving selected sections:",
+                error
+            );
+        }
+    }
+
+
+    // ============================================================
+    // SECTION SETTING
+    // ============================================================
+
+    function toggleSelector() {
+
+        const el =
+            document.getElementById(
+                'sectionSelector'
+            );
+
+
+        if (!el) return;
+
+
+        el.style.display =
+            el.style.display === 'none'
+                ? 'block'
+                : 'none';
+    }
+
+
+    // ============================================================
+    // MOBILE USAGE BUTTON
+    // ============================================================
+
     function handleMobileUsageClick(e) {
+
         e.preventDefault();
         e.stopPropagation();
-        
-        const btn = document.getElementById('mobileUsageBtn');
+
+
+        const btn =
+            document.getElementById(
+                'mobileUsageBtn'
+            );
+
+
         if (!btn.classList.contains('expanded')) {
+
             btn.classList.add('expanded');
+
         } else {
+
             goToUsage();
         }
     }
 
-    document.addEventListener('click', (e) => {
-        const btn = document.getElementById('mobileUsageBtn');
-        if (btn && btn.classList.contains('expanded')) {
-            if (!btn.contains(e.target)) {
-                btn.classList.remove('expanded');
-            }
-        }
-    });
 
-    function goToUsage(){
-        if(!currentContract){ alert("Please choose a contract"); return; }
-        window.location.href = `dashboard-usageschedule.html?id=${currentContract.id}`;
+    function goToUsage() {
+
+        if (!currentContract) {
+
+            alert(
+                "Please choose a contract"
+            );
+
+            return;
+        }
+
+
+        window.location.href =
+            `dashboard-usageschedule.html?id=${currentContract.id}`;
     }
+
+
+    // ============================================================
+    // FAB
+    // ============================================================
 
     function handleFabClick(e) {
-    e.preventDefault();
-    e.stopPropagation();
 
-    const fabBtn = document.getElementById('fabBtn');
+        e.preventDefault();
+        e.stopPropagation();
 
-    if (!fabBtn.classList.contains('expanded')) {
 
-        // Tutup Usage button jika sedang expanded
-        const usageBtn = document.getElementById('mobileUsageBtn');
-        if (usageBtn) {
-            usageBtn.classList.remove('expanded');
+        const fabBtn =
+            document.getElementById(
+                'fabBtn'
+            );
+
+
+        if (!fabBtn.classList.contains('expanded')) {
+
+
+            const usageBtn =
+                document.getElementById(
+                    'mobileUsageBtn'
+                );
+
+
+            if (usageBtn) {
+
+                usageBtn.classList.remove(
+                    'expanded'
+                );
+            }
+
+
+            fabBtn.classList.add(
+                'expanded'
+            );
+
+
+        } else {
+
+            window.location.href =
+                'contract-forms.html';
         }
-
-        // First click = expand
-        fabBtn.classList.add('expanded');
-
-    } else {
-
-        // Second click = open Contract Forms
-        window.location.href = 'contract-forms.html';
     }
-}
 
-    document.addEventListener('click', (e) => {
-        const usageBtn = document.getElementById('mobileUsageBtn');
-        if (usageBtn && usageBtn.classList.contains('expanded')) {
-            if (!usageBtn.contains(e.target)) {
-                usageBtn.classList.remove('expanded');
-            }
-        }
 
-        const fabBtn = document.getElementById('fabBtn');
-        if (fabBtn && fabBtn.classList.contains('expanded')) {
-            if (!fabBtn.contains(e.target)) {
-                fabBtn.classList.remove('expanded');
+    // ============================================================
+    // OUTSIDE CLICK
+    // ============================================================
+
+    document.addEventListener(
+        'click',
+        (e) => {
+
+
+            const usageBtn =
+                document.getElementById(
+                    'mobileUsageBtn'
+                );
+
+
+            if (
+                usageBtn &&
+                usageBtn.classList.contains(
+                    'expanded'
+                )
+            ) {
+
+                if (!usageBtn.contains(e.target)) {
+
+                    usageBtn.classList.remove(
+                        'expanded'
+                    );
+                }
             }
+
+
+            const fabBtn =
+                document.getElementById(
+                    'fabBtn'
+                );
+
+
+            if (
+                fabBtn &&
+                fabBtn.classList.contains(
+                    'expanded'
+                )
+            ) {
+
+                if (!fabBtn.contains(e.target)) {
+
+                    fabBtn.classList.remove(
+                        'expanded'
+                    );
+                }
+            }
+
         }
-    });
+    );
+
+
+    // ============================================================
+    // MOBILE UNIT CENTER
+    // ============================================================
 
     function centerActiveUnit(btn) {
-        if(window.innerWidth <= 768) {
-            btn.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+
+        if (window.innerWidth <= 768) {
+
+            btn.scrollIntoView({
+
+                behavior: "smooth",
+
+                inline: "center",
+
+                block: "nearest"
+
+            });
         }
     }
+
+
+    // ============================================================
+    // MOBILE UNIT SWIPE
+    // ============================================================
 
     let touchStartX = 0;
     let touchEndX = 0;
-    const contractSidebar = document.querySelector('.contract-sidebar');
 
-    contractSidebar.addEventListener('touchstart', e => {
-        touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
 
-    contractSidebar.addEventListener('touchend', e => {
-        touchEndX = e.changedTouches[0].screenX;
-        handleUnitSwipe();
-    }, { passive: true });
+    const contractSidebar =
+        document.querySelector(
+            '.contract-sidebar'
+        );
+
+
+    if (contractSidebar) {
+
+        contractSidebar.addEventListener(
+
+            'touchstart',
+
+            e => {
+
+                touchStartX =
+                    e.changedTouches[0].screenX;
+
+            },
+
+            {
+                passive: true
+            }
+        );
+
+
+        contractSidebar.addEventListener(
+
+            'touchend',
+
+            e => {
+
+                touchEndX =
+                    e.changedTouches[0].screenX;
+
+                handleUnitSwipe();
+
+            },
+
+            {
+                passive: true
+            }
+        );
+    }
+
 
     function handleUnitSwipe() {
-        if(window.innerWidth > 768) return;
-        const diff = touchStartX - touchEndX;
-        if(Math.abs(diff) < 60) return;
 
-        const units = [...document.querySelectorAll('.unit-pill')];
-        const activeIndex = units.findIndex(btn => btn.classList.contains('active'));
-        if(activeIndex === -1) return;
+        if (window.innerWidth > 768) return;
 
-        if(diff > 0 && activeIndex < units.length - 1) {
-            units[activeIndex + 1].click();
+
+        const diff =
+            touchStartX -
+            touchEndX;
+
+
+        if (Math.abs(diff) < 60) return;
+
+
+        const units =
+            [
+                ...document.querySelectorAll(
+                    '.unit-pill'
+                )
+            ];
+
+
+        const activeIndex =
+            units.findIndex(
+                btn =>
+                    btn.classList.contains(
+                        'active'
+                    )
+            );
+
+
+        if (activeIndex === -1) return;
+
+
+        if (
+            diff > 0 &&
+            activeIndex < units.length - 1
+        ) {
+
+            units[
+                activeIndex + 1
+            ].click();
         }
-        if(diff < 0 && activeIndex > 0) {
-            units[activeIndex - 1].click();
+
+
+        if (
+            diff < 0 &&
+            activeIndex > 0
+        ) {
+
+            units[
+                activeIndex - 1
+            ].click();
         }
     }
 
-    /* ================================================================
-       FLIP CARD: click anywhere on the big analysis card (front or back),
-       EXCEPT the "USAGE" button and the "Setting" button/section selector,
-       to flip it and reveal the Usage Trend view sized to the card.
-       Click again anywhere to flip back.
-       ================================================================ */
-    let usageChartInstance = null;
-    let usageLoadedContractId = null;
 
-    document.getElementById('analysis-panel').addEventListener('click', function (e) {
+    // ============================================================
+    // FLIP CARD
+    // ============================================================
+
+    const analysisPanel =
+        document.getElementById(
+            'analysis-panel'
+        );
+
+
+    if (analysisPanel) {
+
+        analysisPanel.addEventListener(
+            'click',
+            function(e) {
+
+
+                if (
+
+                    e.target.closest(
+                        '#mobileUsageBtn'
+                    )
+
+                    ||
+
+                    e.target.closest(
+                        '#manageBtn'
+                    )
+
+                    ||
+
+                    e.target.closest(
+                        '#sectionSelector'
+                    )
+
+                ) {
+
+                    return;
+                }
+
+
+                const panel =
+                    document.getElementById(
+                        'analysis-panel'
+                    );
+
+
+                const isFlippingToBack =
+                    !panel.classList.contains(
+                        'flipped'
+                    );
+
+
+                panel.classList.toggle(
+                    'flipped'
+                );
+
+
+                if (isFlippingToBack) {
+
+                    loadUsageEmbedded();
+                }
+
+            }
+        );
+    }
+
+
+    // ============================================================
+    // FORMAT RM
+    // ============================================================
+
+    function formatRM(value) {
+
+        return "RM " +
+            Number(value || 0).toLocaleString(
+                "en-MY",
+                {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }
+            );
+    }
+
+
+    // ============================================================
+    // USAGE EMBED
+    //
+    // Cache usage untuk contract semasa:
+    // - flip pertama = fetch
+    // - flip seterusnya = tidak fetch lagi
+    // - contract baru = usageLoadedContractId reset
+    // - browser refresh = reset
+    // ============================================================
+
+    async function loadUsageEmbedded() {
+
+        if (!currentContract) return;
+
+
+        const contractId =
+            currentContract.id;
+
+
+        // ========================================================
+        // GUNA DATA YANG SUDAH DIMUAT JIKA CONTRACT SAMA
+        // ========================================================
+
         if (
-            e.target.closest('#mobileUsageBtn') ||
-            e.target.closest('#manageBtn') ||
-            e.target.closest('#sectionSelector')
+            usageLoadedContractId ===
+            contractId
         ) {
+
             return;
         }
 
-        const panel = document.getElementById('analysis-panel');
-        const isFlippingToBack = !panel.classList.contains('flipped');
-        panel.classList.toggle('flipped');
-
-        if (isFlippingToBack) {
-            loadUsageEmbedded();
-        }
-    });
-
-    function formatRM(value) {
-        return "RM " + Number(value || 0).toLocaleString("en-MY", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
-    }
-
-    async function loadUsageEmbedded() {
-        if (!currentContract) return;
-        const contractId = currentContract.id;
 
         try {
-            const contractRes = await fetch(
-                `${API_URL}/rest/v1/contract?id=eq.${encodeURIComponent(contractId)}&select=*`,
-                { headers }
-            );
-            if (!contractRes.ok) throw new Error(`HTTP ${contractRes.status}`);
-            const contractRows = await contractRes.json();
-            const contract = Array.isArray(contractRows) ? contractRows[0] : null;
+
+            const contractRes =
+                await fetch(
+
+                    `${API_URL}/rest/v1/contract` +
+                    `?id=eq.${encodeURIComponent(contractId)}` +
+                    `&select=*`,
+
+                    { headers }
+                );
+
+
+            if (!contractRes.ok) {
+
+                throw new Error(
+                    `HTTP ${contractRes.status}`
+                );
+            }
+
+
+            const contractRows =
+                await contractRes.json();
+
+
+            const contract =
+                Array.isArray(contractRows)
+                    ? contractRows[0]
+                    : null;
+
 
             if (!contract) {
-                console.error('Kontrak tidak dijumpai untuk usage embed:', contractId);
+
+                console.error(
+                    'Kontrak tidak dijumpai untuk usage embed:',
+                    contractId
+                );
+
                 return;
             }
 
-            const [woRes, interimRes] = await Promise.all([
-                fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${encodeURIComponent(contractId)}&select=id,status,interim_no,section_category`, { headers }),
-                fetch(`${API_URL}/rest/v1/interims?contract_id=eq.${encodeURIComponent(contractId)}&order=claim_date.asc&select=*`, { headers })
+
+            const [
+                woRes,
+                interimRes
+            ] = await Promise.all([
+
+                fetch(
+
+                    `${API_URL}/rest/v1/work_orders` +
+                    `?contract_id=eq.${encodeURIComponent(contractId)}` +
+                    `&select=id,status,interim_no,section_category`,
+
+                    { headers }
+                ),
+
+
+                fetch(
+
+                    `${API_URL}/rest/v1/interims` +
+                    `?contract_id=eq.${encodeURIComponent(contractId)}` +
+                    `&order=claim_date.asc` +
+                    `&select=*`,
+
+                    { headers }
+                )
+
             ]);
-            if (!woRes.ok) throw new Error(`HTTP ${woRes.status}`);
-            if (!interimRes.ok) throw new Error(`HTTP ${interimRes.status}`);
 
-            const rawWorkOrders = await woRes.json();
-            const interims = await interimRes.json();
 
-            const ignoredWOStatuses = new Set([
-    "CANCEL",
-    "REJ",
-    "EXEC-REJ",
-    "HOS-REJ",
-    "HOD-REJ",
-    "QUOTATION",
-    "QUO-APP",
-    "QUO-REJ"
-]);
-            const validWorkOrders = (Array.isArray(rawWorkOrders) ? rawWorkOrders : []).filter(row => {
-                const status = String(row.status || "").trim().toUpperCase();
-                return !ignoredWOStatuses.has(status);
-            });
-            const safeInterims = Array.isArray(interims) ? interims : [];
+            if (!woRes.ok) {
 
-            document.getElementById('uwWoCount').innerText = validWorkOrders.length.toLocaleString('en-MY');
-            document.getElementById('uwInterimCount').innerText = safeInterims.length.toLocaleString('en-MY');
+                throw new Error(
+                    `WO HTTP ${woRes.status}`
+                );
+            }
 
-            const contractValue = Number(contract.contract_sum || 0);
 
-            // Already claimed (submitted via interims)
-            const claimedAmount = safeInterims.reduce((sum, row) => sum + Number(row.net_amount || row.claim_amount || 0), 0);
+            if (!interimRes.ok) {
 
-            // Valid WOs not yet attached to an interim = belum claim
-            const pendingAmount = validWorkOrders.reduce((sum, wo) => {
-                if (!wo.interim_no && wo.section_category) {
-                    const sectionTotal = Object.values(wo.section_category).reduce((s, sec) => s + Number((sec && sec.amt) || 0), 0);
-                    return sum + sectionTotal;
-                }
-                return sum;
-            }, 0);
+                throw new Error(
+                    `Interim HTTP ${interimRes.status}`
+                );
+            }
 
-            const totalUsed = claimedAmount + pendingAmount;
-            const balance = contractValue - totalUsed;
-            const progress = contractValue ? ((totalUsed / contractValue) * 100).toFixed(1) : 0;
 
-            document.getElementById('uwContractValue').innerText = formatRM(contractValue);
-            document.getElementById('uwUsedValue').innerText = formatRM(totalUsed);
-            document.getElementById('uwBalanceValue').innerText = formatRM(balance);
-            document.getElementById('uwProgressValue').innerText = progress + '%';
+            const rawWorkOrders =
+                await woRes.json();
+
+
+            const interims =
+                await interimRes.json();
+
+
+            const ignoredWOStatuses =
+                new Set([
+
+                    "CANCEL",
+                    "REJ",
+                    "EXEC-REJ",
+                    "HOS-REJ",
+                    "HOD-REJ",
+                    "QUOTATION",
+                    "QUO-APP",
+                    "QUO-REJ"
+
+                ]);
+
+
+            const validWorkOrders =
+                (
+                    Array.isArray(
+                        rawWorkOrders
+                    )
+                        ? rawWorkOrders
+                        : []
+                ).filter(row => {
+
+                    const status =
+                        String(
+                            row.status || ""
+                        )
+                        .trim()
+                        .toUpperCase();
+
+
+                    return !ignoredWOStatuses.has(
+                        status
+                    );
+                });
+
+
+            const safeInterims =
+                Array.isArray(interims)
+                    ? interims
+                    : [];
+
+
+            // ====================================================
+            // COUNTS
+            // ====================================================
+
+            document.getElementById(
+                'uwWoCount'
+            ).innerText =
+                validWorkOrders
+                    .length
+                    .toLocaleString('en-MY');
+
+
+            document.getElementById(
+                'uwInterimCount'
+            ).innerText =
+                safeInterims
+                    .length
+                    .toLocaleString('en-MY');
+
+
+            // ====================================================
+            // CONTRACT VALUE
+            // ====================================================
+
+            const contractValue =
+                Number(
+                    contract.contract_sum || 0
+                );
+
+
+            // ====================================================
+            // CLAIMED
+            // ====================================================
+
+            const claimedAmount =
+                safeInterims.reduce(
+                    (sum, row) =>
+
+                        sum +
+                        Number(
+                            row.net_amount ||
+                            row.claim_amount ||
+                            0
+                        ),
+
+                    0
+                );
+
+
+            // ====================================================
+            // PENDING WO
+            // ====================================================
+
+            const pendingAmount =
+                validWorkOrders.reduce(
+                    (sum, wo) => {
+
+
+                        if (
+                            !wo.interim_no &&
+                            wo.section_category
+                        ) {
+
+                            const sectionTotal =
+                                Object.values(
+                                    wo.section_category
+                                ).reduce(
+
+                                    (s, sec) =>
+
+                                        s +
+                                        Number(
+                                            (
+                                                sec &&
+                                                sec.amt
+                                            ) || 0
+                                        ),
+
+                                    0
+                                );
+
+
+                            return (
+                                sum +
+                                sectionTotal
+                            );
+                        }
+
+
+                        return sum;
+                    },
+
+                    0
+                );
+
+
+            // ====================================================
+            // USAGE TOTAL
+            // ====================================================
+
+            const totalUsed =
+                claimedAmount +
+                pendingAmount;
+
+
+            const balance =
+                contractValue -
+                totalUsed;
+
+
+            const progress =
+                contractValue
+                    ? (
+                        (
+                            totalUsed /
+                            contractValue
+                        ) * 100
+                    ).toFixed(1)
+                    : 0;
+
+
+            document.getElementById(
+                'uwContractValue'
+            ).innerText =
+                formatRM(contractValue);
+
+
+            document.getElementById(
+                'uwUsedValue'
+            ).innerText =
+                formatRM(totalUsed);
+
+
+            document.getElementById(
+                'uwBalanceValue'
+            ).innerText =
+                formatRM(balance);
+
+
+            document.getElementById(
+                'uwProgressValue'
+            ).innerText =
+                progress + '%';
+
+
+            // ====================================================
+            // MONTHLY ACTUAL
+            // ====================================================
 
             const monthlyMap = {};
+
+
             safeInterims.forEach(item => {
+
                 if (!item.claim_date) return;
-                const date = new Date(item.claim_date);
-                const month = date.toLocaleString('en', { month: 'short' });
-                monthlyMap[month] = (monthlyMap[month] || 0) + Number(item.net_amount || item.claim_amount || 0);
+
+
+                const date =
+                    new Date(
+                        item.claim_date
+                    );
+
+
+                if (isNaN(date.getTime())) {
+                    return;
+                }
+
+
+                // Gunakan tahun sekali supaya
+                // Jan 2025 dan Jan 2026 tidak bercampur.
+                const monthKey =
+                    `${date.getFullYear()}-${String(
+                        date.getMonth() + 1
+                    ).padStart(2, '0')}`;
+
+
+                monthlyMap[monthKey] =
+                    (
+                        monthlyMap[monthKey] || 0
+                    ) +
+                    Number(
+                        item.net_amount ||
+                        item.claim_amount ||
+                        0
+                    );
+
             });
 
-            let months = Object.keys(monthlyMap);
-            let actual = Object.values(monthlyMap);
-            if (months.length === 0) {
-                months = ['Jan', 'Feb', 'Mar'];
-                actual = [0, 0, 0];
+
+            // ====================================================
+            // CONTRACT DURATION
+            //
+            // FIX #3:
+            // Planned bukan lagi contractValue / 12.
+            // Ia berdasarkan tempoh sebenar kontrak.
+            // ====================================================
+
+            const startDate =
+                new Date(
+                    contract.contract_start
+                );
+
+
+            const endDate =
+                new Date(
+                    contract.contract_end
+                );
+
+
+            let totalContractMonths = 1;
+
+
+            if (
+                !isNaN(startDate.getTime()) &&
+                !isNaN(endDate.getTime())
+            ) {
+
+                totalContractMonths = Math.max(
+
+                    1,
+
+                    (
+                        (
+                            endDate.getFullYear() -
+                            startDate.getFullYear()
+                        ) * 12
+                    )
+                    +
+                    (
+                        endDate.getMonth() -
+                        startDate.getMonth()
+                    )
+                    + 1
+
+                );
             }
-            const planned = months.map(() => contractValue / 12);
 
-            buildUsageChart(months, planned, actual);
-            buildUsageTable(Object.keys(monthlyMap), planned, actual);
-            updateUsageLifecycle(contract, safeInterims);
 
-            usageLoadedContractId = contractId;
+            // ====================================================
+            // MONTHS UNTUK CHART
+            // ====================================================
+
+            let months = [];
+            let actual = [];
+
+
+            if (
+                Object.keys(monthlyMap).length > 0
+            ) {
+
+                months =
+                    Object.keys(monthlyMap)
+                        .sort();
+
+
+                actual =
+                    months.map(
+                        m => monthlyMap[m]
+                    );
+
+            } else {
+
+                // Tiada interim:
+                // gunakan bulan semasa / 3 bulan fallback
+                // untuk chart kosong.
+                months = [
+                    'Jan',
+                    'Feb',
+                    'Mar'
+                ];
+
+                actual = [
+                    0,
+                    0,
+                    0
+                ];
+            }
+
+
+            // ====================================================
+            // PLANNED
+            //
+            // Setiap bulan = contract value /
+            // actual contract duration.
+            // ====================================================
+
+            const monthlyPlanned =
+                contractValue /
+                totalContractMonths;
+
+
+            const planned =
+                months.map(
+                    () => monthlyPlanned
+                );
+
+
+            // ====================================================
+            // CHART + TABLE
+            //
+            // FIX #4:
+            // Kedua-duanya menggunakan months yang sama.
+            // ====================================================
+
+            buildUsageChart(
+                months,
+                planned,
+                actual
+            );
+
+
+            buildUsageTable(
+                months,
+                planned,
+                actual,
+                Object.keys(monthlyMap).length === 0
+            );
+
+
+            // ====================================================
+            // LIFECYCLE
+            // ====================================================
+
+            updateUsageLifecycle(
+                contract,
+                safeInterims,
+                validWorkOrders
+            );
+
+
+            // ====================================================
+            // CACHE STATUS
+            // ====================================================
+
+            usageLoadedContractId =
+                contractId;
+
+
         } catch (err) {
-            console.error('Ralat usage embed:', err);
+
+            console.error(
+                'Ralat usage embed:',
+                err
+            );
         }
     }
 
-    function buildUsageChart(months, planned, actual) {
-        const ctx = document.getElementById('uwChart');
-        if (!ctx) return;
-        if (usageChartInstance) { usageChartInstance.destroy(); }
 
-        usageChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: months,
-                datasets: [
-                    { label: 'Planned', data: planned, borderColor: '#8e8e93', borderDash: [6, 4], fill: false, tension: 0.3, pointRadius: 2 },
-                    { label: 'Actual', data: actual, borderColor: '#007AFF', backgroundColor: 'rgba(0,122,255,0.15)', fill: true, tension: 0.35, pointRadius: 3 }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'top', labels: { font: { size: 9, weight: 'bold' } } },
-                    datalabels: { display: false }
+    // ============================================================
+    // USAGE CHART
+    // ============================================================
+
+    function buildUsageChart(
+        months,
+        planned,
+        actual
+    ) {
+
+        const ctx =
+            document.getElementById(
+                'uwChart'
+            );
+
+
+        if (!ctx) return;
+
+
+        if (usageChartInstance) {
+
+            usageChartInstance.destroy();
+
+            usageChartInstance = null;
+        }
+
+
+        usageChartInstance =
+            new Chart(ctx, {
+
+                type: 'line',
+
+
+                data: {
+
+                    labels: months,
+
+                    datasets: [
+
+                        {
+                            label: 'Planned',
+                            data: planned,
+                            borderColor: '#8e8e93',
+                            borderDash: [6, 4],
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 2
+                        },
+
+
+                        {
+                            label: 'Actual',
+                            data: actual,
+                            borderColor: '#007AFF',
+                            backgroundColor:
+                                'rgba(0,122,255,0.15)',
+                            fill: true,
+                            tension: 0.35,
+                            pointRadius: 3
+                        }
+
+                    ]
                 },
-                scales: {
-                    y: { beginAtZero: true, ticks: { font: { size: 8 } } },
-                    x: { ticks: { font: { size: 8 } } }
+
+
+                options: {
+
+                    responsive: true,
+
+                    maintainAspectRatio: false,
+
+
+                    plugins: {
+
+                        legend: {
+
+                            position: 'top',
+
+                            labels: {
+
+                                font: {
+                                    size: 9,
+                                    weight: 'bold'
+                                }
+
+                            }
+
+                        },
+
+
+                        datalabels: {
+                            display: false
+                        }
+
+                    },
+
+
+                    scales: {
+
+                        y: {
+
+                            beginAtZero: true,
+
+                            ticks: {
+                                font: {
+                                    size: 8
+                                }
+                            }
+
+                        },
+
+
+                        x: {
+
+                            ticks: {
+                                font: {
+                                    size: 8
+                                }
+                            }
+
+                        }
+
+                    }
+
                 }
-            }
-        });
+
+            });
     }
 
-    function buildUsageTable(months, planned, actual) {
-        const body = document.getElementById('uwTableBody');
+
+    // ============================================================
+    // USAGE TABLE
+    // ============================================================
+
+    function buildUsageTable(
+        months,
+        planned,
+        actual,
+        noRecords = false
+    ) {
+
+        const body =
+            document.getElementById(
+                'uwTableBody'
+            );
+
+
         if (!body) return;
+
+
         body.innerHTML = '';
 
-        if (months.length === 0) {
-            body.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#8e8e93;">Tiada rekod tuntutan interim</td></tr>`;
+
+        if (noRecords) {
+
+            body.innerHTML = `
+
+                <tr>
+
+                    <td
+                        colspan="4"
+                        style="
+                            text-align:center;
+                            color:#8e8e93;
+                        "
+                    >
+                        Tiada rekod tuntutan interim
+                    </td>
+
+                </tr>
+
+            `;
+
             return;
         }
 
+
         months.forEach((m, i) => {
-            const variance = (actual[i] || 0) - (planned[i] || 0);
-            const color = variance > 0 ? '#FF3B30' : '#34C759';
-            body.innerHTML += `<tr><td>${m}</td><td>${formatRM(planned[i])}</td><td>${formatRM(actual[i])}</td><td style="color:${color}; font-weight:700;">${formatRM(variance)}</td></tr>`;
+
+            const variance =
+                (
+                    actual[i] || 0
+                ) -
+                (
+                    planned[i] || 0
+                );
+
+
+            const color =
+                variance > 0
+                    ? '#FF3B30'
+                    : '#34C759';
+
+
+            body.innerHTML += `
+
+                <tr>
+
+                    <td>${formatUsageMonth(m)}</td>
+
+                    <td>
+                        ${formatRM(
+                            planned[i]
+                        )}
+                    </td>
+
+                    <td>
+                        ${formatRM(
+                            actual[i]
+                        )}
+                    </td>
+
+                    <td
+                        style="
+                            color:${color};
+                            font-weight:700;
+                        "
+                    >
+                        ${formatRM(
+                            variance
+                        )}
+                    </td>
+
+                </tr>
+
+            `;
+
         });
     }
 
-    function updateUsageLifecycle(contract, interims) {
 
-    const root = document.getElementById('flipCardBack');
-    if (!root) return;
+    // ============================================================
+    // FORMAT MONTH
+    //
+    // 2026-01 -> Jan 2026
+    // ============================================================
 
-    const awardNode = root.querySelector('.u-step-award');
-    const woNode = root.querySelector('.u-step-wo');
-    const interimNode = root.querySelector('.u-step-interim');
-    const cpcNode = root.querySelector('.u-step-cpc');
-    const cmgdNode = root.querySelector('.u-step-cmgd');
-    const sfaNode = root.querySelector('.u-step-sfa');
-
-    const allNodes = [
-        awardNode,
-        woNode,
-        interimNode,
-        cpcNode,
-        cmgdNode,
-        sfaNode
-    ];
-
-    /*
-    =====================================================
-    RESET SEMUA STEP
-    Default = belum sampai = jam kelabu
-    =====================================================
-    */
-
-    allNodes.forEach(node => {
-
-        if (!node) return;
-
-        node.classList.remove('u-done', 'u-current');
-
-        const dot = node.querySelector('.u-dot');
-
-        if (dot) {
-            dot.innerHTML = `
-                <i class="fa fa-clock"></i>
-            `;
-        }
-
-    });
-
-
-    /*
-    =====================================================
-    AWARD
-    Contract wujud = Award sudah ada
-    =====================================================
-    */
-
-    if (contract && awardNode) {
-
-        awardNode.classList.add('u-done');
-
-        const dot = awardNode.querySelector('.u-dot');
-
-        if (dot) {
-            dot.innerHTML = `
-                <i class="fa fa-check"></i>
-            `;
-        }
-
-    }
-
-
-    /*
-    =====================================================
-    WO
-    Check berdasarkan jumlah WO sebenar
-    =====================================================
-    */
-
-    const woCount = Number(
-        document.getElementById('uwWoCount')?.innerText || 0
-    );
-
-    if (woCount > 0 && woNode) {
-
-        woNode.classList.add('u-done');
-
-        const dot = woNode.querySelector('.u-dot');
-
-        if (dot) {
-            dot.innerHTML = `
-                <i class="fa fa-check"></i>
-            `;
-        }
-
-    }
-
-
-    /*
-    =====================================================
-    INTERIM
-    Kalau ada interim = done/current
-    =====================================================
-    */
-
-    if (interims && interims.length > 0 && interimNode) {
-
-        interimNode.classList.add('u-current');
-
-        const dot = interimNode.querySelector('.u-dot');
-
-        if (dot) {
-            dot.innerHTML = `
-                <i class="fa fa-clock"></i>
-            `;
-        }
-
-    }
-
-
-    /*
-    =====================================================
-    CURRENT STEP LOGIC
-    Kalau tiada WO -> WO jadi current
-    Kalau ada WO tapi tiada Interim -> Interim jadi current
-    =====================================================
-    */
-
-    if (woCount === 0 && woNode) {
-
-        woNode.classList.remove('u-done');
-        woNode.classList.add('u-current');
-
-    } else if (
-        woCount > 0 &&
-        (!interims || interims.length === 0) &&
-        interimNode
-    ) {
-
-        interimNode.classList.add('u-current');
-
-    }
-
-
-    /*
-    =====================================================
-    CPC
-    Bila contract tamat
-    =====================================================
-    */
-
-    if (contract && contract.contract_end) {
-
-        const today = new Date();
-        const endDate = new Date(contract.contract_end);
+    function formatUsageMonth(value) {
 
         if (
-            !isNaN(endDate.getTime()) &&
+            typeof value === 'string' &&
+            /^\d{4}-\d{2}$/.test(value)
+        ) {
+
+            const [
+                year,
+                month
+            ] =
+                value.split('-');
+
+
+            const date =
+                new Date(
+                    Number(year),
+                    Number(month) - 1,
+                    1
+                );
+
+
+            return date.toLocaleString(
+                'en-MY',
+                {
+                    month: 'short',
+                    year: 'numeric'
+                }
+            );
+        }
+
+
+        return value;
+    }
+
+
+    // ============================================================
+    // USAGE LIFECYCLE
+    //
+    // AWARD
+    //   Contract exists = DONE
+    //
+    // WO
+    //   WO > 0 = DONE
+    //   WO = 0 = CURRENT
+    //
+    // INTERIM
+    //   ikut logic asal:
+    //   jika tiada WO / tiada interim -> current
+    //   jika ada interim -> current
+    //
+    // CPC
+    //   selepas contract_end = CURRENT
+    //
+    // CMGD
+    //   6 bulan selepas contract_end = CURRENT
+    //
+    // SFA
+    //   18 bulan selepas contract_end = CURRENT
+    //
+    // ============================================================
+
+    function updateUsageLifecycle(
+        contract,
+        interims,
+        validWorkOrders = []
+    ) {
+
+        const root =
+            document.getElementById(
+                'flipCardBack'
+            );
+
+
+        if (!root) return;
+
+
+        const awardNode =
+            root.querySelector(
+                '.u-step-award'
+            );
+
+
+        const woNode =
+            root.querySelector(
+                '.u-step-wo'
+            );
+
+
+        const interimNode =
+            root.querySelector(
+                '.u-step-interim'
+            );
+
+
+        const cpcNode =
+            root.querySelector(
+                '.u-step-cpc'
+            );
+
+
+        const cmgdNode =
+            root.querySelector(
+                '.u-step-cmgd'
+            );
+
+
+        const sfaNode =
+            root.querySelector(
+                '.u-step-sfa'
+            );
+
+
+        const allNodes = [
+
+            awardNode,
+            woNode,
+            interimNode,
+            cpcNode,
+            cmgdNode,
+            sfaNode
+
+        ];
+
+
+        // ========================================================
+        // RESET
+        // ========================================================
+
+        allNodes.forEach(node => {
+
+            if (!node) return;
+
+
+            node.classList.remove(
+                'u-done',
+                'u-current'
+            );
+
+
+            const dot =
+                node.querySelector(
+                    '.u-dot'
+                );
+
+
+            if (dot) {
+
+                dot.innerHTML = `
+                    <i class="fa fa-clock"></i>
+                `;
+            }
+
+        });
+
+
+        // ========================================================
+        // AWARD
+        //
+        // Contract wujud = Award DONE
+        // ========================================================
+
+        if (
+            contract &&
+            awardNode
+        ) {
+
+            awardNode.classList.add(
+                'u-done'
+            );
+
+
+            const dot =
+                awardNode.querySelector(
+                    '.u-dot'
+                );
+
+
+            if (dot) {
+
+                dot.innerHTML = `
+                    <i class="fa fa-check"></i>
+                `;
+            }
+        }
+
+
+        // ========================================================
+        // WO COUNT
+        //
+        // Guna data sebenar yang sudah fetch.
+        // ========================================================
+
+        const woCount =
+            Array.isArray(validWorkOrders)
+
+                ? validWorkOrders.length
+
+                : Number(
+                    document.getElementById(
+                        'uwWoCount'
+                    )?.innerText || 0
+                );
+
+
+        // ========================================================
+        // WO
+        // ========================================================
+
+        if (woNode) {
+
+            if (woCount > 0) {
+
+                woNode.classList.add(
+                    'u-done'
+                );
+
+
+                const dot =
+                    woNode.querySelector(
+                        '.u-dot'
+                    );
+
+
+                if (dot) {
+
+                    dot.innerHTML = `
+                        <i class="fa fa-check"></i>
+                    `;
+                }
+
+            } else {
+
+                woNode.classList.add(
+                    'u-current'
+                );
+            }
+        }
+
+
+        // ========================================================
+        // INTERIM
+        //
+        // Kekalkan logic asal:
+        // kalau ada interim -> current
+        // ========================================================
+
+        const interimCount =
+            Array.isArray(interims)
+                ? interims.length
+                : 0;
+
+
+        if (
+            interimCount > 0 &&
+            interimNode
+        ) {
+
+            interimNode.classList.add(
+                'u-current'
+            );
+
+
+            const dot =
+                interimNode.querySelector(
+                    '.u-dot'
+                );
+
+
+            if (dot) {
+
+                dot.innerHTML = `
+                    <i class="fa fa-clock"></i>
+                `;
+            }
+        }
+
+
+        // ========================================================
+        // CURRENT STEP LOGIC ASAL
+        //
+        // Tiada WO:
+        //     WO current
+        //
+        // Ada WO tapi tiada Interim:
+        //     Interim current
+        // ========================================================
+
+        if (
+            woCount === 0 &&
+            woNode
+        ) {
+
+            woNode.classList.remove(
+                'u-done'
+            );
+
+
+            woNode.classList.add(
+                'u-current'
+            );
+
+
+        } else if (
+
+            woCount > 0 &&
+
+            interimCount === 0 &&
+
+            interimNode
+
+        ) {
+
+            interimNode.classList.add(
+                'u-current'
+            );
+        }
+
+
+        // ========================================================
+        // CONTRACT DATES
+        // ========================================================
+
+        if (
+            !contract ||
+            !contract.contract_end
+        ) {
+
+            return;
+        }
+
+
+        const today =
+            new Date();
+
+
+        const endDate =
+            new Date(
+                contract.contract_end
+            );
+
+
+        if (
+            isNaN(
+                endDate.getTime()
+            )
+        ) {
+
+            return;
+        }
+
+
+        // ========================================================
+        // CPC DATE
+        //
+        // KEKALKAN LOGIC ASAL:
+        // today > contract_end
+        // ========================================================
+
+        if (
             today > endDate
         ) {
 
+            // Interim jadi DONE
             if (interimNode) {
-                interimNode.classList.remove('u-current');
-                interimNode.classList.add('u-done');
 
-                const dot = interimNode.querySelector('.u-dot');
+                interimNode.classList.remove(
+                    'u-current'
+                );
+
+
+                interimNode.classList.add(
+                    'u-done'
+                );
+
+
+                const dot =
+                    interimNode.querySelector(
+                        '.u-dot'
+                    );
+
 
                 if (dot) {
+
                     dot.innerHTML = `
                         <i class="fa fa-check"></i>
                     `;
                 }
             }
 
+
+            // CPC current
             if (cpcNode) {
-                cpcNode.classList.add('u-current');
+
+                cpcNode.classList.add(
+                    'u-current'
+                );
+            }
+        }
+
+
+        // ========================================================
+        // CMGD
+        //
+        // 6 BULAN SELEPAS CONTRACT END
+        // ========================================================
+
+        const cmgdDate =
+            new Date(
+                endDate
+            );
+
+
+        cmgdDate.setMonth(
+            cmgdDate.getMonth() + 6
+        );
+
+
+        if (
+            today >= cmgdDate
+        ) {
+
+            // CPC DONE
+            if (cpcNode) {
+
+                cpcNode.classList.remove(
+                    'u-current'
+                );
+
+
+                cpcNode.classList.add(
+                    'u-done'
+                );
+
+
+                const dot =
+                    cpcNode.querySelector(
+                        '.u-dot'
+                    );
+
+
+                if (dot) {
+
+                    dot.innerHTML = `
+                        <i class="fa fa-check"></i>
+                    `;
+                }
             }
 
+
+            // CMGD CURRENT
+            if (cmgdNode) {
+
+                cmgdNode.classList.add(
+                    'u-current'
+                );
+            }
+        }
+
+
+        // ========================================================
+        // SFA
+        //
+        // 18 BULAN / 1 TAHUN 6 BULAN
+        // SELEPAS CONTRACT END
+        // ========================================================
+
+        const sfaDate =
+            new Date(
+                endDate
+            );
+
+
+        sfaDate.setMonth(
+            sfaDate.getMonth() + 18
+        );
+
+
+        if (
+            today >= sfaDate
+        ) {
+
+            // CPC DONE
+            if (cpcNode) {
+
+                cpcNode.classList.remove(
+                    'u-current'
+                );
+
+
+                cpcNode.classList.add(
+                    'u-done'
+                );
+
+
+                const cpcDot =
+                    cpcNode.querySelector(
+                        '.u-dot'
+                    );
+
+
+                if (cpcDot) {
+
+                    cpcDot.innerHTML = `
+                        <i class="fa fa-check"></i>
+                    `;
+                }
+            }
+
+
+            // CMGD DONE
+            if (cmgdNode) {
+
+                cmgdNode.classList.remove(
+                    'u-current'
+                );
+
+
+                cmgdNode.classList.add(
+                    'u-done'
+                );
+
+
+                const cmgdDot =
+                    cmgdNode.querySelector(
+                        '.u-dot'
+                    );
+
+
+                if (cmgdDot) {
+
+                    cmgdDot.innerHTML = `
+                        <i class="fa fa-check"></i>
+                    `;
+                }
+            }
+
+
+            // SFA CURRENT
+            if (sfaNode) {
+
+                sfaNode.classList.add(
+                    'u-current'
+                );
+            }
         }
 
     }
-
-}
 </script>
 </body>
 </html>
