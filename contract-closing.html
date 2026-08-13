@@ -206,173 +206,1018 @@ margin:6px 0;
 </div>
 
 <script>
-const SB_URL="https://ywmsvowroxzhrjwrhsru.supabase.co";
-const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3bXN2b3dyb3h6aHJqd3Joc3J1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDU5MzcsImV4cCI6MjA4Nzg4MTkzN30.OHJ-I_T3QID8y8eaoOBWeG2nKd2FhHfzG4P515Rzfks";
+const API_URL = "https://me-connect-api.mech-elec-ranhill.workers.dev";
 
-const headers={
-apikey:SB_KEY,
-Authorization:"Bearer "+SB_KEY,
-"Content-Type":"application/json"
+const headers = {
+    "Content-Type": "application/json"
 };
 
-let contract=null;
+let contract = null;
+let currentClosing = null;
 
-/* TAB */
-function showTab(event,t){
 
-document.querySelectorAll(".form-tabs button")
-.forEach(b=>b.classList.remove("active"));
+/* =========================================================
+   HELPERS
+========================================================= */
 
-event.target.classList.add("active");
-
-document.getElementById("cpcTab").style.display =
-t==="cpc"?"block":"none";
-
-document.getElementById("cmgdTab").style.display =
-t==="cmgd"?"block":"none";
-
-document.getElementById("sfaTab").style.display =
-t==="sfa"?"block":"none";
+function getEl(id) {
+    return document.getElementById(id);
 }
 
-/* LOAD CONTRACT */
-async function loadContracts(){
-const unit=document.getElementById("unit").value;
+function formatDate(date) {
+    if (!(date instanceof Date) || isNaN(date.getTime())) {
+        return "-";
+    }
 
-const res=await fetch(`${SB_URL}/rest/v1/contract?unit_id=eq.${unit}`,{headers});
-const data=await res.json();
+    return date.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+    });
+}
 
-let sel=document.getElementById("contract");
-sel.innerHTML="<option value=''>Select</option>";
+function addMonthsSafe(date, months) {
+    const result = new Date(date);
 
-data.forEach(c=>{
-let opt=document.createElement("option");
-opt.value=c.id;
-opt.text=c.contract_code;
-sel.appendChild(opt);
+    const originalDay = result.getDate();
+
+    result.setMonth(result.getMonth() + months);
+
+    /*
+     * Handle month overflow.
+     * Contoh:
+     * 31 Jan + 1 bulan tidak boleh menjadi 03 Mac.
+     */
+    if (result.getDate() !== originalDay) {
+        result.setDate(0);
+    }
+
+    return result;
+}
+
+async function apiFetch(url, options = {}) {
+
+    const config = {
+        ...options,
+        headers: {
+            ...headers,
+            ...(options.headers || {})
+        }
+    };
+
+    const response = await fetch(url, config);
+
+    if (!response.ok) {
+        let errorText = "";
+
+        try {
+            errorText = await response.text();
+        } catch (e) {
+            errorText = "";
+        }
+
+        throw new Error(
+            `API Error ${response.status}: ${errorText || response.statusText}`
+        );
+    }
+
+    return response;
+}
+
+
+/* =========================================================
+   TAB
+========================================================= */
+
+function showTab(event, type) {
+
+    document.querySelectorAll(".form-tabs button")
+        .forEach(button => {
+            button.classList.remove("active");
+        });
+
+    event.target.classList.add("active");
+
+    getEl("cpcTab").style.display =
+        type === "cpc" ? "block" : "none";
+
+    getEl("cmgdTab").style.display =
+        type === "cmgd" ? "block" : "none";
+
+    getEl("sfaTab").style.display =
+        type === "sfa" ? "block" : "none";
+}
+
+
+/* =========================================================
+   LOAD UNITS
+========================================================= */
+
+async function loadUnits() {
+
+    try {
+
+        const response = await apiFetch(
+            `${API_URL}/rest/v1/units?select=id,unit_name`
+        );
+
+        const data = await response.json();
+
+        const unitSelect = getEl("unit");
+
+        unitSelect.innerHTML =
+            '<option value="">Select Unit</option>';
+
+        if (!Array.isArray(data)) {
+            throw new Error("Invalid units response");
+        }
+
+        data.forEach(unit => {
+
+            const option = document.createElement("option");
+
+            option.value = unit.id;
+            option.textContent = unit.unit_name;
+
+            unitSelect.appendChild(option);
+        });
+
+        if (data.length > 0) {
+
+            unitSelect.value = data[0].id;
+
+            await loadContracts();
+        }
+
+    } catch (error) {
+
+        console.error("Error loading units:", error);
+
+        alert(
+            "Gagal mendapatkan Unit.\n\n" +
+            error.message
+        );
+    }
+}
+
+
+/* =========================================================
+   LOAD CONTRACTS
+========================================================= */
+
+async function loadContracts() {
+
+    const unitId = getEl("unit").value;
+
+    const contractSelect = getEl("contract");
+
+    contractSelect.innerHTML =
+        '<option value="">Loading...</option>';
+
+    resetClosingForm();
+
+    if (!unitId) {
+
+        contractSelect.innerHTML =
+            '<option value="">Select Contract</option>';
+
+        return;
+    }
+
+    try {
+
+        const response = await apiFetch(
+            `${API_URL}/rest/v1/contract` +
+            `?unit_id=eq.${encodeURIComponent(unitId)}` +
+            `&select=id,contract_code,contract_name,contract_start,contract_end,contract_sum` +
+            `&order=contract_start.asc`
+        );
+
+        const data = await response.json();
+
+        contractSelect.innerHTML =
+            '<option value="">Select Contract</option>';
+
+        if (!Array.isArray(data)) {
+            throw new Error("Invalid contract response");
+        }
+
+        data.forEach(item => {
+
+            const option = document.createElement("option");
+
+            option.value = item.id;
+            option.textContent =
+                item.contract_code +
+                (item.contract_name
+                    ? ` - ${item.contract_name}`
+                    : "");
+
+            contractSelect.appendChild(option);
+        });
+
+    } catch (error) {
+
+        console.error("Error loading contracts:", error);
+
+        contractSelect.innerHTML =
+            '<option value="">Unable to load contracts</option>';
+
+        alert(
+            "Gagal mendapatkan Contract.\n\n" +
+            error.message
+        );
+    }
+}
+
+
+/* =========================================================
+   RESET FORM
+========================================================= */
+
+function resetClosingForm() {
+
+    contract = null;
+    currentClosing = null;
+
+    getEl("contractEnd").innerHTML = "";
+
+    getEl("cmgdStatus").innerHTML = "";
+
+    getEl("sfaStatus").innerHTML = "";
+
+    getEl("cmgd").value = "";
+    getEl("defect").value = "Completed";
+    getEl("cmgdRemark").value = "";
+
+    getEl("sfa").value = "";
+    getEl("final").value = "";
+    getEl("retention").value = "";
+    getEl("pg").value = "";
+    getEl("sfaRemark").value = "";
+
+    getEl("c1").checked = false;
+    getEl("c2").checked = false;
+    getEl("c3").checked = false;
+
+    getEl("btnCPC").style.display = "none";
+    getEl("btnCMGD").style.display = "none";
+    getEl("btnSFA").style.display = "none";
+}
+
+
+/* =========================================================
+   LOAD CONTRACT DATA
+========================================================= */
+
+async function loadData() {
+
+    const contractId = getEl("contract").value;
+
+    resetClosingForm();
+
+    if (!contractId) {
+        return;
+    }
+
+    try {
+
+        /*
+         * Get contract
+         */
+
+        const contractResponse = await apiFetch(
+            `${API_URL}/rest/v1/contract` +
+            `?id=eq.${encodeURIComponent(contractId)}` +
+            `&select=*`
+        );
+
+        const contractRows = await contractResponse.json();
+
+        if (!Array.isArray(contractRows) || !contractRows.length) {
+
+            throw new Error("Contract tidak dijumpai.");
+        }
+
+        contract = contractRows[0];
+
+
+        /*
+         * Get existing closing record.
+         *
+         * Ini penting supaya:
+         * - CPC status boleh dipaparkan semula
+         * - CMGD data boleh dipaparkan semula
+         * - SFA data boleh dipaparkan semula
+         */
+
+        try {
+
+            const closingResponse = await apiFetch(
+                `${API_URL}/rest/v1/contract_closing` +
+                `?contract_id=eq.${encodeURIComponent(contract.id)}` +
+                `&select=*`
+            );
+
+            const closingRows = await closingResponse.json();
+
+            currentClosing =
+                Array.isArray(closingRows) && closingRows.length
+                    ? closingRows[0]
+                    : null;
+
+        } catch (closingError) {
+
+            /*
+             * Jika endpoint closing belum wujud / belum support GET,
+             * contract masih boleh digunakan.
+             */
+
+            console.warn(
+                "Unable to load contract closing record:",
+                closingError
+            );
+
+            currentClosing = null;
+        }
+
+
+        /*
+         * Contract end date
+         */
+
+        const today = new Date();
+
+        const contractEnd = new Date(
+            contract.contract_end
+        );
+
+        if (isNaN(contractEnd.getTime())) {
+
+            throw new Error(
+                "contract_end tidak sah untuk contract ini."
+            );
+        }
+
+
+        /*
+         * CPC
+         *
+         * CPC eligible apabila kontrak telah tamat.
+         */
+
+        const cpcEligible =
+            today >= contractEnd;
+
+
+        /*
+         * CMGD
+         *
+         * CMGD = 6 bulan selepas contract end.
+         */
+
+        const cmgdDate =
+            addMonthsSafe(contractEnd, 6);
+
+        const cmgdEligible =
+            today >= cmgdDate;
+
+
+        /*
+         * SFA
+         *
+         * SFA = 1 tahun 6 bulan
+         *      = 18 bulan selepas contract end.
+         */
+
+        const sfaDate =
+            addMonthsSafe(contractEnd, 18);
+
+        const sfaEligible =
+            today >= sfaDate;
+
+
+        /* =====================================================
+           CPC STATUS
+        ===================================================== */
+
+        if (currentClosing &&
+            String(currentClosing.cpc_status || "").toUpperCase() === "COMPLETED") {
+
+            getEl("contractEnd").innerHTML =
+                "✅ CPC COMPLETED";
+
+            getEl("btnCPC").style.display = "none";
+
+        } else if (cpcEligible) {
+
+            getEl("contractEnd").innerHTML =
+                "✅ Eligible for CPC<br>" +
+                `<small>Contract ended: ${formatDate(contractEnd)}</small>`;
+
+            getEl("btnCPC").style.display = "block";
+
+        } else {
+
+            getEl("contractEnd").innerHTML =
+                "⏳ Contract ends: " +
+                formatDate(contractEnd);
+
+            getEl("btnCPC").style.display = "none";
+        }
+
+
+        /* =====================================================
+           CMGD STATUS
+        ===================================================== */
+
+        if (currentClosing &&
+            currentClosing.cmgd_date) {
+
+            getEl("cmgdStatus").innerHTML =
+                "✅ CMGD COMPLETED<br>" +
+                `<small>Date: ${formatDate(
+                    new Date(currentClosing.cmgd_date)
+                )}</small>`;
+
+            getEl("cmgd").value =
+                String(currentClosing.cmgd_date).substring(0, 10);
+
+            if (currentClosing.defect_status) {
+                getEl("defect").value =
+                    currentClosing.defect_status;
+            }
+
+            if (currentClosing.cmgd_remarks) {
+                getEl("cmgdRemark").value =
+                    currentClosing.cmgd_remarks;
+            }
+
+            getEl("btnCMGD").style.display = "none";
+
+        } else if (cmgdEligible) {
+
+            getEl("cmgdStatus").innerHTML =
+                "✅ Eligible for CMGD<br>" +
+                `<small>Eligible date: ${formatDate(cmgdDate)}</small>`;
+
+            getEl("btnCMGD").style.display = "block";
+
+            /*
+             * Default CMGD date = eligibility date.
+             */
+
+            getEl("cmgd").value =
+                cmgdDate.toISOString().substring(0, 10);
+
+        } else {
+
+            getEl("cmgdStatus").innerHTML =
+                "⏳ Available after: " +
+                formatDate(cmgdDate);
+
+            getEl("btnCMGD").style.display = "none";
+        }
+
+
+        /* =====================================================
+           SFA STATUS
+        ===================================================== */
+
+        if (currentClosing &&
+            currentClosing.sfa_date) {
+
+            getEl("sfaStatus").innerHTML =
+                "✅ SFA COMPLETED<br>" +
+                `<small>Date: ${formatDate(
+                    new Date(currentClosing.sfa_date)
+                )}</small>`;
+
+            getEl("sfa").value =
+                String(currentClosing.sfa_date).substring(0, 10);
+
+            if (currentClosing.final_account != null) {
+                getEl("final").value =
+                    currentClosing.final_account;
+            }
+
+            if (currentClosing.retention_release != null) {
+                getEl("retention").value =
+                    currentClosing.retention_release;
+            }
+
+            if (currentClosing.pg_release != null) {
+                getEl("pg").value =
+                    currentClosing.pg_release;
+            }
+
+            if (currentClosing.sfa_remarks) {
+                getEl("sfaRemark").value =
+                    currentClosing.sfa_remarks;
+            }
+
+            getEl("btnSFA").style.display = "none";
+
+        } else if (sfaEligible) {
+
+            getEl("sfaStatus").innerHTML =
+                "✅ Eligible for SFA<br>" +
+                `<small>Eligible date: ${formatDate(sfaDate)}</small>`;
+
+            getEl("btnSFA").style.display = "block";
+
+            /*
+             * Default SFA date = eligibility date.
+             */
+
+            getEl("sfa").value =
+                sfaDate.toISOString().substring(0, 10);
+
+        } else {
+
+            getEl("sfaStatus").innerHTML =
+                "⏳ Available after: " +
+                formatDate(sfaDate);
+
+            getEl("btnSFA").style.display = "none";
+        }
+
+    } catch (error) {
+
+        console.error("Error loading contract data:", error);
+
+        alert(
+            "Gagal mendapatkan data contract.\n\n" +
+            error.message
+        );
+    }
+}
+
+
+/* =========================================================
+   SAVE CPC
+========================================================= */
+
+async function saveCPC() {
+
+    if (!contract) {
+
+        alert("Sila pilih contract dahulu.");
+
+        return;
+    }
+
+
+    /*
+     * Checklist
+     */
+
+    if (
+        !getEl("c1").checked ||
+        !getEl("c2").checked ||
+        !getEl("c3").checked
+    ) {
+
+        alert(
+            "Sila lengkapkan semua CPC checklist."
+        );
+
+        return;
+    }
+
+
+    /*
+     * Double-check eligibility
+     */
+
+    const contractEnd =
+        new Date(contract.contract_end);
+
+    if (new Date() < contractEnd) {
+
+        alert(
+            "Contract masih belum tamat. CPC belum boleh dibuat."
+        );
+
+        return;
+    }
+
+
+    const button = getEl("btnCPC");
+
+    button.disabled = true;
+    button.innerText = "Saving...";
+
+
+    try {
+
+        /*
+         * Jika closing record sudah wujud,
+         * PATCH record tersebut.
+         *
+         * Jika belum wujud,
+         * POST record baru.
+         */
+
+        if (currentClosing && currentClosing.id) {
+
+            await apiFetch(
+                `${API_URL}/rest/v1/contract_closing` +
+                `?id=eq.${encodeURIComponent(currentClosing.id)}`,
+                {
+                    method: "PATCH",
+                    body: JSON.stringify({
+                        cpc_status: "COMPLETED"
+                    })
+                }
+            );
+
+        } else {
+
+            const response = await apiFetch(
+                `${API_URL}/rest/v1/contract_closing`,
+                {
+                    method: "POST",
+                    body: JSON.stringify({
+                        contract_id: contract.id,
+                        cpc_status: "COMPLETED"
+                    })
+                }
+            );
+
+            /*
+             * Simpan returned record jika Worker
+             * memulangkannya.
+             */
+
+            try {
+
+                const rows = await response.json();
+
+                if (Array.isArray(rows) && rows.length) {
+                    currentClosing = rows[0];
+                }
+
+            } catch (e) {
+                // Response mungkin kosong.
+            }
+        }
+
+
+        alert("CPC saved successfully.");
+
+        await loadData();
+
+    } catch (error) {
+
+        console.error("Error saving CPC:", error);
+
+        alert(
+            "Gagal save CPC.\n\n" +
+            error.message
+        );
+
+    } finally {
+
+        button.disabled = false;
+        button.innerText = "Submit CPC";
+    }
+}
+
+
+/* =========================================================
+   SAVE CMGD
+========================================================= */
+
+async function saveCMGD() {
+
+    if (!contract) {
+
+        alert("Sila pilih contract dahulu.");
+
+        return;
+    }
+
+
+    const cmgdDateValue =
+        getEl("cmgd").value;
+
+    if (!cmgdDateValue) {
+
+        alert("Sila masukkan CMGD Date.");
+
+        return;
+    }
+
+
+    /*
+     * CMGD eligibility:
+     * contract end + 6 months
+     */
+
+    const contractEnd =
+        new Date(contract.contract_end);
+
+    const eligibleDate =
+        addMonthsSafe(contractEnd, 6);
+
+    const selectedDate =
+        new Date(cmgdDateValue);
+
+
+    if (new Date() < eligibleDate) {
+
+        alert(
+            "CMGD belum eligible.\n\n" +
+            "Available after: " +
+            formatDate(eligibleDate)
+        );
+
+        return;
+    }
+
+
+    /*
+     * CMGD date tidak boleh sebelum eligibility date.
+     */
+
+    if (selectedDate < eligibleDate) {
+
+        alert(
+            "CMGD Date tidak boleh sebelum " +
+            formatDate(eligibleDate)
+        );
+
+        return;
+    }
+
+
+    const button = getEl("btnCMGD");
+
+    button.disabled = true;
+    button.innerText = "Saving...";
+
+
+    try {
+
+        const payload = {
+            contract_id: contract.id,
+            cmgd_date: cmgdDateValue,
+            defect_status: getEl("defect").value,
+            cmgd_remarks: getEl("cmgdRemark").value
+        };
+
+
+        /*
+         * Jika closing record sudah ada:
+         * update record contract tersebut.
+         */
+
+        if (currentClosing && currentClosing.id) {
+
+            await apiFetch(
+                `${API_URL}/rest/v1/contract_closing` +
+                `?id=eq.${encodeURIComponent(currentClosing.id)}`,
+                {
+                    method: "PATCH",
+                    body: JSON.stringify(payload)
+                }
+            );
+
+        } else {
+
+            const response = await apiFetch(
+                `${API_URL}/rest/v1/contract_closing`,
+                {
+                    method: "POST",
+                    body: JSON.stringify(payload)
+                }
+            );
+
+            try {
+
+                const rows = await response.json();
+
+                if (Array.isArray(rows) && rows.length) {
+                    currentClosing = rows[0];
+                }
+
+            } catch (e) {
+                // Empty response.
+            }
+        }
+
+
+        alert("CMGD saved successfully.");
+
+        await loadData();
+
+    } catch (error) {
+
+        console.error("Error saving CMGD:", error);
+
+        alert(
+            "Gagal save CMGD.\n\n" +
+            error.message
+        );
+
+    } finally {
+
+        button.disabled = false;
+        button.innerText = "Submit CMGD";
+    }
+}
+
+
+/* =========================================================
+   SAVE SFA
+========================================================= */
+
+async function saveSFA() {
+
+    if (!contract) {
+
+        alert("Sila pilih contract dahulu.");
+
+        return;
+    }
+
+
+    const sfaDateValue =
+        getEl("sfa").value;
+
+    if (!sfaDateValue) {
+
+        alert("Sila masukkan SFA Date.");
+
+        return;
+    }
+
+
+    /*
+     * SFA eligibility:
+     *
+     * Contract End
+     * +
+     * 18 months
+     */
+
+    const contractEnd =
+        new Date(contract.contract_end);
+
+    const eligibleDate =
+        addMonthsSafe(contractEnd, 18);
+
+    const selectedDate =
+        new Date(sfaDateValue);
+
+
+    if (new Date() < eligibleDate) {
+
+        alert(
+            "SFA belum eligible.\n\n" +
+            "Available after: " +
+            formatDate(eligibleDate)
+        );
+
+        return;
+    }
+
+
+    /*
+     * SFA Date tidak boleh sebelum
+     * eligibility date.
+     */
+
+    if (selectedDate < eligibleDate) {
+
+        alert(
+            "SFA Date tidak boleh sebelum " +
+            formatDate(eligibleDate)
+        );
+
+        return;
+    }
+
+
+    /*
+     * Confirm sebelum close contract.
+     */
+
+    const confirmed =
+        confirm(
+            "Adakah anda pasti mahu CLOSE CONTRACT ini?"
+        );
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    const button = getEl("btnSFA");
+
+    button.disabled = true;
+    button.innerText = "Closing...";
+
+
+    try {
+
+        const payload = {
+            contract_id: contract.id,
+
+            sfa_date: sfaDateValue,
+
+            final_account:
+                getEl("final").value === ""
+                    ? null
+                    : Number(getEl("final").value),
+
+            retention_release:
+                getEl("retention").value === ""
+                    ? null
+                    : Number(getEl("retention").value),
+
+            pg_release:
+                getEl("pg").value === ""
+                    ? null
+                    : Number(getEl("pg").value),
+
+            sfa_remarks:
+                getEl("sfaRemark").value,
+
+            status: "CLOSED"
+        };
+
+
+        /*
+         * Existing closing record
+         */
+
+        if (currentClosing && currentClosing.id) {
+
+            await apiFetch(
+                `${API_URL}/rest/v1/contract_closing` +
+                `?id=eq.${encodeURIComponent(currentClosing.id)}`,
+                {
+                    method: "PATCH",
+                    body: JSON.stringify(payload)
+                }
+            );
+
+        } else {
+
+            const response = await apiFetch(
+                `${API_URL}/rest/v1/contract_closing`,
+                {
+                    method: "POST",
+                    body: JSON.stringify(payload)
+                }
+            );
+
+            try {
+
+                const rows = await response.json();
+
+                if (Array.isArray(rows) && rows.length) {
+                    currentClosing = rows[0];
+                }
+
+            } catch (e) {
+                // Empty response.
+            }
+        }
+
+
+        alert(
+            "Contract Closed Successfully."
+        );
+
+        await loadData();
+
+    } catch (error) {
+
+        console.error("Error closing contract:", error);
+
+        alert(
+            "Gagal close contract.\n\n" +
+            error.message
+        );
+
+    } finally {
+
+        button.disabled = false;
+        button.innerText = "CLOSE CONTRACT";
+    }
+}
+
+
+/* =========================================================
+   INIT
+========================================================= */
+
+document.addEventListener("DOMContentLoaded", () => {
+    loadUnits();
 });
-}
-
-/* LOAD DATA + ELIGIBILITY */
-async function loadData(){
-
-const id=document.getElementById("contract").value;
-if(!id)return;
-
-const res=await fetch(`${SB_URL}/rest/v1/contract?id=eq.${id}`,{headers});
-contract=(await res.json())[0];
-
-const today=new Date();
-const contractEnd=new Date(contract.contract_end);
-
-let cmgdDate=new Date(contract.contract_end);
-cmgdDate.setMonth(cmgdDate.getMonth()+6);
-
-let sfaDate=new Date(contract.contract_end);
-sfaDate.setMonth(sfaDate.getMonth()+12);
-
-/* CPC */
-document.getElementById("contractEnd").innerHTML =
-contractEnd<=today
-? "✅ Eligible for CPC"
-: "⏳ Contract ends: "+contract.contract_end;
-
-/* CMGD */
-document.getElementById("cmgdStatus").innerHTML =
-cmgdDate<=today
-? "✅ Eligible for CMGD"
-: "⏳ Available after: "+cmgdDate.toLocaleDateString("en-GB");
-
-/* SFA */
-document.getElementById("sfaStatus").innerHTML =
-sfaDate<=today
-? "✅ Eligible for SFA"
-: "⏳ Available after: "+sfaDate.toLocaleDateString("en-GB");
-
-/* BUTTON CONTROL */
-document.getElementById("btnCPC").style.display =
-contractEnd<=today?"block":"none";
-
-document.getElementById("btnCMGD").style.display =
-cmgdDate<=today?"block":"none";
-
-document.getElementById("btnSFA").style.display =
-sfaDate<=today?"block":"none";
-}
-
-/* SAVE CPC */
-async function saveCPC(){
-
-if(!c1.checked || !c2.checked || !c3.checked){
-alert("Sila lengkapkan CPC checklist");
-return;
-}
-
-await fetch(`${SB_URL}/rest/v1/contract_closing`,{
-method:"POST",
-headers,
-body:JSON.stringify({
-contract_id:contract.id,
-cpc_status:"COMPLETED"
-})
-});
-
-alert("CPC saved");
-}
-
-/* SAVE CMGD */
-async function saveCMGD(){
-await fetch(`${SB_URL}/rest/v1/contract_closing`,{
-method:"PATCH",
-headers,
-body:JSON.stringify({
-cmgd_date:cmgd.value,
-defect_status:defect.value,
-cmgd_remarks:cmgdRemark.value
-})
-});
-
-alert("CMGD saved");
-}
-
-/* SAVE SFA */
-async function saveSFA(){
-await fetch(`${SB_URL}/rest/v1/contract_closing`,{
-method:"PATCH",
-headers,
-body:JSON.stringify({
-sfa_date:sfa.value,
-final_account:final.value,
-retention_release:retention.value,
-pg_release:pg.value,
-sfa_remarks:sfaRemark.value,
-status:"CLOSED"
-})
-});
-
-alert("Contract Closed");
-}
-
-/* INIT */
-async function loadUnits(){
-const res=await fetch(`${SB_URL}/rest/v1/units`,{headers});
-const data=await res.json();
-
-let u=document.getElementById("unit");
-u.innerHTML="";
-
-data.forEach(x=>{
-u.innerHTML+=`<option value="${x.id}">${x.unit_name}</option>`;
-});
-
-if(data.length){
-u.value=data[0].id;
-loadContracts();
-}
-}
-
-loadUnits();
 </script>
-
 </body>
 </html>
