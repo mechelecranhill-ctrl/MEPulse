@@ -335,9 +335,21 @@
         .c-card .sub-text { font-size: 9px; color: #888; margin-top: 2px; }
 
         .analysis-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-        #analysis-panel { display: none; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); flex: 1; overflow: hidden; flex-direction: column; }
 
-        .health-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; flex: 1; overflow: hidden; margin-top: 5px; }
+        /* #analysis-panel is now the flip-card "stage": it holds the front (analysis)
+           and back (usage trend) faces and rotates between them on click. */
+        #analysis-panel {
+            display: none;
+            background: transparent;
+            box-shadow: none;
+            border-radius: 20px;
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+            perspective: 2200px;
+        }
+
+        .health-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; flex: 1; overflow: hidden; margin-top: 5px; cursor: pointer; }
         
         .chart-box { padding: 10px; background: #f9f9fb; border-radius: 15px; flex: 1; position: relative; min-height: 0; display: flex; flex-direction: column; transform: translateZ(0); }
 
@@ -352,6 +364,86 @@
         .sel-chip { display: inline-block; padding: 4px 10px; border-radius: 12px; background: #e5e5ea; margin: 3px; font-size: 10px; cursor: pointer; font-weight: 600; }
         .sel-chip.active { background: var(--ios-blue); color: white; }
         .selector-warning { font-size: 10px; color: var(--ios-red); font-weight: 700; margin-bottom: 8px; line-height: 1.4; }
+
+        /* ================= FLIP CARD MECHANICS ================= */
+        .flip-card-inner {
+            position: absolute;
+            inset: 0;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+        #analysis-panel.flipped .flip-card-inner {
+            transform: rotateY(180deg);
+        }
+        .flip-card-front, .flip-card-back {
+            position: absolute;
+            inset: 0;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .flip-card-front { padding: 20px; }
+        .flip-card-back {
+            transform: rotateY(180deg);
+            padding: 15px;
+            overflow-y: auto;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            .flip-card-front, .flip-card-back {
+                border-radius: 20px 20px 0 0 !important;
+            }
+        }
+
+        /* ================= USAGE TREND (page 2, scaled to fit the card) ================= */
+        .usage-embed { font-family: -apple-system, system-ui, sans-serif; height: 100%; display: flex; flex-direction: column; }
+        .usage-embed .u-header { margin-bottom: 10px; flex-shrink: 0; }
+        .usage-embed .u-title { font-size: 14px; font-weight: 800; color: var(--ios-blue); letter-spacing: -0.3px; }
+        .usage-embed .u-subtitle { font-size: 11px; color: #8e8e93; margin-top: 2px; }
+
+        .usage-embed .u-lifecycle {
+            display: flex; align-items: center; justify-content: flex-start;
+            gap: 0; background: #f9f9fb; padding: 12px 10px; border-radius: 12px;
+            margin-bottom: 10px; overflow-x: auto; flex-shrink: 0;
+        }
+        .usage-embed .u-award, .usage-embed .u-normal { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 48px; flex-shrink: 0; }
+        .usage-embed .u-dot { width: 20px; height: 20px; border-radius: 50%; background: #e5e5ea; display: flex; align-items: center; justify-content: center; font-size: 9px; }
+        .usage-embed .u-award span, .usage-embed .u-normal span, .usage-embed .u-node-label { font-size: 8px; font-weight: 700; color: #1c1c1e; margin-top: 3px; }
+        .usage-embed .u-done .u-dot { background: var(--ios-green); color: white; }
+        .usage-embed .u-current .u-dot { background: var(--ios-blue); color: white; }
+        .usage-embed .u-branch { position: relative; width: 116px; height: 76px; flex-shrink: 0; }
+        .usage-embed .u-branch-main { position: absolute; left: 0; top: 38px; width: 20px; height: 2px; background: #e5e5ea; }
+        .usage-embed .u-branch-split { position: absolute; left: 20px; top: 14px; width: 2px; height: 48px; background: #e5e5ea; }
+        .usage-embed .u-branch-wo { position: absolute; left: 20px; top: 14px; width: 32px; height: 2px; background: #e5e5ea; }
+        .usage-embed .u-branch-interim { position: absolute; left: 20px; top: 62px; width: 32px; height: 2px; background: #e5e5ea; }
+        .usage-embed .u-node-wo { position: absolute; left: 52px; top: 2px; }
+        .usage-embed .u-node-interim { position: absolute; left: 52px; top: 50px; }
+        .usage-embed .u-node { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 48px; }
+        .usage-embed .u-count { margin-top: 1px; font-size: 8px; font-weight: 800; color: var(--ios-blue); }
+        .usage-embed .u-merge { position: relative; width: 32px; height: 76px; flex-shrink: 0; }
+        .usage-embed .u-merge-wo { position: absolute; left: 0; top: 14px; width: 14px; height: 2px; background: #e5e5ea; }
+        .usage-embed .u-merge-interim { position: absolute; left: 0; top: 62px; width: 14px; height: 2px; background: #e5e5ea; }
+        .usage-embed .u-merge-vertical { position: absolute; left: 14px; top: 14px; width: 2px; height: 48px; background: #e5e5ea; }
+        .usage-embed .u-merge-main { position: absolute; left: 14px; top: 38px; width: 18px; height: 2px; background: #e5e5ea; }
+        .usage-embed .u-normal .u-dot { font-size: 7px; font-weight: 800; }
+        .usage-embed .u-line { width: 20px; height: 2px; background: #e5e5ea; flex-shrink: 0; }
+
+        .usage-embed .u-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; flex-shrink: 0; }
+        .usage-embed .u-card { background: #f9f9fb; padding: 8px 6px; border-radius: 10px; text-align: center; }
+        .usage-embed .u-label { font-size: 8px; color: #8e8e93; font-weight: 700; }
+        .usage-embed .u-value { font-size: 12px; font-weight: 800; margin-top: 3px; color: var(--ios-blue); }
+
+        .usage-embed .u-chartBox { background: #f9f9fb; padding: 10px; border-radius: 12px; margin-bottom: 10px; flex-shrink: 0; height: 160px; position: relative; }
+        .usage-embed .u-tableWrap { flex: 1; overflow-y: auto; border-radius: 10px; }
+        .usage-embed table { width: 100%; border-collapse: collapse; background: white; font-size: 10px; }
+        .usage-embed th, .usage-embed td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #f2f2f7; }
+        .usage-embed th { background: #f9f9fb; position: sticky; top: 0; }
         
     </style>
 
@@ -391,35 +483,111 @@
 
         <div class="analysis-container">
             <div id="analysis-panel">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #f2f2f7;">
-                    <div>
-                        <h1 id="panel-title" style="margin:0; font-size: 24px; letter-spacing: -0.5px; color: var(--ios-blue);">Analysis</h1>
-                        <p id="panel-vendor" style="margin:2px 0 0 0; color: #8e8e93; font-size: 13px; font-weight: 500;"></p>
-                    </div>
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <a href="#" class="mobile-usage-btn" id="mobileUsageBtn" onclick="handleMobileUsageClick(event)">
-                            <span class="btn-text">USAGE</span>
-                            <i class="fa fa-chevron-right icon-main"></i>
-                        </a>
-                    </div>
-                </div>
+                <div class="flip-card-inner" id="flipCardInner">
 
-                <div class="health-grid">
-                    <div class="chart-box">
-                        <div style="font-size: 11px; font-weight: bold; color: #666; margin-bottom: 10px;">MONTHLY AVERAGE: ACTUAL VS PLANNED (RM)</div>
-                        <canvas id="healthChart"></canvas>
-                    </div>
-                    <div style="display: flex; flex-direction: column; overflow: hidden;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; flex-shrink: 0; margin-bottom: 8px;">
-                            <h3 style="margin:0; font-size: 16px;">Sections</h3>
-                            <button id="manageBtn" class="manage-btn" onclick="toggleSelector()"><i class="fa fa-cog"></i> Setting</button>
+                    <!-- FRONT FACE: original analysis view -->
+                    <div class="flip-card-front" id="flipCardFront">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #f2f2f7;">
+                            <div>
+                                <h1 id="panel-title" style="margin:0; font-size: 24px; letter-spacing: -0.5px; color: var(--ios-blue);">Analysis</h1>
+                                <p id="panel-vendor" style="margin:2px 0 0 0; color: #8e8e93; font-size: 13px; font-weight: 500;"></p>
+                            </div>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <a href="#" class="mobile-usage-btn" id="mobileUsageBtn" onclick="handleMobileUsageClick(event)">
+                                    <span class="btn-text">USAGE</span>
+                                    <i class="fa fa-chevron-right icon-main"></i>
+                                </a>
+                            </div>
                         </div>
-                        <div id="sectionSelector" style="display:none; background: #f9f9fb; padding: 10px; border-radius: 15px; margin-bottom: 10px; border: 1px dashed #ccc;">
-                            <div class="selector-warning">* Sections selected here will be used as the displayed sections in the Blueform.</div>
-                            <div id="fullSectionList"></div>
+
+                        <div class="health-grid">
+                            <div class="chart-box">
+                                <div style="font-size: 11px; font-weight: bold; color: #666; margin-bottom: 10px;">MONTHLY AVERAGE: ACTUAL VS PLANNED (RM)</div>
+                                <canvas id="healthChart"></canvas>
+                            </div>
+                            <div style="display: flex; flex-direction: column; overflow: hidden;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; flex-shrink: 0; margin-bottom: 8px;">
+                                    <h3 style="margin:0; font-size: 16px;">Sections</h3>
+                                    <button id="manageBtn" class="manage-btn" onclick="toggleSelector()"><i class="fa fa-cog"></i> Setting</button>
+                                </div>
+                                <div id="sectionSelector" style="display:none; background: #f9f9fb; padding: 10px; border-radius: 15px; margin-bottom: 10px; border: 1px dashed #ccc;">
+                                    <div class="selector-warning">* Sections selected here will be used as the displayed sections in the Blueform.</div>
+                                    <div id="fullSectionList"></div>
+                                </div>
+                                <div id="selectedSectionContainer"></div>
+                            </div>
                         </div>
-                        <div id="selectedSectionContainer"></div>
                     </div>
+
+                    <!-- BACK FACE: usage trend dashboard, sized to fit the card -->
+                    <div class="flip-card-back" id="flipCardBack">
+                        <div class="usage-embed" id="usageEmbedRoot">
+                            <div class="u-header">
+                                <div class="u-title">USAGE SCHEDULE TREND</div>
+                                <div class="u-subtitle" id="uwSubtitle">Memuatkan data...</div>
+                            </div>
+
+                            <div class="u-lifecycle">
+                                <div class="u-award u-done">
+                                    <div class="u-dot"><i class="fa fa-check"></i></div>
+                                    <span>AWARD</span>
+                                </div>
+
+                                <div class="u-branch">
+                                    <div class="u-branch-main"></div>
+                                    <div class="u-branch-split"></div>
+                                    <div class="u-branch-wo"></div>
+                                    <div class="u-branch-interim"></div>
+
+                                    <div class="u-node u-node-wo u-done">
+                                        <div class="u-dot"><i class="fa fa-check"></i></div>
+                                        <div class="u-node-label">WO</div>
+                                        <div class="u-count" id="uwWoCount">0</div>
+                                    </div>
+
+                                    <div class="u-node u-node-interim u-current">
+                                        <div class="u-dot"><i class="fa fa-clock"></i></div>
+                                        <div class="u-node-label">INTERIM</div>
+                                        <div class="u-count" id="uwInterimCount">0</div>
+                                    </div>
+                                </div>
+
+                                <div class="u-merge">
+                                    <div class="u-merge-wo"></div>
+                                    <div class="u-merge-interim"></div>
+                                    <div class="u-merge-vertical"></div>
+                                    <div class="u-merge-main"></div>
+                                </div>
+
+                                <div class="u-normal"><div class="u-dot">CPC</div><span>CPC</span></div>
+                                <div class="u-line"></div>
+                                <div class="u-normal"><div class="u-dot">CMGD</div><span>CMGD</span></div>
+                                <div class="u-line"></div>
+                                <div class="u-normal"><div class="u-dot">SFA</div><span>SFA</span></div>
+                            </div>
+
+                            <div class="u-summary">
+                                <div class="u-card"><div class="u-label">CONTRACT VALUE</div><div class="u-value" id="uwContractValue">RM 0.00</div></div>
+                                <div class="u-card"><div class="u-label">USED</div><div class="u-value" id="uwUsedValue">RM 0.00</div></div>
+                                <div class="u-card"><div class="u-label">BALANCE</div><div class="u-value" id="uwBalanceValue">RM 0.00</div></div>
+                                <div class="u-card"><div class="u-label">PROGRESS</div><div class="u-value" id="uwProgressValue">0%</div></div>
+                            </div>
+
+                            <div class="u-chartBox">
+                                <canvas id="uwChart"></canvas>
+                            </div>
+
+                            <div class="u-tableWrap">
+                                <table>
+                                    <thead>
+                                        <tr><th>Month</th><th>Planned</th><th>Actual</th><th>Variance</th></tr>
+                                    </thead>
+                                    <tbody id="uwTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -514,6 +682,7 @@
         document.getElementById('contractSearch').value = '';
         document.body.classList.remove('analysis-active');
         document.getElementById('analysis-panel').style.display = 'none';
+        document.getElementById('analysis-panel').classList.remove('flipped');
 
         currentContract = null;
         currentWO = [];
@@ -580,9 +749,13 @@
     async function openAnalysis(contract) {
         const mobileBtn = document.getElementById('mobileUsageBtn');
         if(mobileBtn) mobileBtn.classList.remove('expanded');
+
+        // Reset the card to its front (analysis) face whenever a new contract is opened
+        document.getElementById('analysis-panel').classList.remove('flipped');
+        usageLoadedContractId = null;
         
         document.body.classList.add('analysis-active');
-        document.getElementById('analysis-panel').style.display = 'flex';
+        document.getElementById('analysis-panel').style.display = 'block';
         document.getElementById('panel-title').innerText = contract.contract_code;
         document.getElementById('panel-vendor').innerText = contract.contract_name;
 
@@ -878,6 +1051,202 @@
         }
         if(diff < 0 && activeIndex > 0) {
             units[activeIndex - 1].click();
+        }
+    }
+
+    /* ================================================================
+       FLIP CARD: click anywhere on the big analysis card (front or back),
+       EXCEPT the "USAGE" button and the "Setting" button/section selector,
+       to flip it and reveal the Usage Trend view sized to the card.
+       Click again anywhere to flip back.
+       ================================================================ */
+    let usageChartInstance = null;
+    let usageLoadedContractId = null;
+
+    document.getElementById('analysis-panel').addEventListener('click', function (e) {
+        if (
+            e.target.closest('#mobileUsageBtn') ||
+            e.target.closest('#manageBtn') ||
+            e.target.closest('#sectionSelector')
+        ) {
+            return;
+        }
+
+        const panel = document.getElementById('analysis-panel');
+        const isFlippingToBack = !panel.classList.contains('flipped');
+        panel.classList.toggle('flipped');
+
+        if (isFlippingToBack) {
+            loadUsageEmbedded();
+        }
+    });
+
+    function formatRM(value) {
+        return "RM " + Number(value || 0).toLocaleString("en-MY", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    async function loadUsageEmbedded() {
+        if (!currentContract) return;
+        const contractId = currentContract.id;
+        const subtitleEl = document.getElementById('uwSubtitle');
+        subtitleEl.innerText = 'Memuatkan data...';
+
+        try {
+            const contractRes = await fetch(
+                `${API_URL}/rest/v1/contract?id=eq.${encodeURIComponent(contractId)}&select=*`,
+                { headers }
+            );
+            if (!contractRes.ok) throw new Error(`HTTP ${contractRes.status}`);
+            const contractRows = await contractRes.json();
+            const contract = Array.isArray(contractRows) ? contractRows[0] : null;
+
+            if (!contract) {
+                subtitleEl.innerHTML = `<span style="color:var(--ios-red); font-weight:700;">Kontrak tidak dijumpai</span>`;
+                return;
+            }
+
+            subtitleEl.innerText = (contract.contract_code || 'N/A') + ' • ' + (contract.contract_name || '');
+
+            const [woRes, interimRes] = await Promise.all([
+                fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${encodeURIComponent(contractId)}&select=id,status`, { headers }),
+                fetch(`${API_URL}/rest/v1/interims?contract_id=eq.${encodeURIComponent(contractId)}&order=claim_date.asc&select=*`, { headers })
+            ]);
+            if (!woRes.ok) throw new Error(`HTTP ${woRes.status}`);
+            if (!interimRes.ok) throw new Error(`HTTP ${interimRes.status}`);
+
+            const rawWorkOrders = await woRes.json();
+            const interims = await interimRes.json();
+
+            const ignoredWOStatuses = new Set(["CANCEL", "EXEC-REJ", "HOS-REJ", "HOD-REJ"]);
+            const validWorkOrders = (Array.isArray(rawWorkOrders) ? rawWorkOrders : []).filter(row => {
+                const status = String(row.status || "").trim().toUpperCase();
+                return !ignoredWOStatuses.has(status);
+            });
+            const safeInterims = Array.isArray(interims) ? interims : [];
+
+            document.getElementById('uwWoCount').innerText = validWorkOrders.length.toLocaleString('en-MY');
+            document.getElementById('uwInterimCount').innerText = safeInterims.length.toLocaleString('en-MY');
+
+            const contractValue = Number(contract.contract_sum || 0);
+            const totalUsed = safeInterims.reduce((sum, row) => sum + Number(row.net_amount || row.claim_amount || 0), 0);
+            const balance = contractValue - totalUsed;
+            const progress = contractValue ? ((totalUsed / contractValue) * 100).toFixed(1) : 0;
+
+            document.getElementById('uwContractValue').innerText = formatRM(contractValue);
+            document.getElementById('uwUsedValue').innerText = formatRM(totalUsed);
+            document.getElementById('uwBalanceValue').innerText = formatRM(balance);
+            document.getElementById('uwProgressValue').innerText = progress + '%';
+
+            const monthlyMap = {};
+            safeInterims.forEach(item => {
+                if (!item.claim_date) return;
+                const date = new Date(item.claim_date);
+                const month = date.toLocaleString('en', { month: 'short' });
+                monthlyMap[month] = (monthlyMap[month] || 0) + Number(item.net_amount || item.claim_amount || 0);
+            });
+
+            let months = Object.keys(monthlyMap);
+            let actual = Object.values(monthlyMap);
+            if (months.length === 0) {
+                months = ['Jan', 'Feb', 'Mar'];
+                actual = [0, 0, 0];
+            }
+            const planned = months.map(() => contractValue / 12);
+
+            buildUsageChart(months, planned, actual);
+            buildUsageTable(Object.keys(monthlyMap), planned, actual);
+            updateUsageLifecycle(contract, safeInterims);
+
+            usageLoadedContractId = contractId;
+        } catch (err) {
+            console.error('Ralat usage embed:', err);
+            subtitleEl.innerHTML = `<span style="color:var(--ios-red); font-weight:700;">Gagal memuatkan data</span>`;
+        }
+    }
+
+    function buildUsageChart(months, planned, actual) {
+        const ctx = document.getElementById('uwChart');
+        if (!ctx) return;
+        if (usageChartInstance) { usageChartInstance.destroy(); }
+
+        usageChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: months,
+                datasets: [
+                    { label: 'Planned', data: planned, borderColor: '#8e8e93', borderDash: [6, 4], fill: false, tension: 0.3, pointRadius: 2 },
+                    { label: 'Actual', data: actual, borderColor: '#007AFF', backgroundColor: 'rgba(0,122,255,0.15)', fill: true, tension: 0.35, pointRadius: 3 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { font: { size: 9, weight: 'bold' } } },
+                    datalabels: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true, ticks: { font: { size: 8 } } },
+                    x: { ticks: { font: { size: 8 } } }
+                }
+            }
+        });
+    }
+
+    function buildUsageTable(months, planned, actual) {
+        const body = document.getElementById('uwTableBody');
+        if (!body) return;
+        body.innerHTML = '';
+
+        if (months.length === 0) {
+            body.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#8e8e93;">Tiada rekod tuntutan interim</td></tr>`;
+            return;
+        }
+
+        months.forEach((m, i) => {
+            const variance = (actual[i] || 0) - (planned[i] || 0);
+            const color = variance > 0 ? '#FF3B30' : '#34C759';
+            body.innerHTML += `<tr><td>${m}</td><td>${formatRM(planned[i])}</td><td>${formatRM(actual[i])}</td><td style="color:${color}; font-weight:700;">${formatRM(variance)}</td></tr>`;
+        });
+    }
+
+    function updateUsageLifecycle(contract, interims) {
+        const root = document.getElementById('flipCardBack');
+        if (!root) return;
+
+        const awardNode = root.querySelector('.u-award');
+        const woNode = root.querySelector('.u-node-wo');
+        const interimNode = root.querySelector('.u-node-interim');
+        if (!awardNode || !woNode || !interimNode) return;
+
+        awardNode.classList.remove('u-done', 'u-current');
+        woNode.classList.remove('u-done', 'u-current');
+        interimNode.classList.remove('u-done', 'u-current');
+
+        if (contract) awardNode.classList.add('u-done');
+        woNode.classList.add('u-done');
+
+        if (interims.length > 0) {
+            interimNode.classList.add('u-current');
+        } else {
+            woNode.classList.remove('u-done');
+            woNode.classList.add('u-current');
+        }
+
+        const normals = root.querySelectorAll('.u-normal');
+        normals.forEach(n => n.classList.remove('u-done', 'u-current'));
+
+        if (contract && contract.contract_end) {
+            const today = new Date();
+            const endDate = new Date(contract.contract_end);
+            if (!isNaN(endDate.getTime()) && today > endDate) {
+                interimNode.classList.remove('u-current');
+                interimNode.classList.add('u-done');
+                if (normals[0]) normals[0].classList.add('u-current');
+            }
         }
     }
 </script>
