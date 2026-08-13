@@ -1,782 +1,1254 @@
 <!DOCTYPE html>
-<html lang="ms">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Usage Trend Dashboard</title>
-
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link rel="icon" href="data:,">
-
-<style>
-:root{
-    --ios-blue:#007AFF;
-    --ios-green:#34C759;
-    --ios-red:#FF3B30;
-    --bg:#f2f2f7;
-}
-
-body{
-    margin:0;
-    font-family:-apple-system,system-ui,sans-serif;
-    background:var(--bg);
-    padding:15px;
-}
-
-/* HEADER */
-.header{
-    background:white;
-    padding:15px;
-    border-radius:15px;
-    margin-bottom:15px;
-}
-
-.title{
-    font-size:18px;
-    font-weight:800;
-    color:var(--ios-blue);
-}
-
-.subtitle{
-    font-size:12px;
-    color:#8e8e93;
-}
-
-/* ============================================================
-   LIFECYCLE - BRANCH / TREE TIMELINE
-   AWARD
-      │
-      ├── WO
-      │    value
-      │
-      └── INTERIM
-           value
-             │
-             └── CPC ── CMGD ── SFA
-   ============================================================ */
-
-.lifecycle{
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    gap:0;
-    background:white;
-    padding:18px 15px;
-    border-radius:15px;
-    margin-bottom:15px;
-    overflow-x:auto;
-}
-
-/* AWARD */
-.lifecycle-award{
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    min-width:75px;
-    flex-shrink:0;
-}
-
-.lifecycle-award .dot{
-    margin-bottom:5px;
-}
-
-/* Branch area */
-.lifecycle-branch{
-    position:relative;
-    width:180px;
-    height:112px;
-    flex-shrink:0;
-}
-
-/* Main split line from AWARD */
-.branch-main{
-    position:absolute;
-    left:0;
-    top:56px;
-    width:32px;
-    height:2px;
-    background:#e5e5ea;
-}
-
-/* Vertical split */
-.branch-split{
-    position:absolute;
-    left:32px;
-    top:20px;
-    width:2px;
-    height:72px;
-    background:#e5e5ea;
-}
-
-/* Upper branch to WO */
-.branch-wo{
-    position:absolute;
-    left:32px;
-    top:20px;
-    width:48px;
-    height:2px;
-    background:#e5e5ea;
-}
-
-/* Lower branch to INTERIM */
-.branch-interim{
-    position:absolute;
-    left:32px;
-    top:92px;
-    width:48px;
-    height:2px;
-    background:#e5e5ea;
-}
-
-/* WO node */
-.branch-node-wo{
-    position:absolute;
-    left:80px;
-    top:4px;
-}
-
-/* INTERIM node */
-.branch-node-interim{
-    position:absolute;
-    left:80px;
-    top:76px;
-}
-
-/* Node contents */
-.branch-node{
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    min-width:72px;
-}
-
-.branch-node .dot{
-    margin-bottom:4px;
-}
-
-.branch-node .node-label{
-    font-size:10px;
-    font-weight:700;
-    color:#1c1c1e;
-    line-height:1.1;
-}
-
-.timeline-count{
-    margin-top:2px;
-    font-size:11px;
-    font-weight:800;
-    color:var(--ios-blue);
-    line-height:1;
-}
-
-.timeline-count .count-value{
-    color:var(--ios-blue);
-}
-
-/* Merge area after WO / INTERIM */
-.lifecycle-merge{
-    position:relative;
-    width:52px;
-    height:112px;
-    flex-shrink:0;
-}
-
-/* Upper branch enters merge */
-.merge-wo{
-    position:absolute;
-    left:0;
-    top:20px;
-    width:20px;
-    height:2px;
-    background:#e5e5ea;
-}
-
-/* Lower branch enters merge */
-.merge-interim{
-    position:absolute;
-    left:0;
-    top:92px;
-    width:20px;
-    height:2px;
-    background:#e5e5ea;
-}
-
-/* Vertical merge */
-.merge-vertical{
-    position:absolute;
-    left:20px;
-    top:20px;
-    width:2px;
-    height:72px;
-    background:#e5e5ea;
-}
-
-/* Single line leaving merge */
-.merge-main{
-    position:absolute;
-    left:20px;
-    top:56px;
-    width:32px;
-    height:2px;
-    background:#e5e5ea;
-}
-
-/* Normal lifecycle node after merge */
-.lifecycle-normal{
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    min-width:62px;
-    flex-shrink:0;
-}
-
-.lifecycle-normal .dot{
-    margin-bottom:5px;
-}
-
-.lifecycle-normal span{
-    font-size:10px;
-    font-weight:700;
-    color:#1c1c1e;
-}
-
-/* Connecting line */
-.lifecycle-line{
-    width:38px;
-    height:2px;
-    background:#e5e5ea;
-    flex-shrink:0;
-}
-
-/* Existing step styles retained for compatibility */
-.step{
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    min-width:70px;
-}
-
-.dot{
-    width:28px;
-    height:28px;
-    border-radius:50%;
-    background:#e5e5ea;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-size:12px;
-}
-
-.done .dot{
-    background:var(--ios-green);
-    color:white;
-}
-
-.current .dot{
-    background:var(--ios-blue);
-    color:white;
-}
-
-.overdue .dot{
-    background:var(--ios-red);
-    color:white;
-}
-
-.line{
-    flex:1;
-    height:3px;
-    background:#e5e5ea;
-    border-radius:2px;
-}
-
-/* SUMMARY */
-.summary{
-    display:grid;
-    grid-template-columns:repeat(4,1fr);
-    gap:10px;
-    margin-bottom:15px;
-}
-
-.card{
-    background:white;
-    padding:12px;
-    border-radius:15px;
-    text-align:center;
-}
-
-.label{
-    font-size:10px;
-    color:#8e8e93;
-    font-weight:700;
-}
-
-.value{
-    font-size:16px;
-    font-weight:800;
-    margin-top:5px;
-    color:var(--ios-blue);
-}
-
-/* CHART */
-.chartBox{
-    background:white;
-    padding:15px;
-    border-radius:15px;
-    margin-bottom:15px;
-}
-
-/* TABLE */
-table{
-    width:100%;
-    border-collapse:collapse;
-    background:white;
-    border-radius:15px;
-    overflow:hidden;
-}
-
-th,td{
-    padding:10px;
-    font-size:12px;
-    text-align:left;
-    border-bottom:1px solid #eee;
-}
-
-th{
-    background:#f9f9fb;
-}
-
-.timeline-count {
-    font-size: 10px;
-    font-weight: 800;
-    color: var(--ios-blue);
-    margin-top: 3px;
-    line-height: 1.1;
-}
-
-.timeline-count .count-label {
-    color: #8e8e93;
-    margin-right: 2px;
-}
-
-.timeline-count .count-value {
-    font-size: 11px;
-    color: var(--ios-blue);
-}
-
-.timeline-wo {
-    margin-top: 3px;
-}
-
-.timeline-interim {
-    margin-top: 3px;
-}
-
-/* MOBILE */
-@media(max-width:768px){
-    .summary{
-        grid-template-columns:repeat(2,1fr);
-    }
-        .timeline-count {
-        font-size: 9px;
-    }
-
-    .timeline-count .count-value {
-        font-size: 10px;
-    }
-}
-</style>
-</head>
-
-<body>
-
-<div class="header">
-    <div class="title">CONTRACT HEALTH DASHBOARD</div>
-    <div class="subtitle">Memuatkan data kontrak...</div>
-</div>
-
-<div class="lifecycle">
-
-    <!-- AWARD -->
-    <div class="lifecycle-award done">
-        <div class="dot"><i class="fa fa-check"></i></div>
-        <span>AWARD</span>
-    </div>
-
-    <!-- AWARD -> SPLIT -> WO / INTERIM -->
-    <div class="lifecycle-branch">
-
-        <div class="branch-main"></div>
-        <div class="branch-split"></div>
-
-        <div class="branch-wo"></div>
-        <div class="branch-interim"></div>
-
-        <!-- WO branch -->
-        <div class="branch-node branch-node-wo done">
-            <div class="dot"><i class="fa fa-check"></i></div>
-            <div class="node-label">WO</div>
-            <div class="timeline-count">
-                <span class="count-value" id="woCount">0</span>
-            </div>
-        </div>
-
-        <!-- INTERIM branch -->
-        <div class="branch-node branch-node-interim current">
-            <div class="dot"><i class="fa fa-clock"></i></div>
-            <div class="node-label">INTERIM</div>
-            <div class="timeline-count">
-                <span class="count-value" id="interimCount">0</span>
-            </div>
-        </div>
-
-    </div>
-
-    <!-- WO + INTERIM -> MERGE -->
-    <div class="lifecycle-merge">
-        <div class="merge-wo"></div>
-        <div class="merge-interim"></div>
-        <div class="merge-vertical"></div>
-        <div class="merge-main"></div>
-    </div>
-
-    <!-- CPC -->
-    <div class="lifecycle-normal">
-        <div class="dot">CPC</div>
-        <span>CPC</span>
-    </div>
-
-    <div class="lifecycle-line"></div>
-
-    <!-- CMGD -->
-    <div class="lifecycle-normal">
-        <div class="dot">CMGD</div>
-        <span>CMGD</span>
-    </div>
-
-    <div class="lifecycle-line"></div>
-
-    <!-- SFA -->
-    <div class="lifecycle-normal">
-        <div class="dot">SFA</div>
-        <span>SFA</span>
-    </div>
-
-</div>
-
-<div class="summary">
-    <div class="card">
-        <div class="label">CONTRACT VALUE</div>
-        <div class="value" id="contractValue">RM 0.00</div>
-    </div>
-
-    <div class="card">
-        <div class="label">USED</div>
-        <div class="value" id="usedValue">RM 0.00</div>
-    </div>
-
-    <div class="card">
-        <div class="label">BALANCE</div>
-        <div class="value" id="balanceValue">RM 0.00</div>
-    </div>
-
-    <div class="card">
-        <div class="label">PROGRESS</div>
-        <div class="value" id="progressValue">0%</div>
-    </div>
-</div>
-
-<div class="chartBox">
-    <canvas id="chart"></canvas>
-</div>
-
-<table>
-<thead>
-<tr>
-    <th>Month</th>
-    <th>Planned</th>
-    <th>Actual</th>
-    <th>Variance</th>
-</tr>
-</thead>
-<tbody id="tableBody"></tbody>
-</table>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<script>
-const API_URL = "https://me-connect-api.mech-elec-ranhill.workers.dev";
-const headers = {
-    "Content-Type": "application/json"
-};
-
-let chartInstance = null;
-
-function formatRM(value){
-    return "RM " + Number(value || 0).toLocaleString("en-MY", {
-        minimumFractionDigits:2,
-        maximumFractionDigits:2
-    });
-}
-
-function updateRecordCounts(woCount, interimCount){
-    const woEl = document.getElementById("woCount");
-    const interimEl = document.getElementById("interimCount");
-
-    if(woEl){
-        woEl.innerText = Number(woCount || 0).toLocaleString("en-MY");
-    }
-
-    if(interimEl){
-        interimEl.innerText = Number(interimCount || 0).toLocaleString("en-MY");
-    }
-}
-
-async function loadDashboard(){
-    try{
-        // ID kontrak dikekalkan seperti fungsi asal.
-        const contractId = 2;
-
-        /* ==========================
-           CONTRACT FETCH - CLOUDFLARE
-        ========================== */
-        const contractRes = await fetch(
-            `${API_URL}/rest/v1/contract?id=eq.${encodeURIComponent(contractId)}&select=*`,
-            { headers }
-        );
-
-        if(!contractRes.ok){
-            throw new Error(`Gagal mendapatkan kontrak: HTTP ${contractRes.status}`);
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contract Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0" defer></script>
+    <style>
+        :root { 
+            --ios-blue: #007AFF; --ios-green: #34C759; --ios-orange: #FF9500; --ios-red: #FF3B30;
+            --dark-bg: #1c1c1e; --card-bg: #ffffff; --glass: rgba(255,255,255,0.8);
         }
 
-        const contractRows = await contractRes.json();
-        const contract = Array.isArray(contractRows) ? contractRows[0] : null;
+        body { 
+            font-family: -apple-system, system-ui, sans-serif;   
+            background: linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%); 
+            margin: 0; 
+            height: 100vh; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+        }
+        .search-container {
+            padding: 5px 10px 10px 0;
+            flex-shrink: 0;
+        }
+        .search-box {
+            width: 100%;
+            padding: 10px 15px;
+            border-radius: 12px;
+            border: 1px solid #d1d1d6;
+            background: white;
+            font-size: 13px;
+            outline: none;
+            box-sizing: border-box;
+            transition: border-color 0.2s; 
+        }
+        .search-box:focus {
+            border-color: var(--ios-blue);
+        }
+        .mobile-usage-btn { display: none; } 
 
-        if(!contract) {
-            document.querySelector(".subtitle").innerHTML =
-                `<span style="color:red;font-weight:bold;">Ralat: Kontrak ID ${contractId} tidak dijumpai!</span>`;
-            updateRecordCounts(0, 0);
+        .glass-header { 
+            width: 100%; height: 60px; 
+            background: linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%);
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 1px 10px rgba(0,0,0,0.05); z-index: 1000; flex-shrink: 0;
+            position: relative;
+            padding: 0 60px;
+            box-sizing: border-box;
+        }
+
+        .unit-container-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+
+        .unit-container {
+            display: flex;
+            flex-wrap: wrap;         
+            justify-content: center; 
+            gap: 8px;
+            padding: 0;
+        }
+
+        .unit-pill { 
+            padding: 8px 16px;
+            border-radius: 15px;     
+            background: rgba(255,255,255,.2);
+            color: white;
+            border: none; 
+            cursor: pointer; 
+            font-weight: 600; 
+            font-size: 12px; 
+            white-space: nowrap; 
+            transition: background-color 0.2s, color 0.2s; 
+        }
+        .unit-pill.active { 
+            background: white;
+            color: #0b3d91; 
+        }
+
+        @media (max-width: 768px) {
+            #panel-vendor, 
+            .next-container { 
+                display: none !important; 
+            }
+
+            #analysis-panel > div:first-child {
+                position: relative;
+            }
+
+            .mobile-usage-btn {
+                display: flex;
+                background: var(--ios-blue);
+                color: white;
+                text-decoration: none;
+                padding: 0 10px;
+                border-radius: 50%;
+                font-size: 11px;
+                font-weight: 800;
+                align-items: center;
+                justify-content: center;
+                transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-radius 0.3s ease, padding 0.3s ease;
+                will-change: width, border-radius;
+                position: absolute;
+                right: 0;
+                top: 0;
+                width: 35px;
+                height: 35px;
+                box-sizing: border-box;
+                overflow: hidden;
+                z-index: 1510;
+            }
+
+            .mobile-usage-btn .btn-text {
+                opacity: 0;
+                width: 0;
+                white-space: nowrap;
+                transition: opacity 0.2s ease, margin 0.3s ease;
+                font-size: 11px;
+                letter-spacing: 0.5px;
+            }
+
+            .mobile-usage-btn .icon-main {
+                font-size: 11px;
+                flex-shrink: 0;
+            }
+
+            .mobile-usage-btn.expanded {
+                width: 105px;
+                padding: 0 12px;
+                border-radius: 10px;
+                box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+            }
+
+            .mobile-usage-btn.expanded .btn-text {
+                opacity: 1;
+                width: auto;
+                margin-right: 5px;
+            }
+
+            .contract-sidebar {
+                width: 100% !important;
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                will-change: transform;
+            }
+
+            .analysis-container {
+                position: fixed;
+                top: 60px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                width: auto;
+                height: auto;
+                box-sizing: border-box;
+                padding: 10px;
+                background: #f2f2f7;
+                z-index: 1500;
+                transform: translateX(100%);
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                will-change: transform;
+                overflow-x: hidden;
+            }
+
+            body.analysis-active .analysis-container { 
+                transform: translateX(0);
+            }
+            body.analysis-active .contract-sidebar {
+                transform: translateX(-100%);
+            }
+
+            #analysis-panel {
+                border-radius: 20px 20px 0 0 !important;
+                height: 100%; 
+                min-width: 0;
+            }
+            .health-grid {
+                grid-template-columns: 1fr !important;
+                overflow-y: auto !important; 
+                min-width: 0;
+            }
+            .chart-box {
+                min-height: 250px;
+                flex-shrink: 0; 
+                min-width: 0;
+            }
+
+            .glass-header {
+                padding: 0 10px; 
+            }
+
+            .unit-container-wrapper {
+                flex: 1;
+                overflow: hidden;
+                margin: 0 50px;  
+            }
+
+            .unit-container {
+                flex-wrap: nowrap;           
+                justify-content: flex-start;
+                overflow-x: auto;
+                scroll-behavior: smooth;
+                scroll-snap-type: x mandatory;
+                scrollbar-width: none;
+                padding: 0 16px;
+            }
+
+            .unit-container::-webkit-scrollbar { display: none; }
+
+            .unit-container::before,
+            .unit-container::after {
+                display: block;
+                content: "";
+                flex: 0 0 50%;
+            }
+
+            .unit-pill {
+                scroll-snap-align: center;
+            }
+
+            .fab {
+                top: 12px;
+                right: 15px;
+                border-radius: 50%;
+                will-change: width, border-radius;
+            }
+
+        }
+
+        .nav-btn {
+            position: absolute;
+            background: #e5e5ea;
+            border: none;
+            height: 35px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--ios-blue);
+            padding: 0 10px;
+        }
+
+        .next-container {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 2000;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 15px;
+            border-radius: 20px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            border: 1px solid rgba(0, 122, 255, 0.2);
+        }
+        .next-label { font-size: 11px; font-weight: 800; color: #48484a; letter-spacing: 0.8px; text-align: right; }
+        .next-btn-circle {
+            background: var(--ios-blue);
+            border: none;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.4);
+        }
+
+        .fab { 
+            position: fixed; 
+            top: 12px; 
+            right: 20px; 
+            height: 35px; 
+            width: 35px;
+            background: var(--ios-blue); 
+            color: white; 
+            border-radius: 10px;
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            cursor: pointer; 
+            z-index: 1100;
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s ease;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        .fab .fab-text {
+            opacity: 0;
+            width: 0;
+            white-space: nowrap;
+            transition: opacity 0.2s ease, margin 0.3s ease;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+        }
+
+        .fab .icon-main {
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+                    .fab.expanded {
+                width: 150px; 
+                padding: 0 12px;
+                border-radius: 10px;
+                justify-content: space-between;
+                box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+            }
+
+            .fab.expanded .fab-text {
+                opacity: 1;
+                width: auto;
+                margin-right: 5px;
+            }
+
+        .main-wrapper { display: flex; flex: 1; overflow: hidden; padding: 10px; gap: 15px; }
+        .contract-sidebar { width: 220px; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+        #contractList { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 5px; }
+        
+        .c-card { background: var(--card-bg); border-radius: 12px; padding: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); cursor: pointer; border: 1px solid rgba(0,0,0,0.05); }
+        .c-card.active { border-color: var(--ios-blue); background: #f0f7ff; }
+        .c-card h4 { margin: 0; font-size: 11px; color: #1c1c1e; overflow: hidden; text-overflow: ellipsis; }
+        .c-card .sub-text { font-size: 9px; color: #888; margin-top: 2px; }
+
+        .analysis-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* #analysis-panel is now the flip-card "stage": it holds the front (analysis)
+           and back (usage trend) faces and rotates between them on click. */
+        #analysis-panel {
+            display: none;
+            background: transparent;
+            box-shadow: none;
+            border-radius: 20px;
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+            perspective: 2200px;
+        }
+
+        .health-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; flex: 1; overflow: hidden; margin-top: 5px; cursor: pointer; }
+        
+        .chart-box { padding: 10px; background: #f9f9fb; border-radius: 15px; flex: 1; position: relative; min-height: 0; display: flex; flex-direction: column; transform: translateZ(0); }
+
+        .section-row { background: #fff; border: 1px solid var(--ios-blue); border-radius: 12px; padding: 10px; margin-bottom: 8px; }
+        .prog-bar-bg { width: 100%; height: 8px; background: #eee; border-radius: 4px; margin-top: 5px; overflow: hidden; }
+
+        .prog-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease-out !important; width: 0 !important; will-change: width;}
+        .avg-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 5px; }
+        .avg-item { font-size: 9px; font-weight: 600; color: #666; }
+        .manage-btn { background: #f2f2f7; border: none; padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; color: var(--ios-blue); cursor: pointer; }
+        #selectedSectionContainer { flex: 1; overflow-y: auto; padding-right: 5px; }
+        .sel-chip { display: inline-block; padding: 4px 10px; border-radius: 12px; background: #e5e5ea; margin: 3px; font-size: 10px; cursor: pointer; font-weight: 600; }
+        .sel-chip.active { background: var(--ios-blue); color: white; }
+        .selector-warning { font-size: 10px; color: var(--ios-red); font-weight: 700; margin-bottom: 8px; line-height: 1.4; }
+
+        /* ================= FLIP CARD MECHANICS ================= */
+        .flip-card-inner {
+            position: absolute;
+            inset: 0;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+        #analysis-panel.flipped .flip-card-inner {
+            transform: rotateY(180deg);
+        }
+        .flip-card-front, .flip-card-back {
+            position: absolute;
+            inset: 0;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .flip-card-front { padding: 20px; }
+        .flip-card-back {
+            transform: rotateY(180deg);
+            padding: 15px;
+            overflow-y: auto;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            .flip-card-front, .flip-card-back {
+                border-radius: 20px 20px 0 0 !important;
+            }
+        }
+
+        /* ================= USAGE TREND (page 2, scaled to fit the card) ================= */
+        .usage-embed { font-family: -apple-system, system-ui, sans-serif; height: 100%; display: flex; flex-direction: column; }
+        .usage-embed .u-header { margin-bottom: 10px; flex-shrink: 0; }
+        .usage-embed .u-title { font-size: 14px; font-weight: 800; color: var(--ios-blue); letter-spacing: -0.3px; }
+        .usage-embed .u-subtitle { font-size: 11px; color: #8e8e93; margin-top: 2px; }
+
+        .usage-embed .u-lifecycle {
+            display: flex; align-items: center; justify-content: flex-start;
+            gap: 0; background: #f9f9fb; padding: 12px 10px; border-radius: 12px;
+            margin-bottom: 10px; overflow-x: auto; flex-shrink: 0;
+        }
+        .usage-embed .u-award, .usage-embed .u-normal { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 48px; flex-shrink: 0; }
+        .usage-embed .u-dot { width: 20px; height: 20px; border-radius: 50%; background: #e5e5ea; display: flex; align-items: center; justify-content: center; font-size: 9px; }
+        .usage-embed .u-award span, .usage-embed .u-normal span, .usage-embed .u-node-label { font-size: 8px; font-weight: 700; color: #1c1c1e; margin-top: 3px; }
+        .usage-embed .u-done .u-dot { background: var(--ios-green); color: white; }
+        .usage-embed .u-current .u-dot { background: var(--ios-blue); color: white; }
+        .usage-embed .u-branch { position: relative; width: 116px; height: 76px; flex-shrink: 0; }
+        .usage-embed .u-branch-main { position: absolute; left: 0; top: 38px; width: 20px; height: 2px; background: #e5e5ea; }
+        .usage-embed .u-branch-split { position: absolute; left: 20px; top: 14px; width: 2px; height: 48px; background: #e5e5ea; }
+        .usage-embed .u-branch-wo { position: absolute; left: 20px; top: 14px; width: 32px; height: 2px; background: #e5e5ea; }
+        .usage-embed .u-branch-interim { position: absolute; left: 20px; top: 62px; width: 32px; height: 2px; background: #e5e5ea; }
+        .usage-embed .u-node-wo { position: absolute; left: 52px; top: 2px; }
+        .usage-embed .u-node-interim { position: absolute; left: 52px; top: 50px; }
+        .usage-embed .u-node { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 48px; }
+        .usage-embed .u-count { margin-top: 1px; font-size: 8px; font-weight: 800; color: var(--ios-blue); }
+        .usage-embed .u-merge { position: relative; width: 32px; height: 76px; flex-shrink: 0; }
+        .usage-embed .u-merge-wo { position: absolute; left: 0; top: 14px; width: 14px; height: 2px; background: #e5e5ea; }
+        .usage-embed .u-merge-interim { position: absolute; left: 0; top: 62px; width: 14px; height: 2px; background: #e5e5ea; }
+        .usage-embed .u-merge-vertical { position: absolute; left: 14px; top: 14px; width: 2px; height: 48px; background: #e5e5ea; }
+        .usage-embed .u-merge-main { position: absolute; left: 14px; top: 38px; width: 18px; height: 2px; background: #e5e5ea; }
+        .usage-embed .u-normal .u-dot { font-size: 7px; font-weight: 800; }
+        .usage-embed .u-line { width: 20px; height: 2px; background: #e5e5ea; flex-shrink: 0; }
+
+        .usage-embed .u-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; flex-shrink: 0; }
+        .usage-embed .u-card { background: #f9f9fb; padding: 8px 6px; border-radius: 10px; text-align: center; }
+        .usage-embed .u-label { font-size: 8px; color: #8e8e93; font-weight: 700; }
+        .usage-embed .u-value { font-size: 12px; font-weight: 800; margin-top: 3px; color: var(--ios-blue); }
+
+        .usage-embed .u-chartBox { background: #f9f9fb; padding: 10px; border-radius: 12px; margin-bottom: 10px; flex-shrink: 0; height: 160px; position: relative; }
+        .usage-embed .u-tableWrap { flex: 1; overflow-y: auto; border-radius: 10px; }
+        .usage-embed table { width: 100%; border-collapse: collapse; background: white; font-size: 10px; }
+        .usage-embed th, .usage-embed td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #f2f2f7; }
+        .usage-embed th { background: #f9f9fb; position: sticky; top: 0; }
+        
+    </style>
+
+    <link rel="stylesheet" href="sidebar.css">
+
+    <script src="session.js" defer></script>
+    <script src="sidebar.js" defer></script>
+</head>
+<body>
+
+    <app-sidebar></app-sidebar>
+    <div class="fab" id="fabBtn" onclick="handleFabClick(event)">
+        <span class="fab-text">REGISTER FORMS</span>
+        <i class="fa fa-plus icon-main"></i>
+    </div>
+
+    <div class="glass-header">
+        <div class="unit-container-wrapper">
+            <div class="unit-container" id="unitNav"></div>
+        </div>
+    </div>
+
+    <div class="next-container">
+        <span class="next-label">USAGE<br>SCHEDULE</span>
+        <button class="next-btn-circle" onclick="goToUsage()">
+            <i class="fa fa-chevron-right"></i>
+        </button>
+    </div>
+
+    <div class="main-wrapper">
+        <div class="contract-sidebar">
+            <div class="search-container">
+                <input type="text" id="contractSearch" class="search-box" placeholder="Search Code/Contract" onkeyup="debouncedFilterContracts()">
+            </div>
+            <div id="contractList"></div>
+        </div>
+
+        <div class="analysis-container">
+            <div id="analysis-panel">
+                <div class="flip-card-inner" id="flipCardInner">
+
+                    <!-- FRONT FACE: original analysis view -->
+                    <div class="flip-card-front" id="flipCardFront">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #f2f2f7;">
+                            <div>
+                                <h1 id="panel-title" style="margin:0; font-size: 24px; letter-spacing: -0.5px; color: var(--ios-blue);">Analysis</h1>
+                                <p id="panel-vendor" style="margin:2px 0 0 0; color: #8e8e93; font-size: 13px; font-weight: 500;"></p>
+                            </div>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <a href="#" class="mobile-usage-btn" id="mobileUsageBtn" onclick="handleMobileUsageClick(event)">
+                                    <span class="btn-text">USAGE</span>
+                                    <i class="fa fa-chevron-right icon-main"></i>
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="health-grid">
+                            <div class="chart-box">
+                                <div style="font-size: 11px; font-weight: bold; color: #666; margin-bottom: 10px;">MONTHLY AVERAGE: ACTUAL VS PLANNED (RM)</div>
+                                <canvas id="healthChart"></canvas>
+                            </div>
+                            <div style="display: flex; flex-direction: column; overflow: hidden;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; flex-shrink: 0; margin-bottom: 8px;">
+                                    <h3 style="margin:0; font-size: 16px;">Sections</h3>
+                                    <button id="manageBtn" class="manage-btn" onclick="toggleSelector()"><i class="fa fa-cog"></i> Setting</button>
+                                </div>
+                                <div id="sectionSelector" style="display:none; background: #f9f9fb; padding: 10px; border-radius: 15px; margin-bottom: 10px; border: 1px dashed #ccc;">
+                                    <div class="selector-warning">* Sections selected here will be used as the displayed sections in the Blueform.</div>
+                                    <div id="fullSectionList"></div>
+                                </div>
+                                <div id="selectedSectionContainer"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- BACK FACE: usage trend dashboard, sized to fit the card -->
+                    <div class="flip-card-back" id="flipCardBack">
+                        <div class="usage-embed" id="usageEmbedRoot">
+                            <div class="u-header">
+                                <div class="u-title">USAGE SCHEDULE TREND</div>
+                                <div class="u-subtitle" id="uwSubtitle">Memuatkan data...</div>
+                            </div>
+
+                            <div class="u-lifecycle">
+                                <div class="u-award u-done">
+                                    <div class="u-dot"><i class="fa fa-check"></i></div>
+                                    <span>AWARD</span>
+                                </div>
+
+                                <div class="u-branch">
+                                    <div class="u-branch-main"></div>
+                                    <div class="u-branch-split"></div>
+                                    <div class="u-branch-wo"></div>
+                                    <div class="u-branch-interim"></div>
+
+                                    <div class="u-node u-node-wo u-done">
+                                        <div class="u-dot"><i class="fa fa-check"></i></div>
+                                        <div class="u-node-label">WO</div>
+                                        <div class="u-count" id="uwWoCount">0</div>
+                                    </div>
+
+                                    <div class="u-node u-node-interim u-current">
+                                        <div class="u-dot"><i class="fa fa-clock"></i></div>
+                                        <div class="u-node-label">INTERIM</div>
+                                        <div class="u-count" id="uwInterimCount">0</div>
+                                    </div>
+                                </div>
+
+                                <div class="u-merge">
+                                    <div class="u-merge-wo"></div>
+                                    <div class="u-merge-interim"></div>
+                                    <div class="u-merge-vertical"></div>
+                                    <div class="u-merge-main"></div>
+                                </div>
+
+                                <div class="u-normal"><div class="u-dot">CPC</div><span>CPC</span></div>
+                                <div class="u-line"></div>
+                                <div class="u-normal"><div class="u-dot">CMGD</div><span>CMGD</span></div>
+                                <div class="u-line"></div>
+                                <div class="u-normal"><div class="u-dot">SFA</div><span>SFA</span></div>
+                            </div>
+
+                            <div class="u-summary">
+                                <div class="u-card"><div class="u-label">CONTRACT VALUE</div><div class="u-value" id="uwContractValue">RM 0.00</div></div>
+                                <div class="u-card"><div class="u-label">USED</div><div class="u-value" id="uwUsedValue">RM 0.00</div></div>
+                                <div class="u-card"><div class="u-label">BALANCE</div><div class="u-value" id="uwBalanceValue">RM 0.00</div></div>
+                                <div class="u-card"><div class="u-label">PROGRESS</div><div class="u-value" id="uwProgressValue">0%</div></div>
+                            </div>
+
+                            <div class="u-chartBox">
+                                <canvas id="uwChart"></canvas>
+                            </div>
+
+                            <div class="u-tableWrap">
+                                <table>
+                                    <thead>
+                                        <tr><th>Month</th><th>Planned</th><th>Actual</th><th>Variance</th></tr>
+                                    </thead>
+                                    <tbody id="uwTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+    
+<script>
+    var API_URL = 'https://me-connect-api.mech-elec-ranhill.workers.dev';
+    const headers = { 'Content-Type': 'application/json' };
+
+    let myChart = null;
+    let currentContract = null;
+    let currentWO = [];
+    let selectedSections = [];
+    let searchTimeout = null;
+    const cacheContracts = {}; 
+
+    // Setting sekarang dibuka untuk semua pengguna (bukan admin-only lagi)
+    function updateAdminUI() {
+        const btn = document.getElementById("manageBtn");
+        if (btn) {
+            btn.style.display = "inline-block";
+        }
+    }
+
+    window.onload = () => {
+        if (typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') {
+            Chart.register(ChartDataLabels);
+        }
+        updateAdminUI();
+        fetchUnits();
+    };
+
+    function debouncedFilterContracts() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(filterContracts, 150);
+    }
+
+    function filterContracts() {
+        const query = document.getElementById('contractSearch').value.toLowerCase();
+        const cards = document.querySelectorAll('.c-card');
+        
+        requestAnimationFrame(() => {
+            cards.forEach(card => {
+                const code = card.querySelector('h4').innerText.toLowerCase();
+                const name = card.querySelector('.sub-text').innerText.toLowerCase();
+                card.style.display = (code.includes(query) || name.includes(query)) ? 'block' : 'none';
+            });
+        });
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const selectedSectionName = urlParams.get('section');
+
+    async function fetchUnits() {
+        try {
+            const [secRes, unitsRes] = await Promise.all([
+                fetch(`${API_URL}/rest/v1/me_sections?select=id`, { headers }),
+                fetch(`${API_URL}/rest/v1/units?select=id,unit_name,section_id`, { headers })
+            ]);
+            const sections = await secRes.json();
+            const units = await unitsRes.json();
+
+            let selectedSection = null;
+            if (selectedSectionName) {
+                selectedSection = sections.find(s => s.id == selectedSectionName);
+            }
+
+            const filteredUnits = selectedSection
+                ? units.filter(u => u.section_id === selectedSection.id)
+                : units;
+
+            const nav = document.getElementById('unitNav');
+            nav.innerHTML = filteredUnits.map(u => `
+                <button class="unit-pill" id="unit-${u.id}" onclick="fetchContracts(${u.id}, this)">
+                    ${u.unit_name}
+                </button>
+            `).join('');
+
+            if (filteredUnits.length > 0) {
+                document.getElementById(`unit-${filteredUnits[0].id}`).click();
+            }
+        } catch (e) {
+            console.error("Error units:", e);
+        }
+    }
+
+    async function fetchContracts(unitId, btn) {
+        document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        centerActiveUnit(btn);
+
+        document.getElementById('contractSearch').value = '';
+        document.body.classList.remove('analysis-active');
+        document.getElementById('analysis-panel').style.display = 'none';
+        document.getElementById('analysis-panel').classList.remove('flipped');
+
+        currentContract = null;
+        currentWO = [];
+        document.getElementById('panel-title').innerText = 'Analisis';
+        document.getElementById('panel-vendor').innerText = '';
+
+        if (cacheContracts[unitId]) {
+            renderContractList(cacheContracts[unitId]);
             return;
         }
 
-        document.querySelector(".subtitle").innerHTML =
-            (contract.contract_code || "N/A") + " • " +
-            (contract.contract_name || "Tiada Nama Kontrak");
-
-        /* ==========================
-           WO + INTERIMS FETCH
-           Kedua-duanya run simultaneously.
-        ========================== */
-        const [woRes, interimRes] = await Promise.all([
-            fetch(
-                `${API_URL}/rest/v1/work_orders?contract_id=eq.${encodeURIComponent(contractId)}&select=id,status`,
+        try {
+            const res = await fetch(
+                `${API_URL}/rest/v1/contract?unit_id=eq.${unitId}&select=id,contract_code,contract_name,contract_start,contract_end,selected_sections,contract_sections_breakdown`,
                 { headers }
-            ),
-            fetch(
-                `${API_URL}/rest/v1/interims?contract_id=eq.${encodeURIComponent(contractId)}&order=claim_date.asc&select=*`,
-                { headers }
-            )
-        ]);
+            );
+            let data = await res.json();
 
-        if(!woRes.ok){
-            throw new Error(`Gagal mendapatkan Work Order: HTTP ${woRes.status}`);
-        }
-
-        if(!interimRes.ok){
-            throw new Error(`Gagal mendapatkan Interim: HTTP ${interimRes.status}`);
-        }
-
-        const rawWorkOrders = await woRes.json();
-        const interims = await interimRes.json();
-
-        /* ============================================================
-           WO COUNT
-           Abaikan:
-           CANCEL / EXEC-REJ / HOS-REJ / HOD-REJ
-           ============================================================ */
-        const ignoredWOStatuses = new Set([
-            "CANCEL",
-            "EXEC-REJ",
-            "HOS-REJ",
-            "HOD-REJ"
-        ]);
-
-        const validWorkOrders = (Array.isArray(rawWorkOrders) ? rawWorkOrders : [])
-            .filter(row => {
-                const status = String(row.status || "")
-                    .trim()
-                    .toUpperCase();
-
-                return !ignoredWOStatuses.has(status);
+            data.sort((a, b) => {
+                const dateDiff = new Date(a.contract_start) - new Date(b.contract_start);
+                if (dateDiff !== 0) return dateDiff;
+                return a.contract_code.localeCompare(b.contract_code, undefined, { numeric: true, sensitivity: "base" });
             });
 
-        const safeInterims = Array.isArray(interims) ? interims : [];
+            cacheContracts[unitId] = data;
+            renderContractList(data);
+        } catch (e) {
+            console.error("Error contracts:", e);
+        }
+    }
 
-        /* ==========================
-           WO / INTERIM COUNT UPDATE
-        ========================== */
-        updateRecordCounts(
-            validWorkOrders.length,
-            safeInterims.length
-        );
+    function renderContractList(data) {
+        const list = document.getElementById('contractList');
+        list.innerHTML = data.map(c => `
+            <div class="c-card" id="card-${c.id}">
+                <h4>${c.contract_code}</h4>
+                <div class="sub-text">${c.contract_name}</div>
+            </div>
+        `).join('');
 
-        const contractValue = Number(contract.contract_sum || 0);
-
-        const totalUsed = safeInterims.reduce((sum, row) =>
-            sum + Number(row.net_amount || row.claim_amount || 0), 0
-        );
-
-        const balance = contractValue - totalUsed;
-        const progress = contractValue
-            ? ((totalUsed / contractValue) * 100).toFixed(1)
-            : 0;
-
-        /* ==========================
-           KPI INTERFACE UPDATE
-        ========================== */
-        document.getElementById("contractValue").innerText = formatRM(contractValue);
-        document.getElementById("usedValue").innerText = formatRM(totalUsed);
-        document.getElementById("balanceValue").innerText = formatRM(balance);
-        document.getElementById("progressValue").innerText = progress + "%";
-
-        /* ==========================
-           MONTHLY DATA PROCESSING
-        ========================== */
-        const monthlyMap = {};
-
-        safeInterims.forEach(item => {
-            if(!item.claim_date) return;
-
-            const date = new Date(item.claim_date);
-            const month = date.toLocaleString("en", { month: "short" });
-
-            monthlyMap[month] =
-                (monthlyMap[month] || 0) +
-                Number(item.net_amount || item.claim_amount || 0);
+        data.forEach(c => {
+            const cardEl = document.getElementById(`card-${c.id}`);
+            if (cardEl) {
+                cardEl.addEventListener('click', () => {
+                    selectCard(c.id);
+                    openAnalysis(c);
+                });
+            }
         });
 
-        let months = Object.keys(monthlyMap);
-        let actual = Object.values(monthlyMap);
+        if (data.length > 0 && window.innerWidth > 768) {
+            selectCard(data[0].id);
+            openAnalysis(data[0]);
+        }
+    }
 
-        if(months.length === 0) {
-            months = ["Jan", "Feb", "Mar"];
-            actual = [0, 0, 0];
+    function selectCard(id) {
+        const currentActive = document.querySelector('.c-card.active');
+        if(currentActive) currentActive.classList.remove('active');
+        const activeCard = document.getElementById(`card-${id}`);
+        if(activeCard) activeCard.classList.add('active');
+    }
+
+    async function openAnalysis(contract) {
+        const mobileBtn = document.getElementById('mobileUsageBtn');
+        if(mobileBtn) mobileBtn.classList.remove('expanded');
+
+        // Reset the card to its front (analysis) face whenever a new contract is opened
+        document.getElementById('analysis-panel').classList.remove('flipped');
+        usageLoadedContractId = null;
+        
+        document.body.classList.add('analysis-active');
+        document.getElementById('analysis-panel').style.display = 'block';
+        document.getElementById('panel-title').innerText = contract.contract_code;
+        document.getElementById('panel-vendor').innerText = contract.contract_name;
+
+        currentContract = contract;
+
+        try {
+            const [resW, resI] = await Promise.all([
+                fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${currentContract.id}&status=not.in.(CANCEL,REJ,EXEC-REJ,HOS-REJ,HOD-REJ,QUOTATION,QUO-APP,QUO-REJ)&select=interim_no,section_category,status`, { headers }),
+                fetch(`${API_URL}/rest/v1/interims?contract_id=eq.${currentContract.id}&order=date_received.asc&select=claim_breakdown`, { headers })
+            ]);
+
+            let rawWO = await resW.json();
+            
+            currentWO = rawWO.map(wo => {
+                if (wo.status && wo.status.toLowerCase() === 'claimed') {
+                    wo.status = 'CLAIMED';
+                }
+                return wo;
+            });
+
+            const currentInterims = await resI.json();
+
+            selectedSections = (currentContract.selected_sections && currentContract.selected_sections.length > 0) 
+                ? currentContract.selected_sections 
+                : Object.keys(currentContract.contract_sections_breakdown || {});
+            
+            renderUI(currentInterims);
+        } catch (error) { 
+            console.error("Error fetching analysis data:", error); 
+        }
+    }
+
+    async function renderUI(currentInterims = []) {
+        if(!currentContract) return;
+
+        try {
+            updateAdminUI();
+
+            const sections = currentContract.contract_sections_breakdown || {};
+            const start = new Date(currentContract.contract_start);
+            const end = new Date(currentContract.contract_end);
+            const today = new Date();
+
+            const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()));
+            let monthsElapsed = (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()) + 1;
+            monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
+
+            document.getElementById('fullSectionList').innerHTML = Object.keys(sections).sort().map(s => `
+                <span class="sel-chip ${selectedSections.includes(s) ? 'active' : ''}" onclick="toggleSection('${s}')">${s}</span>
+            `).join('');
+
+            const mainContainer = document.getElementById('selectedSectionContainer');
+            let htmlBuilder = '';
+
+            const interimMap = {};
+            const woMap = {};
+
+            currentInterims.forEach(int => {
+                if (int.claim_breakdown) {
+                    Object.keys(int.claim_breakdown).forEach(s => {
+                        interimMap[s] = (interimMap[s] || 0) + (int.claim_breakdown[s].amt || 0);
+                    });
+                }
+            });
+
+            currentWO.forEach(wo => {
+                if (!wo.interim_no && wo.section_category) {
+                    Object.keys(wo.section_category).forEach(s => {
+                        woMap[s] = (woMap[s] || 0) + (wo.section_category[s].amt || 0);
+                    });
+                }
+            });
+
+            let labels = [], targetAvgData = [], actualAvgData = [];
+
+            selectedSections.sort().forEach(s => {
+                if(!sections[s]) return;
+                
+                const totalInterimClaim = interimMap[s] || 0;
+                const totalPendingWO = woMap[s] || 0;
+
+                const used = totalInterimClaim + totalPendingWO;
+                const budget = sections[s].amt || 0; 
+                const plannedTotalToDate = (budget / totalMonths) * monthsElapsed;
+                const variance = used - plannedTotalToDate;
+                const variancePercent = plannedTotalToDate ? (variance / plannedTotalToDate) * 100 : 0;
+                const color = used > plannedTotalToDate ? 'var(--ios-red)' : 'var(--ios-green)';
+                const progressPercent = budget ? (used / budget) * 100 : 0;
+
+                labels.push(s);
+                targetAvgData.push((budget / totalMonths).toFixed(2));
+                actualAvgData.push((used / monthsElapsed).toFixed(2));
+
+                htmlBuilder += `
+                    <div class="section-row">
+                        <div style="display:flex; justify-content:space-between; align-items:start;">
+                            <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">
+                                ${s}: ${sections[s].desc || s}
+                            </div>
+                        </div>
+                        <div class="avg-stats">
+                            <div class="avg-item">BUDGET: RM ${budget.toLocaleString()}</div>
+                            <div class="avg-item" style="color: #8e8e93;">PLANNED: RM ${plannedTotalToDate.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
+                        </div>
+                        <div class="avg-stats">
+                            <div class="avg-item">ACTUAL: RM ${used.toLocaleString()}</div>
+                            <div class="avg-item" style="color: ${color};">VARIANCE: ${variancePercent > 0 ? '+' : ''}${variancePercent.toFixed(1)}%</div>
+                        </div>
+                        <div class="prog-bar-bg">
+                            <div class="prog-bar-fill" data-width="${Math.min(100, progressPercent)}%" style="background:${color}"></div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            mainContainer.innerHTML = htmlBuilder;
+            updateChartDirect(labels, targetAvgData, actualAvgData);
+
+            requestAnimationFrame(() => {
+                document.querySelectorAll('.prog-bar-fill').forEach(bar => {
+                    bar.style.setProperty('width', bar.getAttribute('data-width'), 'important');
+                });
+            });
+
+        } catch (error) { console.error("Error processing UI:", error); }
+    }
+
+    function updateChartDirect(labels, targetAvgData, actualAvgData) {
+        const trimmedLabels = labels.map(label => label.replace(/^section\s*/i, ''));
+
+        if (myChart) {
+            myChart.data.labels = trimmedLabels;
+            myChart.data.datasets[0].data = targetAvgData;
+            myChart.data.datasets[1].data = actualAvgData;
+            myChart.update('none');
+        } else {
+            const ctx = document.getElementById('healthChart').getContext('2d');
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: trimmedLabels,
+                    datasets: [
+                        { label: 'Planned', data: targetAvgData, backgroundColor: 'rgba(200, 200, 205, 0.5)', borderRadius: 5 },
+                        { label: 'Actual', data: actualAvgData, backgroundColor: '#007AFF', borderRadius: 5 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    animation: { duration: 150 },
+                    layout: {
+                        padding: { bottom: 15, top: 15 }
+                    },
+                    plugins: { 
+                        legend: { position: 'top', labels: { font: { size: 10, weight: 'bold' } } },
+                        datalabels: { anchor: 'end', align: 'top', font: { size: 9, weight: 'bold' }, formatter: (v) => v > 0 ? `RM${Math.round(v).toLocaleString()}` : '' }
+                    },
+                    scales: { 
+                        y: { beginAtZero: true }, 
+                        x: { 
+                            ticks: { 
+                                font: { size: 10, weight: 'bold' }, 
+                                maxRotation: 0, 
+                                minRotation: 0  
+                            } 
+                        } 
+                    }
+                }
+            });
+        }
+    }
+
+    function updateChart(currentInterims = []) {
+        renderUI(currentInterims);
+    }
+
+    async function toggleSection(s) {
+        if (selectedSections.includes(s)) {
+            selectedSections = selectedSections.filter(x => x !== s);
+        } else {
+            selectedSections.push(s);
+        }
+        
+        renderUI([]);
+        
+        await fetch(`${API_URL}/rest/v1/contract?id=eq.${currentContract.id}`, {
+            method: 'PATCH',
+            headers: headers,
+            body: JSON.stringify({ selected_sections: selectedSections })
+        });
+    }
+
+    function toggleSelector() {
+        const el = document.getElementById('sectionSelector');
+        el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function handleMobileUsageClick(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const btn = document.getElementById('mobileUsageBtn');
+        if (!btn.classList.contains('expanded')) {
+            btn.classList.add('expanded');
+        } else {
+            goToUsage();
+        }
+    }
+
+    document.addEventListener('click', (e) => {
+        const btn = document.getElementById('mobileUsageBtn');
+        if (btn && btn.classList.contains('expanded')) {
+            if (!btn.contains(e.target)) {
+                btn.classList.remove('expanded');
+            }
+        }
+    });
+
+    function goToUsage(){
+        if(!currentContract){ alert("Please choose a contract"); return; }
+        window.location.href = `dashboard-usageschedule.html?id=${currentContract.id}`;
+    }
+
+    function handleFabClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const fabBtn = document.getElementById('fabBtn');
+
+    if (!fabBtn.classList.contains('expanded')) {
+
+        // Tutup Usage button jika sedang expanded
+        const usageBtn = document.getElementById('mobileUsageBtn');
+        if (usageBtn) {
+            usageBtn.classList.remove('expanded');
         }
 
-        const planned = months.map(() => contractValue / 12);
+        // First click = expand
+        fabBtn.classList.add('expanded');
 
-        buildChart(months, planned, actual);
-        buildTable(Object.keys(monthlyMap), planned, actual);
-        updateLifecycle(contract, safeInterims);
-
-    } catch(err) {
-        console.error("Ralat Papan Pemuka:", err);
-        updateRecordCounts(0, 0);
-        alert(err.message || "Gagal memuatkan data dari Cloudflare Worker.");
-    }
-}
-
-function buildChart(months, planned, actual){
-    const ctx = document.getElementById("chart");
-    if(!ctx) return;
-    if(chartInstance){ chartInstance.destroy(); }
-
-    chartInstance = new Chart(ctx, {
-        type: "line",
-        data: {
-            labels: months,
-            datasets: [
-                { label: "Planned", data: planned, borderColor: "#8e8e93", borderDash: [6,4], fill: false, tension: 0.3 },
-                { label: "Actual Interim Claims", data: actual, borderColor: "#007AFF", backgroundColor: "rgba(0,122,255,0.15)", fill: true, tension: 0.35, pointRadius: 5 }
-            ]
-        },
-        options: { responsive: true, plugins: { legend: { position: "top" } }, scales: { y: { beginAtZero: true } } }
-    });
-}
-
-function buildTable(months, planned, actual){
-    const body = document.getElementById("tableBody");
-    if(!body) return;
-    body.innerHTML = "";
-
-    if(months.length === 0) {
-        body.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#8e8e93;">Tiada rekod tuntutan interim ditemui</td></tr>`;
-        return;
-    }
-
-    months.forEach((m, i) => {
-        const variance = (actual[i] || 0) - (planned[i] || 0);
-        const color = variance > 0 ? "#FF3B30" : "#34C759";
-        body.innerHTML += `<tr><td>${m}</td><td>${formatRM(planned[i])}</td><td>${formatRM(actual[i])}</td><td style="color:${color}; font-weight:700;">${formatRM(variance)}</td></tr>`;
-    });
-}
-
-function updateLifecycle(contract, interims){
-    const awardNode = document.querySelector(".lifecycle-award");
-    const woNode = document.querySelector(".branch-node-wo");
-    const interimNode = document.querySelector(".branch-node-interim");
-
-    if(!awardNode || !woNode || !interimNode) return;
-
-    awardNode.classList.remove("done", "current", "overdue");
-    woNode.classList.remove("done", "current", "overdue");
-    interimNode.classList.remove("done", "current", "overdue");
-
-    /*
-     * AWARD is completed once the contract exists.
-     */
-    if(contract){
-        awardNode.classList.add("done");
-    }
-
-    /*
-     * WO is the first branch after award.
-     * Its count is displayed by updateRecordCounts().
-     */
-    woNode.classList.add("done");
-
-    /*
-     * INTERIM becomes current once at least one interim exists.
-     * Otherwise WO remains the active stage.
-     */
-    if(interims.length > 0){
-        interimNode.classList.add("current");
     } else {
-        woNode.classList.remove("done");
-        woNode.classList.add("current");
+
+        // Second click = open Contract Forms
+        window.location.href = 'contract-forms.html';
     }
+}
 
-    /*
-     * Contract ended -> move lifecycle to CPC.
-     * The branch remains visible; only CPC becomes active.
-     */
-    const cpcNode = document.querySelectorAll(".lifecycle-normal")[0];
-    const cmgdNode = document.querySelectorAll(".lifecycle-normal")[1];
-    const sfaNode = document.querySelectorAll(".lifecycle-normal")[2];
+    document.addEventListener('click', (e) => {
+        const usageBtn = document.getElementById('mobileUsageBtn');
+        if (usageBtn && usageBtn.classList.contains('expanded')) {
+            if (!usageBtn.contains(e.target)) {
+                usageBtn.classList.remove('expanded');
+            }
+        }
 
-    [cpcNode, cmgdNode, sfaNode].forEach(node => {
-        if(node) node.classList.remove("done", "current", "overdue");
+        const fabBtn = document.getElementById('fabBtn');
+        if (fabBtn && fabBtn.classList.contains('expanded')) {
+            if (!fabBtn.contains(e.target)) {
+                fabBtn.classList.remove('expanded');
+            }
+        }
     });
 
-    if(contract && contract.contract_end){
-        const today = new Date();
-        const endDate = new Date(contract.contract_end);
+    function centerActiveUnit(btn) {
+        if(window.innerWidth <= 768) {
+            btn.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+        }
+    }
 
-        if(!isNaN(endDate.getTime()) && today > endDate){
-            interimNode.classList.remove("current");
-            interimNode.classList.add("done");
+    let touchStartX = 0;
+    let touchEndX = 0;
+    const contractSidebar = document.querySelector('.contract-sidebar');
 
-            if(cpcNode){
-                cpcNode.classList.add("current");
+    contractSidebar.addEventListener('touchstart', e => {
+        touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    contractSidebar.addEventListener('touchend', e => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleUnitSwipe();
+    }, { passive: true });
+
+    function handleUnitSwipe() {
+        if(window.innerWidth > 768) return;
+        const diff = touchStartX - touchEndX;
+        if(Math.abs(diff) < 60) return;
+
+        const units = [...document.querySelectorAll('.unit-pill')];
+        const activeIndex = units.findIndex(btn => btn.classList.contains('active'));
+        if(activeIndex === -1) return;
+
+        if(diff > 0 && activeIndex < units.length - 1) {
+            units[activeIndex + 1].click();
+        }
+        if(diff < 0 && activeIndex > 0) {
+            units[activeIndex - 1].click();
+        }
+    }
+
+    /* ================================================================
+       FLIP CARD: click anywhere on the big analysis card (front or back),
+       EXCEPT the "USAGE" button and the "Setting" button/section selector,
+       to flip it and reveal the Usage Trend view sized to the card.
+       Click again anywhere to flip back.
+       ================================================================ */
+    let usageChartInstance = null;
+    let usageLoadedContractId = null;
+
+    document.getElementById('analysis-panel').addEventListener('click', function (e) {
+        if (
+            e.target.closest('#mobileUsageBtn') ||
+            e.target.closest('#manageBtn') ||
+            e.target.closest('#sectionSelector')
+        ) {
+            return;
+        }
+
+        const panel = document.getElementById('analysis-panel');
+        const isFlippingToBack = !panel.classList.contains('flipped');
+        panel.classList.toggle('flipped');
+
+        if (isFlippingToBack) {
+            loadUsageEmbedded();
+        }
+    });
+
+    function formatRM(value) {
+        return "RM " + Number(value || 0).toLocaleString("en-MY", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    async function loadUsageEmbedded() {
+        if (!currentContract) return;
+        const contractId = currentContract.id;
+        const subtitleEl = document.getElementById('uwSubtitle');
+        subtitleEl.innerText = 'Memuatkan data...';
+
+        try {
+            const contractRes = await fetch(
+                `${API_URL}/rest/v1/contract?id=eq.${encodeURIComponent(contractId)}&select=*`,
+                { headers }
+            );
+            if (!contractRes.ok) throw new Error(`HTTP ${contractRes.status}`);
+            const contractRows = await contractRes.json();
+            const contract = Array.isArray(contractRows) ? contractRows[0] : null;
+
+            if (!contract) {
+                subtitleEl.innerHTML = `<span style="color:var(--ios-red); font-weight:700;">Kontrak tidak dijumpai</span>`;
+                return;
+            }
+
+            subtitleEl.innerText = (contract.contract_code || 'N/A') + ' • ' + (contract.contract_name || '');
+
+            const [woRes, interimRes] = await Promise.all([
+                fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${encodeURIComponent(contractId)}&select=id,status`, { headers }),
+                fetch(`${API_URL}/rest/v1/interims?contract_id=eq.${encodeURIComponent(contractId)}&order=claim_date.asc&select=*`, { headers })
+            ]);
+            if (!woRes.ok) throw new Error(`HTTP ${woRes.status}`);
+            if (!interimRes.ok) throw new Error(`HTTP ${interimRes.status}`);
+
+            const rawWorkOrders = await woRes.json();
+            const interims = await interimRes.json();
+
+            const ignoredWOStatuses = new Set(["CANCEL", "EXEC-REJ", "HOS-REJ", "HOD-REJ"]);
+            const validWorkOrders = (Array.isArray(rawWorkOrders) ? rawWorkOrders : []).filter(row => {
+                const status = String(row.status || "").trim().toUpperCase();
+                return !ignoredWOStatuses.has(status);
+            });
+            const safeInterims = Array.isArray(interims) ? interims : [];
+
+            document.getElementById('uwWoCount').innerText = validWorkOrders.length.toLocaleString('en-MY');
+            document.getElementById('uwInterimCount').innerText = safeInterims.length.toLocaleString('en-MY');
+
+            const contractValue = Number(contract.contract_sum || 0);
+            const totalUsed = safeInterims.reduce((sum, row) => sum + Number(row.net_amount || row.claim_amount || 0), 0);
+            const balance = contractValue - totalUsed;
+            const progress = contractValue ? ((totalUsed / contractValue) * 100).toFixed(1) : 0;
+
+            document.getElementById('uwContractValue').innerText = formatRM(contractValue);
+            document.getElementById('uwUsedValue').innerText = formatRM(totalUsed);
+            document.getElementById('uwBalanceValue').innerText = formatRM(balance);
+            document.getElementById('uwProgressValue').innerText = progress + '%';
+
+            const monthlyMap = {};
+            safeInterims.forEach(item => {
+                if (!item.claim_date) return;
+                const date = new Date(item.claim_date);
+                const month = date.toLocaleString('en', { month: 'short' });
+                monthlyMap[month] = (monthlyMap[month] || 0) + Number(item.net_amount || item.claim_amount || 0);
+            });
+
+            let months = Object.keys(monthlyMap);
+            let actual = Object.values(monthlyMap);
+            if (months.length === 0) {
+                months = ['Jan', 'Feb', 'Mar'];
+                actual = [0, 0, 0];
+            }
+            const planned = months.map(() => contractValue / 12);
+
+            buildUsageChart(months, planned, actual);
+            buildUsageTable(Object.keys(monthlyMap), planned, actual);
+            updateUsageLifecycle(contract, safeInterims);
+
+            usageLoadedContractId = contractId;
+        } catch (err) {
+            console.error('Ralat usage embed:', err);
+            subtitleEl.innerHTML = `<span style="color:var(--ios-red); font-weight:700;">Gagal memuatkan data</span>`;
+        }
+    }
+
+    function buildUsageChart(months, planned, actual) {
+        const ctx = document.getElementById('uwChart');
+        if (!ctx) return;
+        if (usageChartInstance) { usageChartInstance.destroy(); }
+
+        usageChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: months,
+                datasets: [
+                    { label: 'Planned', data: planned, borderColor: '#8e8e93', borderDash: [6, 4], fill: false, tension: 0.3, pointRadius: 2 },
+                    { label: 'Actual', data: actual, borderColor: '#007AFF', backgroundColor: 'rgba(0,122,255,0.15)', fill: true, tension: 0.35, pointRadius: 3 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { font: { size: 9, weight: 'bold' } } },
+                    datalabels: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true, ticks: { font: { size: 8 } } },
+                    x: { ticks: { font: { size: 8 } } }
+                }
+            }
+        });
+    }
+
+    function buildUsageTable(months, planned, actual) {
+        const body = document.getElementById('uwTableBody');
+        if (!body) return;
+        body.innerHTML = '';
+
+        if (months.length === 0) {
+            body.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#8e8e93;">Tiada rekod tuntutan interim</td></tr>`;
+            return;
+        }
+
+        months.forEach((m, i) => {
+            const variance = (actual[i] || 0) - (planned[i] || 0);
+            const color = variance > 0 ? '#FF3B30' : '#34C759';
+            body.innerHTML += `<tr><td>${m}</td><td>${formatRM(planned[i])}</td><td>${formatRM(actual[i])}</td><td style="color:${color}; font-weight:700;">${formatRM(variance)}</td></tr>`;
+        });
+    }
+
+    function updateUsageLifecycle(contract, interims) {
+        const root = document.getElementById('flipCardBack');
+        if (!root) return;
+
+        const awardNode = root.querySelector('.u-award');
+        const woNode = root.querySelector('.u-node-wo');
+        const interimNode = root.querySelector('.u-node-interim');
+        if (!awardNode || !woNode || !interimNode) return;
+
+        awardNode.classList.remove('u-done', 'u-current');
+        woNode.classList.remove('u-done', 'u-current');
+        interimNode.classList.remove('u-done', 'u-current');
+
+        if (contract) awardNode.classList.add('u-done');
+        woNode.classList.add('u-done');
+
+        if (interims.length > 0) {
+            interimNode.classList.add('u-current');
+        } else {
+            woNode.classList.remove('u-done');
+            woNode.classList.add('u-current');
+        }
+
+        const normals = root.querySelectorAll('.u-normal');
+        normals.forEach(n => n.classList.remove('u-done', 'u-current'));
+
+        if (contract && contract.contract_end) {
+            const today = new Date();
+            const endDate = new Date(contract.contract_end);
+            if (!isNaN(endDate.getTime()) && today > endDate) {
+                interimNode.classList.remove('u-current');
+                interimNode.classList.add('u-done');
+                if (normals[0]) normals[0].classList.add('u-current');
             }
         }
     }
-}
-
-window.addEventListener("DOMContentLoaded", () => { loadDashboard(); });
 </script>
-
 </body>
 </html>
