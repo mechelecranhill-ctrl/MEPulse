@@ -744,6 +744,14 @@ let currentTableData = [];
 let currentContractId = null;
 
 // ============================================================
+// DATA KONTRAK + INTERIM YANG SUDAH FETCH UNTUK KONTRAK SEMASA.
+// Disimpan supaya updateStatus/updateStatusGroup boleh render
+// semula guna data sedia ada (tiada refetch penuh dari server).
+// ============================================================
+let currentContractData = null;
+let currentInterimsData = [];
+
+// ============================================================
 // FULL SET BUNDLE (Blueform + Quotation PDF) — disamakan dengan
 // previewFullSet() di app-tech.html. Ditulis di sini (bukan
 // blueform.js) supaya blueform.js tidak disentuh langsung.
@@ -1084,8 +1092,14 @@ const rawWorks = await woRes.json();
 // (QUOTATION / QUO-APP / QUO-REJ) belum sesuai dipaparkan di sini lagi.
 allWorks = rawWorks.filter(w => !['QUOTATION', 'QUO-APP', 'QUO-REJ'].includes((w.status || '').toUpperCase().trim()));
 const interims = await intRes.json();
+
+// Simpan reference supaya updateStatus/updateStatusGroup boleh
+// render semula tanpa fetch semula seluruh kontrak.
+currentContractData = c;
+currentInterimsData = interims;
+
 renderTable(allWorks, true);
-buildInterimMatrix(c, interims, allWorks, c.vo_breakdown || {});
+        buildInterimMatrix(c, interims, allWorks, c.vo_breakdown || {});
         generateDistrictTabs(allWorks);
         filterDistrict('ALL', document.querySelector('.district-tab'));
     }catch(e){ console.error(e); }
@@ -1531,6 +1545,16 @@ function openSummary(){
     window.location.href = `contract_summary.html?id=${id}`;
 }
 
+// ============================================================
+// UPDATE STATUS
+//
+// FIX: tiada lagi loadSingleContract(currentContractId) selepas
+// PATCH. Kemaskini local state (allWorks) sahaja, kemudian render
+// semula table + matrix guna currentContractData/currentInterimsData
+// yang sudah ada dalam memori. Ini elak fetch semula seluruh
+// contract + work_orders (unfiltered) + interims setiap kali satu
+// status ditukar.
+// ============================================================
 async function updateStatus(id, status){
     try{
         await fetch(`${API_URL}/rest/v1/work_orders?id=eq.${id}`,{
@@ -1539,9 +1563,10 @@ async function updateStatus(id, status){
         });
         const row = allWorks.find(w => Number(w.id) === Number(id));
         if(row) row.status = status;
-        
-        // Muat semula matriks interim untuk kemaskini amaun On-Going Works
-        loadSingleContract(currentContractId);
+
+        // Render semula guna data sedia ada — TIADA network call
+        renderTable(currentTableData, currentView === "AREA");
+        buildInterimMatrix(currentContractData, currentInterimsData, allWorks, currentContractData.vo_breakdown || {});
     }catch(e){ console.error(e); alert("Gagal update status"); }
 }
 
@@ -1558,9 +1583,10 @@ async function updateStatusGroup(idsStr, status){
             const row = allWorks.find(w => Number(w.id) === Number(id));
             if(row) row.status = status;
         });
-        
-        // Muat semula matriks interim untuk kemaskini amaun On-Going Works
-        loadSingleContract(currentContractId);
+
+        // Render semula guna data sedia ada — TIADA network call
+        renderTable(currentTableData, currentView === "AREA");
+        buildInterimMatrix(currentContractData, currentInterimsData, allWorks, currentContractData.vo_breakdown || {});
     }catch(e){ console.error(e); alert("Gagal update status group"); }
 }
 </script>
