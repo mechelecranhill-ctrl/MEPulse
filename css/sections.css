@@ -1,0 +1,524 @@
+/* ==========================================================
+   VIEW: SECTIONS (Department Sections wheel)
+   Scoped to #app.view-sections so it never leaks into the
+   contract dashboard view. Anywhere the original CSS targeted
+   <body> (background image, ::before fog, hide-wheel state)
+   now targets this view's root instead, and the JS toggles
+   these classes on #app rather than document.body.
+   ========================================================== */
+
+#app.view-sections {
+    position: relative;
+    height: 100dvh;
+    width: 100%;
+    overflow: hidden;
+    background-color: #0b1220;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-attachment: fixed;
+    transition: background-image 0.6s ease-in-out;
+}
+
+#app.view-sections.bg-maint { background-image: url("../Maintbck.png"); }
+
+#app.view-sections::before {
+    content: "";
+    position: absolute;
+    inset: -20%;
+    background:
+        radial-gradient(circle at 20% 80%, rgba(255,255,255,.18), transparent 25%),
+        radial-gradient(circle at 80% 20%, rgba(255,255,255,.10), transparent 30%);
+    filter: blur(40px);
+    animation: fogMove 10s ease-in-out infinite alternate;
+    z-index: 0;
+}
+
+@keyframes fogMove{
+    from{ transform:translateX(-30px) translateY(0); }
+    to{ transform:translateX(30px) translateY(-20px); }
+}
+
+.view-sections .stage {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+}
+
+.view-sections .wheel {
+    position: absolute;
+    width: 650px;
+    height: 650px;
+    left: -325px;
+    top: 50%;
+    transform: translateY(-50%) rotate(0deg);
+    transition: transform 0.7s cubic-bezier(.22,1,.36,1);
+    transform-origin: center center;
+    pointer-events: auto;
+}
+
+.view-sections .item{
+    position:absolute;
+    width:120px;
+    height:120px;
+    border-radius:18px;
+    background:transparent;
+    border:none;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    text-align:center;
+    color:white;
+    font-weight:600;
+    backdrop-filter:none;
+    transition:0.3s;
+    opacity:0.4;
+    transform:scale(0.9);
+    pointer-events: none;
+    cursor: default;
+}
+
+.view-sections .item.active{
+    background:transparent;
+    border:none;
+    box-shadow:none;
+    opacity:1;
+    transform:scale(1.25);
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.view-sections .panel{
+    position:absolute;
+    z-index:2;
+    right:80px;
+    color:white;
+}
+.view-sections .panel h1{ font-size:46px; }
+.view-sections .panel p{ opacity:0.6; }
+
+.view-sections .info-card {
+    position: absolute;
+    z-index: 10;
+    right: 80px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 340px;
+    padding: 24px;
+    border-radius: 24px;
+    background: rgba(90, 90, 90, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(18px);
+    color: white;
+    opacity: 0;
+    animation: none;
+    pointer-events: auto;
+}
+
+@keyframes fadeInRight{
+    from{ opacity:0; transform:translateY(-50%) translateX(50px); }
+    to{ opacity:1; transform:translateY(-50%) translateX(0); }
+}
+.view-sections .info-card.show{
+    animation:fadeInRight .45s ease forwards;
+}
+
+.view-sections .info-card h2{ margin-bottom:10px; font-size:22px; }
+.view-sections .info-card p{ opacity:.7; line-height:1.6; }
+
+.view-sections .status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    margin-bottom: 6px;
+    border-radius: 14px;
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.1);
+    font-size: 13.5px;
+    font-weight: 500;
+    gap: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.view-sections .status-row:active {
+    background: rgba(255,255,255,.12);
+}
+
+.view-sections .status-row span:first-child {
+    flex: 1;
+    word-break: break-word;
+}
+
+.view-sections .status-badge {
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 8px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.view-sections .detail-panel {
+    position: absolute;
+    inset: 0;
+    border-radius: 24px;
+    background: rgba(10, 20, 40, 0.85);
+    backdrop-filter: blur(24px);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 20;
+    overflow: hidden;
+}
+
+.view-sections .detail-panel.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.view-sections .detail-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+}
+
+.view-sections .detail-panel-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    opacity: 0.6;
+    text-transform: uppercase;
+}
+
+.view-sections .detail-back-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.view-sections .detail-back-btn:active {
+    background: rgba(255,255,255,0.2);
+}
+
+.view-sections .detail-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-right: 2px;
+}
+
+.view-sections .detail-list::-webkit-scrollbar { width: 3px; }
+.view-sections .detail-list::-webkit-scrollbar-track { background: transparent; }
+.view-sections .detail-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+
+.view-sections .detail-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-radius: 11px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.09);
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.view-sections .detail-item-code {
+    font-size: 12px;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+}
+
+.view-sections .detail-item-sub {
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0.75;
+    text-align: right;
+    flex: 1;
+    word-break: break-all;
+}
+
+.view-sections .detail-item-sub.warn { color: #fde047; }
+.view-sections .detail-item-sub.danger { color: #ff6b6b; }
+.view-sections .detail-item-sub.safe { color: #4ade80; }
+
+.view-sections .section-helm{
+    width:160px;
+    height:160px;
+    object-fit:contain;
+    pointer-events:none;
+    transition: transform 0.3s, filter 0.3s;
+}
+
+.view-sections .item.active .section-helm{
+    transform:scale(1.15);
+    filter:
+        drop-shadow(0 0 10px rgba(255,255,255,.6))
+        drop-shadow(0 0 20px rgba(56,189,248,.4));
+}
+
+.view-sections #openBtn{
+    display:block;
+    width:100%;
+    margin-top:10px;
+    padding:12px 0;
+    border-radius:14px;
+    border:none;
+    background:rgba(56,189,248,0.3);
+    border:1px solid rgba(56,189,248,0.5);
+    color:white;
+    font-size:15px;
+    font-weight:600;
+    letter-spacing:0.3px;
+    cursor:pointer;
+    backdrop-filter:blur(10px);
+    transition:background 0.2s, transform 0.15s;
+    flex-shrink: 0;
+}
+.view-sections #openBtn:active{
+    background:rgba(56,189,248,0.5);
+    transform:scale(0.97);
+}
+
+.floating-helm{
+    position:fixed;
+    object-fit:contain;
+    z-index:1001;
+    pointer-events:none;
+    transition:
+        top 0.5s cubic-bezier(.22,1,.36,1),
+        left 0.5s cubic-bezier(.22,1,.36,1),
+        width 0.5s cubic-bezier(.22,1,.36,1),
+        height 0.5s cubic-bezier(.22,1,.36,1);
+    filter:
+        drop-shadow(0 0 10px rgba(56,189,248,.8))
+        drop-shadow(0 0 20px rgba(56,189,248,.5));
+}
+
+.view-sections .nav-controls{
+    position: fixed;
+    bottom: 30px;
+    left: 75%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 18px;
+    z-index: 9999;
+}
+
+.view-sections .nav-controls button{
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.08);
+    color: white;
+    font-size: 18px;
+    backdrop-filter: blur(10px);
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.view-sections .nav-controls button:active{
+    transform: scale(0.92);
+}
+
+@media (max-width:768px){
+    .view-sections .panel { display:none; }
+
+    .view-sections .info-card {
+        position: fixed;
+        left: 20px;
+        right: 20px;
+        bottom: 20px;
+        width: calc(100% - 40px);
+        height: auto;
+        max-height: 55vh;
+        margin: 0 auto;
+        padding: 20px;
+        border-radius: 24px;
+        z-index: 10000;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(40px);
+        transition: opacity .35s ease, transform .35s ease, visibility .35s;
+        box-sizing: border-box;
+    }
+
+    .view-sections #cardDesc {
+        flex: none;
+        overflow: hidden !important;
+        margin-bottom: 4px;
+    }
+
+    .view-sections .info-card.show-mobile{
+        opacity:1;
+        visibility:visible;
+        transform:translateY(0);
+    }
+
+    #app.view-sections.hide-wheel .wheel{
+        opacity:0;
+        transform:translateY(-50%) scale(0.6);
+        pointer-events:none;
+        transition:0.4s ease;
+    }
+
+    #app.view-sections.hide-wheel .item{
+        opacity:0;
+        transition:0.3s ease;
+    }
+
+    #app.view-sections.hide-wheel .item.active{
+        opacity:0 !important;
+    }
+
+    .view-sections .nav-controls{
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+}
+
+@media (min-width: 769px) {
+    .view-sections .panel { display:none; }
+
+    .view-sections .info-card {
+        position: fixed !important;
+        top: 0 !important;
+        right: 0 !important;
+        transform: none !important;
+        width: 50vw !important;
+        height: 100vh !important;
+        max-height: 100vh !important;
+        padding: 40px !important;
+        border-radius: 30px !important;
+        border-left: 1px solid rgba(255, 255, 255, .12);
+        border-top: none !important;
+        border-right: none !important;
+        border-bottom: none !important;
+        background: rgba(90, 90, 90, 0.85);
+        backdrop-filter: blur(30px);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        overflow: hidden !important;
+        opacity: 0;
+        visibility: visible !important;
+    }
+
+    .view-sections .detail-panel {
+        border-radius: 0 !important;
+        background: rgba(10, 20, 40, 0.95);
+    }
+
+    .view-sections .info-card h2 {
+        font-size: 34px;
+        margin-bottom: 24px;
+        line-height: 1.2;
+        flex-shrink: 0;
+    }
+
+    .view-sections #cardDesc {
+        flex: none;
+        overflow: hidden !important;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        gap: 4px;
+    }
+
+    .view-sections .status-row {
+        padding: 16px 20px;
+        margin-bottom: 8px;
+        font-size: 16px;
+    }
+
+    .view-sections .status-badge {
+        font-size: 14px;
+        padding: 5px 12px;
+    }
+
+    .view-sections #openBtn {
+        margin-top: 24px;
+        padding: 16px 0;
+        font-size: 16px;
+        flex-shrink: 0;
+    }
+
+    @keyframes fadeInRightDesktop {
+        from { opacity: 0; transform: translateX(100%); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+
+    .view-sections .info-card.show {
+        animation: fadeInRightDesktop .45s cubic-bezier(.22, 1, .36, 1) forwards !important;
+    }
+}
+
+@media (min-width: 1800px){
+    .view-sections .wheel{
+        width: 820px;
+        height: 820px;
+        left:-410px;
+    }
+
+    .view-sections .item{
+        width:160px;
+        height:160px;
+    }
+
+    .view-sections .section-helm{
+        width:210px;
+        height:210px;
+    }
+
+    .view-sections .item.active{
+        transform:scale(1.35);
+    }
+
+    .view-sections .info-card{
+        width:calc(50vw - 60px) !important;
+        max-width:900px;
+        padding:38px !important;
+    }
+
+    .view-sections .info-card h2{
+        font-size:38px;
+    }
+
+    .view-sections .status-row{
+        padding:18px 22px;
+        font-size:18px;
+    }
+
+    .view-sections .status-badge{
+        font-size:16px;
+        padding:6px 14px;
+    }
+
+    .view-sections #openBtn{
+        font-size:18px;
+        padding:16px 0;
+    }
+}
