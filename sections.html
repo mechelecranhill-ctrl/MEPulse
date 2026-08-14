@@ -621,25 +621,41 @@ window.addEventListener("DOMContentLoaded", async () => {
    ========================================================== */
 const API_URL = "https://me-connect-api.mech-elec-ranhill.workers.dev";
 
+/* ==========================================================
+   PATCH (row-read fix): fetchAllRows() SEBELUM ini guna
+   Range header -> worker translate jadi LIMIT/OFFSET.
+   OFFSET dalam SQLite/D1 kena SCAN dari row 0 setiap page
+   (page 5 scan 5000 row untuk dapat 1000 row baru), jadi kos
+   jadi O(n^2) untuk table besar -- ni punca utama rows-read
+   tinggi (649.89k rows untuk work_orders/interims dump).
+
+   FIX: guna keyset/cursor pagination ikut "id" (id=gt.X&order=
+   id.asc&limit=Y). Setiap page terus loncat ke posisi lepas
+   id terakhir -- O(n) total, bukan O(n^2). Requires "id" untuk
+   disenaraikan dalam select= param setiap panggilan (lihat
+   sectionsPromise/interimsPromise/workOrdersPromise di bawah).
+   ========================================================== */
 async function fetchAllRows(url) {
-    console.log("🔥 fetchAllRows:", url);
+    console.log("🔥 fetchAllRows (cursor):", url);
 
     let all = [];
-    let from = 0;
+    let lastId = 0;
     const pageSize = 1000;
+    const sep = url.includes("?") ? "&" : "?";
 
     while (true) {
-        console.log(`🔥 Reading rows ${from} - ${from + pageSize - 1}`);
+        const pagedUrl = `${url}${sep}id=gt.${lastId}&order=id.asc&limit=${pageSize}`;
+        console.log(`🔥 Reading rows after id=${lastId}`);
 
-        const res = await fetch(url, {
-            headers: { Range: `${from}-${from + pageSize - 1}` }
-        });
-
+        const res = await fetch(pagedUrl);
         const chunk = await res.json();
+
+        if (!Array.isArray(chunk) || chunk.length === 0) break;
+
         all = all.concat(chunk);
+        lastId = chunk[chunk.length - 1].id;
 
         if (chunk.length < pageSize) break;
-        from += pageSize;
     }
 
     return all;
@@ -926,10 +942,13 @@ async function loadSections(){
     `${API_URL}/rest/v1/me_sections?select=*,units(*,contract(id,contract_code,contract_name,contract_start,contract_end,contract_sum,contract_sections_breakdown,vo_breakdown))`
 ).then(r => r.json());
 
+/* PATCH: tambah "id" dalam select= supaya fetchAllRows() ada
+   cursor value untuk pagination keyset (id=gt.X). Tanpa "id"
+   di sini, cursor loop tak dapat nilai terakhir -> infinite/rosak. */
 const interimsPromise = allInterimsCache
     ? Promise.resolve(allInterimsCache)
     : fetchAllRows(
-        `${API_URL}/rest/v1/interims?select=contract_id,claim_breakdown`
+        `${API_URL}/rest/v1/interims?select=id,contract_id,claim_breakdown`
     ).then(data => {
         allInterimsCache = data;
         return data;
@@ -938,7 +957,7 @@ const interimsPromise = allInterimsCache
 const workOrdersPromise = allWorkOrdersCache
     ? Promise.resolve(allWorkOrdersCache)
     : fetchAllRows(
-        `${API_URL}/rest/v1/work_orders?select=contract_id,section_category,additional,status`
+        `${API_URL}/rest/v1/work_orders?select=id,contract_id,section_category,additional,status`
     ).then(data => {
         allWorkOrdersCache = data;
         return data;
