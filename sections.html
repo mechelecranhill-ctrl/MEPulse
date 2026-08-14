@@ -699,7 +699,7 @@ let activeSection = "";
 let contractClaimCache = {};
 let contractPSumKeyCache = {};
 
-let allWorkOrdersCache = null;
+let allWorkOrderSummaryCache = null;
 let allInterimsCache = null;
 
 let currentLists = {
@@ -954,19 +954,19 @@ const interimsPromise = allInterimsCache
         return data;
     });
 
-const workOrdersPromise = allWorkOrdersCache
-    ? Promise.resolve(allWorkOrdersCache)
+const workOrderSummaryPromise = allWorkOrderSummaryCache
+    ? Promise.resolve(allWorkOrderSummaryCache)
     : fetchAllRows(
-        `${API_URL}/rest/v1/work_orders?select=id,contract_id,section_category,additional,status`
+        `${API_URL}/rest/v1/work_order_summary?select=id,contract_id,section_key,pending_amount,wo_count`
     ).then(data => {
-        allWorkOrdersCache = data;
+        allWorkOrderSummaryCache = data;
         return data;
     });
 
-const [sections, allInterims, allWOs] = await Promise.all([
+const [sections, allInterims, allWOSummary] = await Promise.all([
     sectionsPromise,
     interimsPromise,
-    workOrdersPromise
+    workOrderSummaryPromise
 ]);
 
         contractClaimCache = {};
@@ -1000,52 +1000,22 @@ const [sections, allInterims, allWOs] = await Promise.all([
         });
 
         // ── 2. Accumulate pending WO (Kemas kini penapisan mengikut buildInterimMatrix) ──
-        allWOs.forEach(wo => {
-            if (!wo.contract_id) return;
+        // ── 2. Load pending WO daripada work_order_summary ──
+allWOSummary.forEach(summary => {
+    if (!summary.contract_id || !summary.section_key) return;
 
-            const statusUpper = wo.status ? wo.status.toUpperCase().trim() : "";
+    if (!contractClaimCache[summary.contract_id]) {
+        contractClaimCache[summary.contract_id] = {
+            interimUsed: {},
+            woUsed: {}
+        };
+    }
 
-            // Skip jika sudah di-claim (Sebiji ikut buildInterimMatrix)
-            if (statusUpper === "CLAIMED") return;
+    const keyUpper = String(summary.section_key).toUpperCase().trim();
+    const pendingAmount = Number(summary.pending_amount || 0);
 
-            // Skip jika status adalah VO kerana VO ditapis berasingan masuk terus ke kiraan Budget
-            if (statusUpper === "VARIATION ORDER" || statusUpper === "VO") return;
-
-            // Skip jika kerja telah dibatalkan
-            if (statusUpper === "CANCEL") return;
-
-            if (!contractClaimCache[wo.contract_id]) {
-                contractClaimCache[wo.contract_id] = { interimUsed: {}, woUsed: {} };
-            }
-
-            const pSumKeyRaw = contractPSumKeyCache[wo.contract_id];
-
-            // Pecahan section_category — accumulate ke seksyen berkaitan
-            if (wo.section_category) {
-                Object.entries(wo.section_category).forEach(([s, val]) => {
-                    const amt = Number(typeof val === 'object' ? (val.amt || val.amount || 0) : val) || 0;
-                    if (amt <= 0) return;
-                    const keyUpper = s.toUpperCase().trim();
-                    contractClaimCache[wo.contract_id].woUsed[keyUpper] =
-                        (contractClaimCache[wo.contract_id].woUsed[keyUpper] || 0) + amt;
-                });
-            }
-
-            // Serapan automatic 'additional' jika tiada breakdown khusus "PROVISIONAL SUM"
-            const secCat = wo.section_category || {};
-            const hasPSumInCat = Object.keys(secCat).some(
-                k => k.toUpperCase().trim() === (pSumKeyRaw ? pSumKeyRaw.toUpperCase().trim() : "PROVISIONAL SUM")
-            );
-            
-            const add = Number(wo.additional || 0);
-            if (add > 0 && !hasPSumInCat) {
-                if (pSumKeyRaw) {
-                    const pKeyUpper = pSumKeyRaw.toUpperCase().trim();
-                    contractClaimCache[wo.contract_id].woUsed[pKeyUpper] =
-                        (contractClaimCache[wo.contract_id].woUsed[pKeyUpper] || 0) + add;
-                }
-            }
-        });
+    contractClaimCache[summary.contract_id].woUsed[keyUpper] = pendingAmount;
+});
 
         items = sections.map(sec => ({
             id: sec.id,
