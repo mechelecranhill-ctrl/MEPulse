@@ -21,7 +21,7 @@ class AppSidebar extends HTMLElement {
                     <div class="profile-role">${staffRole.toUpperCase()}</div>
                 </div>
 
-                <a href="#/sections" class="menu-link" data-nav="sections">Home</a>
+                <a href="sections.html" class="menu-link">Home</a>
 
                 <div class="menu-group">
                     <a href="#" class="menu-parent" id="dashboardBtn">
@@ -78,8 +78,6 @@ class AppSidebar extends HTMLElement {
         this.bindEvents();
         this.loadDashboardLinks();
         this.setActiveMenu();
-
-        window.addEventListener("hashchange", () => this.setActiveMenu());
     }
 
     cacheDOM() {
@@ -132,26 +130,20 @@ class AppSidebar extends HTMLElement {
         this.querySelector("#cancelLogout").onclick = () => this.logoutModal.classList.remove("active");
         this.querySelector("#confirmLogout").onclick = () => this.logout();
 
-        // Section links -> SPA navigation to the contract dashboard view
-        // (was: window.location.href = `dashboard-contract.html?section=${id}`)
+        // Section Links Click
         this.subLinks.forEach(link => {
             link.addEventListener("click", (e) => {
                 e.preventDefault();
                 if (link.dataset.sectionId) {
-                    if (typeof window.appNavigate === "function") {
-                        window.appNavigate(`/contract?section=${link.dataset.sectionId}`);
-                    } else {
-                        window.location.href = `dashboard-contract.html?section=${link.dataset.sectionId}`;
-                    }
+                    window.location.href = `dashboard-contract.html?section=${link.dataset.sectionId}`;
                 }
-                this.close();
             });
         });
     }
 
     async loadDashboardLinks() {
         try {
-            const res = await fetch(`${window.API_URL || API_URL}/rest/v1/me_sections?select=id,section_name`);
+            const res = await fetch(`${API_URL}/rest/v1/me_sections?select=id,section_name`);
             if (!res.ok) return;
             const sections = await res.json();
             
@@ -168,15 +160,15 @@ class AppSidebar extends HTMLElement {
     }
 
     setActiveMenu() {
+        const fullPath = window.location.pathname.split("/").pop();
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentSectionId = urlParams.get("section");
 
-        const hash = window.location.hash.slice(1) || "/sections";
-        const [routePath, routeQuery] = hash.split("?");
-        const routeName = routePath.replace(/^\/+/, "") || "sections";
-        const currentSectionId = new URLSearchParams(routeQuery || "").get("section");
-
+        // Bersihkan kelas active terdahulu
         this.menuLinks.forEach(link => link.classList.remove("active"));
 
-        if (routeName === "contract") {
+        // 1. Semakan untuk Submenu Dashboard-Contracts
+        if (fullPath === "dashboard-contract.html") {
             this.dashboardMenu.classList.add("open");
             this.dashArrow.innerText = "▲";
 
@@ -189,23 +181,17 @@ class AppSidebar extends HTMLElement {
             }
         }
 
-        if (routeName === "sections") {
-            const homeLink = this.querySelector('[data-nav="sections"]');
-            if (homeLink) homeLink.classList.add("active");
-        }
-
-        // Non-SPA pages (Blueform Approvals) are still matched by filename,
-        // for when the sidebar is reused on those standalone pages.
-        const fullPath = window.location.pathname.split("/").pop();
+        // 2. Semakan untuk Submenu Dashboard-Approvals
         const quotePages = ['app-tech.html', 'app-exec.html', 'app-sect.html', 'app-dept.html'];
         if (quotePages.includes(fullPath)) {
             this.quotationMenu.classList.add("open");
             this.quoteArrow.innerText = "▲";
         }
 
+        // 3. Highlight pautan halaman biasa
         this.menuLinks.forEach(link => {
             const href = link.getAttribute("href");
-            if (href && href !== "#" && !href.startsWith("#/") && href === fullPath) {
+            if (href && href !== "#" && href === fullPath) {
                 link.classList.add("active");
             }
         });
