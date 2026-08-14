@@ -1,5 +1,5 @@
 /* ==========================================================
-   VIEW: CONTRACT DASHBOARD
+   VIEW: CONTRACT DASHBOARD 
 
    Adapted 1:1 from the original dashboard-contract.html inline
    <script>. Differences from the original, purely to make it
