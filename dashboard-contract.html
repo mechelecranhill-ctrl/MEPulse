@@ -938,6 +938,10 @@
     // Refresh browser = cache hilang dan API akan fetch semula.
     const cacheContracts = {};
 
+    // Cache work_orders + interims per kontrak (openAnalysis).
+    // Klik kontrak yang sama dua kali (A -> B -> A) tak fetch semula.
+    const cacheAnalysis = {};
+
     let usageLoadedContractId = null;
 
 
@@ -1112,16 +1116,6 @@
         }
     }
 
-
-    // ============================================================
-    // FETCH CONTRACTS
-    //
-    // CACHE:
-    // - hanya hidup selama page tidak direfresh
-    // - refresh = cacheContracts reset
-    // - tidak menggunakan localStorage/sessionStorage
-    // ============================================================
-
     async function fetchContracts(unitId, btn) {
 
         document
@@ -1164,11 +1158,6 @@
         document.getElementById('panel-vendor').innerText =
             '';
 
-
-        // ========================================================
-        // GUNA CACHE JIKA SUDAH ADA
-        // ========================================================
-
         if (cacheContracts[unitId]) {
 
             renderContractList(
@@ -1188,6 +1177,7 @@
                 `&select=` +
                 `id,contract_code,contract_name,` +
                 `contract_start,contract_end,` +
+                `contract_sum,` +
                 `selected_sections,` +
                 `contract_sections_breakdown`,
 
@@ -1340,6 +1330,10 @@
 
     // ============================================================
     // OPEN ANALYSIS
+    //
+    // FIX: guna cacheAnalysis[contract.id] kalau kontrak ni dah
+    // pernah dibuka dalam session semasa (klik A -> B -> A tak
+    // fetch work_orders/interims semula).
     // ============================================================
 
     async function openAnalysis(contract) {
@@ -1384,6 +1378,37 @@
         currentContract = contract;
 
 
+        // ========================================================
+        // GUNA CACHE KALAU KONTRAK NI DAH PERNAH DIBUKA
+        // ========================================================
+
+        if (cacheAnalysis[contract.id]) {
+
+            currentWO = cacheAnalysis[contract.id].wo;
+            currentInterims = cacheAnalysis[contract.id].interims;
+
+            selectedSections =
+
+                (
+                    currentContract.selected_sections &&
+                    currentContract.selected_sections.length > 0
+                )
+
+                    ? [
+                        ...currentContract.selected_sections
+                    ]
+
+                    : Object.keys(
+                        currentContract
+                            .contract_sections_breakdown || {}
+                    );
+
+            renderUI(currentInterims);
+
+            return;
+        }
+
+
         // Reset data contract semasa
         currentWO = [];
         currentInterims = [];
@@ -1411,7 +1436,7 @@
                         `${API_URL}/rest/v1/interims` +
                         `?contract_id=eq.${currentContract.id}` +
                         `&order=date_received.asc` +
-                        `&select=claim_breakdown`,
+                        `&select=claim_breakdown,net_amount,claim_amount,claim_date`,
 
                         { headers }
                     )
@@ -1458,6 +1483,16 @@
 
             currentInterims =
                 await resI.json();
+
+
+            // ====================================================
+            // SIMPAN DALAM CACHE (fix #3)
+            // ====================================================
+
+            cacheAnalysis[contract.id] = {
+                wo: currentWO,
+                interims: currentInterims
+            };
 
 
             selectedSections =
@@ -2565,9 +2600,14 @@
     // ============================================================
     // USAGE EMBED
     //
+    // FIX #1: TIADA fetch langsung. currentWO sudah difilter
+    // (status NOT IN CANCEL/REJ/... sama macam ignoredWOStatuses
+    // yang lama) dan currentInterims sudah ada claim_breakdown +
+    // net_amount + claim_amount + claim_date dari openAnalysis().
+    //
     // Cache usage untuk contract semasa:
-    // - flip pertama = fetch
-    // - flip seterusnya = tidak fetch lagi
+    // - flip pertama = process sekali (tiada network)
+    // - flip seterusnya = tidak proses lagi
     // - contract baru = usageLoadedContractId reset
     // - browser refresh = reset
     // ============================================================
@@ -2596,140 +2636,18 @@
 
         try {
 
-            const contractRes =
-                await fetch(
-
-                    `${API_URL}/rest/v1/contract` +
-                    `?id=eq.${encodeURIComponent(contractId)}` +
-                    `&select=*`,
-
-                    { headers }
-                );
-
-
-            if (!contractRes.ok) {
-
-                throw new Error(
-                    `HTTP ${contractRes.status}`
-                );
-            }
-
-
-            const contractRows =
-                await contractRes.json();
-
-
+            // TIADA network fetch — guna currentContract/currentWO/
+            // currentInterims yang sudah difetch oleh openAnalysis().
             const contract =
-                Array.isArray(contractRows)
-                    ? contractRows[0]
-                    : null;
-
-
-            if (!contract) {
-
-                console.error(
-                    'Kontrak tidak dijumpai untuk usage embed:',
-                    contractId
-                );
-
-                return;
-            }
-
-
-            const [
-                woRes,
-                interimRes
-            ] = await Promise.all([
-
-                fetch(
-
-                    `${API_URL}/rest/v1/work_orders` +
-                    `?contract_id=eq.${encodeURIComponent(contractId)}` +
-                    `&select=id,status,interim_no,section_category`,
-
-                    { headers }
-                ),
-
-
-                fetch(
-
-                    `${API_URL}/rest/v1/interims` +
-                    `?contract_id=eq.${encodeURIComponent(contractId)}` +
-                    `&order=claim_date.asc` +
-                    `&select=*`,
-
-                    { headers }
-                )
-
-            ]);
-
-
-            if (!woRes.ok) {
-
-                throw new Error(
-                    `WO HTTP ${woRes.status}`
-                );
-            }
-
-
-            if (!interimRes.ok) {
-
-                throw new Error(
-                    `Interim HTTP ${interimRes.status}`
-                );
-            }
-
-
-            const rawWorkOrders =
-                await woRes.json();
-
-
-            const interims =
-                await interimRes.json();
-
-
-            const ignoredWOStatuses =
-                new Set([
-
-                    "CANCEL",
-                    "REJ",
-                    "EXEC-REJ",
-                    "HOS-REJ",
-                    "HOD-REJ",
-                    "QUOTATION",
-                    "QUO-APP",
-                    "QUO-REJ"
-
-                ]);
+                currentContract;
 
 
             const validWorkOrders =
-                (
-                    Array.isArray(
-                        rawWorkOrders
-                    )
-                        ? rawWorkOrders
-                        : []
-                ).filter(row => {
-
-                    const status =
-                        String(
-                            row.status || ""
-                        )
-                        .trim()
-                        .toUpperCase();
-
-
-                    return !ignoredWOStatuses.has(
-                        status
-                    );
-                });
+                currentWO;
 
 
             const safeInterims =
-                Array.isArray(interims)
-                    ? interims
-                    : [];
+                currentInterims;
 
 
             // ====================================================
@@ -2924,7 +2842,6 @@
             // ====================================================
             // CONTRACT DURATION
             //
-            // FIX #3:
             // Planned bukan lagi contractValue / 12.
             // Ia berdasarkan tempoh sebenar kontrak.
             // ====================================================
@@ -3032,7 +2949,6 @@
             // ====================================================
             // CHART + TABLE
             //
-            // FIX #4:
             // Kedua-duanya menggunakan months yang sama.
             // ====================================================
 
