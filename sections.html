@@ -622,44 +622,22 @@ window.addEventListener("DOMContentLoaded", async () => {
 const API_URL = "https://me-connect-api.mech-elec-ranhill.workers.dev";
 
 /* ==========================================================
-   PATCH (row-read fix): fetchAllRows() SEBELUM ini guna
-   Range header -> worker translate jadi LIMIT/OFFSET.
-   OFFSET dalam SQLite/D1 kena SCAN dari row 0 setiap page
-   (page 5 scan 5000 row untuk dapat 1000 row baru), jadi kos
-   jadi O(n^2) untuk table besar -- ni punca utama rows-read
-   tinggi (649.89k rows untuk work_orders/interims dump).
+   PATCH (row-read fix v2): loadSections() DULU panggil
+   fetchAllRows() untuk SCAN SELURUH table interims + work_orders
+   setiap kali page ini dibuka, semata-mata untuk kira baki
+   Provisional Sum per-contract di client-side. Ini punca
+   utama rows-read melecet naik hampir 5M/bulan (649.89k rows
+   sekali scan untuk table besar).
 
-   FIX: guna keyset/cursor pagination ikut "id" (id=gt.X&order=
-   id.asc&limit=Y). Setiap page terus loncat ke posisi lepas
-   id terakhir -- O(n) total, bukan O(n^2). Requires "id" untuk
-   disenaraikan dalam select= param setiap panggilan (lihat
-   sectionsPromise/interimsPromise/workOrdersPromise di bawah).
+   FIX: pengiraan tu dah dipindah ke Worker (recomputeContract-
+   ClaimSummary), dikira secara INCREMENTAL & SCOPED per
+   contract_id setiap kali ada write (POST/PATCH/DELETE) pada
+   interims/work_orders — bukan setiap kali page dibuka. Hasil
+   dikira disimpan dalam contract.claim_usage_summary (JSON).
+   Page ini sekarang cuma baca column tu terus melalui embed
+   sedia ada (me_sections -> units -> contract) — TIADA lagi
+   scan besar di sini.
    ========================================================== */
-async function fetchAllRows(url) {
-    console.log("🔥 fetchAllRows (cursor):", url);
-
-    let all = [];
-    let lastId = 0;
-    const pageSize = 1000;
-    const sep = url.includes("?") ? "&" : "?";
-
-    while (true) {
-        const pagedUrl = `${url}${sep}id=gt.${lastId}&order=id.asc&limit=${pageSize}`;
-        console.log(`🔥 Reading rows after id=${lastId}`);
-
-        const res = await fetch(pagedUrl);
-        const chunk = await res.json();
-
-        if (!Array.isArray(chunk) || chunk.length === 0) break;
-
-        all = all.concat(chunk);
-        lastId = chunk[chunk.length - 1].id;
-
-        if (chunk.length < pageSize) break;
-    }
-
-    return all;
-}
 
 const wheel = document.getElementById("wheel");
 const title = document.getElementById("title");
@@ -696,12 +674,6 @@ let itemEls = [];
 let currentFloating = null;
 let activeSection = "";
 
-let contractClaimCache = {};
-let contractPSumKeyCache = {};
-
-let allWorkOrdersCache = null;
-let allInterimsCache = null;
-
 let currentLists = {
     ongoing: [],
     renewal: [],
@@ -737,10 +709,13 @@ function findProvisionalSumKey(breakdown) {
     });
 }
 
-/* ── KEMASKINI PENUH: Kiraan baki Provisional Sum mengikut tapisan ketat ── */
+/* ── Kiraan baki Provisional Sum — sekarang baca terus dari
+   claim_usage_summary (dikira & disimpan oleh Worker secara
+   incremental), bukan cache yang dibina daripada scan penuh
+   client-side lagi. ── */
 function getProvisionalSumBalance(c) {
     const breakdown = c.contract_sections_breakdown || {};
-    const cache = contractClaimCache[c.id] || { interimUsed: {}, woUsed: {} };
+    const summary = c.claim_usage_summary || { interimUsed: {}, woUsed: {} };
     const voBreakdown = c.vo_breakdown || {};
 
     const pSumKey = findProvisionalSumKey(breakdown);
@@ -761,12 +736,11 @@ function getProvisionalSumBalance(c) {
     });
     const budget = baseAmt + voAmt;
 
-    // Ambil jumlah yang telah di-claim daripada jadual interims
-    const totalInterimClaim = Number(cache.interimUsed[keyUpper] || 0);
-    
-    // Ambil jumlah komitmen daripada jadual work_orders yang belum diproses masuk interim
-    const totalOngoingWO = Number(cache.woUsed[keyUpper] || 0);
-    
+    // Ambil jumlah yang telah di-claim & jumlah komitmen WO pending
+    // terus dari summary yang Worker dah kira (scoped per contract_id)
+    const totalInterimClaim = Number(summary.interimUsed?.[keyUpper] || 0);
+    const totalOngoingWO = Number(summary.woUsed?.[keyUpper] || 0);
+
     const used = totalInterimClaim + totalOngoingWO;
     const balance = budget - used;
 
@@ -938,114 +912,12 @@ async function loadSections(){
     console.count("🔥 loadSections CALLED");
 
     try {
-        const sectionsPromise = fetch(
-    `${API_URL}/rest/v1/me_sections?select=*,units(*,contract(id,contract_code,contract_name,contract_start,contract_end,contract_sum,contract_sections_breakdown,vo_breakdown))`
-).then(r => r.json());
-
-/* PATCH: tambah "id" dalam select= supaya fetchAllRows() ada
-   cursor value untuk pagination keyset (id=gt.X). Tanpa "id"
-   di sini, cursor loop tak dapat nilai terakhir -> infinite/rosak. */
-const interimsPromise = allInterimsCache
-    ? Promise.resolve(allInterimsCache)
-    : fetchAllRows(
-        `${API_URL}/rest/v1/interims?select=id,contract_id,claim_breakdown`
-    ).then(data => {
-        allInterimsCache = data;
-        return data;
-    });
-
-const workOrdersPromise = allWorkOrdersCache
-    ? Promise.resolve(allWorkOrdersCache)
-    : fetchAllRows(
-        `${API_URL}/rest/v1/work_orders?select=id,contract_id,section_category,additional,status`
-    ).then(data => {
-        allWorkOrdersCache = data;
-        return data;
-    });
-
-const [sections, allInterims, allWOs] = await Promise.all([
-    sectionsPromise,
-    interimsPromise,
-    workOrdersPromise
-]);
-
-        contractClaimCache = {};
-        contractPSumKeyCache = {};
-
-        // ── Bina pSumKey cache ──
-        sections.forEach(sec => {
-            (sec.units || []).forEach(u => {
-                (u.contract || []).forEach(c => {
-                    if (!c.id || !c.contract_sections_breakdown) return;
-                    const pKey = findProvisionalSumKey(c.contract_sections_breakdown);
-                    if (pKey) {
-                        contractPSumKeyCache[c.id] = pKey.toUpperCase().trim();
-                    }
-                });
-            });
-        });
-
-        // ── 1. Accumulate interim claims ──
-        allInterims.forEach(im => {
-            if (!im.contract_id || !im.claim_breakdown) return;
-            if (!contractClaimCache[im.contract_id]) {
-                contractClaimCache[im.contract_id] = { interimUsed: {}, woUsed: {} };
-            }
-            Object.entries(im.claim_breakdown).forEach(([s, val]) => {
-                const amt = Number(typeof val === 'object' ? (val.amt || val.amount || 0) : val) || 0;
-                const keyUpper = s.toUpperCase().trim();
-                contractClaimCache[im.contract_id].interimUsed[keyUpper] =
-                    (contractClaimCache[im.contract_id].interimUsed[keyUpper] || 0) + amt;
-            });
-        });
-
-        // ── 2. Accumulate pending WO (Kemas kini penapisan mengikut buildInterimMatrix) ──
-        allWOs.forEach(wo => {
-            if (!wo.contract_id) return;
-
-            const statusUpper = wo.status ? wo.status.toUpperCase().trim() : "";
-
-            // Skip jika sudah di-claim (Sebiji ikut buildInterimMatrix)
-            if (statusUpper === "CLAIMED") return;
-
-            // Skip jika status adalah VO kerana VO ditapis berasingan masuk terus ke kiraan Budget
-            if (statusUpper === "VARIATION ORDER" || statusUpper === "VO") return;
-
-            // Skip jika kerja telah dibatalkan
-            if (statusUpper === "CANCEL") return;
-
-            if (!contractClaimCache[wo.contract_id]) {
-                contractClaimCache[wo.contract_id] = { interimUsed: {}, woUsed: {} };
-            }
-
-            const pSumKeyRaw = contractPSumKeyCache[wo.contract_id];
-
-            // Pecahan section_category — accumulate ke seksyen berkaitan
-            if (wo.section_category) {
-                Object.entries(wo.section_category).forEach(([s, val]) => {
-                    const amt = Number(typeof val === 'object' ? (val.amt || val.amount || 0) : val) || 0;
-                    if (amt <= 0) return;
-                    const keyUpper = s.toUpperCase().trim();
-                    contractClaimCache[wo.contract_id].woUsed[keyUpper] =
-                        (contractClaimCache[wo.contract_id].woUsed[keyUpper] || 0) + amt;
-                });
-            }
-
-            // Serapan automatic 'additional' jika tiada breakdown khusus "PROVISIONAL SUM"
-            const secCat = wo.section_category || {};
-            const hasPSumInCat = Object.keys(secCat).some(
-                k => k.toUpperCase().trim() === (pSumKeyRaw ? pSumKeyRaw.toUpperCase().trim() : "PROVISIONAL SUM")
-            );
-            
-            const add = Number(wo.additional || 0);
-            if (add > 0 && !hasPSumInCat) {
-                if (pSumKeyRaw) {
-                    const pKeyUpper = pSumKeyRaw.toUpperCase().trim();
-                    contractClaimCache[wo.contract_id].woUsed[pKeyUpper] =
-                        (contractClaimCache[wo.contract_id].woUsed[pKeyUpper] || 0) + add;
-                }
-            }
-        });
+        /* Satu query sahaja — sections -> units -> contract, termasuk
+           claim_usage_summary yang dah dikira terlebih dahulu oleh
+           Worker (bukan scan interims/work_orders di sini lagi). */
+        const sections = await fetch(
+            `${API_URL}/rest/v1/me_sections?select=*,units(*,contract(id,contract_code,contract_name,contract_start,contract_end,contract_sum,contract_sections_breakdown,vo_breakdown,claim_usage_summary))`
+        ).then(r => r.json());
 
         items = sections.map(sec => ({
             id: sec.id,
@@ -1285,11 +1157,13 @@ window.addEventListener("keydown", (e) => {
 });
 </script>
 
+<script>
 if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("cache.js")
         .then(() => console.log("Service Worker Registered"))
         .catch(err => console.error(err));
 }
+</script>
 
 </body>
 </html>
