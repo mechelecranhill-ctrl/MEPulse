@@ -696,35 +696,35 @@ window.onload = async () => {
 };
 
 async function loadDeptHead() {
-    let res = await fetch(`${API_URL}/department-head`);
+    let res = await fetch(`${API_URL}/department-head`, { cache: 'no-store' });
     let raw = await res.json();
     deptHeadAssignments = raw.map(r => ({ ...r, staff_id: Number(r.staff_id), is_acting: r.is_acting === 1 || r.is_acting === true }));
 }
 
 async function loadUnits() {
-    let res = await fetch(`${API_URL}/units`);
+    let res = await fetch(`${API_URL}/units`, { cache: 'no-store' });
     let raw = await res.json();
     unitData = raw.map(r => ({ ...r, id: Number(r.id), section_id: Number(r.section_id) }));
 }
 
 async function loadSections() {
-    let res = await fetch(`${API_URL}/me-sections`);
+    let res = await fetch(`${API_URL}/me-sections`, { cache: 'no-store' });
     let raw = await res.json();
     sectionData = raw.map(r => ({ ...r, id: Number(r.id) }));
 }
 
 async function loadAssignments() {
-    let res1 = await fetch(`${API_URL}/staff-section-assignment`);
+    let res1 = await fetch(`${API_URL}/staff-section-assignment`, { cache: 'no-store' });
     let raw1 = await res1.json();
     staffSectionAssignments = raw1.map(r => ({ ...r, staff_id: Number(r.staff_id), section_id: Number(r.section_id), is_acting: r.is_acting === 1 || r.is_acting === true }));
 
-    let res2 = await fetch(`${API_URL}/staff-unit-assignment`);
+    let res2 = await fetch(`${API_URL}/staff-unit-assignment`, { cache: 'no-store' });
     let raw2 = await res2.json();
     staffUnitAssignments = raw2.map(r => ({ ...r, staff_id: Number(r.staff_id), unit_id: Number(r.unit_id), is_acting: r.is_acting === 1 || r.is_acting === true }));
 }
 
 async function loadStaff() {
-    let res = await fetch(`${API_URL}/staff`);
+    let res = await fetch(`${API_URL}/staff`, { cache: 'no-store' });
     let raw = await res.json();
     staffData = raw.map(r => ({ ...r, id: Number(r.id) }));
     renderStaff();
@@ -1229,14 +1229,29 @@ function closeAssignModal() {
 
 function populatePositionDropdown(selectedValue = "") {
     let selectEl = document.getElementById("fPosition");
-    let html = `<option value="" disabled ${!selectedValue ? 'selected' : ''}>-- Select Position --</option>`;
-    
+    let normalized = (selectedValue || "").trim().toUpperCase();
+    let matchFound = Object.keys(hierarki).some(pos => pos.toUpperCase() === normalized);
+
+    // Only mark a real option as selected if it actually matches. Otherwise keep the
+    // placeholder selected so the browser never silently falls back to the first
+    // option in the list (which previously caused staff to be silently reassigned
+    // to "HEAD OF DEPARTMENT" whenever their stored position didn't match exactly,
+    // e.g. Malay text like "KETUA SEKSYEN").
+    let html = `<option value="" disabled ${(!normalized || !matchFound) ? 'selected' : ''}>-- Select Position --</option>`;
+
     Object.keys(hierarki).forEach(pos => {
-        let selected = pos.toUpperCase() === selectedValue.toUpperCase() ? "selected" : "";
+        let selected = pos.toUpperCase() === normalized ? "selected" : "";
         html += `<option value="${pos}" ${selected}>${pos}</option>`;
     });
-    
+
     selectEl.innerHTML = html;
+
+    if (normalized && !matchFound) {
+        showAlert(
+            "Jawatan Tidak Sepadan",
+            `Jawatan asal staff ini ("${selectedValue}") tidak sepadan dengan mana-mana pilihan dalam senarai (mungkin beza bahasa/ejaan). Sila pilih jawatan yang betul sebelum simpan, jika tidak rekod jawatan lama akan hilang.`
+        );
+    }
 }
 
 function addNewPositionOption() {
