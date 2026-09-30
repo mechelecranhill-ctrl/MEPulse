@@ -746,6 +746,23 @@
     font-size: 10px;
     font-weight: 800;
 }
+
+/* ================= WO / INTERIM COUNT DOT ================= */
+
+.usage-embed .u-count-dot {
+    width: auto !important;
+    min-width: 34px;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 800;
+    box-sizing: border-box;
+}
+.usage-embed .u-step-interim .u-count-dot { min-width: 24px; font-size: 10px; }
+@media (max-width:768px){
+    .usage-embed .u-step-wo .u-count-dot { min-width: 24px; font-size: 10px; }
+    .usage-embed .u-step-interim .u-count-dot { min-width: 19px; font-size: 9px; }
+}
         
     </style>
 
@@ -841,20 +858,14 @@
 
     <!-- WO -->
 <div class="u-step u-step-wo">
-    <div class="u-dot">
-        <i class="fa fa-clock"></i>
-    </div>
-
-    <span>WO = <strong id="uwWoCount">100</strong></span>
+    <div class="u-dot u-count-dot" id="uwWoCount">0</div>
+    <span>WO</span>
 </div>
 
 <!-- INTERIM -->
 <div class="u-step u-step-interim">
-    <div class="u-dot">
-        <i class="fa fa-clock"></i>
-    </div>
-
-    <span>INTERIM = <strong id="uwInterimCount">11</strong></span>
+    <div class="u-dot u-count-dot" id="uwInterimCount">0</div>
+    <span>INTERIM</span>
 </div>
 
 </div>
@@ -2889,61 +2900,52 @@
 
             // ====================================================
             // MONTHS UNTUK CHART
+            // TIMELINE PENUH: bulan mula kontrak -> bulan tamat kontrak
             // ====================================================
 
-            let months = [];
-            let actual = [];
-
-
-            if (
-                Object.keys(monthlyMap).length > 0
-            ) {
-
-                months =
-                    Object.keys(monthlyMap)
-                        .sort();
-
-
-                actual =
-                    months.map(
-                        m => monthlyMap[m]
-                    );
-
-            } else {
-
-                // Tiada interim:
-                // gunakan bulan semasa / 3 bulan fallback
-                // untuk chart kosong.
-                months = [
-                    'Jan',
-                    'Feb',
-                    'Mar'
-                ];
-
-                actual = [
-                    0,
-                    0,
-                    0
-                ];
+            const base = isNaN(startDate.getTime()) ? new Date() : startDate;
+            const months = [];
+            const cur = new Date(base.getFullYear(), base.getMonth(), 1);
+            for (let i = 0; i < totalContractMonths; i++) {
+                months.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`);
+                cur.setMonth(cur.getMonth() + 1);
             }
 
 
             // ====================================================
-            // PLANNED
+            // PLANNED (KUMULATIF)
             //
-            // Setiap bulan = contract value /
-            // actual contract duration.
+            // Naik linear. Akhir bulan terakhir = contract value.
             // ====================================================
 
-            const monthlyPlanned =
-                contractValue /
-                totalContractMonths;
+            const monthlyPlanned = contractValue / totalContractMonths;
+            const planned = months.map((_, i) => monthlyPlanned * (i + 1));
 
 
-            const planned =
-                months.map(
-                    () => monthlyPlanned
-                );
+            // ====================================================
+            // ACTUAL (KUMULATIF)
+            //
+            // Claim di luar tempoh dimasukkan ke bulan pertama/terakhir.
+            // Berhenti pada bulan semasa (selepas tu null).
+            // ====================================================
+
+            const monthlyActual = months.map(() => 0);
+            Object.keys(monthlyMap).forEach(k => {
+                let idx = months.indexOf(k);
+                if (idx === -1) idx = k < months[0] ? 0 : months.length - 1;
+                monthlyActual[idx] += monthlyMap[k];
+            });
+
+            const now = new Date();
+            const nowKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const lastIdx = nowKey < months[0] ? -1
+                          : nowKey > months[months.length - 1] ? months.length - 1
+                          : months.indexOf(nowKey);
+            let run = 0;
+            const actual = monthlyActual.map((v, i) => {
+                run += v;
+                return i <= lastIdx ? run : null;
+            });
 
 
             // ====================================================
@@ -2963,7 +2965,7 @@
                 months,
                 planned,
                 actual,
-                Object.keys(monthlyMap).length === 0
+                false
             );
 
 
@@ -2976,6 +2978,15 @@
                 safeInterims,
                 validWorkOrders
             );
+
+
+            // Letak semula nombor dalam bulatan WO / INTERIM
+            // (updateUsageLifecycle reset bulatan kepada ikon)
+            [['.u-step-wo', validWorkOrders.length], ['.u-step-interim', safeInterims.length]]
+                .forEach(([sel, n]) => {
+                    const dot = document.querySelector('#flipCardBack ' + sel + ' .u-dot');
+                    if (dot) dot.textContent = n.toLocaleString('en-MY');
+                });
 
 
             // ====================================================
@@ -3041,7 +3052,7 @@
                             borderColor: '#8e8e93',
                             borderDash: [6, 4],
                             fill: false,
-                            tension: 0.3,
+                            tension: 0,
                             pointRadius: 2
                         },
 
@@ -3054,7 +3065,8 @@
                                 'rgba(0,122,255,0.15)',
                             fill: true,
                             tension: 0.35,
-                            pointRadius: 3
+                            pointRadius: 3,
+                            spanGaps: false
                         }
 
                     ]
@@ -3113,6 +3125,11 @@
                             ticks: {
                                 font: {
                                     size: 8
+                                },
+                                maxRotation: 45,
+                                autoSkip: true,
+                                callback(v) {
+                                    return formatUsageMonth(this.getLabelForValue(v));
                                 }
                             }
 
@@ -3175,17 +3192,15 @@
 
         months.forEach((m, i) => {
 
-            const variance =
-                (
-                    actual[i] || 0
-                ) -
-                (
-                    planned[i] || 0
-                );
+            const hasActual = actual[i] !== null && actual[i] !== undefined;
+
+            const variance = hasActual
+                ? actual[i] - (planned[i] || 0)
+                : null;
 
 
             const color =
-                variance > 0
+                variance !== null && variance > 0
                     ? '#FF3B30'
                     : '#34C759';
 
@@ -3203,9 +3218,7 @@
                     </td>
 
                     <td>
-                        ${formatRM(
-                            actual[i]
-                        )}
+                        ${hasActual ? formatRM(actual[i]) : '-'}
                     </td>
 
                     <td
@@ -3214,9 +3227,7 @@
                             font-weight:700;
                         "
                     >
-                        ${formatRM(
-                            variance
-                        )}
+                        ${variance !== null ? formatRM(variance) : '-'}
                     </td>
 
                 </tr>
