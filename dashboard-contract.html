@@ -1436,7 +1436,7 @@
                         `?contract_id=eq.${currentContract.id}` +
                         `&status=not.in.` +
                         `(CANCEL,REJ,EXEC-REJ,HOS-REJ,HOD-REJ,QUOTATION,QUO-APP,QUO-REJ)` +
-                        `&select=interim_no,section_category,status`,
+                        `&select=interim_no,section_category,status,qpb_date`,
 
                         { headers }
                     ),
@@ -1447,7 +1447,7 @@
                         `${API_URL}/rest/v1/interims` +
                         `?contract_id=eq.${currentContract.id}` +
                         `&order=date_received.asc` +
-                        `&select=claim_breakdown,net_amount,claim_amount,claim_date`,
+                        `&select=interim_no,claim_breakdown,net_amount,claim_amount,claim_date`,
 
                         { headers }
                     )
@@ -2925,25 +2925,64 @@
             // ====================================================
             // ACTUAL (KUMULATIF)
             //
-            // Claim di luar tempoh dimasukkan ke bulan pertama/terakhir.
+            // Sebelum interim masuk: guna nilai WO (ikut qpb_date).
+            // Bila interim masuk (claim_date): WO yang ada interim_no
+            // tu ditolak, diganti dengan nilai interim claim.
+            // Claim/WO di luar tempoh dimasukkan ke bulan pertama/terakhir.
             // Berhenti pada bulan semasa (selepas tu null).
             // ====================================================
 
-            const monthlyActual = months.map(() => 0);
-            Object.keys(monthlyMap).forEach(k => {
-                let idx = months.indexOf(k);
-                if (idx === -1) idx = k < months[0] ? 0 : months.length - 1;
-                monthlyActual[idx] += monthlyMap[k];
+            const keyOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+            // tarikh -> index bulan (clamp kalau di luar tempoh)
+            const idxOf = v => {
+                const d = new Date(v);
+                if (isNaN(d.getTime())) return null;
+                const k = keyOf(d);
+                let i = months.indexOf(k);
+                if (i === -1) i = k < months[0] ? 0 : months.length - 1;
+                return i;
+            };
+
+            const woAmt = wo => Object.values(wo.section_category || {})
+                .reduce((s, x) => s + Number((x && x.amt) || 0), 0);
+
+            // 1) Interim: tambah nilai claim pada bulan claim, ingat bulan tiap interim_no
+            const claimDelta = months.map(() => 0);
+            const interimIdx = {};
+            safeInterims.forEach(it => {
+                const i = idxOf(it.claim_date);
+                if (i === null) return;
+                claimDelta[i] += Number(it.net_amount || it.claim_amount || 0);
+                if (it.interim_no != null) interimIdx[it.interim_no] = i;
             });
 
+            // 2) WO: tambah pada bulan WO; kalau dah ada interim, tolak pada bulan interim
+            const woDelta = months.map(() => 0);
+            validWorkOrders.forEach(wo => {
+                const i = idxOf(wo.qpb_date);
+                if (i === null) return;
+                const amt = woAmt(wo);
+
+                if (!wo.interim_no) {                       // belum di-claim
+                    woDelta[i] += amt;
+                } else if (interimIdx[wo.interim_no] !== undefined) {
+                    const j = interimIdx[wo.interim_no];    // WO dikira sampai interim masuk
+                    woDelta[i] += amt;
+                    woDelta[Math.max(i, j)] -= amt;
+                }
+                // interim_no ada tapi interim tak jumpa -> diabaikan (sama macam kad Used)
+            });
+
+            // 3) Kumulatif, berhenti pada bulan semasa
             const now = new Date();
-            const nowKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const nowKey = keyOf(now);
             const lastIdx = nowKey < months[0] ? -1
                           : nowKey > months[months.length - 1] ? months.length - 1
                           : months.indexOf(nowKey);
             let run = 0;
-            const actual = monthlyActual.map((v, i) => {
-                run += v;
+            const actual = months.map((_, i) => {
+                run += claimDelta[i] + woDelta[i];
                 return i <= lastIdx ? run : null;
             });
 
