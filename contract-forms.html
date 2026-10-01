@@ -696,6 +696,67 @@
 
     let selectedDistricts = new Set();
 
+    // ============================================================
+    // CACHE (IndexedDB) - DB BERASINGAN drpd contract.html
+    // (contract.html guna 'me-connect-cache' v1; jangan kongsi nama
+    //  supaya tak berlaku VersionError).
+    // Hanya utk data rujukan (units, senarai kontrak per unit).
+    // ============================================================
+    const FORMS_DB = 'me-connect-forms-cache';
+    const UNITS_TTL = 24 * 60 * 60 * 1000;   // 24 jam
+    const CONTRACTS_TTL = 5 * 60 * 1000;     // 5 minit
+
+    function fOpen() {
+        return new Promise((res, rej) => {
+            const r = indexedDB.open(FORMS_DB, 1);
+            r.onupgradeneeded = () => r.result.createObjectStore('kv');
+            r.onsuccess = () => res(r.result);
+            r.onerror = () => rej(r.error);
+        });
+    }
+
+    async function cached(key, ttlMs, loader) {
+        let db = null;
+        try {
+            db = await fOpen();
+            const hit = await new Promise(r => {
+                const q = db.transaction('kv').objectStore('kv').get(key);
+                q.onsuccess = () => r(q.result);
+                q.onerror = () => r(null);
+            });
+            if (hit && Date.now() - hit.t < ttlMs) return hit.v;
+        } catch (_) { db = null; }
+
+        const v = await loader();   // kalau loader throw, TIADA apa disimpan
+
+        if (db) {
+            try { db.transaction('kv', 'readwrite').objectStore('kv').put({ v, t: Date.now() }, key); } catch (_) {}
+        }
+        return v;
+    }
+
+    async function cacheClearAll() {
+        try {
+            const db = await fOpen();
+            await new Promise(r => {
+                const tx = db.transaction('kv', 'readwrite');
+                tx.objectStore('kv').clear();
+                tx.oncomplete = () => r();
+                tx.onerror = () => r();
+                tx.onabort = () => r();
+            });
+        } catch (_) {}
+    }
+
+    // Recompute claim_usage_summary SEKALI sahaja (selepas semua write
+    // yang guna &nosync=1 siap). Endpoint ini kena wujud di worker.
+    async function recomputeClaims(contractId) {
+        if (!contractId) return;
+        try {
+            await fetch(`${API_URL}/recompute-claims?contract_id=${encodeURIComponent(contractId)}`, { method: 'POST' });
+        } catch (e) { console.error('recomputeClaims failed:', e); }
+    }
+
     function initApp() {
         fetchUnits();
         showPage('registerWorkPage');
@@ -820,6 +881,7 @@
                         await updateWorkOrderSequenceNumbers(currentContractId, newDistrict, newArea);
                     }
                 }
+                await cacheClearAll();
                 alert(currentContractId ? "Kontrak berjaya dikemaskini!" : "Kontrak berjaya didaftar!");
                 location.reload();
             }
@@ -893,40 +955,57 @@
                     };
                 });
 
-                for(const workIdValue of currentWorkIds){
-                    const payload = perWorkIdPayload[workIdValue]; if(!payload) continue;
-                    const checkRes = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}`, { headers });
-                    const existing = await checkRes.json();
+                // 1 query sahaja utk semua ID (sebelum ini: 1 query per ID)
+                const inList = currentWorkIds.map(id => encodeURIComponent(id)).join(',');
+                const checkRes = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=in.(${inList})&select=id,work_id,status`, { headers });
+                const existingRows = await checkRes.json();
+                const existingMap = {};
+                (Array.isArray(existingRows) ? existingRows : []).forEach(r => { existingMap[r.work_id] = r; });
 
-                    if(existing.length > 0){
-                        const existingStatus = existing[0].status || '';
-                        const isRejected = existingStatus.includes('REJ');
+                try {
+                    for(const workIdValue of currentWorkIds){
+                        const payload = perWorkIdPayload[workIdValue]; if(!payload) continue;
+                        const existing = existingMap[workIdValue];
+                        let wr;
 
-                        const patchPayload = {
-                            ...payload,
-                            sequence_no: sequenceToUse,
-                            district: districtSelected
-                        };
+                        if(existing){
+                            const isRejected = (existing.status || '').includes('REJ');
 
-                        if(isRejected){
-                            patchPayload.status = 'BLUEFORM';
-                            patchPayload.reject_reason = null;
-                            patchPayload.revision_in_progress = false;
+                            const patchPayload = {
+                                ...payload,
+                                sequence_no: sequenceToUse,
+                                district: districtSelected
+                            };
+
+                            if(isRejected){
+                                patchPayload.status = 'BLUEFORM';
+                                patchPayload.reject_reason = null;
+                                patchPayload.revision_in_progress = false;
+                            }
+
+                            wr = await fetch(`${API_URL}/rest/v1/work_orders?id=eq.${existing.id}&nosync=1`, {
+                                method: 'PATCH', headers, body: JSON.stringify(patchPayload)
+                            });
+                        }else{
+                            wr = await fetch(`${API_URL}/rest/v1/work_orders?nosync=1`, {
+                                method: 'POST', headers, body: JSON.stringify(payload)
+                            });
                         }
 
-                        await fetch(`${API_URL}/rest/v1/work_orders?id=eq.${existing[0].id}`, {
-                            method: 'PATCH', headers, body: JSON.stringify(patchPayload)
-                        });
-                    }else{
-                        await fetch(`${API_URL}/rest/v1/work_orders`, {
-                            method: 'POST', headers, body: JSON.stringify(payload)
-                        });
+                        if(!wr.ok) throw new Error(await wr.text());
                     }
-                }
 
-                originalLoadedWorkIds.filter(id => !currentWorkIds.includes(id)).forEach(async (removedId) => {
-                    await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(removedId)}`, { method: 'DELETE', headers });
-                });
+                    // 1 DELETE sahaja, dan di-await sebelum reload
+                    // (dulu: forEach(async) tak di-await -> boleh terbatal bila location.reload())
+                    const removed = originalLoadedWorkIds.filter(id => !currentWorkIds.includes(id));
+                    if(removed.length){
+                        const rmList = removed.map(id => encodeURIComponent(id)).join(',');
+                        await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=in.(${rmList})&nosync=1`, { method: 'DELETE', headers });
+                    }
+                } finally {
+                    // Recompute SEKALI sahaja (walau ada ralat separuh jalan, summary kekal betul)
+                    await recomputeClaims(contractId);
+                }
 
                 alert(`Berjaya didaftar! No. Rujukan: ${sequenceToUse}`);
                 location.reload();
@@ -936,8 +1015,11 @@
 
     async function fetchUnits() {
         try{
-            const res = await fetch(`${API_URL}/rest/v1/units?select=*`, { headers });
-            const units = await res.json();
+            const units = await cached('units', UNITS_TTL, async () => {
+                const r = await fetch(`${API_URL}/units`);
+                if (!r.ok) throw new Error('units fetch failed');
+                return r.json();
+            });
 
             const admin = document.getElementById('c_unit_id');
             const wUnit = document.getElementById('w_unit_id');
@@ -965,8 +1047,13 @@
         contractSelect.innerHTML = '<option value="">Loading...</option>';
 
         try{
-            const res = await fetch(`${API_URL}/rest/v1/contract?select=*&unit_id=eq.${unitId}`, { headers });
-            const data = await res.json();
+            const data = await cached(`contracts:${unitId}`, CONTRACTS_TTL, async () => {
+                const r = await fetch(`${API_URL}/rest/v1/contract?select=*&unit_id=eq.${unitId}`, { headers });
+                if (!r.ok) throw new Error('contract fetch failed');
+                const d = await r.json();
+                if (!Array.isArray(d)) throw new Error('unexpected contract response');
+                return d;
+            });
 
             data.sort((a, b) => {
                 const dateA = a.contract_start ? new Date(a.contract_start).getTime() : 0;
@@ -1245,22 +1332,26 @@
         pendingDupGroups = [];
         const soloIds = [];
 
-        for(const { id, base } of toCheck){
-            try{
-                const res = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=ilike.${encodeURIComponent(base)}*&select=work_id,amount_spent,section_category,status,location`, { headers });
-                const rows = await res.json();
-                const escBase = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const variantRegex = new RegExp(`^${escBase}[A-Z]?$`);
-                const matches = Array.isArray(rows) ? rows.filter(r => variantRegex.test(r.work_id)) : [];
+        // 1 query utk SEMUA bare ID (sebelum ini: 1 query per ID)
+        let allRows = [];
+        try{
+            const orFilter = toCheck.map(({ base }) => `work_id.ilike.${encodeURIComponent(base)}*`).join(',');
+            const res = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&or=(${orFilter})&select=work_id,amount_spent,section_category,status,location`, { headers });
+            const data = await res.json();
+            allRows = Array.isArray(data) ? data : [];
+        }catch(e){
+            console.error(e);
+        }
 
-                if(matches.length > 1){
-                    matches.sort((a, b) => a.work_id.localeCompare(b.work_id));
-                    pendingDupGroups.push({ base, options: matches, selected: null });
-                } else {
-                    soloIds.push(id);
-                }
-            }catch(e){
-                console.error(e);
+        for(const { id, base } of toCheck){
+            const escBase = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const variantRegex = new RegExp(`^${escBase}[A-Z]?$`);
+            const matches = allRows.filter(r => variantRegex.test(r.work_id));
+
+            if(matches.length > 1){
+                matches.sort((a, b) => a.work_id.localeCompare(b.work_id));
+                pendingDupGroups.push({ base, options: matches, selected: null });
+            } else {
                 soloIds.push(id);
             }
         }
@@ -1403,15 +1494,21 @@
         const penalty = parseFloat(document.getElementById('i_penalty').dataset.rawValue || 0);
 
         const payload = { contract_id: cId, interim_no: iNo, date_received: iDate, salvage_value: salvage, performance_guarantee_sum: pg, tax: taxAmount, penalty: penalty, claim_breakdown: breakdown, claim_amount: total, net_amount: total - salvage - pg + taxAmount - penalty };
-        let res = currentInterimId ? await fetch(`${API_URL}/rest/v1/interims?id=eq.${currentInterimId}`, { method:'PATCH', headers, body: JSON.stringify(payload) }) : await fetch(`${API_URL}/rest/v1/interims`, { method:'POST', headers, body: JSON.stringify(payload) });
+        let res = currentInterimId ? await fetch(`${API_URL}/rest/v1/interims?id=eq.${currentInterimId}&nosync=1`, { method:'PATCH', headers, body: JSON.stringify(payload) }) : await fetch(`${API_URL}/rest/v1/interims?nosync=1`, { method:'POST', headers, body: JSON.stringify(payload) });
 
         if(res.ok){
-            for (let workId of attachedWorkOrders) {
-                const findRes = await fetch(`${API_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}&select=id`, { headers });
-                const rows = await findRes.json();
-                if (rows.length > 0) {
-                    await fetch(`${API_URL}/rest/v1/work_orders?id=eq.${rows[0].id}`, { method: 'PATCH', headers, body: JSON.stringify({ interim_no: iNo, status: 'CLAIMED' }) });
+            try {
+                // 1 PATCH sahaja utk semua WO, dihadkan kepada kontrak ini
+                // (dulu: 1 GET + 1 PATCH per WO, dan GET tak tapis contract_id)
+                if (attachedWorkOrders.length) {
+                    const inList = attachedWorkOrders.map(id => encodeURIComponent(id)).join(',');
+                    const wr = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=in.(${inList})&nosync=1`, {
+                        method: 'PATCH', headers, body: JSON.stringify({ interim_no: iNo, status: 'CLAIMED' })
+                    });
+                    if (!wr.ok) alert(await wr.text());
                 }
+            } finally {
+                await recomputeClaims(cId);   // SEKALI sahaja
             }
             alert(currentInterimId ? "Interim berjaya dikemaskini!" : "Interim berjaya direkodkan!"); location.reload();
         } else { alert(await res.text()); }
@@ -1441,11 +1538,9 @@
         calcVOTotal();
 
         try {
-            const res = await fetch(`${API_URL}/rest/v1/contract?id=eq.${opt.value}&select=vo_breakdown`, { headers });
-            const data = await res.json();
-            if (!data || data.length === 0) return;
-
-            currentVOBreakdown = data[0].vo_breakdown || {};
+            // vo_breakdown sudah dimuat dlm opt.dataset.vo oleh loadContractsByUnit()
+            // (submitVO tetap GET segar sebelum PATCH, jadi data selamat).
+            currentVOBreakdown = JSON.parse(opt.dataset.vo || '{}') || {};
             const voNames = Object.keys(currentVOBreakdown); if (voNames.length === 0) return;
 
             pillsSection.style.display = 'block';
@@ -1518,13 +1613,13 @@
                 vBreak[voName] = { amt: amt, date: voDate, breakdown: breakdown };
                 
                 const resUpd = await fetch(`${API_URL}/rest/v1/contract?id=eq.${cId}`, { method: 'PATCH', headers, body: JSON.stringify({ vo_breakdown: vBreak, total_vo_amount: (contract.total_vo_amount || 0) - oldAmt + amt }) });
-                if (resUpd.ok) { alert(`VO "${voName}" berjaya dikemaskini!`); location.reload(); }
+                if (resUpd.ok) { await cacheClearAll(); alert(`VO "${voName}" berjaya dikemaskini!`); location.reload(); }
             } else {
                 if (vBreak[voName] && !window.confirm(`VO "${voName}" sudah wujud. Ganti sedia ada?`)) return;
                 vBreak[voName] = { amt: amt, date: voDate, breakdown: breakdown };
 
                 const resUpd = await fetch(`${API_URL}/rest/v1/contract?id=eq.${cId}`, { method: 'PATCH', headers, body: JSON.stringify({ vo_breakdown: vBreak, total_vo_amount: (contract.total_vo_amount || 0) + amt }) });
-                if (resUpd.ok) { alert("Variation Order Berjaya Direkodkan!"); location.reload(); }
+                if (resUpd.ok) { await cacheClearAll(); alert("Variation Order Berjaya Direkodkan!"); location.reload(); }
             }
         } catch (e) { alert("Ralat sistem berlaku."); }
     }
@@ -1539,7 +1634,7 @@
             const contractId = document.getElementById("w_contract_id").value; if(!contractId) return;
             try{
                 const filter = currentIds.map(id=>`work_id.eq.${encodeURIComponent(id)}`).join(",");
-                const res = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&or=(${filter})&select=*`, {headers});
+                const res = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&or=(${filter})&select=sequence_no&limit=1`, {headers});
                 const matches = await res.json();
                 if(!Array.isArray(matches) || matches.length===0) return;
 
@@ -1655,7 +1750,7 @@
     async function updateWorkOrderSequenceNumbers(contractId, districtText, areaText){
         const districts = districtText.split(",").map(x=>x.trim().toUpperCase());
         const areas = areaText.split(",").map(x=>x.trim().toUpperCase());
-        const res = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&select=*`, {headers});
+        const res = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&select=id,district,sequence_no`, {headers});
         const works = await res.json(); const bulk = [];
 
         districts.forEach((district,index)=>{
@@ -1667,7 +1762,7 @@
                 works.filter(w=>w.sequence_no===oldSeq).forEach(w=>{ bulk.push({ id:w.id, sequence_no: areaCode + String(i+1).padStart(3,"0"), district:district }); });
             });
         });
-        if(bulk.length) await fetch(`${API_URL}/rest/v1/work_orders`, { method:"POST", headers:{...headers, Prefer:"resolution=merge-duplicates"}, body:JSON.stringify(bulk) });
+        if(bulk.length) await fetch(`${API_URL}/rest/v1/work_orders?nosync=1`, { method:"POST", headers:{...headers, Prefer:"resolution=merge-duplicates"}, body:JSON.stringify(bulk) });
     }
 
     function centerActiveForm(btn) { if(window.innerWidth <= 768) { btn.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" }); } }
