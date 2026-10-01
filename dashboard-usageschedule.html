@@ -1068,6 +1068,90 @@ function sortWorkOrders(data, areaPriority){
     });
 }
 
+// ============================================================
+// INDEXEDDB CACHE: work_orders + interims (per contract_id)
+//
+// Database berasingan daripada dashboard.html sebab bentuk data
+// berbeza (select column lain + tiada tapisan status di server).
+//
+// Versi cache = contract.claim_usage_summary.updated_at.
+// Worker mengemas kini nilai ini setiap kali ada POST/PATCH/
+// DELETE pada work_orders atau interims untuk kontrak berkenaan
+// (termasuk updateStatus di page ni). Row contract memang sudah
+// di-fetch dalam loadSingleContract(), jadi semakan versi tidak
+// menambah query/rows read.
+// ============================================================
+const USAGE_IDB_NAME = 'me-connect-cache-usage';
+const USAGE_IDB_STORE = 'usage';
+
+function usageIdbOpen() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(USAGE_IDB_NAME, 1);
+        req.onupgradeneeded = () =>
+            req.result.createObjectStore(USAGE_IDB_STORE, { keyPath: 'contract_id' });
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function usageIdbGet(key) {
+    const db = await usageIdbOpen();
+    return new Promise((resolve, reject) => {
+        const r = db.transaction(USAGE_IDB_STORE).objectStore(USAGE_IDB_STORE).get(key);
+        r.onsuccess = () => resolve(r.result || null);
+        r.onerror = () => reject(r.error);
+    });
+}
+
+async function usageIdbPut(value) {
+    const db = await usageIdbOpen();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(USAGE_IDB_STORE, 'readwrite');
+        tx.objectStore(USAGE_IDB_STORE).put(value);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+async function getUsageData(id, contract) {
+
+    const fp = contract.claim_usage_summary?.updated_at || null;
+
+    let cached = null;
+    try { cached = await usageIdbGet(contract.id); } catch (e) {}
+
+    // Tiada perubahan -> guna IndexedDB
+    if (fp && cached && cached.fp === fp) {
+        return { works: cached.works, interims: cached.interims };
+    }
+
+    // Ada perubahan (atau belum ada cache) -> fetch penuh
+    const [woRes, intRes] = await Promise.all([
+        fetch(
+        `${API_URL}/rest/v1/work_orders?contract_id=eq.${id}&select=id,contract_id,work_id,status,section_category,additional,amount_spent,qpb_date,blueform_created_at,created_at,district,sequence_no,interim_no,location,description,pdf_url`,
+        { headers }
+    ),
+        fetch(`${API_URL}/rest/v1/interims?contract_id=eq.${id}&order=date_received.asc`, { headers })
+    ]);
+
+    const works = await woRes.json();
+    const interims = await intRes.json();
+
+    if (fp) {
+        try {
+            await usageIdbPut({
+                contract_id: contract.id,
+                fp,
+                works,
+                interims,
+                saved: Date.now()
+            });
+        } catch (e) {}
+    }
+
+    return { works, interims };
+}
+
 async function loadSingleContract(id){
     currentContractId = id;
     try{
@@ -1080,18 +1164,10 @@ async function loadSingleContract(id){
         document.getElementById('viewTitle').innerText = c.contract_code;
         document.getElementById('viewSubtitle').innerText = c.contract_name;
         document.getElementById('tableWrapper').style.display = 'block';
-        const [woRes, intRes] = await Promise.all([
-    fetch(
-    `${API_URL}/rest/v1/work_orders?contract_id=eq.${id}&select=id,contract_id,work_id,status,section_category,additional,amount_spent,qpb_date,blueform_created_at,created_at,district,sequence_no,interim_no,location,description,pdf_url`,
-    { headers }
-),
-    fetch(`${API_URL}/rest/v1/interims?contract_id=eq.${id}&order=date_received.asc`, { headers })
-]);
-const rawWorks = await woRes.json();
+        const { works: rawWorks, interims } = await getUsageData(id, c);
 // Halaman ni untuk Usage Schedule (BLUEFORM ke atas) - fasa quotation
 // (QUOTATION / QUO-APP / QUO-REJ) belum sesuai dipaparkan di sini lagi.
 allWorks = rawWorks.filter(w => !['QUOTATION', 'QUO-APP', 'QUO-REJ'].includes((w.status || '').toUpperCase().trim()));
-const interims = await intRes.json();
 
 // Simpan reference supaya updateStatus/updateStatusGroup boleh
 // render semula tanpa fetch semula seluruh kontrak.
