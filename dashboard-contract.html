@@ -1190,7 +1190,8 @@
                 `contract_start,contract_end,` +
                 `contract_sum,` +
                 `selected_sections,` +
-                `contract_sections_breakdown`,
+                `contract_sections_breakdown,` +
+                `claim_usage_summary`,
 
                 { headers }
             );
@@ -1340,6 +1341,163 @@
 
 
     // ============================================================
+    // INDEXEDDB CACHE: work_orders + interims (per contract_id)
+    //
+    // Versi cache = contract.claim_usage_summary.updated_at.
+    // Worker mengemas kini nilai ini setiap kali ada POST/PATCH/
+    // DELETE pada work_orders atau interims untuk kontrak berkenaan.
+    // Selagi nilai ini sama, data dibaca dari IndexedDB (tiada
+    // query work_orders / interims ke D1).
+    // ============================================================
+
+    const IDB_NAME = 'me-connect-cache';
+    const IDB_STORE = 'work_orders';
+
+    function idbOpen() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(IDB_NAME, 1);
+            req.onupgradeneeded = () =>
+                req.result.createObjectStore(IDB_STORE, { keyPath: 'contract_id' });
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    async function idbGet(key) {
+        const db = await idbOpen();
+        return new Promise((resolve, reject) => {
+            const r = db.transaction(IDB_STORE).objectStore(IDB_STORE).get(key);
+            r.onsuccess = () => resolve(r.result || null);
+            r.onerror = () => reject(r.error);
+        });
+    }
+
+    async function idbPut(value) {
+        const db = await idbOpen();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(IDB_STORE, 'readwrite');
+            tx.objectStore(IDB_STORE).put(value);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    async function idbDelete(key) {
+        const db = await idbOpen();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(IDB_STORE, 'readwrite');
+            tx.objectStore(IDB_STORE).delete(key);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    async function getAnalysisData(contract) {
+
+        // Versi = masa terakhir WO/interim kontrak ini berubah (dari Worker)
+        const fp = contract.claim_usage_summary?.updated_at || null;
+
+        let cached = null;
+
+        try {
+            cached = await idbGet(contract.id);
+        } catch (e) {}
+
+
+        // Tiada perubahan -> guna IndexedDB
+        if (fp && cached && cached.fp === fp) {
+
+            return {
+                wo: cached.wo,
+                interims: cached.interims
+            };
+        }
+
+
+        // Ada perubahan (atau belum ada cache) -> fetch penuh
+        const [resW, resI] = await Promise.all([
+
+            fetch(
+
+                `${API_URL}/rest/v1/work_orders` +
+                `?contract_id=eq.${contract.id}` +
+                `&status=not.in.` +
+                `(CANCEL,REJ,EXEC-REJ,HOS-REJ,HOD-REJ,QUOTATION,QUO-APP,QUO-REJ)` +
+                `&select=interim_no,section_category,status,qpb_date`,
+
+                { headers }
+            ),
+
+
+            fetch(
+
+                `${API_URL}/rest/v1/interims` +
+                `?contract_id=eq.${contract.id}` +
+                `&order=date_received.asc` +
+                `&select=interim_no,claim_breakdown,net_amount,claim_amount,claim_date`,
+
+                { headers }
+            )
+
+        ]);
+
+
+        if (!resW.ok) {
+            throw new Error(
+                `WO HTTP ${resW.status}`
+            );
+        }
+
+
+        if (!resI.ok) {
+            throw new Error(
+                `Interim HTTP ${resI.status}`
+            );
+        }
+
+
+        const rawWO =
+            await resW.json();
+
+
+        const wo =
+            rawWO.map(w => {
+
+                if (
+                    w.status &&
+                    w.status.toLowerCase() === 'claimed'
+                ) {
+
+                    w.status = 'CLAIMED';
+                }
+
+                return w;
+            });
+
+
+        const interims =
+            await resI.json();
+
+
+        if (fp) {
+
+            try {
+                await idbPut({
+                    contract_id: contract.id,
+                    fp,
+                    wo,
+                    interims,
+                    saved: Date.now()
+                });
+            } catch (e) {}
+        }
+
+
+        return { wo, interims };
+    }
+
+
+    // ============================================================
     // OPEN ANALYSIS
     //
     // FIX: guna cacheAnalysis[contract.id] kalau kontrak ni dah
@@ -1427,73 +1585,23 @@
 
         try {
 
-            const [resW, resI] =
-                await Promise.all([
+            // ====================================================
+            // INDEXEDDB: guna cache kalau tiada perubahan,
+            // kalau tidak fetch semula dan kemas kini cache
+            // ====================================================
 
-                    fetch(
-
-                        `${API_URL}/rest/v1/work_orders` +
-                        `?contract_id=eq.${currentContract.id}` +
-                        `&status=not.in.` +
-                        `(CANCEL,REJ,EXEC-REJ,HOS-REJ,HOD-REJ,QUOTATION,QUO-APP,QUO-REJ)` +
-                        `&select=interim_no,section_category,status,qpb_date`,
-
-                        { headers }
-                    ),
-
-
-                    fetch(
-
-                        `${API_URL}/rest/v1/interims` +
-                        `?contract_id=eq.${currentContract.id}` +
-                        `&order=date_received.asc` +
-                        `&select=interim_no,claim_breakdown,net_amount,claim_amount,claim_date`,
-
-                        { headers }
-                    )
-
-                ]);
-
-
-            if (!resW.ok) {
-                throw new Error(
-                    `WO HTTP ${resW.status}`
+            const data =
+                await getAnalysisData(
+                    currentContract
                 );
-            }
-
-
-            if (!resI.ok) {
-                throw new Error(
-                    `Interim HTTP ${resI.status}`
-                );
-            }
-
-
-            const rawWO =
-                await resW.json();
 
 
             currentWO =
-                rawWO.map(wo => {
+                data.wo;
 
-                    if (
-                        wo.status &&
-                        wo.status.toLowerCase() === 'claimed'
-                    ) {
-
-                        wo.status = 'CLAIMED';
-                    }
-
-                    return wo;
-                });
-
-
-            // ====================================================
-            // SIMPAN INTERIM YANG SUDAH FETCHED
-            // ====================================================
 
             currentInterims =
-                await resI.json();
+                data.interims;
 
 
             // ====================================================
