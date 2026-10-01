@@ -45,6 +45,46 @@ const headers = {
 const params = new URLSearchParams(window.location.search);
 const contractId = params.get('id');
 
+// ============================================================
+// CACHE (IndexedDB) - DB berasingan, tak kacau contract.html /
+// contract_forms. Data WO + interims kontrak dicache dan
+// disahkan guna contract.claim_usage_summary.updated_at
+// (Worker kemas kini nilai ni pada SETIAP write WO/interim).
+// Sama = tiada perubahan -> skip query interims & work_orders.
+// ============================================================
+const SUM_DB = 'me-connect-summary-cache';
+
+function sOpen() {
+    return new Promise((res, rej) => {
+        const r = indexedDB.open(SUM_DB, 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('kv');
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+    });
+}
+async function sGet(key) {
+    try {
+        const db = await sOpen();
+        return await new Promise(r => {
+            const q = db.transaction('kv').objectStore('kv').get(key);
+            q.onsuccess = () => r(q.result || null);
+            q.onerror = () => r(null);
+        });
+    } catch (_) { return null; }
+}
+async function sPut(key, value) {
+    try {
+        const db = await sOpen();
+        await new Promise(r => {
+            const tx = db.transaction('kv', 'readwrite');
+            tx.objectStore('kv').put(value, key);
+            tx.oncomplete = () => r();
+            tx.onerror = () => r();
+            tx.onabort = () => r();
+        });
+    } catch (_) {}
+}
+
 function formatDateMY(dateStr) {
     if (!dateStr) return "-";
     const date = new Date(dateStr);
@@ -64,18 +104,40 @@ async function startAutoDownload() {
     if(!contractId) return;
     
     try {
-        const [conRes, intRes, woRes] = await Promise.all([
-            fetch(`${API_URL}/rest/v1/contract?id=eq.${contractId}`, { headers }),
-            fetch(`${API_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=created_at.asc`, { headers }),
-            // 1. PENAPIS DITAMBAHBAIK:
-            // - status=not.ilike.*REJ* -> Membuang sebarang status yang ada 'REJ' (EXEC-REJ, HOS-REJ, HOD-REJ, REJ, etc.)
-            // - status=neq.CANCEL      -> Membuang status CANCEL
-            fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&status=not.ilike.*REJ*&status=neq.CANCEL`, { headers })
-        ]);
-
+        // 1) Contract dulu (1 row ikut PK) - bawa fingerprint cache
+        const conRes = await fetch(`${API_URL}/rest/v1/contract?id=eq.${contractId}`, { headers });
         const contracts = await conRes.json();
-        const interims = await intRes.json();
-        let rawWorkorders = await woRes.json();
+        const fp = contracts?.[0]?.claim_usage_summary?.updated_at || null;
+
+        let interims = [];
+        let rawWorkorders = [];
+
+        if (contracts && contracts.length > 0) {
+
+            const hit = fp ? await sGet(`data:${contractId}`) : null;
+
+            if (hit && hit.fp === fp) {
+                // Tiada perubahan sejak kali lepas -> guna IndexedDB (0 rows read)
+                interims = hit.interims;
+                rawWorkorders = hit.rawWorkorders;
+            } else {
+                const [intRes, woRes] = await Promise.all([
+                    fetch(`${API_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=created_at.asc`, { headers }),
+                    // PENAPIS:
+                    // - status=not.ilike.*REJ* -> buang EXEC-REJ, HOS-REJ, HOD-REJ, REJ, dll
+                    // - status=neq.CANCEL      -> buang CANCEL
+                    fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&status=not.ilike.*REJ*&status=neq.CANCEL`, { headers })
+                ]);
+
+                if (!intRes.ok) throw new Error(`Interims HTTP ${intRes.status}`);
+                if (!woRes.ok) throw new Error(`Work orders HTTP ${woRes.status}`);
+
+                interims = await intRes.json();
+                rawWorkorders = await woRes.json();
+
+                if (fp) await sPut(`data:${contractId}`, { fp, interims, rawWorkorders, saved: Date.now() });
+            }
+        }
 
         // 2. PENYERAGAMAN: Tukar sebarang status 'Claimed' / 'claimed' kepada 'CLAIMED'
         const workorders = rawWorkorders.map(w => {
@@ -89,9 +151,16 @@ async function startAutoDownload() {
             const c = contracts[0];
             let unitName = "UNIT";
             try {
-                const unitRes = await fetch(`${API_URL}/rest/v1/units?id=eq.${c.unit_id}`, { headers });
-                const units = await unitRes.json();
-                if (units && units.length > 0) unitName = units[0].unit_name;
+                // Senarai unit kecil & jarang berubah -> cache 24 jam
+                let uc = await sGet('units');
+                if (!uc || Date.now() - uc.t > 24 * 60 * 60 * 1000) {
+                    const ur = await fetch(`${API_URL}/units`);
+                    if (!ur.ok) throw new Error('units fetch failed');
+                    uc = { t: Date.now(), v: await ur.json() };
+                    await sPut('units', uc);
+                }
+                const u = uc.v.find(x => String(x.id) === String(c.unit_id));
+                if (u) unitName = u.unit_name;
             } catch (e) {}
 
             const startYear = c.contract_start ? new Date(c.contract_start).getFullYear() : "????";
