@@ -248,7 +248,10 @@ animation:fadeInRight .45s ease forwards;
 
 .detail-list {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
+    overscroll-behavior: contain;   /* scroll berhenti di hujung list, tak bocor ke luar */
+    -webkit-overflow-scrolling: touch;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -1117,6 +1120,10 @@ function prev(){ index=(index-1+items.length)%items.length; baseAngle+=stepAngle
 
 let buffer = 0;
 window.addEventListener("wheel", e => {
+    // Scroll di dalam kotak kanan (info-card / detail-list) = scroll isi kotak,
+    // BUKAN tukar section.
+    if(e.target.closest && e.target.closest(".info-card")) return;
+
     if(lock) return;
     lock = true;
     buffer += e.deltaY;
@@ -1128,13 +1135,16 @@ window.addEventListener("wheel", e => {
 let startX = 0;
 const isCardOpen = () => card.classList.contains("show-mobile");
 
+let touchInCard = false;
+
 window.addEventListener("touchstart", e => {
-    if(isCardOpen()) return;
+    touchInCard = !!(e.target.closest && e.target.closest(".info-card"));
+    if(touchInCard || isCardOpen()) return;
     startX = e.touches[0].clientX;
 }, { passive:true });
 
 window.addEventListener("touchend", e => {
-    if(isCardOpen()) return;
+    if(touchInCard || isCardOpen()) return;
     const diff = startX - e.changedTouches[0].clientX;
     if(Math.abs(diff) < 40) return;
     if(diff > 0) next(); else prev();
