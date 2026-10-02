@@ -387,7 +387,42 @@
             flex-direction: column;
             overflow: hidden;
         }
-        .flip-card-front { padding: 20px; }
+        .flip-card-front { padding: 20px 20px 46px; }
+
+        /* ---- flip hint (affordance) ---- */
+        .flip-hint {
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: rgba(0,122,255,0.10);
+            color: var(--ios-blue);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 5;
+            animation: flipHintPulse 2s ease-in-out infinite;
+            transition: opacity .3s;
+        }
+        .flip-hint i { animation: flipHintNudge 1.4s ease-in-out infinite; }
+        /* lepas user dah flip sekali: berhenti animate, kekal subtle */
+        .flip-hint.seen { animation: none; opacity: 0.6; }
+        .flip-hint.seen i { animation: none; }
+        @keyframes flipHintPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(0,122,255,0.35); }
+            50%      { box-shadow: 0 0 0 7px rgba(0,122,255,0); }
+        }
+        @keyframes flipHintNudge {
+            0%, 100% { transform: translateX(0); }
+            50%      { transform: translateX(3px); }
+        }
         .flip-card-back {
             transform: rotateY(180deg);
             padding: 15px;
@@ -836,6 +871,7 @@
                                 <div id="selectedSectionContainer"></div>
                             </div>
                         </div>
+                        <div class="flip-hint" id="flipHint"><span>TAP TO VIEW USAGE TREND</span> <i class="fa fa-rotate"></i></div>
                     </div>
 
                     <!-- BACK FACE: usage trend dashboard, sized to fit the card -->
@@ -2687,6 +2723,9 @@
                 panel.classList.toggle(
                     'flipped'
                 );
+
+                const hint = document.getElementById('flipHint');
+                if (hint) hint.classList.add('seen');
 
 
                 if (isFlippingToBack) {
