@@ -279,6 +279,68 @@ animation:fadeInRight .45s ease forwards;
     font-weight: 700;
     color: white;
     flex-shrink: 0;
+    cursor: pointer;
+    text-decoration: underline dotted rgba(255,255,255,0.45);
+    text-underline-offset: 3px;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: color .15s;
+}
+.detail-item-code:hover,
+.detail-item-code.active,
+.detail-item-code:focus-visible {
+    color: #7dd3fc;
+    text-decoration-color: #7dd3fc;
+}
+
+/* ── POPUP NAMA KONTRAK (hover / klik pada contract code) ── */
+.contract-tip {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 100000;
+    max-width: min(280px, calc(100vw - 16px));
+    padding: 9px 12px;
+    border-radius: 12px;
+    background: rgba(20, 28, 48, 0.97);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.18);
+    box-shadow: 0 10px 28px rgba(0,0,0,0.45);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.45;
+    word-break: break-word;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+    transition: opacity .15s ease, transform .15s ease;
+}
+.contract-tip.visible { opacity: 1; transform: none; }
+.contract-tip small {
+    display: block;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    opacity: 0.55;
+    margin-bottom: 2px;
+}
+.contract-tip::after {              /* anak panah ke bawah (popup di atas code) */
+    content: "";
+    position: absolute;
+    left: var(--ax, 16px);
+    bottom: -6px;
+    width: 10px;
+    height: 10px;
+    background: rgba(20, 28, 48, 0.97);
+    border-right: 1px solid rgba(255,255,255,0.18);
+    border-bottom: 1px solid rgba(255,255,255,0.18);
+    transform: rotate(45deg);
+}
+.contract-tip.below::after {        /* popup di bawah code */
+    bottom: auto;
+    top: -6px;
+    transform: rotate(225deg);
 }
 
 .detail-item-sub {
@@ -653,6 +715,98 @@ const nextBtn = document.getElementById("nextBtn");
 const detailPanel = document.getElementById("detailPanel");
 const detailPanelTitle = document.getElementById("detailPanelTitle");
 const detailList = document.getElementById("detailList");
+
+/* ── POPUP NAMA KONTRAK ──
+   Desktop : hover pada contract code = popup, klik = pin (kekal sampai klik tempat lain)
+   Mobile  : tap pada contract code = popup, tap lagi / tap tempat lain = tutup */
+const contractTip = document.createElement("div");
+contractTip.className = "contract-tip";
+contractTip.setAttribute("role", "tooltip");
+document.body.appendChild(contractTip);
+
+let tipAnchor = null;     // elemen code yang sedang ditunjuk
+let tipPinned = false;    // true bila dibuka melalui klik / tap
+const canHover = window.matchMedia("(hover: hover)").matches;
+
+function escHtml(str) {
+    return String(str).replace(/[&<>"']/g, ch => (
+        { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]
+    ));
+}
+
+function showContractTip(anchor) {
+    if (tipAnchor && tipAnchor !== anchor) tipAnchor.classList.remove("active");
+    tipAnchor = anchor;
+    anchor.classList.add("active");
+
+    const name = anchor.dataset.name || "";
+    contractTip.innerHTML = "<small>Contract Name</small>" +
+        (name ? escHtml(name) : '<span style="opacity:.6">Tiada nama kontrak</span>');
+
+    // ukur dulu, baru letak
+    contractTip.classList.remove("below");
+    const r  = anchor.getBoundingClientRect();
+    const tw = contractTip.offsetWidth;
+    const th = contractTip.offsetHeight;
+    const gap = 10, pad = 8;
+
+    const left = Math.min(Math.max(pad, r.left), window.innerWidth - tw - pad);
+    let top = r.top - th - gap;
+    let below = false;
+    if (top < pad) { top = r.bottom + gap; below = true; }   // tak cukup ruang atas -> bawah
+
+    contractTip.style.left = left + "px";
+    contractTip.style.top  = top + "px";
+    contractTip.style.setProperty(
+        "--ax", Math.max(10, Math.min(tw - 20, r.left + r.width / 2 - left - 5)) + "px"
+    );
+    contractTip.classList.toggle("below", below);
+    contractTip.classList.add("visible");
+}
+
+function hideContractTip() {
+    contractTip.classList.remove("visible");
+    if (tipAnchor) tipAnchor.classList.remove("active");
+    tipAnchor = null;
+    tipPinned = false;
+}
+
+function toggleContractTip(el) {
+    if (tipPinned && tipAnchor === el) { hideContractTip(); return; }
+    tipPinned = true;
+    showContractTip(el);
+}
+
+detailList.addEventListener("mouseover", e => {
+    if (!canHover || tipPinned) return;
+    const el = e.target.closest(".detail-item-code");
+    if (el) showContractTip(el);
+});
+
+detailList.addEventListener("mouseout", e => {
+    if (tipPinned) return;
+    const el = e.target.closest(".detail-item-code");
+    if (el && !el.contains(e.relatedTarget)) hideContractTip();
+});
+
+detailList.addEventListener("click", e => {
+    const el = e.target.closest(".detail-item-code");
+    if (el) toggleContractTip(el);
+});
+
+detailList.addEventListener("keydown", e => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const el = e.target.closest(".detail-item-code");
+    if (!el) return;
+    e.preventDefault();
+    toggleContractTip(el);
+});
+
+detailList.addEventListener("scroll", hideContractTip, { passive: true });
+window.addEventListener("resize", hideContractTip);
+document.addEventListener("click", e => {
+    if (!e.target.closest(".detail-item-code")) hideContractTip();
+});
 const detailBackBtn = document.getElementById("detailBackBtn");
 
 const isMobile = window.innerWidth <= 768;
@@ -693,6 +847,7 @@ detailBackBtn.addEventListener("click", (e) => {
 });
 
 function closeDetail() {
+    hideContractTip();
     detailPanel.classList.remove("visible");
 }
 
@@ -863,6 +1018,8 @@ function openDetail(type) {
 
     const list = currentLists[type];
 
+    hideContractTip();
+
     detailPanelTitle.textContent = cfg.title;
     detailPanelTitle.style.color = cfg.color;
     detailPanelTitle.style.opacity = "1";
@@ -874,7 +1031,9 @@ function openDetail(type) {
             const rendered = cfg.render(c);
             return `
                 <div class="detail-item">
-                    <span class="detail-item-code">${rendered.code}</span>
+                    <span class="detail-item-code" tabindex="0" role="button"
+                          aria-label="Show contract name"
+                          data-name="${escHtml(c.contract_name || '')}">${rendered.code}</span>
                     <span class="detail-item-sub ${rendered.subClass}">${rendered.sub}</span>
                 </div>
             `;
