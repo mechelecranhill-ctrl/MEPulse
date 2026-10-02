@@ -398,14 +398,25 @@
             position: absolute;
             left: 50%;
             bottom: 10px;
-            transform: translateX(-50%);
             z-index: 10;
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 7px;
             pointer-events: none;
+
+            /* default = tersembunyi, "pop off" */
+            opacity: 0;
+            transform: translateX(-50%) translateY(16px) scale(0.85);
+            transition: opacity .25s ease,
+                        transform .4s cubic-bezier(0.34, 1.56, 0.64, 1);   /* overshoot = pop */
         }
+        /* "pop up" bila ada .show (JS tambah, buang selepas 1 saat) */
+        .flip-dock.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0) scale(1);
+        }
+        .flip-dock:not(.show) .flip-pill { pointer-events: none; }
 
         .flip-pill {
             pointer-events: auto;
@@ -439,7 +450,7 @@
             border-radius: inherit;
             border: 2px solid rgba(0,122,255,0.45);
             pointer-events: none;
-            animation: flipRing 2.2s ease-out infinite;
+            animation: flipRing 1s ease-out infinite;
         }
         .flip-pill:active { transform: scale(0.96); }
         .flip-pill b { color: var(--ios-blue); font-weight: 800; }
@@ -497,14 +508,7 @@
             background: var(--ios-blue);
         }
 
-        /* user dah pernah flip -> tenang kan hint */
-        .flip-dock.seen .flip-pill { animation: none; opacity: 0.8; box-shadow: 0 2px 8px rgba(0,0,0,0.10); }
-        .flip-dock.seen .flip-pill::after,
-        .flip-dock.seen .flip-mini-card { animation: none; }
-        .flip-dock.seen .flip-pill:hover { opacity: 1; }
 
-        /* teaser: card "intai" sekali bila pertama kali dibuka */
-        .flip-card-inner.teaser { animation: flipTeaser 1.5s cubic-bezier(0.4, 0, 0.2, 1) 0.9s 1; }
 
         @media (hover: hover) {
             .flip-pill:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 10px 24px rgba(0,122,255,0.28); }
@@ -523,15 +527,9 @@
             50%, 85%  { transform: rotateY(180deg); }
             100%      { transform: rotateY(360deg); }
         }
-        @keyframes flipTeaser {
-            0%   { transform: rotateY(0deg); }
-            30%  { transform: rotateY(-20deg); }
-            55%  { transform: rotateY(0deg); }
-            75%  { transform: rotateY(-8deg); }
-            100% { transform: rotateY(0deg); }
-        }
         @media (prefers-reduced-motion: reduce) {
-            .flip-pill, .flip-pill::after, .flip-mini-card, .flip-card-inner.teaser { animation: none !important; }
+            .flip-pill, .flip-pill::after, .flip-mini-card { animation: none !important; }
+            .flip-dock { transform: translateX(-50%) !important; }
         }
         .flip-card-back {
             transform: rotateY(180deg);
@@ -1698,7 +1696,7 @@
 
         panel.style.display = 'block';
 
-        playFlipTeaser();
+        showFlipHint(350);
 
 
         document.getElementById('panel-title').innerText =
@@ -2803,18 +2801,37 @@
     const analysisPanel =
         document.getElementById('analysis-panel');
 
-    const FLIP_SEEN_KEY = 'contractFlipHintSeen';
-    let flipTeaserPlayed = false;
+    // ------------------------------------------------------------
+    // FLIP HINT: pop up sekejap, pop off selepas 1 saat
+    //   - bila contract dibuka
+    //   - bila card di-flip (label ikut face baru)
+    // Lokasi sama (bawah tengah card).
+    // ------------------------------------------------------------
+    const FLIP_HINT_VISIBLE_MS = 1000;
+    let flipHintDelayTimer = null;
+    let flipHintHideTimer  = null;
 
-    function flipHintSeen() {
-        try { return localStorage.getItem(FLIP_SEEN_KEY) === '1'; }
-        catch (e) { return false; }
-    }
+    function showFlipHint(delay) {
 
-    function markFlipHintSeen() {
         const dock = document.getElementById('flipDock');
-        if (dock) dock.classList.add('seen');
-        try { localStorage.setItem(FLIP_SEEN_KEY, '1'); } catch (e) {}
+
+        if (!dock) return;
+
+        clearTimeout(flipHintDelayTimer);
+        clearTimeout(flipHintHideTimer);
+
+        // reset supaya animasi pop sentiasa main semula
+        dock.classList.remove('show');
+
+        flipHintDelayTimer = setTimeout(function () {
+
+            dock.classList.add('show');
+
+            flipHintHideTimer = setTimeout(function () {
+                dock.classList.remove('show');
+            }, FLIP_HINT_VISIBLE_MS);
+
+        }, delay || 0);
     }
 
     // Satu pintu untuk semua trigger: click, pill, swipe
@@ -2827,48 +2844,12 @@
 
         analysisPanel.classList.toggle('flipped');
 
-        const inner = document.getElementById('flipCardInner');
-        if (inner) inner.classList.remove('teaser');
-
-        markFlipHintSeen();
+        // tunggu sekejap supaya hint muncul bila face baru mendarat
+        showFlipHint(250);
 
         if (isFlippingToBack) {
             loadUsageEmbedded();
         }
-    }
-
-    // Dipanggil bila contract dibuka (openAnalysis).
-    // - user belum pernah flip: pill berdenyut + card "intai" sekali
-    // - user dah pernah flip: hint senyap
-    function playFlipTeaser() {
-
-        const dock  = document.getElementById('flipDock');
-        const inner = document.getElementById('flipCardInner');
-
-        if (!dock || !inner) return;
-
-        if (flipHintSeen()) {
-            dock.classList.add('seen');
-            return;
-        }
-
-        dock.classList.remove('seen');
-
-        if (flipTeaserPlayed) return;
-        if (window.matchMedia &&
-            window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-        flipTeaserPlayed = true;
-
-        inner.classList.remove('teaser');
-        void inner.offsetWidth;            // restart animation
-        inner.classList.add('teaser');
-
-        inner.addEventListener('animationend', function done(e) {
-            if (e.animationName !== 'flipTeaser') return;
-            inner.classList.remove('teaser');
-            inner.removeEventListener('animationend', done);
-        });
     }
 
 
