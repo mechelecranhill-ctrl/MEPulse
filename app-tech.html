@@ -737,6 +737,45 @@ async function getPermissionContext() {
     }
     return ctx;
 }
+// Tapis senarai unit untuk dropdown borang ikut staf yang login.
+// Admin & Ketua Jabatan: semua unit. Lain-lain: unit yang ditugaskan (staff_unit_assignment)
+// + semua unit dalam section yang ditugaskan (staff_section_assignment) jika berperanan Ketua Seksyen.
+// Logik sama seperti skop jadual senarai dalam fetchTechnicianDashboard().
+async function filterUnitsForCurrentStaff(allUnits) {
+    const perm = window.__techPerm || await getPermissionContext();
+    if (perm.isAdmin || perm.canActDept) return allUnits;
+
+    const staffIdRaw = localStorage.getItem('staff_id');
+    const staffId = staffIdRaw !== null ? Number(staffIdRaw) : null;
+    if (staffId === null || Number.isNaN(staffId)) return [];
+
+    const allowed = new Set();
+
+    const unitAssign = await apiQuery('staff_unit_assignment',
+        `staff_id=eq.${encodeURIComponent(staffId)}&active=eq.true&select=unit_id`);
+    (unitAssign || []).forEach(a => allowed.add(String(a.unit_id)));
+
+    if (perm.canActSection) {
+        const secAssign = await apiQuery('staff_section_assignment',
+            `staff_id=eq.${encodeURIComponent(staffId)}&active=eq.true&select=section_id`);
+        const sectionIds = new Set((secAssign || []).map(x => String(x.section_id)));
+        // section_id sudah ada pada setiap unit, jadi tak perlu query tambahan ke D1
+        allUnits.forEach(u => { if (sectionIds.has(String(u.section_id))) allowed.add(String(u.id)); });
+    }
+
+    return allUnits.filter(u => allowed.has(String(u.id)));
+}
+
+function renderUnitSelect(sel, units) {
+    if (!sel) return;
+    if (!units.length) {
+        sel.innerHTML = '<option value="">Tiada unit ditetapkan untuk akaun anda</option>';
+        return;
+    }
+    sel.innerHTML = '<option value="">Choose Unit</option>' +
+        units.map(u => `<option value="${u.id}">${u.unit_name}</option>`).join('');
+}
+
 function applyTechPermissionUI(perm) {
             const canManage = !!perm.canManageTech;
             const addQuoBtn = document.querySelector('#quotation-section button[onclick="openQuotationModal()"]');
@@ -884,10 +923,8 @@ function tqResetDetectState() {
         async function tqFetchUnits() {
             try {
                 const res = await fetch(`${API_URL}/rest/v1/units?select=*`, { headers: qHeaders });
-                const units = await res.json();
-                const sel = document.getElementById('tq_unit_id');
-                sel.innerHTML = '<option value="">Choose Unit</option>';
-                units.forEach(u => { sel.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`; });
+                const units = await filterUnitsForCurrentStaff(await res.json());
+                renderUnitSelect(document.getElementById('tq_unit_id'), units);
             } catch(e) { console.error(e); }
         }
 
@@ -1548,10 +1585,8 @@ async function tqDoSubmit(e) {
         async function woFetchUnits() {
             try {
                 const res = await fetch(`${API_URL}/rest/v1/units?select=*`, { headers: qHeaders });
-                const units = await res.json();
-                const sel = document.getElementById('wo_unit_id');
-                sel.innerHTML = '<option value="">Choose Unit</option>';
-                units.forEach(u => { sel.innerHTML += `<option value="${u.id}">${u.unit_name}</option>`; });
+                const units = await filterUnitsForCurrentStaff(await res.json());
+                renderUnitSelect(document.getElementById('wo_unit_id'), units);
             } catch(e) { console.error(e); }
         }
 
