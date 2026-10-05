@@ -338,6 +338,9 @@
         }
 
 // ============ ROLE / PERMISSION CONTEXT (KONGSI SEMUA PAGE) ============
+// Only these sections should be shown on this dashboard
+const ALLOWED_SECTION_NAMES = ['SEKSYEN SELENGGARA', 'SEKSYEN PEMATUHAN PERATURAN'];
+
 const ACT_ROLES = {
     TECH: ['JURUTEKNIK', 'JURUTEKNIK KANAN', 'EKSEKUTIF', 'EKSEKUTIF KANAN'],
     UNIT_EXEC: ['EKSEKUTIF', 'EKSEKUTIF KANAN'],
@@ -413,7 +416,7 @@ async function getPermissionContext() {
     }
 
     if (perm.canActDept) {
-        const allUnits = await apiQuery('units', 'select=id,unit_name');
+        const allUnits = await apiQuery('units', 'select=id,unit_name,section_id');
         unitsPreset = allUnits || [];
     } else {
         // 1. Assignment terus ke SEKSYEN
@@ -451,7 +454,7 @@ async function getPermissionContext() {
 
         const unitsInSection = await apiQuery(
             'units',
-            `section_id=${buildInFilter(activeSectionIds)}&select=id,unit_name`
+            `section_id=${buildInFilter(activeSectionIds)}&select=id,unit_name,section_id`
         );
         unitsPreset = unitsInSection || [];
 
@@ -461,9 +464,29 @@ async function getPermissionContext() {
         }
     }
 } else {
-    const allUnits = await apiQuery('units', 'select=id,unit_name');
+    const allUnits = await apiQuery('units', 'select=id,unit_name,section_id');
     unitsPreset = allUnits || [];
 }
+
+                // ===== TAPIS: papar seksyen SELENGGARA & PEMATUHAN PERATURAN sahaja =====
+                let allSections = [];
+                try {
+                    allSections = await apiQuery('me_sections', 'select=id,section_name');
+                } catch (e) {
+                    console.error('Failed to load sections:', e.message);
+                }
+                const allowedSectionIds = new Set(
+                    (allSections || [])
+                        .filter(sec => ALLOWED_SECTION_NAMES.includes((sec.section_name || '').trim().toUpperCase()))
+                        .map(sec => String(sec.id))
+                );
+                unitsPreset = unitsPreset.filter(u => allowedSectionIds.has(String(u.section_id)));
+
+                if (unitsPreset.length === 0) {
+                    showEmptyRow('No units under Seksyen Selenggara / Seksyen Pematuhan Peraturan.');
+                    return;
+                }
+                const allowedUnitIdSet = new Set(unitsPreset.map(u => String(u.id)));
 
                 const scopeIsAll = isAdmin || (perm && perm.canActDept);
                 const activeUnitIds = unitsPreset.map(u => u.id);
@@ -522,6 +545,10 @@ async function getPermissionContext() {
                 workOrders.forEach(item => {
                     item.contract = contractMap.get(String(item.contract_id)) || null;
                 });
+
+                workOrders = workOrders.filter(item =>
+                    item.contract && allowedUnitIdSet.has(String(item.contract.unit_id))
+                );
 
                 workOrders.forEach(item => { item.mapped_pdf_url = item.pdf_url || null; });
 
