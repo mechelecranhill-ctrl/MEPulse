@@ -2746,6 +2746,50 @@ async function executeStatusUpdate(
     try {
 
         /* =====================================================
+           SEMAKAN SIGNATURE (WAJIB) - hanya utk APP-EXEC
+           Tanpa signature dalam table staff, approve disekat
+           SEBELUM sebarang perubahan data dibuat.
+           Admin (@dm1n) dikecualikan (tiada staff_id/signature).
+           ===================================================== */
+
+        if (nextStatus === 'APP-EXEC') {
+
+            const isAdminUser =
+                localStorage.getItem('userId') === '@dm1n' ||
+                localStorage.getItem('role') === 'admin';
+
+            if (!isAdminUser) {
+
+                const staffId = localStorage.getItem('staff_id');
+                let hasSignature = false;
+
+                if (staffId) {
+                    try {
+                        const staffRows = await apiQuery(
+                            'staff',
+                            `id=eq.${encodeValue(staffId)}&select=signature`
+                        );
+                        hasSignature = !!(
+                            staffRows &&
+                            staffRows[0] &&
+                            String(staffRows[0].signature || '').trim()
+                        );
+                    } catch (sigErr) {
+                        console.error('Gagal semak signature:', sigErr);
+                    }
+                }
+
+                if (!hasSignature) {
+                    showAppToast(
+                        'Approve disekat: signature anda belum wujud. Sila muat naik signature dahulu.',
+                        'error'
+                    );
+                    return;
+                }
+            }
+        }
+
+        /* =====================================================
            QUOTATION DECISION
            ===================================================== */
 
