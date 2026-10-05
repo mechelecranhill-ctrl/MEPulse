@@ -39,7 +39,7 @@ function formatShortDate(dateStr){
 // NOTA MIGRASI: staff yang log masuk sekarang dikenal pasti melalui
 // localStorage.getItem('staff_id') (diset di login.html selepas panggil
 // POST /login pada Worker), BUKAN lagi Supabase Auth.
-async function mergeApprovalStamp(table, workId, stageKey) {
+async function mergeApprovalStamp(table, workId, stageKey, approvalDate = null) {
     try {
         const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
         if (isAdmin) return null;
@@ -50,7 +50,7 @@ async function mergeApprovalStamp(table, workId, stageKey) {
         const res = await fetch(`${API_URL}/rest/v1/${table}?work_id=eq.${encodeURIComponent(workId)}&select=approval_stamps`, { headers });
         const rows = await res.json();
         const stamps = (rows[0] && rows[0].approval_stamps) ? { ...rows[0].approval_stamps } : {};
-        stamps[stageKey] = { staff_id: staffId, date: new Date().toISOString().slice(0, 10) };
+        stamps[stageKey] = { staff_id: staffId, date: approvalDate || new Date().toISOString().slice(0, 10) };
         return stamps;
     } catch (e) {
         console.error('Gagal merge approval stamp:', e);
@@ -76,7 +76,7 @@ async function fetchGroupMembers(contractId, district, sequenceNo) {
     });
 }
 
-async function stageGroupDecision(workId, contractId, district, sequenceNo, nextStatus, reason, stampStage) {
+async function stageGroupDecision(workId, contractId, district, sequenceNo, nextStatus, reason, stampStage, approvalDate = null) {
 
     // Standalone Work Order
     if (!sequenceNo) {
@@ -86,7 +86,7 @@ async function stageGroupDecision(workId, contractId, district, sequenceNo, next
         };
 
         if (stampStage && !String(nextStatus).endsWith('REJ')) {
-            const stamps = await mergeApprovalStamp('work_orders', workId, stampStage);
+            const stamps = await mergeApprovalStamp('work_orders', workId, stampStage, approvalDate);
             if (stamps) payload.approval_stamps = stamps;
         }
 
@@ -140,7 +140,8 @@ async function stageGroupDecision(workId, contractId, district, sequenceNo, next
             const stamps = await mergeApprovalStamp(
                 'work_orders',
                 workId,
-                stampStage
+                stampStage,
+                approvalDate
             );
 
             if (stamps)
@@ -210,7 +211,8 @@ async function stageGroupDecision(workId, contractId, district, sequenceNo, next
             const stamps = await mergeApprovalStamp(
                 'work_orders',
                 m.work_id,
-                stampStage
+                stampStage,
+                approvalDate
             );
 
             if (stamps)
@@ -234,7 +236,7 @@ async function stageGroupDecision(workId, contractId, district, sequenceNo, next
 }
 
 // Wrapper: cari contract_id/district/sequence_no dari work_id dulu, then stage.
-async function stageGroupDecisionByWorkId(workId, nextStatus, reason, stampStage) {
+async function stageGroupDecisionByWorkId(workId, nextStatus, reason, stampStage, approvalDate = null) {
     const res = await fetch(
         `${API_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}&select=id,contract_id,district,sequence_no`,
         { headers }
@@ -242,7 +244,7 @@ async function stageGroupDecisionByWorkId(workId, nextStatus, reason, stampStage
     const rows = await res.json();
     if (!rows || rows.length === 0) throw new Error('Work order tidak dijumpai: ' + workId);
     const row = rows[0];
-    return stageGroupDecision(workId, row.contract_id, row.district, row.sequence_no, nextStatus, reason, stampStage);
+    return stageGroupDecision(workId, row.contract_id, row.district, row.sequence_no, nextStatus, reason, stampStage, approvalDate);
 }
 
 // Selesaikan staff_id -> signature/initial image untuk semua stamp dalam satu record
