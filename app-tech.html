@@ -2455,18 +2455,6 @@ async function qActionDeleteQuotation() {
                 const currentWorkIds = woGetCurrentWorkIdsFromRows();
                 if(currentWorkIds.length === 0){ alert('Please enter at least one Work Order ID!'); return; }
 
-                // ===== SEMAKAN INITIAL (WAJIB) =====
-                // Tanpa initial, submit disekat SEBELUM sebarang perubahan data dibuat.
-                const stampsByWorkId = {};
-                for(const wid of currentWorkIds){
-                    const st = await mergeApprovalStamp('work_orders', wid, 'tech_initial');
-                    if(!st){
-                        showAppToast('Submit disekat: initial anda belum wujud. Sila tetapkan initial dahulu.', 'error');
-                        return;
-                    }
-                    stampsByWorkId[wid] = st;
-                }
-
                 // Jika mod Save as New -> jangan batalkan rekod lama dahulu. Simpan senarai
                 // untuk dibatalkan HANYA selepas rekod baharu berjaya disimpan.
                 let idsToCancelForSaveAsNew = [];
@@ -2532,7 +2520,7 @@ async function qActionDeleteQuotation() {
 
                 for(const workIdValue of currentWorkIds){
     const payload = perWorkIdPayload[workIdValue]; if(!payload) continue;
-    const stamps = stampsByWorkId[workIdValue];
+    const stamps = await mergeApprovalStamp('work_orders', workIdValue, 'tech_initial');
     if (stamps) payload.approval_stamps = stamps;
     const checkRes = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workIdValue)}`, { headers: qHeaders });
     const existing = await checkRes.json();
