@@ -235,6 +235,15 @@
                               placeholder="Please specify the reason for rejection here..."></textarea>
                     <p id="rejectErrorMsg" class="hidden text-[11px] text-red-600 mt-1 font-medium"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Rejection reason is required.</p>
                 </div>
+
+                <div id="approvalDateSection" class="hidden mb-5">
+                    <label for="approvalDateInput" class="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1.5 text-left">
+                        Approval Date <span class="text-red-500">*</span>
+                    </label>
+                    <input type="date" id="approvalDateInput"
+                           class="w-full text-sm p-3 border border-gray-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 bg-gray-50 transition-all">
+                    <p id="approvalDateErrorMsg" class="hidden text-[11px] text-red-600 mt-1 font-medium"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Approval date is required.</p>
+                </div>
                 
                 <div class="flex gap-3 justify-center">
                     <button onclick="closeConfirmModal()" class="flex-1 px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-sm transition-colors cursor-pointer">
@@ -2409,6 +2418,22 @@ function openConfirmModal(
         );
 
 
+    const approvalDateSection = document.getElementById('approvalDateSection');
+    const approvalDateInput = document.getElementById('approvalDateInput');
+    const approvalDateError = document.getElementById('approvalDateErrorMsg');
+    const isBlueformApprove = (mode === 'BLUEFORM');
+
+    approvalDateError.classList.add('hidden');
+    approvalDateInput.classList.remove('border-red-500');
+    if (isBlueformApprove) {
+        const now = new Date();
+        approvalDateInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        approvalDateSection.classList.remove('hidden');
+    } else {
+        approvalDateInput.value = '';
+        approvalDateSection.classList.add('hidden');
+    }
+
     reasonInput.value = '';
 
     errorMsg.classList.add(
@@ -2659,13 +2684,24 @@ function openConfirmModal(
             }
 
 
-            closeConfirmModal();
+            let approvalDateValue = null;
+            if (isBlueformApprove) {
+                approvalDateValue = approvalDateInput.value;
+                if (!approvalDateValue) {
+                    approvalDateError.classList.remove('hidden');
+                    approvalDateInput.classList.add('border-red-500');
+                    approvalDateInput.focus();
+                    return;
+                }
+            }
 
+            closeConfirmModal();
 
             await executeStatusUpdate(
                 workId,
                 nextStatus,
-                reasonText
+                reasonText,
+                approvalDateValue
             );
 
         };
@@ -2740,7 +2776,8 @@ function closeConfirmModal() {
 async function executeStatusUpdate(
     workId,
     nextStatus,
-    reason = null
+    reason = null,
+    approvalDate = null
 ) {
 
     try {
@@ -2868,7 +2905,8 @@ async function executeStatusUpdate(
                     workId,
                     nextStatus,
                     reason,
-                    stampStage
+                    stampStage,
+                    approvalDate
                 );
 
 
