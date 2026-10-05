@@ -220,6 +220,15 @@
                           placeholder="Please specify the reason for rejection here..."></textarea>
                 <p id="rejectErrorMsg" class="hidden text-[11px] text-red-600 mt-1 font-medium"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Rejection reason is required.</p>
             </div>
+
+            <div id="approvalDateSection" class="hidden mb-5">
+                <label for="approvalDateInput" class="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1.5 text-left">
+                    Approval Date <span class="text-red-500">*</span>
+                </label>
+                <input type="date" id="approvalDateInput"
+                       class="w-full text-sm p-3 border border-gray-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-gray-50 transition-all">
+                <p id="approvalDateErrorMsg" class="hidden text-[11px] text-red-600 mt-1 font-medium"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Approval date is required.</p>
+            </div>
             
             <div class="flex gap-3 justify-center">
                 <button onclick="closeConfirmModal()" class="flex-1 px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-sm transition-colors cursor-pointer">
@@ -933,10 +942,18 @@ function toggleAccordion(contentId, iconId) {
     errorMsg.classList.add('hidden');
     reasonInput.classList.remove('border-red-500', 'focus:ring-red-500/20');
 
+    const approvalDateSection = document.getElementById('approvalDateSection');
+    const approvalDateInput = document.getElementById('approvalDateInput');
+    const approvalDateError = document.getElementById('approvalDateErrorMsg');
+    approvalDateError.classList.add('hidden');
+    approvalDateInput.classList.remove('border-red-500');
+
     const isReject = mode === 'REJECT';
 
     if (isReject) {
         reasonSection.classList.remove('hidden');
+        approvalDateInput.value = '';
+        approvalDateSection.classList.add('hidden');
         banner.className = "p-5 bg-red-50 text-red-600 flex justify-center items-center border-b border-red-100";
         iconContainer.className = "w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md text-xl text-red-600";
         icon.className = "fa-solid fa-ban";
@@ -945,6 +962,9 @@ function toggleAccordion(contentId, iconId) {
         confirmBtn.className = "flex-1 px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-all shadow-md bg-red-600 hover:bg-red-700 cursor-pointer";
     } else {
         reasonSection.classList.add('hidden');
+        const now = new Date();
+        approvalDateInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        approvalDateSection.classList.remove('hidden');
         banner.className = "p-5 bg-purple-50 text-purple-600 flex justify-center items-center border-b border-purple-100";
         iconContainer.className = "w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md text-xl text-purple-600";
         icon.className = "fa-solid fa-check-double";
@@ -964,8 +984,18 @@ function toggleAccordion(contentId, iconId) {
                 return;
             }
         }
+        let approvalDateValue = null;
+        if (!isReject) {
+            approvalDateValue = approvalDateInput.value;
+            if (!approvalDateValue) {
+                approvalDateError.classList.remove('hidden');
+                approvalDateInput.classList.add('border-red-500');
+                approvalDateInput.focus();
+                return;
+            }
+        }
         closeConfirmModal();
-        await executeStatusUpdate(workId, nextStatus, reasonText);
+        await executeStatusUpdate(workId, nextStatus, reasonText, approvalDateValue);
     };
 
     modal.classList.remove('hidden');
@@ -984,10 +1014,33 @@ function closeConfirmModal() {
     }, 150);
 }
 
-async function executeStatusUpdate(workId, nextStatus, reason = null) {
+async function executeStatusUpdate(workId, nextStatus, reason = null, approvalDate = null) {
     try {
+        // ===== SEMAKAN SIGNATURE (WAJIB) - hanya utk APP-HOD =====
+        // Tanpa signature dalam table staff, approve disekat SEBELUM sebarang perubahan data.
+        // Admin (@dm1n) dikecualikan (tiada staff_id/signature).
+        if (nextStatus === 'APP-HOD') {
+            const isAdminUser = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
+            if (!isAdminUser) {
+                const staffId = localStorage.getItem('staff_id');
+                let hasSignature = false;
+                if (staffId) {
+                    try {
+                        const staffRows = await apiQuery('staff', `id=eq.${encodeValue(staffId)}&select=signature`);
+                        hasSignature = !!(staffRows && staffRows[0] && String(staffRows[0].signature || '').trim());
+                    } catch (sigErr) {
+                        console.error('Gagal semak signature:', sigErr);
+                    }
+                }
+                if (!hasSignature) {
+                    showAppToast('Approve disekat: signature anda belum wujud. Sila muat naik signature dahulu.', 'error');
+                    return;
+                }
+            }
+        }
+
         const stampStage = nextStatus === 'APP-HOD' ? 'dept_head' : null;
-        const result = await stageGroupDecisionByWorkId(workId, nextStatus, reason, stampStage);
+        const result = await stageGroupDecisionByWorkId(workId, nextStatus, reason, stampStage, approvalDate);
         if (result.waiting) {
             showAppToast('Decision saved. Waiting for other Work Orders in the same sequence to be decided first.', 'info');
         }
