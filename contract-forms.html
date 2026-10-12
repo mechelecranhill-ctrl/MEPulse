@@ -377,6 +377,36 @@
         .dup-btn-confirm{ flex:2; padding:12px; border-radius:12px; border:none; background:var(--ios-blue); color:white; font-weight:700; cursor:pointer; margin:0; }
         .dup-btn-confirm:disabled{ opacity:0.45; cursor:not-allowed; }
 
+        /* ===== POPUP (ganti alert/confirm asli browser) ===== */
+        .app-popup-overlay{
+            display:none; position:fixed; inset:0; z-index:10000;
+            background:rgba(11,61,145,0.45); backdrop-filter:blur(4px);
+            -webkit-backdrop-filter:blur(4px);
+            align-items:center; justify-content:center; padding:20px;
+        }
+        .app-popup-overlay.visible{ display:flex; }
+        .app-popup{
+            background:rgba(255,255,255,0.95); backdrop-filter:blur(20px);
+            -webkit-backdrop-filter:blur(20px);
+            border-radius:22px; border:1px solid rgba(255,255,255,0.7);
+            max-width:380px; width:100%; padding:26px 22px 18px; text-align:center;
+            box-shadow:0 20px 60px rgba(0,0,0,0.35); animation:fadeIn 0.25s ease;
+        }
+        .app-popup-icon{
+            width:52px; height:52px; border-radius:50%; margin:0 auto 14px;
+            display:flex; align-items:center; justify-content:center;
+            font-size:26px; font-weight:800; color:#fff;
+        }
+        .app-popup-icon.success{ background:var(--ios-green); }
+        .app-popup-icon.error{ background:var(--ios-red); }
+        .app-popup-icon.warning{ background:var(--ios-orange); }
+        .app-popup-icon.info, .app-popup-icon.confirm{ background:var(--ios-blue); }
+        .app-popup-title{ margin:0 0 8px; font-size:17px; font-weight:800; color:#111; }
+        .app-popup-msg{ margin:0 0 20px; font-size:13px; color:#444; line-height:1.5; white-space:pre-line; word-break:break-word; max-height:50vh; overflow-y:auto; }
+        .app-popup-actions{ display:flex; gap:10px; }
+        .app-popup-btn{ flex:1; padding:12px; border-radius:12px; border:none; font-weight:700; font-size:14px; cursor:pointer; margin:0; background:var(--ios-blue); color:#fff; }
+        .app-popup-btn.secondary{ background:transparent; border:1px solid rgba(0,0,0,0.15); color:#555; }
+
         /* ===== LOADING OVERLAY ===== */
         .loading-overlay{
             display:none; position:fixed; inset:0; z-index:9999;
@@ -674,6 +704,19 @@
         </div>
     </div>
 
+    <!-- ===== POPUP (ganti alert/confirm) ===== -->
+    <div id="appPopupOverlay" class="app-popup-overlay">
+        <div class="app-popup" role="dialog" aria-modal="true" aria-labelledby="appPopupTitle">
+            <div id="appPopupIcon" class="app-popup-icon info">i</div>
+            <h3 id="appPopupTitle" class="app-popup-title"></h3>
+            <p id="appPopupMsg" class="app-popup-msg"></p>
+            <div class="app-popup-actions">
+                <button type="button" id="appPopupCancel" class="app-popup-btn secondary">Batal</button>
+                <button type="button" id="appPopupOk" class="app-popup-btn">OK</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ===== LOADING OVERLAY ===== -->
     <div id="loadingOverlay" class="loading-overlay">
         <div class="loading-spinner"></div>
@@ -804,6 +847,51 @@
             .forEach(el => el.inert = false);
     }
 
+    // ===== POPUP: ganti alert()/confirm() asli browser =====
+    // Guna: await showPopup('mesej', 'success'|'error'|'warning'|'info')
+    //       if (!(await showConfirm('mesej'))) return;
+    const _popupMeta = {
+        success: { icon: '✓', title: 'Berjaya' },
+        error:   { icon: '!', title: 'Ralat' },
+        warning: { icon: '!', title: 'Perhatian' },
+        info:    { icon: 'i', title: 'Maklumat' },
+        confirm: { icon: '?', title: 'Pengesahan' }
+    };
+    function _openPopup(message, type, isConfirm) {
+        return new Promise(resolve => {
+            const meta = _popupMeta[type] || _popupMeta.info;
+            const overlay = document.getElementById('appPopupOverlay');
+            const okBtn = document.getElementById('appPopupOk');
+            const cancelBtn = document.getElementById('appPopupCancel');
+            const icon = document.getElementById('appPopupIcon');
+            icon.className = 'app-popup-icon ' + type;
+            icon.textContent = meta.icon;
+            document.getElementById('appPopupTitle').textContent = meta.title;
+            document.getElementById('appPopupMsg').textContent = String(message ?? '');
+            cancelBtn.style.display = isConfirm ? '' : 'none';
+            okBtn.textContent = isConfirm ? 'Ya' : 'OK';
+
+            const finish = (val) => {
+                overlay.classList.remove('visible');
+                okBtn.onclick = cancelBtn.onclick = overlay.onclick = null;
+                document.removeEventListener('keydown', onKey, true);
+                resolve(val);
+            };
+            const onKey = (e) => {
+                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+                else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); finish(true); }
+            };
+            okBtn.onclick = () => finish(true);
+            cancelBtn.onclick = () => finish(false);
+            overlay.onclick = (e) => { if (e.target === overlay) finish(!isConfirm); };
+            document.addEventListener('keydown', onKey, true);
+            overlay.classList.add('visible');
+            okBtn.focus();
+        });
+    }
+    function showPopup(message, type = 'info') { return _openPopup(message, type, false); }
+    function showConfirm(message) { return _openPopup(message, 'confirm', true); }
+
     function reloadPage() { isReloading = true; location.reload(); }
 
     // Bungkus mana-mana fungsi async: tunjuk loading, elak double-submit
@@ -814,7 +902,7 @@
             if (isLoading) return;
             showLoading(text);
             try { return await fn.apply(this, args); }
-            catch (err) { console.error(err); alert('Ralat berlaku. Sila cuba lagi.'); }
+            catch (err) { console.error(err); await showPopup('Ralat berlaku. Sila cuba lagi.', 'error'); }
             finally { hideLoading(); }
         };
     }
@@ -944,7 +1032,7 @@
                     }
                 }
                 await cacheClearAll();
-                alert(currentContractId ? "Kontrak berjaya dikemaskini!" : "Kontrak berjaya didaftar!");
+                await showPopup(currentContractId ? "Kontrak berjaya dikemaskini!" : "Kontrak berjaya didaftar!", 'success');
                 reloadPage();
             }
         }, 'Menyimpan kontrak...'));
@@ -965,7 +1053,7 @@
                 let areaCode = (index !== -1 && areaCodes[index]) ? areaCodes[index] : "WO";
 
                 const currentWorkIds = getCurrentWorkIdsFromRows('w');
-                if(currentWorkIds.length === 0){ alert("Sila masukkan sekurang-kurangnya satu Work Order ID!"); return; }
+                if(currentWorkIds.length === 0){ await showPopup("Sila masukkan sekurang-kurangnya satu Work Order ID!", 'warning'); return; }
 
                 let sequenceToUse = currentWorkSequenceNo;
                 const originalDistrict = document.getElementById("w_dist").dataset.originalDistrict || "";
@@ -1069,9 +1157,9 @@
                     await recomputeClaims(contractId);
                 }
 
-                alert(`Berjaya didaftar! No. Rujukan: ${sequenceToUse}`);
+                await showPopup(`Berjaya didaftar! No. Rujukan: ${sequenceToUse}`, 'success');
                 reloadPage();
-            } catch (error) { console.error(error); alert("Gagal memproses nombor turutan."); }
+            } catch (error) { console.error(error); await showPopup("Gagal memproses nombor turutan.", 'error'); }
         }, 'Menyimpan Blue Form...'));
     }
 
@@ -1531,7 +1619,7 @@
         const cId = document.getElementById('i_contract_id').value;
         const iNo = parseInt(document.getElementById('i_no').value);
         const iDate = document.getElementById('i_date_received').value;
-        if(!cId || !iNo || !iDate){ alert("Lengkapkan maklumat interim!"); return; }
+        if(!cId || !iNo || !iDate){ await showPopup("Lengkapkan maklumat interim!", 'warning'); return; }
 
         let total = 0; const breakdown = {};
         document.querySelectorAll('.i_sec_claim_val').forEach(i=>{
@@ -1567,13 +1655,13 @@
                     const wr = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=in.(${inList})&nosync=1`, {
                         method: 'PATCH', headers, body: JSON.stringify({ interim_no: iNo, status: 'CLAIMED' })
                     });
-                    if (!wr.ok) alert(await wr.text());
+                    if (!wr.ok) await showPopup(await wr.text(), 'error');
                 }
             } finally {
                 await recomputeClaims(cId);   // SEKALI sahaja
             }
-            alert(currentInterimId ? "Interim berjaya dikemaskini!" : "Interim berjaya direkodkan!"); reloadPage();
-        } else { alert(await res.text()); }
+            await showPopup(currentInterimId ? "Interim berjaya dikemaskini!" : "Interim berjaya direkodkan!", 'success'); reloadPage();
+        } else { await showPopup(await res.text(), 'error'); }
     }
     window.submitInterim = lockable(_submitInterim, 'Menyimpan Interim...');
 
@@ -1663,8 +1751,8 @@
                 if (value > 0) { breakdown[i.dataset.sec] = { amt: value }; amt += value; }
             });
 
-            if (!cId) return alert("Sila pilih kontrak!");
-            if (!voName || !voDate || isNaN(amt)) return alert("Sila isi Nama VO, Tarikh VO dan Amaun!");
+            if (!cId) return await showPopup("Sila pilih kontrak!", 'warning');
+            if (!voName || !voDate || isNaN(amt)) return await showPopup("Sila isi Nama VO, Tarikh VO dan Amaun!", 'warning');
 
             const resGet = await fetch(`${API_URL}/rest/v1/contract?id=eq.${cId}`, { headers });
             const contract = (await resGet.json())[0];
@@ -1676,15 +1764,15 @@
                 vBreak[voName] = { amt: amt, date: voDate, breakdown: breakdown };
                 
                 const resUpd = await fetch(`${API_URL}/rest/v1/contract?id=eq.${cId}`, { method: 'PATCH', headers, body: JSON.stringify({ vo_breakdown: vBreak, total_vo_amount: (contract.total_vo_amount || 0) - oldAmt + amt }) });
-                if (resUpd.ok) { await cacheClearAll(); alert(`VO "${voName}" berjaya dikemaskini!`); reloadPage(); }
+                if (resUpd.ok) { await cacheClearAll(); await showPopup(`VO "${voName}" berjaya dikemaskini!`, 'success'); reloadPage(); }
             } else {
-                if (vBreak[voName] && !window.confirm(`VO "${voName}" sudah wujud. Ganti sedia ada?`)) return;
+                if (vBreak[voName] && !(await showConfirm(`VO "${voName}" sudah wujud. Ganti sedia ada?`))) return;
                 vBreak[voName] = { amt: amt, date: voDate, breakdown: breakdown };
 
                 const resUpd = await fetch(`${API_URL}/rest/v1/contract?id=eq.${cId}`, { method: 'PATCH', headers, body: JSON.stringify({ vo_breakdown: vBreak, total_vo_amount: (contract.total_vo_amount || 0) + amt }) });
-                if (resUpd.ok) { await cacheClearAll(); alert("Variation Order Berjaya Direkodkan!"); reloadPage(); }
+                if (resUpd.ok) { await cacheClearAll(); await showPopup("Variation Order Berjaya Direkodkan!", 'success'); reloadPage(); }
             }
-        } catch (e) { alert("Ralat sistem berlaku."); }
+        } catch (e) { await showPopup("Ralat sistem berlaku.", 'error'); }
     }
     window.submitVO = lockable(_submitVO, 'Menyimpan Variation Order...');
 
