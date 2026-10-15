@@ -2,6 +2,7 @@
 <html lang="en">
 <head> 
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https:;">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>User Directory</title>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -38,7 +39,6 @@ body {
     width: 100vw;
 }
 
-/* Header */
 .header {
     height: 65px;
     background: rgba(255, 255, 255, 0.8);
@@ -78,7 +78,6 @@ body {
     background: rgba(0,0,0,0.06);
 }
 
-/* Container & Search */
 .container {
     padding: 16px;
     max-width: 1200px;
@@ -104,7 +103,6 @@ body {
     box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.1);
 }
 
-/* Tree Relationship Hierarchy */
 .tree-group {
     margin-bottom: 24px;
     background: var(--bg-card);
@@ -173,7 +171,6 @@ body {
     background: var(--tree-line);
 }
 
-/* Layout Wrapper */
 .tree-wrapper {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -188,7 +185,6 @@ body {
     }
 }
 
-/* Staff Card */
 .staff-card {
     background: var(--bg-card);
     border-radius: var(--radius-lg);
@@ -280,7 +276,6 @@ body {
     transform: rotate(180deg);
 }
 
-/* Details Section */
 .staff-details {
     max-height: 0;
     overflow: hidden;
@@ -312,7 +307,6 @@ body {
     flex-shrink: 0;
 }
 
-/* Action Buttons */
 .action-group {
     margin-top: 12px;
     display: flex;
@@ -344,7 +338,6 @@ body {
 .delete-btn { background: var(--accent-red); }
 .acting-btn { background: var(--accent-orange); }
 
-/* Floating Action Button */
 .fab {
     position: fixed;
     right: 16px;
@@ -371,7 +364,6 @@ body {
     font-size: 14px;
 }
 
-/* Modals */
 .modal-overlay {
     display: none;
     position: fixed;
@@ -478,7 +470,6 @@ body {
     background: #e5e5ea;
 }
 
-/* Alert / Custom Popup Styling */
 .alert-box {
     background: rgba(255, 255, 255, 0.95);
     width: 85%;
@@ -524,7 +515,6 @@ body {
     <i class="fa fa-plus"></i>
 </div>
 
-<!-- Staff Modal -->
 <div id="staffModal" class="modal-overlay">
     <div class="modal-content">
         <h3 id="modalTitle">Staff</h3>
@@ -580,7 +570,6 @@ body {
     </div>
 </div>
 
-<!-- Assign Modal -->
 <div id="assignModal" class="modal-overlay">
     <div class="modal-content">
         <h3 id="assignModalTitle">Assign</h3>
@@ -592,7 +581,6 @@ body {
     </div>
 </div>
 
-<!-- Acting Modal -->
 <div id="actingModal" class="modal-overlay">
     <div class="modal-content">
         <h3>Appoint Acting Personnel</h3>
@@ -604,7 +592,6 @@ body {
     </div>
 </div>
 
-<!-- CUSTOM POPUP ALERT & CONFIRM MODAL -->
 <div id="customAlertModal" class="modal-overlay" style="align-items: center;">
     <div class="alert-box">
         <div id="customAlertTitle" class="alert-title">Notification</div>
@@ -651,7 +638,6 @@ let currentActingTargetId = null;
 
 let customAlertCallback = null;
 
-/* Custom Alert & Confirm Modals */
 function showAlert(title, desc) {
     document.getElementById("customAlertTitle").innerText = title;
     document.getElementById("customAlertDesc").innerText = desc;
@@ -737,7 +723,6 @@ function toggleCard(el, evt) {
 
 function staffCardHtml(s, isActing = false, actingType = "", targetId = null) {
     let avatarHtml = `<i class="fa-solid fa-user"></i>`;
-    let safeName = s.name ? s.name.replace(/'/g, "\\'") : "";
     let positionUpper = s.position ? s.position.toUpperCase() : "";
     let isKJ = positionUpper === "HEAD OF DEPARTMENT" || positionUpper === "KETUA JABATAN";
 
@@ -763,9 +748,9 @@ function staffCardHtml(s, isActing = false, actingType = "", targetId = null) {
         <div class="staff-left">
             <div class="staff-avatar" ${isActing ? 'style="background:rgba(255,149,0,0.1); color:var(--accent-orange);"' : ''}>${avatarHtml}</div>
             <div class="staff-info">
-                ${isActing ? `<span class="badge-acting"><i class="fa fa-gavel"></i> PEMANGKU</span>` : ''}
+                ${isActing ? `<span class="badge-acting"><i class="fa fa-gavel"></i> ACTING</span>` : ''}
                 <h4>${s.name}</h4>
-                <p>${isActing ? (actingType === 'section' ? 'PEMANGKU KETUA SEKSYEN' : 'PEMANGKU EKSEKUTIF UNIT') : s.position}</p>
+                <p>${isActing ? (actingType === 'section' ? 'ACTING HEAD OF SECTION' : 'ACTING UNIT EXECUTIVE') : s.position}</p>
             </div>
             <div class="expand-hint">
                 <i class="fa fa-chevron-down"></i>
@@ -829,7 +814,6 @@ function renderStaff() {
 
     let html = "";
 
-    // 1. HEAD OF DEPARTMENT
     let kjStaff = staffData.find(s => s.position?.toUpperCase() === "HEAD OF DEPARTMENT" || s.position?.toUpperCase() === "KETUA JABATAN");
     let actingKjRow = deptHeadAssignments.find(a => (a.is_acting === true || a.is_acting === 'true'));
     let actingKjStaff = (!kjStaff && actingKjRow) ? staffData.find(x => x.id === actingKjRow.staff_id) : null;
@@ -842,12 +826,11 @@ function renderStaff() {
         <div class="tree-group" style="border-left: 4px solid var(--accent-blue);">
             <div class="section-title" style="margin-top:0;"><i class="fa fa-user-tie" style="color:#004b93;"></i> Head of Department</div>
             <div class="tree-wrapper">
-                ${kjStaff ? staffCardHtml(kjStaff) : (actingKjStaff ? staffCardHtml(actingKjStaff, true, 'kj', 'kj') : emptyCardHtml("KETUA JABATAN", "kj", "kj"))}
+                ${kjStaff ? staffCardHtml(kjStaff) : (actingKjStaff ? staffCardHtml(actingKjStaff, true, 'kj', 'kj') : emptyCardHtml("HEAD OF DEPARTMENT", "kj", "kj"))}
             </div>
         </div>`;
     }
 
-    // 2. SECTIONS & UNITS
     sectionData.forEach(sec => {
         let secAssignments = staffSectionAssignments.filter(a => a.section_id === sec.id);
         
@@ -915,7 +898,7 @@ function renderStaff() {
                 } else if (actingUnitStaff) {
                     unitBlocks += staffCardHtml(actingUnitStaff, true, 'unit', u.id);
                 } else {
-                    unitBlocks += emptyCardHtml("EKSEKUTIF UNIT", "unit", u.id);
+                    unitBlocks += emptyCardHtml("UNIT EXECUTIVE", "unit", u.id);
                 }
 
                 unitBlocks += otherUnitStaff.map(s => staffCardHtml(s, false)).join("") + `
@@ -942,7 +925,7 @@ function renderStaff() {
             } else if (actingKsStaff) {
                 html += `<div class="tree-wrapper">${staffCardHtml(actingKsStaff, true, 'section', sec.id)}</div>`;
             } else if (hasHighLevelStaff || (!ksStaff && otherSecStaff.length === 0 && unitsInSection.length > 0)) {
-                html += `<div class="tree-wrapper">${emptyCardHtml("KETUA SEKSYEN", "section", sec.id)}</div>`;
+                html += `<div class="tree-wrapper">${emptyCardHtml("HEAD OF SECTION", "section", sec.id)}</div>`;
             }
 
             if (otherSecStaff.length > 0) {
@@ -1232,11 +1215,6 @@ function populatePositionDropdown(selectedValue = "") {
     let normalized = (selectedValue || "").trim().toUpperCase();
     let matchFound = Object.keys(hierarki).some(pos => pos.toUpperCase() === normalized);
 
-    // Only mark a real option as selected if it actually matches. Otherwise keep the
-    // placeholder selected so the browser never silently falls back to the first
-    // option in the list (which previously caused staff to be silently reassigned
-    // to "HEAD OF DEPARTMENT" whenever their stored position didn't match exactly,
-    // e.g. Malay text like "KETUA SEKSYEN").
     let html = `<option value="" disabled ${(!normalized || !matchFound) ? 'selected' : ''}>-- Select Position --</option>`;
 
     Object.keys(hierarki).forEach(pos => {
@@ -1248,8 +1226,8 @@ function populatePositionDropdown(selectedValue = "") {
 
     if (normalized && !matchFound) {
         showAlert(
-            "Jawatan Tidak Sepadan",
-            `Jawatan asal staff ini ("${selectedValue}") tidak sepadan dengan mana-mana pilihan dalam senarai (mungkin beza bahasa/ejaan). Sila pilih jawatan yang betul sebelum simpan, jika tidak rekod jawatan lama akan hilang.`
+            "Position Mismatch",
+            `The staff's original position ("${selectedValue}") does not match any preset option in the list. Please select the correct position before saving, otherwise the old position record may be lost.`
         );
     }
 }
@@ -1441,14 +1419,11 @@ async function saveStaff() {
 async function deleteStaff(id, name) {
     showConfirm("Delete Record", `Are you sure you want to delete ${name}?`, async () => {
         try {
-            // CALL ONLY THIS SINGLE ENDPOINT.
-            // The backend Worker safely deletes child records (assignments/dept head) automatically.
             let res = await fetch(`${API_URL}/staff/${id}`, { 
                 method: "DELETE" 
             });
 
             if (res.ok) {
-                // Refresh views after successful deletion
                 if (typeof loadAssignments === "function") await loadAssignments();
                 if (typeof loadDeptHead === "function") await loadDeptHead();
                 if (typeof loadStaff === "function") await loadStaff();
