@@ -2,6 +2,7 @@
 <html lang="en">
 <head> 
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval';">
     <title>Generating Excel...</title> 
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <style>
@@ -29,13 +30,6 @@
 </div>
 
 <script>
-/*
- * ============================================================
- * CLOUDFLARE WORKER API
- * ============================================================
- * Semua data kini diambil melalui Cloudflare Worker.
- * Gantikan URL ini dengan URL Worker sebenar anda.
- */
     const API_URL = "https://me-connect-api.mech-elec-ranhill.workers.dev";
 
 const headers = {
@@ -45,13 +39,6 @@ const headers = {
 const params = new URLSearchParams(window.location.search);
 const contractId = params.get('id');
 
-// ============================================================
-// CACHE (IndexedDB) - DB berasingan, tak kacau contract.html /
-// contract_forms. Data WO + interims kontrak dicache dan
-// disahkan guna contract.claim_usage_summary.updated_at
-// (Worker kemas kini nilai ni pada SETIAP write WO/interim).
-// Sama = tiada perubahan -> skip query interims & work_orders.
-// ============================================================
 const SUM_DB = 'me-connect-summary-cache';
 
 function sOpen() {
@@ -104,7 +91,6 @@ async function startAutoDownload() {
     if(!contractId) return;
     
     try {
-        // 1) Contract dulu (1 row ikut PK) - bawa fingerprint cache
         const conRes = await fetch(`${API_URL}/rest/v1/contract?id=eq.${contractId}`, { headers });
         const contracts = await conRes.json();
         const fp = contracts?.[0]?.claim_usage_summary?.updated_at || null;
@@ -117,15 +103,11 @@ async function startAutoDownload() {
             const hit = fp ? await sGet(`data:${contractId}`) : null;
 
             if (hit && hit.fp === fp) {
-                // Tiada perubahan sejak kali lepas -> guna IndexedDB (0 rows read)
                 interims = hit.interims;
                 rawWorkorders = hit.rawWorkorders;
             } else {
                 const [intRes, woRes] = await Promise.all([
                     fetch(`${API_URL}/rest/v1/interims?contract_id=eq.${contractId}&order=created_at.asc`, { headers }),
-                    // PENAPIS:
-                    // - status=not.ilike.*REJ* -> buang EXEC-REJ, HOS-REJ, HOD-REJ, REJ, dll
-                    // - status=neq.CANCEL      -> buang CANCEL
                     fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&status=not.ilike.*REJ*&status=neq.CANCEL`, { headers })
                 ]);
 
@@ -139,7 +121,6 @@ async function startAutoDownload() {
             }
         }
 
-        // 2. PENYERAGAMAN: Tukar sebarang status 'Claimed' / 'claimed' kepada 'CLAIMED'
         const workorders = rawWorkorders.map(w => {
             if (w.status && w.status.toUpperCase() === 'CLAIMED') {
                 w.status = 'CLAIMED';
@@ -151,7 +132,6 @@ async function startAutoDownload() {
             const c = contracts[0];
             let unitName = "UNIT";
             try {
-                // Senarai unit kecil & jarang berubah -> cache 24 jam
                 let uc = await sGet('units');
                 if (!uc || Date.now() - uc.t > 24 * 60 * 60 * 1000) {
                     const ur = await fetch(`${API_URL}/units`);
@@ -384,7 +364,6 @@ async function startAutoDownload() {
             const lastRowIdx = ws_data.length - 1;
             const maxDataCols = ws_data.reduce((m, r) => Math.max(m, r.length), 0);
 
-            // STYLING SHEET 1
             for (let r = 0; r <= lastRowIdx; r++) {
                 for (let cidx = 0; cidx <= maxDataCols; cidx++) {
                     const cellRef = XLSX.utils.encode_cell({ r: r, c: cidx });
@@ -449,9 +428,6 @@ async function startAutoDownload() {
             for (let i = 0; i < maxDataCols; i++) ws["!cols"].push({ wch: 14 });
             XLSX.utils.book_append_sheet(wb, ws, "Summary");
 
-            // ==========================================
-            // SHEET 2
-            // ==========================================
             let sumLab = 0, sumSpa = 0, sumPrv = 0;
             let balLab = 0, balSpa = 0, balPrv = 0;
 
@@ -528,10 +504,6 @@ async function startAutoDownload() {
             ws2["!cols"] = [{ wch: 35 }, { wch: 5 }, { wch: 15 }, { wch: 10 }, { wch: 5 }, { wch: 5 }, { wch: 40 }, { wch: 10 }];
             XLSX.utils.book_append_sheet(wb, ws2, "Budget Usage");
             
-            // ==========================================
-            // SHEET 3: LIST WORK ORDER
-            // ==========================================
-
             const districtString = c.district || "SEGAMAT,MUAR,BATU PAHAT,KLUANG,MERSING";
             const daerahList = districtString.split(',').map(d => d.trim());
             
@@ -832,10 +804,10 @@ async function startAutoDownload() {
 
             ws3["!rows"] = ws3_data.map(() => ({ hpt: 15.75 }));
             let ws3Cols = [
-                { wch: 5 },   // NO
-                { wch: 40 },  // DESCRIPTION
-                { wch: 20 },  // LOCATION
-                { wch: 15 }   // WORK ORDER
+                { wch: 5 },   
+                { wch: 40 },  
+                { wch: 20 },  
+                { wch: 15 }   
             ];
 
             for(let i=0; i<sectionCount; i++) {
