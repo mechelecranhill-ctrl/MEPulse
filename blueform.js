@@ -288,7 +288,6 @@ function sortWOChronological(woArray, districtPriority) {
         return (a.sequence_no || '').localeCompare(b.sequence_no || '');
     });
 }
-
 function buildInterimDateMap(allInterims){
     const map = new Map();
     (allInterims || []).forEach(int => {
@@ -428,6 +427,7 @@ async function buildBlueformData(id, sharedData = null) {
         bakiKontrak += Number(int.performance_guarantee_sum || 0);
         bakiKontrak -= Number(int.tax || 0);
         bakiKontrak -= Number(int.penalty || 0);
+
     });
 
     sortedAllWO.forEach((wo, index) => {
@@ -453,6 +453,7 @@ async function buildBlueformData(id, sharedData = null) {
         voBreakdown, activeVO,
         stampImages
     };
+
 }
 
 async function buildBlueformDataGroup(ids, sharedData = null) {
@@ -488,14 +489,14 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
     const uniqueLocations = [...new Set(woResults.map(w => (w.location || '').trim()).filter(l => l !== ''))];
     const combinedLocation = uniqueLocations.join(', ');
     const uniqueDescriptions = [
-        ...new Map(
-            woResults
-                .map(w => [(w.description || '').trim().toLowerCase(), w.description])
-                .filter(([k, v]) => k !== '')
-        ).values()
-    ];
+    ...new Map(
+        woResults
+            .map(w => [(w.description || '').trim().toLowerCase(), w.description])
+            .filter(([k, v]) => k !== '')
+    ).values()
+];
 
-    const combinedDesc = uniqueDescriptions.join(', ');
+const combinedDesc = uniqueDescriptions.join(', ');
 
     let allInterims, allWO, localDistrictPriority;
     if (sharedData) {
@@ -527,10 +528,11 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
     const interimDateMap = buildInterimDateMap(allInterims);
 
     let sectionUsed = {};
-    let totalSalvage = 0;
-    let totalPG = 0;
-    let totalTax = 0;
-    let totalPenalty = 0;
+
+let totalSalvage = 0;
+let totalPG = 0;
+let totalTax = 0;
+let totalPenalty = 0;
 
     allInterims.forEach(int => {
         const intDate = new Date(int.date_received);
@@ -654,11 +656,13 @@ function buildBlueformHTML(payload) {
             sectionUsed, totalSalvage, totalPG, totalTax, totalPenalty,
             bakiKontrak, voBreakdown, activeVO, stampImages } = payload;
 
+
     const effectiveVO = activeVO || voBreakdown;
 
     const seq = data.sequence_no || '';
-    const refPrefix = c.reference || generatePresetFromContractCode(c.contract_code); 
-    let formattedRef = seq ? ` - ${seq}` : ''; 
+const refPrefix = c.reference || generatePresetFromContractCode(c.contract_code); 
+
+let formattedRef = seq ? ` - ${seq}` : ''; 
 
     const unitName = (c.units?.unit_name || '').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
     const tpl = Array.isArray(c.selected_sections) ? c.selected_sections : [];
@@ -789,15 +793,15 @@ function buildBlueformHTML(payload) {
                     <div class="bf-value">RM ${totalPG.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
                 </div>
                 <div class="bf-row" style="font-size:9px;">
-                    <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">TAX</span></div>
-                    <div class="bf-colon">:</div>
-                    <div class="bf-value">RM ${totalTax.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
-                </div>
-                <div class="bf-row" style="font-size:9px;">
-                    <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">PENALTY</span></div>
-                    <div class="bf-colon">:</div>
-                    <div class="bf-value" style="color: #dc2626;">RM ${totalPenalty.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
-                </div>
+    <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">TAX</span></div>
+    <div class="bf-colon">:</div>
+    <div class="bf-value">RM ${totalTax.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+</div>
+<div class="bf-row" style="font-size:9px;">
+    <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">PENALTY</span></div>
+    <div class="bf-value" style="color: #dc2626;">RM ${totalPenalty.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+</div>
+
             </div>
         </div>
 
@@ -830,57 +834,58 @@ function buildBlueformHTML(payload) {
         <div id="bf_content" style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;">
             ${contentHtml}
         </div>
-        <div class="bf-signature-grid">
-            <div>
-                <strong>Dimohon Oleh:</strong>
-                <div style="height:70px; position:relative;">
-                    ${stampImages.exec_signature?.signature ? `<img src="${stampImages.exec_signature.signature}" style="max-height:50px; max-width:120px; object-fit:contain; position:absolute; bottom:0; left:5%;">` : ''}
-                </div>
-                <div style="position:relative;">
-                    <div class="bf-sign-line"></div>
-                    ${stampImages.tech_initial?.initial ? `<img src="${stampImages.tech_initial.initial}" style="height:25px;width:auto;object-fit:contain;position:absolute;left:-23px;top:-12px;">` : ''}
-                    ${stampImages.tech_initial?.date ? `<span style="position:absolute;left:-28px;top:10px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.tech_initial.date)}</span>` : ''}
-                    ${stampImages.exec_signature?.date ? `<span style="position:absolute;right:60px;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.exec_signature.date)}</span>` : ''}
-                </div>
-                <small style="display:block; margin-top:2px;">
-                    <span>${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}</span>
-                </small>
-            </div>
-            <div>
-                <strong>Disemak Oleh:</strong>
-                <div style="height:70px; position:relative;">
-                    ${stampImages.section_head?.signature ? `<img src="${stampImages.section_head.signature}" style="max-height:60px; max-width:200px; object-fit:contain; position:absolute; bottom:0; left:5%;">` : ''}
-                </div>
-                <div style="position:relative;">
-                    <div class="bf-sign-line"></div>
-                    ${stampImages.section_head?.date ? `<span style="position:absolute;right:60px;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.section_head.date)}</span>` : ''}
-                </div>
-                <small style="display:block; margin-top:2px;">
-                    <span>Ketua Seksyen Selenggara</span>
-                </small>
-            </div>
-            <div>
-                <strong>Disahkan Oleh:</strong>
-                <div style="height:70px; position:relative;">
-                    ${stampImages.dept_head?.signature ? `<img src="${stampImages.dept_head.signature}" style="max-height:100px; max-width:200px; object-fit:contain; position:absolute; bottom:-25px; left:5%;">` : ''}
-                </div>
-                <div style="position:relative;">
-                    <div class="bf-sign-line"></div>
-                    ${stampImages.dept_head?.date ? `<span style="position:absolute;right:60px;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.dept_head.date)}</span>` : ''}
-                </div>
-                <small style="display:block; margin-top:2px;">
-                    <span>Ketua Mekanikal & Elektrikal</span>
-                </small>
-            </div>
-            <div>
-                <strong>Disokong Oleh:</strong>
-                <div style="height:70px;"></div>
-                <div style="position:relative;">
-                    <div class="bf-sign-line"></div>
-                </div>
-                <small style="display:block; margin-top:2px;">Ketua Bahagian Operasi & Penyelenggaraan</small>
-            </div>
+                                <div class="bf-signature-grid">
+    <div>
+        <strong>Dimohon Oleh:</strong>
+        <div style="height:70px; position:relative;">
+            ${stampImages.exec_signature?.signature ? `<img src="${stampImages.exec_signature.signature}" style="max-height:50px; max-width:120px; object-fit:contain; position:absolute; bottom:0; left:5%;">` : ''}
         </div>
+        <div style="position:relative;">
+            <div class="bf-sign-line"></div>
+            ${stampImages.tech_initial?.initial ? `<img src="${stampImages.tech_initial.initial}" style="height:25px;width:auto;object-fit:contain;position:absolute;left:-23px;top:-12px;">` : ''}
+            ${stampImages.tech_initial?.date ? `<span style="position:absolute;left:-28px;top:10px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.tech_initial.date)}</span>` : ''}
+            ${stampImages.exec_signature?.date ? `<span style="position:absolute;right:60px;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.exec_signature.date)}</span>` : ''}
+        </div>
+        <small style="display:block; margin-top:2px;">
+            <span>${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}</span>
+        </small>
+    </div>
+    <div>
+        <strong>Disemak Oleh:</strong>
+        <div style="height:70px; position:relative;">
+            ${stampImages.section_head?.signature ? `<img src="${stampImages.section_head.signature}" style="max-height:60px; max-width:200px; object-fit:contain; position:absolute; bottom:0; left:5%;">` : ''}
+        </div>
+        <div style="position:relative;">
+            <div class="bf-sign-line"></div>
+            ${stampImages.section_head?.date ? `<span style="position:absolute;right:60px;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.section_head.date)}</span>` : ''}
+        </div>
+        <small style="display:block; margin-top:2px;">
+            <span>Ketua Seksyen Selenggara</span>
+        </small>
+    </div>
+    <div>
+        <strong>Disahkan Oleh:</strong>
+        <div style="height:70px; position:relative;">
+            ${stampImages.dept_head?.signature ? `<img src="${stampImages.dept_head.signature}" style="max-height:100px; max-width:200px; object-fit:contain; position:absolute; bottom:-25px; left:5%;">` : ''}
+        </div>
+        <div style="position:relative;">
+            <div class="bf-sign-line"></div>
+            ${stampImages.dept_head?.date ? `<span style="position:absolute;right:60px;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.dept_head.date)}</span>` : ''}
+        </div>
+        <small style="display:block; margin-top:2px;">
+            <span>Ketua Mekanikal & Elektrikal</span>
+        </small>
+    </div>
+    <div>
+        <strong>Disokong Oleh:</strong>
+        <div style="height:70px;"></div>
+        <div style="position:relative;">
+            <div class="bf-sign-line"></div>
+        </div>
+        <small style="display:block; margin-top:2px;">Ketua Bahagian Operasi & Penyelenggaraan</small>
+    </div>
+</div>
+
         <div class="bf-footer-note">
             * Sebutharga dan Work Order telah disemak sepenuhnya oleh Pihak Daerah
         </div>
