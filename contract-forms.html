@@ -294,7 +294,6 @@
         .region-segment button:nth-child(2){ color:#34C759; }
         .region-segment .clear{ color:#8e8e93; font-weight:600; }
 
-        /* ===== VO EXISTING PILLS ===== */
         .vo-existing-section { margin-bottom: 16px; }
         .vo-existing-label { font-size: 10px; font-weight: 800; color: rgba(0,0,0,0.45); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; display: block; }
         .vo-pills-container { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -377,7 +376,6 @@
         .dup-btn-confirm{ flex:2; padding:12px; border-radius:12px; border:none; background:var(--ios-blue); color:white; font-weight:700; cursor:pointer; margin:0; }
         .dup-btn-confirm:disabled{ opacity:0.45; cursor:not-allowed; }
 
-        /* ===== POPUP (ganti alert/confirm asli browser) ===== */
         .app-popup-overlay{
             display:none; position:fixed; inset:0; z-index:10000;
             background:rgba(11,61,145,0.45); backdrop-filter:blur(4px);
@@ -407,7 +405,6 @@
         .app-popup-btn{ flex:1; padding:12px; border-radius:12px; border:none; font-weight:700; font-size:14px; cursor:pointer; margin:0; background:var(--ios-blue); color:#fff; }
         .app-popup-btn.secondary{ background:transparent; border:1px solid rgba(0,0,0,0.15); color:#555; }
 
-        /* ===== LOADING OVERLAY ===== */
         .loading-overlay{
             display:none; position:fixed; inset:0; z-index:9999;
             background:rgba(11,61,145,0.55);
@@ -689,7 +686,6 @@
 
     </div>
 
-    <!-- ===== DUPLICATE WORK ID PICKER MODAL ===== -->
     <div id="dupModalOverlay" class="dup-modal-overlay" onclick="if(event.target===this) closeDupModal()">
         <div class="dup-modal">
             <div class="dup-modal-header">
@@ -704,7 +700,6 @@
         </div>
     </div>
 
-    <!-- ===== POPUP (ganti alert/confirm) ===== -->
     <div id="appPopupOverlay" class="app-popup-overlay">
         <div class="app-popup" role="dialog" aria-modal="true" aria-labelledby="appPopupTitle">
             <div id="appPopupIcon" class="app-popup-icon info">i</div>
@@ -717,7 +712,6 @@
         </div>
     </div>
 
-    <!-- ===== LOADING OVERLAY ===== -->
     <div id="loadingOverlay" class="loading-overlay">
         <div class="loading-spinner"></div>
         <div id="loadingText">Sila tunggu...</div>
@@ -762,15 +756,9 @@
 
     let selectedDistricts = new Set();
 
-    // ============================================================
-    // CACHE (IndexedDB) - DB BERASINGAN drpd contract.html
-    // (contract.html guna 'me-connect-cache' v1; jangan kongsi nama
-    //  supaya tak berlaku VersionError).
-    // Hanya utk data rujukan (units, senarai kontrak per unit).
-    // ============================================================
     const FORMS_DB = 'me-connect-forms-cache';
-    const UNITS_TTL = 24 * 60 * 60 * 1000;   // 24 jam
-    const CONTRACTS_TTL = 5 * 60 * 1000;     // 5 minit
+    const UNITS_TTL = 24 * 60 * 60 * 1000;   
+    const CONTRACTS_TTL = 5 * 60 * 1000;     
 
     function fOpen() {
         return new Promise((res, rej) => {
@@ -793,7 +781,7 @@
             if (hit && Date.now() - hit.t < ttlMs) return hit.v;
         } catch (_) { db = null; }
 
-        const v = await loader();   // kalau loader throw, TIADA apa disimpan
+        const v = await loader();   
 
         if (db) {
             try { db.transaction('kv', 'readwrite').objectStore('kv').put({ v, t: Date.now() }, key); } catch (_) {}
@@ -814,8 +802,6 @@
         } catch (_) {}
     }
 
-    // Recompute claim_usage_summary SEKALI sahaja (selepas semua write
-    // yang guna &nosync=1 siap). Endpoint ini kena wujud di worker.
     async function recomputeClaims(contractId) {
         if (!contractId) return;
         try {
@@ -823,9 +809,6 @@
         } catch (e) { console.error('recomputeClaims failed:', e); }
     }
 
-    // ============================================================
-    // LOADING HELPERS
-    // ============================================================
     let isLoading = false;
     let isReloading = false;
 
@@ -833,23 +816,19 @@
         isLoading = true;
         document.getElementById('loadingText').textContent = text;
         document.getElementById('loadingOverlay').classList.add('visible');
-        // sekat klik, swipe & keyboard (Tab)
         document.querySelectorAll('.main-content, .glass-header, app-sidebar')
             .forEach(el => el.inert = true);
         document.activeElement?.blur();
     }
 
     function hideLoading() {
-        if (isReloading) return; // kekalkan overlay sehingga page reload
+        if (isReloading) return; 
         isLoading = false;
         document.getElementById('loadingOverlay').classList.remove('visible');
         document.querySelectorAll('.main-content, .glass-header, app-sidebar')
             .forEach(el => el.inert = false);
     }
 
-    // ===== POPUP: ganti alert()/confirm() asli browser =====
-    // Guna: await showPopup('mesej', 'success'|'error'|'warning'|'info')
-    //       if (!(await showConfirm('mesej'))) return;
     const _popupMeta = {
         success: { icon: '✓', title: 'Berjaya' },
         error:   { icon: '!', title: 'Ralat' },
@@ -894,10 +873,8 @@
 
     function reloadPage() { isReloading = true; location.reload(); }
 
-    // Bungkus mana-mana fungsi async: tunjuk loading, elak double-submit
     function lockable(fn, text) {
         return async function (...args) {
-            // elak submit asli browser kalau sedang loading
             if (args[0] && typeof args[0].preventDefault === 'function') args[0].preventDefault();
             if (isLoading) return;
             showLoading(text);
@@ -993,7 +970,6 @@
     }
 
     function setupFormListeners() {
-        // Contract Form Submit
         document.getElementById('contractForm').addEventListener('submit', lockable(async (e) => {
             e.preventDefault();
             const sections = {};
@@ -1037,7 +1013,6 @@
             }
         }, 'Menyimpan kontrak...'));
 
-        // Work Order Form Submit
         document.getElementById('workOrderForm').addEventListener('submit', lockable(async (e) => {
             e.preventDefault();
             const contractId = document.getElementById('w_contract_id').value;
@@ -1105,7 +1080,6 @@
                     };
                 });
 
-                // 1 query sahaja utk semua ID (sebelum ini: 1 query per ID)
                 const inList = currentWorkIds.map(id => encodeURIComponent(id)).join(',');
                 const checkRes = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=in.(${inList})&select=id,work_id,status`, { headers });
                 const existingRows = await checkRes.json();
@@ -1145,15 +1119,12 @@
                         if(!wr.ok) throw new Error(await wr.text());
                     }
 
-                    // 1 DELETE sahaja, dan di-await sebelum reload
-                    // (dulu: forEach(async) tak di-await -> boleh terbatal bila location.reload())
                     const removed = originalLoadedWorkIds.filter(id => !currentWorkIds.includes(id));
                     if(removed.length){
                         const rmList = removed.map(id => encodeURIComponent(id)).join(',');
                         await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=in.(${rmList})&nosync=1`, { method: 'DELETE', headers });
                     }
                 } finally {
-                    // Recompute SEKALI sahaja (walau ada ralat separuh jalan, summary kekal betul)
                     await recomputeClaims(contractId);
                 }
 
@@ -1462,10 +1433,8 @@
         rawIds.forEach(id => {
             const parsed = extractWorkIdBase(id);
             if(!parsed || parsed.suffix !== ''){
-                // Already a specific/explicit ID (e.g. "C 123456A") — no ambiguity, add directly
                 directIds.push(id);
             } else {
-                // Bare ID without suffix (e.g. "C 123456") — could be ambiguous, needs checking
                 toCheck.push({ id, base: parsed.base });
             }
         });
@@ -1482,7 +1451,6 @@
         pendingDupGroups = [];
         const soloIds = [];
 
-        // 1 query utk SEMUA bare ID (sebelum ini: 1 query per ID)
         let allRows = [];
         try{
             const orFilter = toCheck.map(({ base }) => `work_id.ilike.${encodeURIComponent(base)}*`).join(',');
@@ -1648,8 +1616,6 @@
 
         if(res.ok){
             try {
-                // 1 PATCH sahaja utk semua WO, dihadkan kepada kontrak ini
-                // (dulu: 1 GET + 1 PATCH per WO, dan GET tak tapis contract_id)
                 if (attachedWorkOrders.length) {
                     const inList = attachedWorkOrders.map(id => encodeURIComponent(id)).join(',');
                     const wr = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${cId}&work_id=in.(${inList})&nosync=1`, {
@@ -1658,7 +1624,7 @@
                     if (!wr.ok) await showPopup(await wr.text(), 'error');
                 }
             } finally {
-                await recomputeClaims(cId);   // SEKALI sahaja
+                await recomputeClaims(cId);   
             }
             await showPopup(currentInterimId ? "Interim berjaya dikemaskini!" : "Interim berjaya direkodkan!", 'success'); reloadPage();
         } else { await showPopup(await res.text(), 'error'); }
@@ -1689,8 +1655,6 @@
         calcVOTotal();
 
         try {
-            // vo_breakdown sudah dimuat dlm opt.dataset.vo oleh loadContractsByUnit()
-            // (submitVO tetap GET segar sebelum PATCH, jadi data selamat).
             currentVOBreakdown = JSON.parse(opt.dataset.vo || '{}') || {};
             const voNames = Object.keys(currentVOBreakdown); if (voNames.length === 0) return;
 
