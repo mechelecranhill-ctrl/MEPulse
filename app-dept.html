@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https:;">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Blueform Approvals-Approval Endorsement</title>
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
@@ -41,7 +42,6 @@
             .glass-header{ padding-left:10px; padding-right:10px; }
         }
 
-        /* Controls the appearance of multi-page printing */
         @media print {
             @page {
                 size: A4;
@@ -103,7 +103,6 @@
             }
         }
 
-        /* ============ CONTRACT CODE / CONTRACT NAME POPUP ============ */
         .contract-name-label {
             display: none !important;
         }
@@ -114,7 +113,6 @@
             -webkit-user-select: none;
         }
 
-        /* ============ TOAST POPUP (bukan alert dialog) ============ */
         #appToastContainer {
             position: fixed;
             top: calc(20px + env(safe-area-inset-top));
@@ -244,9 +242,6 @@
 
     <script src="blueform.js"></script>
     <script>
-        // ============ CLOUDFLARE WORKER API HELPERS (menggantikan Supabase) ============
-        // API_URL dijangka disediakan oleh session.js
-
         const API_HEADERS = {
             'Content-Type': 'application/json',
             'Prefer': 'return=representation'
@@ -325,66 +320,65 @@
             return `in.(${clean.join(',')})`;
         }
 
-// ============ ROLE / PERMISSION CONTEXT (KONGSI SEMUA PAGE) ============
-const ACT_ROLES = {
-    TECH: ['JURUTEKNIK', 'JURUTEKNIK KANAN', 'EKSEKUTIF', 'EKSEKUTIF KANAN'],
-    UNIT_EXEC: ['EKSEKUTIF', 'EKSEKUTIF KANAN'],
-    SECTION_HEAD: ['KETUA SEKSYEN'],
-    DEPT_HEAD: ['KETUA JABATAN']
-};
+        const ACT_ROLES = {
+            TECH: ['JURUTEKNIK', 'JURUTEKNIK KANAN', 'EKSEKUTIF', 'EKSEKUTIF KANAN'],
+            UNIT_EXEC: ['EKSEKUTIF', 'EKSEKUTIF KANAN'],
+            SECTION_HEAD: ['KETUA SEKSYEN'],
+            DEPT_HEAD: ['KETUA JABATAN']
+        };
 
-// Only these sections should be shown on this dashboard
-const ALLOWED_SECTION_NAMES = ['SEKSYEN SELENGGARA', 'SEKSYEN PEMATUHAN PERATURAN'];
+        const ALLOWED_SECTION_NAMES = ['SEKSYEN SELENGGARA', 'SEKSYEN PEMATUHAN PERATURAN'];
 
-async function getPermissionContext() {
-    const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
+        async function getPermissionContext() {
+            const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
 
-    const ctx = {
-        isAdmin, position: '', userId: null,
-        isActingUnitExec: false, isActingSectionHead: false, isDeptHeadActive: false,
-        canManageTech: false, canActUnit: false, canActSection: false, canActDept: false
-    };
+            const ctx = {
+                isAdmin, position: '', userId: null,
+                isActingUnitExec: false, isActingSectionHead: false, isDeptHeadActive: false,
+                canManageTech: false, canActUnit: false, canActSection: false, canActDept: false
+            };
 
-    if (isAdmin) {
-        ctx.canManageTech = true; ctx.canActUnit = true; ctx.canActSection = true; ctx.canActDept = true;
-        return ctx;
-    }
+            if (isAdmin) {
+                ctx.canManageTech = true; ctx.canActUnit = true; ctx.canActSection = true; ctx.canActDept = true;
+                return ctx;
+            }
 
-    try {
-        const staffIdRaw = localStorage.getItem('staff_id');
-        const staffId = staffIdRaw !== null ? Number(staffIdRaw) : null;
-        if (staffId === null || Number.isNaN(staffId)) return ctx;
-        ctx.userId = staffId;
+            try {
+                const staffIdRaw = localStorage.getItem('staff_id');
+                const staffId = staffIdRaw !== null ? Number(staffIdRaw) : null;
+                if (staffId === null || Number.isNaN(staffId)) return ctx;
+                ctx.userId = staffId;
 
-        try {
-            const staffRows = await apiQuery('staff', `id=eq.${encodeValue(staffId)}&select=position`);
-            ctx.position = (staffRows?.[0]?.position || '').trim().toUpperCase();
-        } catch (e) { console.error('Failed to load staff position:', e); }
+                try {
+                    const staffRows = await apiQuery('staff', `id=eq.${encodeValue(staffId)}&select=position`);
+                    ctx.position = (staffRows?.[0]?.position || '').trim().toUpperCase();
+                } catch (e) { console.error('Failed to load staff position:', e); }
 
-        try {
-            const unitAssignments = await apiQuery('staff_unit_assignment', `staff_id=eq.${encodeValue(staffId)}&is_acting=eq.true&select=unit_id`);
-            ctx.isActingUnitExec = Array.isArray(unitAssignments) && unitAssignments.length > 0;
-        } catch (e) {}
+                try {
+                    const unitAssignments = await apiQuery('staff_unit_assignment', `staff_id=eq.${encodeValue(staffId)}&is_acting=eq.true&select=unit_id`);
+                    ctx.isActingUnitExec = Array.isArray(unitAssignments) && unitAssignments.length > 0;
+                } catch (e) {}
 
-        try {
-            const sectionAssignments = await apiQuery('staff_section_assignment', `staff_id=eq.${encodeValue(staffId)}&is_acting=eq.true&select=section_id`);
-            ctx.isActingSectionHead = Array.isArray(sectionAssignments) && sectionAssignments.length > 0;
-        } catch (e) {}
+                try {
+                    const sectionAssignments = await apiQuery('staff_section_assignment', `staff_id=eq.${encodeValue(staffId)}&is_acting=eq.true&select=section_id`);
+                    ctx.isActingSectionHead = Array.isArray(sectionAssignments) && sectionAssignments.length > 0;
+                } catch (e) {}
 
-        try {
-            const departmentRows = await apiQuery('department_head', `staff_id=eq.${encodeValue(staffId)}&active=eq.true&select=is_acting`);
-            ctx.isDeptHeadActive = Array.isArray(departmentRows) && departmentRows.length > 0;
-        } catch (e) {}
+                try {
+                    const departmentRows = await apiQuery('department_head', `staff_id=eq.${encodeValue(staffId)}&active=eq.true&select=is_acting`);
+                    ctx.isDeptHeadActive = Array.isArray(departmentRows) && departmentRows.length > 0;
+                } catch (e) {}
 
-        ctx.canManageTech = ACT_ROLES.TECH.includes(ctx.position);
-        ctx.canActUnit = ACT_ROLES.UNIT_EXEC.includes(ctx.position) || ctx.isActingUnitExec;
-        ctx.canActSection = ACT_ROLES.SECTION_HEAD.includes(ctx.position) || ctx.isActingSectionHead;
-        ctx.canActDept = ACT_ROLES.DEPT_HEAD.includes(ctx.position) || ctx.isDeptHeadActive;
-    } catch (err) {
-        console.error('Permission context error:', err);
-    }
-    return ctx;
-}
+                ctx.canManageTech = ACT_ROLES.TECH.includes(ctx.position);
+                ctx.canActUnit = ACT_ROLES.UNIT_EXEC.includes(ctx.position) || ctx.isActingUnitExec;
+                ctx.canActSection = ACT_ROLES.SECTION_HEAD.includes(ctx.position) || ctx.isActingSectionHead;
+                ctx.canActDept = ACT_ROLES.DEPT_HEAD.includes(ctx.position) || ctx.isDeptHeadActive;
+            } catch (err) {
+                console.error('Permission context error:', err);
+            }
+            return ctx;
+        }
+
         let renderedBlueformSeqs = new Set();
 
         async function fetchDashboard() {
@@ -399,9 +393,6 @@ async function getPermissionContext() {
                     showEmptyRow('Please log in first.');
                     return;
                 }
-
-                // AKSES VIEW DIBUKA UNTUK SEMUA STAFF YANG LOG MASUK.
-                // Tindakan (approve/reject) tetap disekat ikut perm.canActDept semasa render.
 
                 let allSections = [];
                 try {
@@ -448,7 +439,7 @@ async function getPermissionContext() {
                 </div>`;
         }
 
-function toggleAccordion(contentId, iconId) {
+        function toggleAccordion(contentId, iconId) {
             const content = document.getElementById(contentId);
             const icon = document.getElementById(iconId);
             if (!content || !icon) return;
@@ -461,13 +452,6 @@ function toggleAccordion(contentId, iconId) {
             }
         }
 
-        /* =====================================================
-           CONTRACT CODE / CONTRACT NAME POPUP
-           - Contract name hidden from accordion header
-           - Desktop: hover = temporary popup
-           - Desktop/mobile: click/tap = locked popup
-           - Popup is appended to body so accordion overflow cannot clip it
-           ===================================================== */
         let contractNamePopup = null;
         let contractNamePopupLocked = false;
         let contractNamePopupAnchor = null;
@@ -581,7 +565,6 @@ function toggleAccordion(contentId, iconId) {
             showContractNamePopup(badge, name, true);
         }
 
-        // Desktop hover only. Touch devices use click/tap instead.
         document.addEventListener('pointerover', (e) => {
             if (e.pointerType !== 'mouse') return;
 
@@ -603,7 +586,6 @@ function toggleAccordion(contentId, iconId) {
             );
         });
 
-        // Desktop hover popup closes immediately when the pointer leaves the code.
         document.addEventListener('pointerout', (e) => {
             if (e.pointerType !== 'mouse') return;
 
@@ -620,7 +602,6 @@ function toggleAccordion(contentId, iconId) {
             }
         });
 
-        // Click anywhere else closes a locked popup.
         document.addEventListener('click', (e) => {
             if (!contractNamePopup || contractNamePopup.style.visibility !== 'visible') return;
             if (e.target.closest('.contract-code-badge')) return;
@@ -629,7 +610,6 @@ function toggleAccordion(contentId, iconId) {
             hideContractNamePopup(true);
         });
 
-        // Keep a locked popup aligned when the page/accordion is scrolled or resized.
         window.addEventListener('scroll', () => {
             if (contractNamePopupLocked && contractNamePopupAnchor) {
                 positionContractNamePopup(contractNamePopupAnchor);
@@ -642,35 +622,31 @@ function toggleAccordion(contentId, iconId) {
             }
         });
 
-        // ============ SECTION -> UNIT -> CONTRACT ACCORDION ============
         function renderSectionUnitContractView(containerId, sections, units, orders, canAct, opts) {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
 
-            // 1. Bina rangka Seksyen -> Unit (preset, walaupun tiada data lagi)
             const sectionsMap = {};
             (sections || []).forEach(s => {
-                sectionsMap[s.id] = { id: s.id, name: s.section_name || 'Seksyen', units: {} };
+                sectionsMap[s.id] = { id: s.id, name: s.section_name || 'Section', units: {} };
             });
 
             const unitToSection = {};
             (units || []).forEach(u => {
                 unitToSection[u.id] = (u.section_id !== null && u.section_id !== undefined) ? u.section_id : 'UNKNOWN-SEC';
                 const secId = unitToSection[u.id];
-                if (!sectionsMap[secId]) sectionsMap[secId] = { id: secId, name: 'Seksyen Lain', units: {} };
+                if (!sectionsMap[secId]) sectionsMap[secId] = { id: secId, name: 'Other Section', units: {} };
                 sectionsMap[secId].units[u.id] = { id: u.id, name: u.unit_name || 'Unit', contracts: {} };
             });
 
-            // 2. Isi data kontrak ke dalam unit yang berkenaan
-            //    (hanya untuk unit/seksyen yang dibenarkan - unit_id luar senarai ALLOWED akan diabaikan)
             (orders || []).forEach(item => {
                 const c = Array.isArray(item.contract) ? item.contract[0] : item.contract;
                 const unitId = c?.unit_id || 'UNKNOWN-UNIT';
                 let secId = unitToSection[unitId];
-                if (secId === undefined) return; // unit tiada dalam seksyen yang dibenarkan - skip
+                if (secId === undefined) return;
 
-                if (!sectionsMap[secId]) return; // seksyen tidak dibenarkan - skip
-                if (!sectionsMap[secId].units[unitId]) sectionsMap[secId].units[unitId] = { id: unitId, name: 'Unit Lain', contracts: {} };
+                if (!sectionsMap[secId]) return;
+                if (!sectionsMap[secId].units[unitId]) sectionsMap[secId].units[unitId] = { id: unitId, name: 'Other Unit', contracts: {} };
 
                 const cId = c?.id || item.contract_id || 'UNKNOWN-C';
                 const unitObj = sectionsMap[secId].units[unitId];
@@ -706,7 +682,7 @@ function toggleAccordion(contentId, iconId) {
                 if (unitList.length === 0) {
                     const noUnitDiv = document.createElement('div');
                     noUnitDiv.className = 'text-center py-3 text-gray-400 text-xs italic bg-white rounded-lg border border-dashed border-gray-300';
-                    noUnitDiv.textContent = 'Tiada unit berdaftar di bawah seksyen ini.';
+                    noUnitDiv.textContent = 'No units registered under this section.';
                     sectionWrap.appendChild(noUnitDiv);
                 }
 
@@ -764,45 +740,45 @@ function toggleAccordion(contentId, iconId) {
                             `;
 
                             contract.orders.forEach(item => {
-    const seq = (item.sequence_no || '').trim();
-    const groupKey = seq ? getBlueformGroupKey(item) : null;
-    const dedupeKey = groupKey ? `${contract.id}::${groupKey}` : null;
-    const isFirstInGroup = !dedupeKey || !renderedSeqs.has(dedupeKey);
+                                const seq = (item.sequence_no || '').trim();
+                                const groupKey = seq ? getBlueformGroupKey(item) : null;
+                                const dedupeKey = groupKey ? `${contract.id}::${groupKey}` : null;
+                                const isFirstInGroup = !dedupeKey || !renderedSeqs.has(dedupeKey);
 
-    let fullSetBtnHtml;
-    if (isFirstInGroup) {
-        if (dedupeKey) renderedSeqs.add(dedupeKey);
-        const groupItems = groupKey ? (seqGroups[groupKey] || [item]) : [item];
-        const countLabel = groupItems.length > 1 ? ` (${groupItems.length})` : '';
-        const serializedGroup = encodeURIComponent(JSON.stringify(groupItems));
-        fullSetBtnHtml = `
-            <button onclick="previewFullSet('${serializedGroup}')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-2.5 py-1 rounded-lg text-[11px] shadow-xs cursor-pointer inline-flex items-center gap-1 transition-all">
-                <i class="fa-solid fa-print"></i> Blueform${countLabel}
-            </button>`;
-    } else {
-        fullSetBtnHtml = `<span class="text-[10px] text-gray-400 italic">Refer to first row seq ${seq}</span>`;
-    }
+                                let fullSetBtnHtml;
+                                if (isFirstInGroup) {
+                                    if (dedupeKey) renderedSeqs.add(dedupeKey);
+                                    const groupItems = groupKey ? (seqGroups[groupKey] || [item]) : [item];
+                                    const countLabel = groupItems.length > 1 ? ` (${groupItems.length})` : '';
+                                    const serializedGroup = encodeURIComponent(JSON.stringify(groupItems));
+                                    fullSetBtnHtml = `
+                                        <button onclick="previewFullSet('${serializedGroup}')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-2.5 py-1 rounded-lg text-[11px] shadow-xs cursor-pointer inline-flex items-center gap-1 transition-all">
+                                            <i class="fa-solid fa-print"></i> Blueform${countLabel}
+                                        </button>`;
+                                } else {
+                                    fullSetBtnHtml = `<span class="text-[10px] text-gray-400 italic">Refer to first row seq ${seq}</span>`;
+                                }
 
-    const isPendingGroup =
-    !!item.pending_status &&
-    !String(item.status || '').endsWith('REJ');
+                                const isPendingGroup =
+                                !!item.pending_status &&
+                                !String(item.status || '').endsWith('REJ');
 
-    const actionHtml = !canAct
-        ? `<span class="text-[10px] text-gray-400 italic font-semibold px-1"><i class="fa-solid fa-eye mr-1"></i>View Only</span>`
-        : isPendingGroup
-        ? `<span class="text-[10px] text-amber-600 italic font-semibold px-1"><i class="fa-solid fa-hourglass-half mr-1"></i>Awaiting group blueforms</span>`
-        : `<div class="inline-flex items-center gap-1">
-            <button onclick="openConfirmModal('${item.work_id}', '${opts.rejectStatus}', 'REJECT')" class="text-white px-2 py-1 rounded bg-red-600 hover:bg-red-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Reject"><i class="fa-solid fa-xmark"></i></button>
-            <button onclick="openConfirmModal('${item.work_id}', '${opts.approveStatus}', 'APPROVE')" class="text-white px-2.5 py-1 rounded bg-purple-600 hover:bg-purple-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Approve"><i class="fa-solid fa-check"></i></button>
-           </div>`;
+                                const actionHtml = !canAct
+                                    ? `<span class="text-[10px] text-gray-400 italic font-semibold px-1"><i class="fa-solid fa-eye mr-1"></i>View Only</span>`
+                                    : isPendingGroup
+                                    ? `<span class="text-[10px] text-amber-600 italic font-semibold px-1"><i class="fa-solid fa-hourglass-half mr-1"></i>Awaiting group blueforms</span>`
+                                    : `<div class="inline-flex items-center gap-1">
+                                        <button onclick="openConfirmModal('${item.work_id}', '${opts.rejectStatus}', 'REJECT')" class="text-white px-2 py-1 rounded bg-red-600 hover:bg-red-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Reject"><i class="fa-solid fa-xmark"></i></button>
+                                        <button onclick="openConfirmModal('${item.work_id}', '${opts.approveStatus}', 'APPROVE')" class="text-white px-2.5 py-1 rounded bg-purple-600 hover:bg-purple-700 font-medium transition-all shadow-xs cursor-pointer whitespace-nowrap" title="Approve"><i class="fa-solid fa-check"></i></button>
+                                       </div>`;
 
-    unitHtml += `
-        <tr class="hover:bg-gray-50 transition-colors">
-            <td class="px-3 py-2.5 whitespace-nowrap font-mono text-gray-900 font-medium text-left">${item.work_id}${seq ? ` <span class="text-gray-400 text-[11px]">(${seq})</span>` : ''}</td>
-            <td class="px-3 py-2.5 whitespace-nowrap text-center">${fullSetBtnHtml}</td>
-            <td class="px-3 py-2.5 whitespace-nowrap text-right">${actionHtml}</td>
-        </tr>`;
-});
+                                unitHtml += `
+                                    <tr class="hover:bg-gray-50 transition-colors">
+                                        <td class="px-3 py-2.5 whitespace-nowrap font-mono text-gray-900 font-medium text-left">${item.work_id}${seq ? ` <span class="text-gray-400 text-[11px]">(${seq})</span>` : ''}</td>
+                                        <td class="px-3 py-2.5 whitespace-nowrap text-center">${fullSetBtnHtml}</td>
+                                        <td class="px-3 py-2.5 whitespace-nowrap text-right">${actionHtml}</td>
+                                    </tr>`;
+                            });
                             unitHtml += `</tbody></table></div></div>`;
                         });
                     }
@@ -817,7 +793,6 @@ function toggleAccordion(contentId, iconId) {
             });
         }
 
-        // ============ PDF -> IMAGE PAGE RENDERING (matches Technician view) ============
         async function renderPdfPagesAsElements(pdfUrl) {
             const pages = [];
             try {
@@ -922,134 +897,130 @@ function toggleAccordion(contentId, iconId) {
             document.getElementById('bulkPagesContainer').innerHTML = '';
         }
 
-        // Handles both Approve and Reject (with a reason) status changes
         function openConfirmModal(workId, nextStatus, mode) {
-    const perm = window.__lastPerm;
-    if (perm && !perm.canActDept) { showAppToast('Anda tiada kebenaran untuk membuat tindakan ini (View Only).', 'error'); return; }
+            const perm = window.__lastPerm;
+            if (perm && !perm.canActDept) { showAppToast('You do not have permission to perform this action (View Only).', 'error'); return; }
 
-    const modal = document.getElementById('customConfirmModal');
-    const banner = document.getElementById('modalBanner');
-    const iconContainer = document.getElementById('modalIconContainer');
-    const icon = document.getElementById('modalIcon');
-    const title = document.getElementById('modalTitle');
-    const msg = document.getElementById('modalMessage');
-    const confirmBtn = document.getElementById('modalConfirmBtn');
-    const reasonSection = document.getElementById('rejectReasonSection');
-    const reasonInput = document.getElementById('rejectReasonInput');
-    const errorMsg = document.getElementById('rejectErrorMsg');
+            const modal = document.getElementById('customConfirmModal');
+            const banner = document.getElementById('modalBanner');
+            const iconContainer = document.getElementById('modalIconContainer');
+            const icon = document.getElementById('modalIcon');
+            const title = document.getElementById('modalTitle');
+            const msg = document.getElementById('modalMessage');
+            const confirmBtn = document.getElementById('modalConfirmBtn');
+            const reasonSection = document.getElementById('rejectReasonSection');
+            const reasonInput = document.getElementById('rejectReasonInput');
+            const errorMsg = document.getElementById('rejectErrorMsg');
 
-    reasonInput.value = '';
-    errorMsg.classList.add('hidden');
-    reasonInput.classList.remove('border-red-500', 'focus:ring-red-500/20');
+            reasonInput.value = '';
+            errorMsg.classList.add('hidden');
+            reasonInput.classList.remove('border-red-500', 'focus:ring-red-500/20');
 
-    const approvalDateSection = document.getElementById('approvalDateSection');
-    const approvalDateInput = document.getElementById('approvalDateInput');
-    const approvalDateError = document.getElementById('approvalDateErrorMsg');
-    approvalDateError.classList.add('hidden');
-    approvalDateInput.classList.remove('border-red-500');
+            const approvalDateSection = document.getElementById('approvalDateSection');
+            const approvalDateInput = document.getElementById('approvalDateInput');
+            const approvalDateError = document.getElementById('approvalDateErrorMsg');
+            approvalDateError.classList.add('hidden');
+            approvalDateInput.classList.remove('border-red-500');
 
-    const isReject = mode === 'REJECT';
+            const isReject = mode === 'REJECT';
 
-    if (isReject) {
-        reasonSection.classList.remove('hidden');
-        approvalDateInput.value = '';
-        approvalDateSection.classList.add('hidden');
-        banner.className = "p-5 bg-red-50 text-red-600 flex justify-center items-center border-b border-red-100";
-        iconContainer.className = "w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md text-xl text-red-600";
-        icon.className = "fa-solid fa-ban";
-        title.innerText = "Reject Blueform";
-        msg.innerHTML = `Confirm rejection for <span class="font-mono font-bold text-gray-800">${workId}</span>. Status will change to <span class="text-red-600 font-bold">${nextStatus}</span>.`;
-        confirmBtn.className = "flex-1 px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-all shadow-md bg-red-600 hover:bg-red-700 cursor-pointer";
-    } else {
-        reasonSection.classList.add('hidden');
-        const now = new Date();
-        approvalDateInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-        approvalDateSection.classList.remove('hidden');
-        banner.className = "p-5 bg-purple-50 text-purple-600 flex justify-center items-center border-b border-purple-100";
-        iconContainer.className = "w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md text-xl text-purple-600";
-        icon.className = "fa-solid fa-check-double";
-        title.innerText = "Approve Blueform";
-        msg.innerHTML = `Approve Blueform <span class="font-mono font-bold text-gray-800">${workId}</span>? Status will change to <span class="text-purple-600 font-bold">${nextStatus}</span>.`;
-        confirmBtn.className = "flex-1 px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-all shadow-md bg-purple-600 hover:bg-purple-700 cursor-pointer";
-    }
-
-    confirmBtn.onclick = async () => {
-        let reasonText = null;
-        if (isReject) {
-            reasonText = reasonInput.value.trim();
-            if (!reasonText) {
-                errorMsg.classList.remove('hidden');
-                reasonInput.classList.add('border-red-500');
-                reasonInput.focus();
-                return;
+            if (isReject) {
+                reasonSection.classList.remove('hidden');
+                approvalDateInput.value = '';
+                approvalDateSection.classList.add('hidden');
+                banner.className = "p-5 bg-red-50 text-red-600 flex justify-center items-center border-b border-red-100";
+                iconContainer.className = "w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md text-xl text-red-600";
+                icon.className = "fa-solid fa-ban";
+                title.innerText = "Reject Blueform";
+                msg.innerHTML = `Confirm rejection for <span class="font-mono font-bold text-gray-800">${workId}</span>. Status will change to <span class="text-red-600 font-bold">${nextStatus}</span>.`;
+                confirmBtn.className = "flex-1 px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-all shadow-md bg-red-600 hover:bg-red-700 cursor-pointer";
+            } else {
+                reasonSection.classList.add('hidden');
+                const now = new Date();
+                approvalDateInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                approvalDateSection.classList.remove('hidden');
+                banner.className = "p-5 bg-purple-50 text-purple-600 flex justify-center items-center border-b border-purple-100";
+                iconContainer.className = "w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-md text-xl text-purple-600";
+                icon.className = "fa-solid fa-check-double";
+                title.innerText = "Approve Blueform";
+                msg.innerHTML = `Approve Blueform <span class="font-mono font-bold text-gray-800">${workId}</span>? Status will change to <span class="text-purple-600 font-bold">${nextStatus}</span>.`;
+                confirmBtn.className = "flex-1 px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-all shadow-md bg-purple-600 hover:bg-purple-700 cursor-pointer";
             }
-        }
-        let approvalDateValue = null;
-        if (!isReject) {
-            approvalDateValue = approvalDateInput.value;
-            if (!approvalDateValue) {
-                approvalDateError.classList.remove('hidden');
-                approvalDateInput.classList.add('border-red-500');
-                approvalDateInput.focus();
-                return;
-            }
-        }
-        closeConfirmModal();
-        await executeStatusUpdate(workId, nextStatus, reasonText, approvalDateValue);
-    };
 
-    modal.classList.remove('hidden');
-    setTimeout(() => {
-        modal.firstElementChild.classList.remove('scale-95');
-        modal.firstElementChild.classList.add('scale-100');
-    }, 10);
-}
-
-function closeConfirmModal() {
-    const modal = document.getElementById('customConfirmModal');
-    modal.firstElementChild.classList.remove('scale-100');
-    modal.firstElementChild.classList.add('scale-95');
-    setTimeout(() => {
-        modal.classList.add('hidden');
-    }, 150);
-}
-
-async function executeStatusUpdate(workId, nextStatus, reason = null, approvalDate = null) {
-    try {
-        // ===== SEMAKAN SIGNATURE (WAJIB) - hanya utk APP-HOD =====
-        // Tanpa signature dalam table staff, approve disekat SEBELUM sebarang perubahan data.
-        // Admin (@dm1n) dikecualikan (tiada staff_id/signature).
-        if (nextStatus === 'APP-HOD') {
-            const isAdminUser = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
-            if (!isAdminUser) {
-                const staffId = localStorage.getItem('staff_id');
-                let hasSignature = false;
-                if (staffId) {
-                    try {
-                        const staffRows = await apiQuery('staff', `id=eq.${encodeValue(staffId)}&select=signature`);
-                        hasSignature = !!(staffRows && staffRows[0] && String(staffRows[0].signature || '').trim());
-                    } catch (sigErr) {
-                        console.error('Gagal semak signature:', sigErr);
+            confirmBtn.onclick = async () => {
+                let reasonText = null;
+                if (isReject) {
+                    reasonText = reasonInput.value.trim();
+                    if (!reasonText) {
+                        errorMsg.classList.remove('hidden');
+                        reasonInput.classList.add('border-red-500');
+                        reasonInput.focus();
+                        return;
                     }
                 }
-                if (!hasSignature) {
-                    showAppToast('Approve disekat: signature anda belum wujud. Sila muat naik signature dahulu.', 'error');
-                    return;
+                let approvalDateValue = null;
+                if (!isReject) {
+                    approvalDateValue = approvalDateInput.value;
+                    if (!approvalDateValue) {
+                        approvalDateError.classList.remove('hidden');
+                        approvalDateInput.classList.add('border-red-500');
+                        approvalDateInput.focus();
+                        return;
+                    }
                 }
-            }
+                closeConfirmModal();
+                await executeStatusUpdate(workId, nextStatus, reasonText, approvalDateValue);
+            };
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.firstElementChild.classList.remove('scale-95');
+                modal.firstElementChild.classList.add('scale-100');
+            }, 10);
         }
 
-        const stampStage = nextStatus === 'APP-HOD' ? 'dept_head' : null;
-        const result = await stageGroupDecisionByWorkId(workId, nextStatus, reason, stampStage, approvalDate);
-        if (result.waiting) {
-            showAppToast('Decision saved. Waiting for other Work Orders in the same sequence to be decided first.', 'info');
+        function closeConfirmModal() {
+            const modal = document.getElementById('customConfirmModal');
+            modal.firstElementChild.classList.remove('scale-100');
+            modal.firstElementChild.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 150);
         }
-        fetchDashboard();
-    } catch (err) {
-        console.error("Error during processing:", err.message);
-        showAppToast("Failed to update status: " + err.message, 'error');
-    }
-}
+
+        async function executeStatusUpdate(workId, nextStatus, reason = null, approvalDate = null) {
+            try {
+                if (nextStatus === 'APP-HOD') {
+                    const isAdminUser = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
+                    if (!isAdminUser) {
+                        const staffId = localStorage.getItem('staff_id');
+                        let hasSignature = false;
+                        if (staffId) {
+                            try {
+                                const staffRows = await apiQuery('staff', `id=eq.${encodeValue(staffId)}&select=signature`);
+                                hasSignature = !!(staffRows && staffRows[0] && String(staffRows[0].signature || '').trim());
+                            } catch (sigErr) {
+                                console.error('Failed to check signature:', sigErr);
+                            }
+                        }
+                        if (!hasSignature) {
+                            showAppToast('Approval blocked: Your signature does not exist yet. Please upload your signature first.', 'error');
+                            return;
+                        }
+                    }
+                }
+
+                const stampStage = nextStatus === 'APP-HOD' ? 'dept_head' : null;
+                const result = await stageGroupDecisionByWorkId(workId, nextStatus, reason, stampStage, approvalDate);
+                if (result.waiting) {
+                    showAppToast('Decision saved. Waiting for other Work Orders in the same sequence to be decided first.', 'info');
+                }
+                fetchDashboard();
+            } catch (err) {
+                console.error("Error during processing:", err.message);
+                showAppToast("Failed to update status: " + err.message, 'error');
+            }
+        }
         window.onload = fetchDashboard;
     </script>
 </body>
