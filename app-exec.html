@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https:;">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Blueform Approvals-Request for Approval</title>
     <link class="icon" href="data:;base64,iVBORw0KGgo=">
@@ -43,7 +44,6 @@
             .glass-header{ padding-left:10px; padding-right:10px; }
         }
 
-        /* Controls the appearance of multi-page printing */
         @media print {
             @page {
                 size: A4;
@@ -105,7 +105,6 @@
             }
         }
 
-        /* ============ CONTRACT CODE / CONTRACT NAME POPUP ============ */
         .contract-name-label {
             display: none !important;
         }
@@ -116,9 +115,6 @@
             -webkit-user-select: none;
         }
 
-        /* ============ BESARKAN TEKS KECIL (DESKTOP SAHAJA) ============
-           Tak sentuh .glass-header & tajuk kad (h2 "text-lg")
-           sebab kelas-kelas tu sengaja tak disenaraikan di bawah. */
         @media (min-width: 1024px) {
             .text-\[8px\]  { font-size: 11px !important; }
             .text-\[9px\]  { font-size: 12px !important; }
@@ -128,7 +124,6 @@
             .text-sm       { font-size: 15px !important; }
         }
 
-        /* ============ TOAST POPUP (bukan alert dialog) ============ */
         #appToastContainer {
             position: fixed;
             top: calc(20px + env(safe-area-inset-top));
@@ -383,11 +378,6 @@ function buildInFilter(values) {
     return `in.(${clean.join(',')})`;
 }
 
-
-/* ============================================================
-   ROLE / PERMISSION CONTEXT
-   ============================================================ */
-
 const ACT_ROLES = {
 
     TECH: [
@@ -411,11 +401,6 @@ const ACT_ROLES = {
     ]
 };
 
-
-/* ============================================================
-   GET PERMISSION CONTEXT
-   ============================================================ */
-
 async function getPermissionContext() {
 
     const isAdmin =
@@ -438,11 +423,6 @@ async function getPermissionContext() {
         canActSection: false,
         canActDept: false
     };
-
-
-    /* ---------------------------------------------------------
-       ADMIN
-       --------------------------------------------------------- */
 
     if (isAdmin) {
 
@@ -476,11 +456,6 @@ async function getPermissionContext() {
 
         ctx.userId = staffId;
 
-
-        /* -----------------------------------------------------
-           STAFF POSITION
-           ----------------------------------------------------- */
-
         try {
 
             const staffRows = await apiQuery(
@@ -504,11 +479,6 @@ async function getPermissionContext() {
             );
         }
 
-
-        /* -----------------------------------------------------
-           ACTING UNIT
-           ----------------------------------------------------- */
-
         try {
 
             const unitAssignments = await apiQuery(
@@ -528,11 +498,6 @@ async function getPermissionContext() {
             );
 
         }
-
-
-        /* -----------------------------------------------------
-           ACTING SECTION
-           ----------------------------------------------------- */
 
         try {
 
@@ -554,11 +519,6 @@ async function getPermissionContext() {
 
         }
 
-
-        /* -----------------------------------------------------
-           DEPARTMENT HEAD
-           ----------------------------------------------------- */
-
         try {
 
             const departmentRows = await apiQuery(
@@ -578,11 +538,6 @@ async function getPermissionContext() {
             );
 
         }
-
-
-        /* -----------------------------------------------------
-           FINAL PERMISSION
-           ----------------------------------------------------- */
 
         ctx.canManageTech =
             ACT_ROLES.TECH.includes(ctx.position);
@@ -611,11 +566,6 @@ async function getPermissionContext() {
     return ctx;
 }
 
-
-/* ============================================================
-   FETCH DASHBOARD
-   ============================================================ */
-
 async function fetchDashboard() {
 
     try {
@@ -634,11 +584,6 @@ async function fetchDashboard() {
 
         let scopeIsAll =
             isAdmin;
-
-
-        /* =====================================================
-           DETERMINE UNIT SCOPE
-           ===================================================== */
 
         if (!isAdmin) {
 
@@ -669,11 +614,6 @@ async function fetchDashboard() {
                 return;
             }
 
-
-            /* -------------------------------------------------
-               KETUA JABATAN
-               ------------------------------------------------- */
-
             if (perm.canActDept) {
 
                 scopeIsAll = true;
@@ -682,11 +622,6 @@ async function fetchDashboard() {
 
                 const unitIdSet =
                     new Set();
-
-
-                /* ---------------------------------------------
-                   DIRECT UNIT ASSIGNMENT
-                   --------------------------------------------- */
 
                 const assignments =
                     await apiQuery(
@@ -709,11 +644,6 @@ async function fetchDashboard() {
                     }
 
                 });
-
-
-                /* ---------------------------------------------
-                   SECTION ASSIGNMENT
-                   --------------------------------------------- */
 
                 if (perm.canActSection) {
 
@@ -795,11 +725,6 @@ async function fetchDashboard() {
 
         }
 
-
-        /* =====================================================
-           LOAD WORK ORDERS
-           ===================================================== */
-
         const quotationStatuses =
             'in.(QUOTATION)';
 
@@ -828,11 +753,6 @@ async function fetchDashboard() {
 
         blueformOrders =
             blueformOrders || [];
-
-
-        /* =====================================================
-           LOAD CONTRACTS
-           ===================================================== */
 
         const allOrders = [
             ...quotationOrders,
@@ -877,11 +797,6 @@ async function fetchDashboard() {
                     ])
             );
 
-
-        /* =====================================================
-           ATTACH CONTRACT DATA
-           ===================================================== */
-
         quotationOrders =
             quotationOrders.map(order => {
 
@@ -914,11 +829,6 @@ async function fetchDashboard() {
                 };
 
             });
-
-
-        /* =====================================================
-           APPLY UNIT SCOPE
-           ===================================================== */
 
         if (!scopeIsAll) {
 
@@ -965,22 +875,12 @@ async function fetchDashboard() {
 
         }
 
-
-        /* =====================================================
-           MAP PDF
-           ===================================================== */
-
         blueformOrders.forEach(item => {
 
             item.mapped_pdf_url =
                 item.pdf_url || null;
 
         });
-
-
-        /* =====================================================
-           RENDER
-           ===================================================== */
 
         renderSection(
             'quotations-container',
@@ -1010,11 +910,6 @@ async function fetchDashboard() {
     }
 
 }
-
-
-/* ============================================================
-   RENDER SECTION
-   ============================================================ */
 
 function renderSection(
     containerId,
@@ -1271,11 +1166,6 @@ function renderSection(
 
             }
 
-
-            /* =================================================
-               QUOTATION
-               ================================================= */
-
             if (type === 'QUOTATION') {
 
                 let actionButtonsHtml;
@@ -1396,11 +1286,6 @@ function renderSection(
                 `;
 
             }
-
-
-            /* =================================================
-               BLUEFORM
-               ================================================= */
 
             else {
 
@@ -1637,11 +1522,6 @@ function renderSection(
 
 }
 
-
-/* ============================================================
-   HTML SAFETY
-   ============================================================ */
-
 function escapeHtml(value) {
 
     return String(value ?? '')
@@ -1670,11 +1550,6 @@ function escapeJs(value) {
         .replace(/\n/g, '\\n');
 
 }
-
-
-/* ============================================================
-   ACCORDION
-   ============================================================ */
 
 function toggleAccordion(
     contentId,
@@ -1726,11 +1601,6 @@ function toggleAccordion(
 
 }
 
-
-/* ============================================================
-   EMPTY STATE
-   ============================================================ */
-
 function showEmptyState(
     containerId,
     message
@@ -1759,14 +1629,6 @@ function showEmptyState(
 
 }
 
-
-/* =====================================================
-   CONTRACT CODE / CONTRACT NAME POPUP
-   - Contract name hidden from accordion header
-   - Desktop: hover = temporary popup
-   - Desktop/mobile: click/tap = locked popup
-   - Popup is appended to body so accordion overflow cannot clip it
-   ===================================================== */
 let contractNamePopup = null;
 let contractNamePopupLocked = false;
 let contractNamePopupAnchor = null;
@@ -1880,7 +1742,6 @@ function handleContractBadgeClick(e, encodedName) {
     showContractNamePopup(badge, name, true);
 }
 
-// Desktop hover only. Touch devices use click/tap instead.
 document.addEventListener('pointerover', (e) => {
     if (e.pointerType !== 'mouse') return;
 
@@ -1902,7 +1763,6 @@ document.addEventListener('pointerover', (e) => {
     );
 });
 
-// Desktop hover popup closes immediately when the pointer leaves the code.
 document.addEventListener('pointerout', (e) => {
     if (e.pointerType !== 'mouse') return;
 
@@ -1919,7 +1779,6 @@ document.addEventListener('pointerout', (e) => {
     }
 });
 
-// Click anywhere else closes a locked popup.
 document.addEventListener('click', (e) => {
     if (!contractNamePopup || contractNamePopup.style.visibility !== 'visible') return;
     if (e.target.closest('.contract-code-badge')) return;
@@ -1928,7 +1787,6 @@ document.addEventListener('click', (e) => {
     hideContractNamePopup(true);
 });
 
-// Keep a locked popup aligned when the page/accordion is scrolled or resized.
 window.addEventListener('scroll', () => {
     if (contractNamePopupLocked && contractNamePopupAnchor) {
         positionContractNamePopup(contractNamePopupAnchor);
@@ -1940,7 +1798,6 @@ window.addEventListener('resize', () => {
         positionContractNamePopup(contractNamePopupAnchor);
     }
 });
-
 
 async function renderPdfPagesAsElements(
     pdfUrl
@@ -2120,11 +1977,6 @@ async function renderPdfPagesAsElements(
     return pages;
 
 }
-
-
-/* ============================================================
-   FULL BLUEFORM PREVIEW
-   ============================================================ */
 
 async function previewFullSet(
     escapedGroupData
@@ -2316,11 +2168,6 @@ async function previewFullSet(
 
 }
 
-
-/* ============================================================
-   CLOSE BULK PREVIEW
-   ============================================================ */
-
 function closeBulkPreview() {
 
     const preview =
@@ -2346,11 +2193,6 @@ function closeBulkPreview() {
     }
 
 }
-
-
-/* ============================================================
-   CONFIRM MODAL
-   ============================================================ */
 
 function openConfirmModal(
     workId,
@@ -2466,11 +2308,6 @@ function openConfirmModal(
 
     }
 
-
-    /* ---------------------------------------------------------
-       QUOTATION APPROVE
-       --------------------------------------------------------- */
-
     if (mode === 'QUOTATION') {
 
         banner.className =
@@ -2511,11 +2348,6 @@ function openConfirmModal(
 
     }
 
-
-    /* ---------------------------------------------------------
-       BLUEFORM APPROVE
-       --------------------------------------------------------- */
-
     else if (
         mode === 'BLUEFORM'
     ) {
@@ -2551,11 +2383,6 @@ function openConfirmModal(
             'flex-1 px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-all shadow-md bg-blue-600 hover:bg-blue-700 cursor-pointer';
 
     }
-
-
-    /* ---------------------------------------------------------
-       REJECT QUOTATION
-       --------------------------------------------------------- */
 
     else if (
         mode === 'REJECT-QUOTE'
@@ -2599,11 +2426,6 @@ function openConfirmModal(
 
     }
 
-
-    /* ---------------------------------------------------------
-       REJECT BLUEFORM
-       --------------------------------------------------------- */
-
     else if (
         mode === 'REJECT-BF'
     ) {
@@ -2646,11 +2468,6 @@ function openConfirmModal(
 
     }
 
-
-    /* ---------------------------------------------------------
-       CONFIRM CLICK
-       --------------------------------------------------------- */
-
     confirmBtn.onclick =
         async () => {
 
@@ -2682,7 +2499,6 @@ function openConfirmModal(
                 }
 
             }
-
 
             let approvalDateValue = null;
             if (isBlueformApprove) {
@@ -2731,11 +2547,6 @@ function openConfirmModal(
 
 }
 
-
-/* ============================================================
-   CLOSE CONFIRM MODAL
-   ============================================================ */
-
 function closeConfirmModal() {
 
     const modal =
@@ -2768,11 +2579,6 @@ function closeConfirmModal() {
 
 }
 
-
-/* ============================================================
-   STATUS UPDATE
-   ============================================================ */
-
 async function executeStatusUpdate(
     workId,
     nextStatus,
@@ -2781,13 +2587,6 @@ async function executeStatusUpdate(
 ) {
 
     try {
-
-        /* =====================================================
-           SEMAKAN SIGNATURE (WAJIB) - hanya utk APP-EXEC
-           Tanpa signature dalam table staff, approve disekat
-           SEBELUM sebarang perubahan data dibuat.
-           Admin (@dm1n) dikecualikan (tiada staff_id/signature).
-           ===================================================== */
 
         if (nextStatus === 'APP-EXEC') {
 
@@ -2826,10 +2625,6 @@ async function executeStatusUpdate(
             }
         }
 
-        /* =====================================================
-           QUOTATION DECISION
-           ===================================================== */
-
         if (
             nextStatus === 'QUO-REJ' ||
             nextStatus === 'QUO-APP'
@@ -2867,26 +2662,12 @@ async function executeStatusUpdate(
 
         }
 
-
-        /* =====================================================
-           BLUEFORM DECISION
-           ===================================================== */
-
         else {
 
             const stampStage =
                 nextStatus === 'APP-EXEC'
                     ? 'exec_signature'
                     : null;
-
-
-            /*
-             * stageGroupDecisionByWorkId()
-             * berada dalam blueform.js.
-             *
-             * Pastikan blueform.js anda juga telah
-             * dimigrate ke Cloudflare Worker.
-             */
 
             if (
                 typeof stageGroupDecisionByWorkId !==
@@ -2921,13 +2702,7 @@ async function executeStatusUpdate(
 
         }
 
-
-        /* =====================================================
-           REFRESH
-           ===================================================== */
-
         await fetchDashboard();
-
 
     } catch (error) {
 
