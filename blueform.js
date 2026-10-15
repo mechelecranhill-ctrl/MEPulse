@@ -1,27 +1,3 @@
-/* ============================================================
-   BLUEFORM SHARED LOGIC
-   Extracted verbatim from contract-usage.html
-   Digunakan bersama oleh: contract-usage.html, app-exec.html,
-   app-sect.html, app-dept.html
-
-   CARA GUNA:
-   1. Letak <link rel="stylesheet" href="blueform.css"> di <head>
-   2. Letak <script src="blueform.js"></script> SEBELUM
-      script page (supaya API_URL/headers tersedia dulu)
-   3. Pastikan page TIDAK declare semula `const API_URL` atau
-      `const headers` — sebab dah di-declare global kat sini.
-      Kalau page lama ada declare balik, buang je.
-   4. Pastikan page ada `let currentContractId = ...;` (global)
-      sebelum panggil bulkDownloadBlueform(), sebab function tu
-      rujuk currentContractId terus.
-   5. Markup #bulkPreviewPage / #bulkPagesContainer / #bulkPreviewCount
-      kena ada dalam HTML setiap page (copy dari contract-usage.html)
-      sebab function² ni terus manipulate elemen tu.
-   6. Kalau page ada checkbox "select all" (cth: #checkAllBF) untuk
-      bulk blueform, panggil toggleAllBF(this) pada onchange -- ia
-      akan check/uncheck semua .bf-checkbox sekaligus.
-   ============================================================ */
-
 const API_URL = 'https://me-connect-api.mech-elec-ranhill.workers.dev';
 const headers = { 'Content-Type': 'application/json' };
 
@@ -32,13 +8,6 @@ function formatShortDate(dateStr){
     return `${d.getDate()}/${d.getMonth()+1}`;
 }
 
-// Baca approval_stamps sedia ada (kalau ada), gabung dengan stage baharu.
-// Return null untuk @dm1n (admin tak ada staff_id/signature sendiri) — bila
-// null, caller kena SKIP terus set approval_stamps supaya stamp lama tak kena wipe.
-//
-// NOTA MIGRASI: staff yang log masuk sekarang dikenal pasti melalui
-// localStorage.getItem('staff_id') (diset di login.html selepas panggil
-// POST /login pada Worker), BUKAN lagi Supabase Auth.
 async function mergeApprovalStamp(table, workId, stageKey, approvalDate = null) {
     try {
         const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
@@ -58,7 +27,6 @@ async function mergeApprovalStamp(table, workId, stageKey, approvalDate = null) 
     }
 }
 
-// Ambil semua ahli group (Work Order yang sama sequence_no + district + contract)
 async function fetchGroupMembers(contractId, district, sequenceNo) {
     if (!sequenceNo) return [];
 
@@ -69,7 +37,6 @@ async function fetchGroupMembers(contractId, district, sequenceNo) {
 
     const rows = await res.json();
 
-    // Buang semua Work Order yang telah reject di mana-mana peringkat.
     return rows.filter(r => {
         const status = String(r.status || '').toUpperCase();
         return !status.endsWith('REJ');
@@ -78,7 +45,6 @@ async function fetchGroupMembers(contractId, district, sequenceNo) {
 
 async function stageGroupDecision(workId, contractId, district, sequenceNo, nextStatus, reason, stampStage, approvalDate = null) {
 
-    // Standalone Work Order
     if (!sequenceNo) {
         const payload = {
             status: nextStatus,
@@ -105,7 +71,6 @@ async function stageGroupDecision(workId, contractId, district, sequenceNo, next
         };
     }
 
-    // Simpan keputusan semasa dahulu
     await fetch(
         `${API_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}`,
         {
@@ -118,15 +83,12 @@ async function stageGroupDecision(workId, contractId, district, sequenceNo, next
         }
     );
 
-    // Ambil SEMULA ahli group yang BELUM reject
     const members = await fetchGroupMembers(
         contractId,
         district,
         sequenceNo
     );
 
-    // Jika tinggal seorang sahaja (yang lain dah reject),
-    // terus finalize.
     if (members.length <= 1) {
 
         const payload = {
@@ -163,14 +125,12 @@ async function stageGroupDecision(workId, contractId, district, sequenceNo, next
         };
     }
 
-    // Refresh data selepas PATCH
     const latestMembers = await fetchGroupMembers(
         contractId,
         district,
         sequenceNo
     );
 
-    // Semua ahli group mesti dah ada pending_status
     const everyoneReady = latestMembers.every(m => {
 
         if (m.work_id === workId)
@@ -186,7 +146,6 @@ async function stageGroupDecision(workId, contractId, district, sequenceNo, next
         };
     }
 
-    // Finalize semua ahli group
     for (const m of latestMembers) {
 
         const finalStatus =
@@ -235,7 +194,6 @@ async function stageGroupDecision(workId, contractId, district, sequenceNo, next
     };
 }
 
-// Wrapper: cari contract_id/district/sequence_no dari work_id dulu, then stage.
 async function stageGroupDecisionByWorkId(workId, nextStatus, reason, stampStage, approvalDate = null) {
     const res = await fetch(
         `${API_URL}/rest/v1/work_orders?work_id=eq.${encodeURIComponent(workId)}&select=id,contract_id,district,sequence_no`,
@@ -247,7 +205,6 @@ async function stageGroupDecisionByWorkId(workId, nextStatus, reason, stampStage
     return stageGroupDecision(workId, row.contract_id, row.district, row.sequence_no, nextStatus, reason, stampStage, approvalDate);
 }
 
-// Selesaikan staff_id -> signature/initial image untuk semua stamp dalam satu record
 async function resolveStampImages(approvalStamps) {
     const stamps = approvalStamps || {};
     const staffIds = [...new Set(Object.values(stamps).map(s => s?.staff_id).filter(Boolean))];
@@ -273,21 +230,17 @@ async function resolveStampImages(approvalStamps) {
 function generatePresetFromContractCode(contractCode) {
     if (!contractCode) return 'RSAJ/M&E/IP/11-';
     
-    // Sesuai untuk: 'RSAJ/KP/T/111/2023', 'RanhillSAJ/KP/T/110/2023', 'RSAJ/KP/T/111/23' dll.
-    // Regex ini mencari coretan "/[nombor]/[2 atau 4 digit tahun]" di bahagian paling belakang string
     const match = contractCode.match(/\/(\d+)\/(\d{2,4})$/);
     
     if (match) {
-        let contractNo = match[1]; // Mengambil angka kontrak (Contoh: 110 atau 111)
-        let yearPart = match[2];   // Mengambil angka tahun (Contoh: 2023 atau 23)
+        let contractNo = match[1];
+        let yearPart = match[2];
         
-        // Jika tahun ditulis 4 digit (2023), kita potong ambil 2 digit belakang sahaja (23)
         let shortYear = yearPart.length === 4 ? yearPart.substring(2) : yearPart;
         
         return `RSAJ/M&E/IP/11-${contractNo}/${shortYear}`;
     }
     
-    // Jika format contract_code pelik dan tidak menepati corak, ia akan return default preset ini
     return 'RSAJ/M&E/IP/11-';
 }
 
@@ -318,28 +271,24 @@ function getActiveVO(voBreakdown, cutoffDate){
 
 function sortWOChronological(woArray, districtPriority) {
     return [...woArray].sort((a, b) => {
-        // 1. qpb_date
         const d1 = new Date(a.qpb_date || "1900-01-01");
         const d2 = new Date(b.qpb_date || "1900-01-01");
         if (d1.getTime() !== d2.getTime()) return d1 - d2;
 
-        // 2. blueform_created_at (tarikh Blueform sebenar dicipta) - fallback ke
-        // created_at untuk rekod lama yang belum ada blueform_created_at diisi.
         const t1 = new Date(a.blueform_created_at || a.created_at || "1900-01-01");
         const t2 = new Date(b.blueform_created_at || b.created_at || "1900-01-01");
         if (t1.getTime() !== t2.getTime()) return t1 - t2;
 
-        // 3. district priority (ikut susunan dalam contract.area_code / districtPriority)
         const aDistrict = (a.district || '').toUpperCase().trim();
         const bDistrict = (b.district || '').toUpperCase().trim();
         const aRank = districtPriority[aDistrict] ?? 999;
         const bRank = districtPriority[bDistrict] ?? 999;
         if (aRank !== bRank) return aRank - bRank;
 
-        // 4. sequence_no
         return (a.sequence_no || '').localeCompare(b.sequence_no || '');
     });
 }
+
 function buildInterimDateMap(allInterims){
     const map = new Map();
     (allInterims || []).forEach(int => {
@@ -351,10 +300,10 @@ function buildInterimDateMap(allInterims){
 }
 
 function isWOPendingAtCutoff(wo, interimDateMap, cutoffDate){
-    if (!wo.interim_no) return true; // tiada interim langsung -> pending
+    if (!wo.interim_no) return true;
     const claimDate = interimDateMap.get(String(wo.interim_no));
-    if (!claimDate) return true; // rekod interim tak jumpa -> anggap pending (selamat)
-    return claimDate.getTime() > cutoffDate.getTime(); // claim belum wujud pada cutoff ini -> pending
+    if (!claimDate) return true;
+    return claimDate.getTime() > cutoffDate.getTime();
 }
 
 function formatRM(v){
@@ -405,16 +354,16 @@ async function buildBlueformData(id, sharedData = null) {
     const interimDateMap = buildInterimDateMap(allInterims);
 
     let sectionUsed = {};
-let totalSalvage = 0, totalPG = 0, totalTax = 0, totalPenalty = 0; // Tambah variable penalty
+    let totalSalvage = 0, totalPG = 0, totalTax = 0, totalPenalty = 0;
 
-allInterims.forEach(int => {
-    const intDate = new Date(int.date_received);
-    if (intDate > cutoffDate) return;
+    allInterims.forEach(int => {
+        const intDate = new Date(int.date_received);
+        if (intDate > cutoffDate) return;
 
-    totalSalvage += Number(int.salvage_value || 0);
-    totalPG += Number(int.performance_guarantee_sum || 0);
-    totalTax += Number(int.tax || 0);
-    totalPenalty += Number(int.penalty || 0); // Ambil data penalty dari interim
+        totalSalvage += Number(int.salvage_value || 0);
+        totalPG += Number(int.performance_guarantee_sum || 0);
+        totalTax += Number(int.tax || 0);
+        totalPenalty += Number(int.penalty || 0);
 
         const cat = int.claim_breakdown || {};
         Object.keys(cat).forEach(sec => {
@@ -475,11 +424,10 @@ allInterims.forEach(int => {
             amt += Number(s?.amt || s?.amount || s?.value || 0);
         });
         bakiKontrak -= amt;
-bakiKontrak += Number(int.salvage_value || 0);
-bakiKontrak += Number(int.performance_guarantee_sum || 0);
-bakiKontrak -= Number(int.tax || 0);
-bakiKontrak -= Number(int.penalty || 0); // Tolak denda untuk dapatkan baki bersih
-
+        bakiKontrak += Number(int.salvage_value || 0);
+        bakiKontrak += Number(int.performance_guarantee_sum || 0);
+        bakiKontrak -= Number(int.tax || 0);
+        bakiKontrak -= Number(int.penalty || 0);
     });
 
     sortedAllWO.forEach((wo, index) => {
@@ -505,7 +453,6 @@ bakiKontrak -= Number(int.penalty || 0); // Tolak denda untuk dapatkan baki bers
         voBreakdown, activeVO,
         stampImages
     };
-
 }
 
 async function buildBlueformDataGroup(ids, sharedData = null) {
@@ -541,14 +488,14 @@ async function buildBlueformDataGroup(ids, sharedData = null) {
     const uniqueLocations = [...new Set(woResults.map(w => (w.location || '').trim()).filter(l => l !== ''))];
     const combinedLocation = uniqueLocations.join(', ');
     const uniqueDescriptions = [
-    ...new Map(
-        woResults
-            .map(w => [(w.description || '').trim().toLowerCase(), w.description])
-            .filter(([k, v]) => k !== '')
-    ).values()
-];
+        ...new Map(
+            woResults
+                .map(w => [(w.description || '').trim().toLowerCase(), w.description])
+                .filter(([k, v]) => k !== '')
+        ).values()
+    ];
 
-const combinedDesc = uniqueDescriptions.join(', ');
+    const combinedDesc = uniqueDescriptions.join(', ');
 
     let allInterims, allWO, localDistrictPriority;
     if (sharedData) {
@@ -580,11 +527,10 @@ const combinedDesc = uniqueDescriptions.join(', ');
     const interimDateMap = buildInterimDateMap(allInterims);
 
     let sectionUsed = {};
-
-let totalSalvage = 0;
-let totalPG = 0;
-let totalTax = 0;
-let totalPenalty = 0;
+    let totalSalvage = 0;
+    let totalPG = 0;
+    let totalTax = 0;
+    let totalPenalty = 0;
 
     allInterims.forEach(int => {
         const intDate = new Date(int.date_received);
@@ -593,7 +539,7 @@ let totalPenalty = 0;
         totalSalvage += Number(int.salvage_value || 0);
         totalPG += Number(int.performance_guarantee_sum || 0);
         totalTax += Number(int.tax || 0);
-totalPenalty += Number(int.penalty || 0);
+        totalPenalty += Number(int.penalty || 0);
 
         const cat = int.claim_breakdown || {};
         Object.keys(cat).forEach(sec => {
@@ -659,7 +605,7 @@ totalPenalty += Number(int.penalty || 0);
         bakiKontrak += Number(int.salvage_value || 0);
         bakiKontrak += Number(int.performance_guarantee_sum || 0);
         bakiKontrak -= Number(int.tax || 0);
-bakiKontrak -= Number(int.penalty || 0);
+        bakiKontrak -= Number(int.penalty || 0);
     });
 
     sortedAllWO.forEach((wo, index) => {
@@ -708,15 +654,11 @@ function buildBlueformHTML(payload) {
             sectionUsed, totalSalvage, totalPG, totalTax, totalPenalty,
             bakiKontrak, voBreakdown, activeVO, stampImages } = payload;
 
-
     const effectiveVO = activeVO || voBreakdown;
 
     const seq = data.sequence_no || '';
-// Gunakan data preset dari DB, jika tiada/kosong baru generate terus dari c.contract_code
-const refPrefix = c.reference || generatePresetFromContractCode(c.contract_code); 
-
-// Memastikan sambungan sequence no. cantik (Contoh hasil: RSAJ/M&E/IP/11-111/23 - JBP01)
-let formattedRef = seq ? ` - ${seq}` : ''; 
+    const refPrefix = c.reference || generatePresetFromContractCode(c.contract_code); 
+    let formattedRef = seq ? ` - ${seq}` : ''; 
 
     const unitName = (c.units?.unit_name || '').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
     const tpl = Array.isArray(c.selected_sections) ? c.selected_sections : [];
@@ -847,16 +789,15 @@ let formattedRef = seq ? ` - ${seq}` : '';
                     <div class="bf-value">RM ${totalPG.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
                 </div>
                 <div class="bf-row" style="font-size:9px;">
-    <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">TAX</span></div>
-    <div class="bf-colon">:</div>
-    <div class="bf-value">RM ${totalTax.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
-</div>
-<div class="bf-row" style="font-size:9px;">
-    <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">PENALTY</span></div>
-    <div class="bf-colon">:</div>
-    <div class="bf-value" style="color: #dc2626;">RM ${totalPenalty.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
-</div>
-
+                    <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">TAX</span></div>
+                    <div class="bf-colon">:</div>
+                    <div class="bf-value">RM ${totalTax.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+                </div>
+                <div class="bf-row" style="font-size:9px;">
+                    <div class="bf-label" style="width:220px;"><span style="margin-left:25px;">PENALTY</span></div>
+                    <div class="bf-colon">:</div>
+                    <div class="bf-value" style="color: #dc2626;">RM ${totalPenalty.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+                </div>
             </div>
         </div>
 
@@ -889,58 +830,57 @@ let formattedRef = seq ? ` - ${seq}` : '';
         <div id="bf_content" style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;">
             ${contentHtml}
         </div>
-                                <div class="bf-signature-grid">
-    <div>
-        <strong>Dimohon Oleh:</strong>
-        <div style="height:70px; position:relative;">
-            ${stampImages.exec_signature?.signature ? `<img src="${stampImages.exec_signature.signature}" style="max-height:50px; max-width:120px; object-fit:contain; position:absolute; bottom:0; left:5%;">` : ''}
+        <div class="bf-signature-grid">
+            <div>
+                <strong>Dimohon Oleh:</strong>
+                <div style="height:70px; position:relative;">
+                    ${stampImages.exec_signature?.signature ? `<img src="${stampImages.exec_signature.signature}" style="max-height:50px; max-width:120px; object-fit:contain; position:absolute; bottom:0; left:5%;">` : ''}
+                </div>
+                <div style="position:relative;">
+                    <div class="bf-sign-line"></div>
+                    ${stampImages.tech_initial?.initial ? `<img src="${stampImages.tech_initial.initial}" style="height:25px;width:auto;object-fit:contain;position:absolute;left:-23px;top:-12px;">` : ''}
+                    ${stampImages.tech_initial?.date ? `<span style="position:absolute;left:-28px;top:10px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.tech_initial.date)}</span>` : ''}
+                    ${stampImages.exec_signature?.date ? `<span style="position:absolute;right:60px;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.exec_signature.date)}</span>` : ''}
+                </div>
+                <small style="display:block; margin-top:2px;">
+                    <span>${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}</span>
+                </small>
+            </div>
+            <div>
+                <strong>Disemak Oleh:</strong>
+                <div style="height:70px; position:relative;">
+                    ${stampImages.section_head?.signature ? `<img src="${stampImages.section_head.signature}" style="max-height:60px; max-width:200px; object-fit:contain; position:absolute; bottom:0; left:5%;">` : ''}
+                </div>
+                <div style="position:relative;">
+                    <div class="bf-sign-line"></div>
+                    ${stampImages.section_head?.date ? `<span style="position:absolute;right:60px;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.section_head.date)}</span>` : ''}
+                </div>
+                <small style="display:block; margin-top:2px;">
+                    <span>Ketua Seksyen Selenggara</span>
+                </small>
+            </div>
+            <div>
+                <strong>Disahkan Oleh:</strong>
+                <div style="height:70px; position:relative;">
+                    ${stampImages.dept_head?.signature ? `<img src="${stampImages.dept_head.signature}" style="max-height:100px; max-width:200px; object-fit:contain; position:absolute; bottom:-25px; left:5%;">` : ''}
+                </div>
+                <div style="position:relative;">
+                    <div class="bf-sign-line"></div>
+                    ${stampImages.dept_head?.date ? `<span style="position:absolute;right:60px;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.dept_head.date)}</span>` : ''}
+                </div>
+                <small style="display:block; margin-top:2px;">
+                    <span>Ketua Mekanikal & Elektrikal</span>
+                </small>
+            </div>
+            <div>
+                <strong>Disokong Oleh:</strong>
+                <div style="height:70px;"></div>
+                <div style="position:relative;">
+                    <div class="bf-sign-line"></div>
+                </div>
+                <small style="display:block; margin-top:2px;">Ketua Bahagian Operasi & Penyelenggaraan</small>
+            </div>
         </div>
-        <div style="position:relative;">
-            <div class="bf-sign-line"></div>
-            ${stampImages.tech_initial?.initial ? `<img src="${stampImages.tech_initial.initial}" style="height:25px;width:auto;object-fit:contain;position:absolute;left:-23px;top:-12px;">` : ''}
-            ${stampImages.tech_initial?.date ? `<span style="position:absolute;left:-28px;top:10px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.tech_initial.date)}</span>` : ''}
-            ${stampImages.exec_signature?.date ? `<span style="position:absolute;right:60px;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.exec_signature.date)}</span>` : ''}
-        </div>
-        <small style="display:block; margin-top:2px;">
-            <span>${unitName ? `Eksekutif ${unitName}` : 'Eksekutif'}</span>
-        </small>
-    </div>
-    <div>
-        <strong>Disemak Oleh:</strong>
-        <div style="height:70px; position:relative;">
-            ${stampImages.section_head?.signature ? `<img src="${stampImages.section_head.signature}" style="max-height:60px; max-width:200px; object-fit:contain; position:absolute; bottom:0; left:5%;">` : ''}
-        </div>
-        <div style="position:relative;">
-            <div class="bf-sign-line"></div>
-            ${stampImages.section_head?.date ? `<span style="position:absolute;right:60px;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.section_head.date)}</span>` : ''}
-        </div>
-        <small style="display:block; margin-top:2px;">
-            <span>Ketua Seksyen Selenggara</span>
-        </small>
-    </div>
-    <div>
-        <strong>Disahkan Oleh:</strong>
-        <div style="height:70px; position:relative;">
-            ${stampImages.dept_head?.signature ? `<img src="${stampImages.dept_head.signature}" style="max-height:100px; max-width:200px; object-fit:contain; position:absolute; bottom:-25px; left:5%;">` : ''}
-        </div>
-        <div style="position:relative;">
-            <div class="bf-sign-line"></div>
-            ${stampImages.dept_head?.date ? `<span style="position:absolute;right:60px;top:-18px;font-size:10px;color:#000;white-space:nowrap;">${formatShortDate(stampImages.dept_head.date)}</span>` : ''}
-        </div>
-        <small style="display:block; margin-top:2px;">
-            <span>Ketua Mekanikal & Elektrikal</span>
-        </small>
-    </div>
-    <div>
-        <strong>Disokong Oleh:</strong>
-        <div style="height:70px;"></div>
-        <div style="position:relative;">
-            <div class="bf-sign-line"></div>
-        </div>
-        <small style="display:block; margin-top:2px;">Ketua Bahagian Operasi & Penyelenggaraan</small>
-    </div>
-</div>
-
         <div class="bf-footer-note">
             * Sebutharga dan Work Order telah disemak sepenuhnya oleh Pihak Daerah
         </div>
@@ -1031,8 +971,6 @@ async function bulkDownloadBlueform() {
     }
 }
 
-// Check/uncheck semua .bf-checkbox sekaligus. Panggil ni dari
-// onchange checkbox "select all" (cth: <input onchange="toggleAllBF(this)">)
 function toggleAllBF(el){
     document.querySelectorAll('.bf-checkbox').forEach(cb => { cb.checked = el.checked; });
 }
@@ -1052,17 +990,6 @@ function closeBulkPreview(){
     document.getElementById('bulkPagesContainer').innerHTML = '';
 }
 
-/* ------------------------------------------------------------
-   GROUPING HELPERS (untuk approval pages: app-exec.html,
-   app-sect.html, app-dept.html, dll.)
-
-   Work order yang berkongsi district + sequence_no yang sama
-   patut digabung jadi SATU blueform (openBlueformGroup), bukan
-   dibuka berasingan. Helper ni sentralkan logic tu supaya setiap
-   page approval tak perlu tulis semula.
-   ------------------------------------------------------------ */
-
-// Bina map { "DISTRICT||SEQ": [wo1, wo2, ...] } daripada senarai work order
 function buildSequenceGroups(workOrders){
     const seqGroups = {};
     (workOrders || []).forEach(w => {
