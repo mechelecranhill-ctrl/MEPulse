@@ -71,13 +71,42 @@
         return a.isAdmin || a.isDeptHead || a.sectionNames.some(n => ALLOWED_SECTIONS.includes(n));
     }
 
+    function showPopup(message) {
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:999999;';
+
+            const box = document.createElement('div');
+            box.style.cssText = 'background:#fff;padding:24px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);width:320px;text-align:center;font-family:sans-serif;';
+
+            const msg = document.createElement('p');
+            msg.style.cssText = 'margin:0 0 20px 0;font-size:16px;color:#333;line-height:1.5;';
+            msg.textContent = message;
+
+            const btn = document.createElement('button');
+            btn.style.cssText = 'background:#007bff;color:#white;border:none;padding:10px 20px;font-size:14px;border-radius:4px;cursor:pointer;font-weight:600;';
+            btn.textContent = 'OK';
+            btn.style.color = '#fff';
+
+            btn.onclick = () => {
+                document.body.removeChild(overlay);
+                resolve();
+            };
+
+            box.appendChild(msg);
+            box.appendChild(btn);
+            overlay.appendChild(box);
+            document.body.appendChild(overlay);
+        });
+    }
+
     async function requireAllowedSection() {
         try {
             const a = await getAccess();
             if (isAllowed(a)) { document.documentElement.style.visibility = ''; return true; }
         } catch (e) { console.error('Semakan akses gagal:', e); }
         document.documentElement.style.visibility = '';
-        alert('You do not have access to this page.');
+        await showPopup('You do not have access to this page.');
         window.location.replace('sections.html');
         return false;
     }
