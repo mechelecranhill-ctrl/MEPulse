@@ -73,26 +73,46 @@
 
     function showPopup(message) {
         return new Promise((resolve) => {
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes agFadeIn { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes agPopIn { from { opacity: 0; transform: scale(0.9) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+            `;
+            document.head.appendChild(style);
+
             const overlay = document.createElement('div');
-            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:999999;';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(15,23,42,0.6);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:999999;animation:agFadeIn 0.2s ease-out;';
 
             const box = document.createElement('div');
-            box.style.cssText = 'background:#fff;padding:24px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);width:320px;text-align:center;font-family:sans-serif;';
+            box.style.cssText = 'background:#ffffff;padding:28px 24px;border-radius:16px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);width:100%;max-width:360px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;animation:agPopIn 0.25s cubic-bezier(0.16,1,0.3,1);box-sizing:border-box;margin:16px;';
+
+            const iconContainer = document.createElement('div');
+            iconContainer.style.cssText = 'width:56px;height:56px;background:#fef2f2;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px auto;';
+            iconContainer.innerHTML = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
+
+            const title = document.createElement('h3');
+            title.style.cssText = 'margin:0 0 8px 0;font-size:18px;font-weight:600;color:#0f172a;';
+            title.textContent = 'Access Restricted';
 
             const msg = document.createElement('p');
-            msg.style.cssText = 'margin:0 0 20px 0;font-size:16px;color:#333;line-height:1.5;';
+            msg.style.cssText = 'margin:0 0 24px 0;font-size:14px;color:#64748b;line-height:1.5;';
             msg.textContent = message;
 
             const btn = document.createElement('button');
-            btn.style.cssText = 'background:#007bff;color:#white;border:none;padding:10px 20px;font-size:14px;border-radius:4px;cursor:pointer;font-weight:600;';
-            btn.textContent = 'OK';
-            btn.style.color = '#fff';
+            btn.style.cssText = 'width:100%;background:#2563eb;color:#ffffff;border:none;padding:10px 16px;font-size:14px;border-radius:8px;cursor:pointer;font-weight:500;transition:background 0.2s;outline:none;';
+            btn.textContent = 'Understand';
+
+            btn.onmouseover = () => btn.style.background = '#1d4ed8';
+            btn.onmouseout = () => btn.style.background = '#2563eb';
 
             btn.onclick = () => {
                 document.body.removeChild(overlay);
+                document.head.removeChild(style);
                 resolve();
             };
 
+            box.appendChild(iconContainer);
+            box.appendChild(title);
             box.appendChild(msg);
             box.appendChild(btn);
             overlay.appendChild(box);
