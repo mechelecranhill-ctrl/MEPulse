@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8"> 
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval';">
     <title>Contract Usage Schedule</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
@@ -250,7 +251,6 @@
         tr.status-claimed td strong { color: #34C759; }
         tr.status-cancel td strong { color: #FF3B30; }
 
-        /* ================= KUNING - PERINGKAT APPROVAL EXEC/HOS/HOD ================= */
         tr.status-app-exec td,
         tr.status-exec-rej td,
         tr.status-app-hos td,
@@ -266,18 +266,15 @@
         tr.status-rej-hos td strong,
         tr.status-hod-rej td strong { color: #FF3B30; }
 
-        /* ================= KELABU - INDENT / INDENT APPROVED ================= */
         tr.status-indent td,
         tr.status-indentapproved td { background-color: rgba(142, 142, 147, 0.15) !important; }
 
         tr.status-indent td strong,
         tr.status-indentapproved td strong { color: #636366; }
 
-        /* ================= HIJAU BERBEZA - APPROVED ================= */
         tr.status-approved td { background-color: rgba(0, 168, 107, 0.10) !important; }
         tr.status-approved td strong { color: #00A86B; }
 
-        /* ================= TAG BADGE (mobile card) ================= */
         .tag.approved{ background:#00A86B20; color:#00A86B; }
         .tag.indent{ background:#8E8E9320; color:#636366; }
         .tag.indentapproved{ background:#8E8E9320; color:#636366; }
@@ -614,8 +611,6 @@
                 width: 100% !important;
                 display: block !important;
             }
-            /* Placeholder "No Linked Quotation PDF" = preview sahaja,
-               tidak masuk print / Save PDF */
             .preview-only {
                 display: none !important;
             }
@@ -628,7 +623,6 @@
     <script src="session.js"></script>
     <script src="sidebar.js" defer></script>
 
-    <!-- pdf.js untuk render quotation PDF dalam Full Set bundle (samakan macam app-tech.html) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>
         if (window['pdfjsLib']) {
@@ -748,23 +742,9 @@ let areaPriority = {};
 let currentTableData = [];
 let currentContractId = null;
 
-// ============================================================
-// DATA KONTRAK + INTERIM YANG SUDAH FETCH UNTUK KONTRAK SEMASA.
-// Disimpan supaya updateStatus/updateStatusGroup boleh render
-// semula guna data sedia ada (tiada refetch penuh dari server).
-// ============================================================
 let currentContractData = null;
 let currentInterimsData = [];
 
-// ============================================================
-// FULL SET BUNDLE (Blueform + Quotation PDF) — disamakan dengan
-// previewFullSet() di app-tech.html. Ditulis di sini (bukan
-// blueform.js) supaya blueform.js tidak disentuh langsung.
-// Bergantung pada API_URL, headers, buildBlueformData,
-// buildBlueformDataGroup, buildBlueformHTML, processInBatches
-// dari blueform.js (sudah dimuatkan melalui
-// <script src="blueform.js"> di atas).
-// ============================================================
 async function renderPdfPagesAsElements(pdfUrl) {
     const pages = [];
     try {
@@ -813,7 +793,7 @@ async function renderPdfPagesAsElements(pdfUrl) {
 
 function noPdfPlaceholderPage() {
     const div = document.createElement('div');
-    div.className = 'print-page preview-only';   // nampak di preview, disorok masa print
+    div.className = 'print-page preview-only';   
     div.style.cssText = 'width:210mm;min-height:297mm;background:white;padding:3cm 2cm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:gray;';
     div.innerHTML = `
         <i class="fa-solid fa-file-pdf" style="font-size:36px;color:#d1d5db;margin-bottom:10px;"></i>
@@ -822,7 +802,6 @@ function noPdfPlaceholderPage() {
     return div;
 }
 
-// Cari pdf_url quotation yang berkaitan dengan senarai work_id (helper dikongsi)
 async function fetchLinkedQuotationPdfs(workIds) {
     if (!workIds || workIds.length === 0) return [];
     const filter = workIds.map(w => `work_id.eq.${encodeURIComponent(w)}`).join(',');
@@ -836,8 +815,6 @@ async function fetchLinkedQuotationPdfs(workIds) {
     }
 }
 
-// Bundle Blueform + Quotation PDF untuk SATU item / group (guna ganti
-// openBlueform/openBlueformGroup pada page ni sahaja)
 async function openFullSetBundle(idsStr) {
     const ids = String(idsStr).split(',').map(id => id.trim());
     const container = document.getElementById('bulkPagesContainer');
@@ -849,8 +826,6 @@ async function openFullSetBundle(idsStr) {
             ? await buildBlueformData(ids[0])
             : await buildBlueformDataGroup(ids);
 
-        // pdf_url dah ada terus dalam row work_orders (allWorks sudah dimuat dalam
-        // memori) - tiada perlu lagi hit jadual quotations berasingan.
         const linkedPdfs = ids
             .map(id => (allWorks.find(w => String(w.id) === String(id)) || {}).pdf_url)
             .filter(Boolean);
@@ -873,13 +848,6 @@ async function openFullSetBundle(idsStr) {
     }
 }
 
-// ============================================================
-// Override bulkDownloadBlueform() dari blueform.js — bundle setiap
-// Blueform yang dicentang bersama quotation PDF dia sekali (ikut
-// susunan checkbox), sama macam openFullSetBundle(). blueform.js
-// langsung tidak disentuh; ini override function global sebab
-// script page ni dimuat SELEPAS blueform.js.
-// ============================================================
 async function bulkDownloadBlueform() {
     const checked = [...document.querySelectorAll('.bf-checkbox:checked')];
     if (checked.length === 0) { alert("Sila pilih Blueform."); return; }
@@ -911,7 +879,6 @@ async function bulkDownloadBlueform() {
 
         const sharedData = { allInterims, allWO, localDistrictPriority };
 
-        // Bina data blueform untuk setiap item dipilih (guna sharedData supaya jimat request)
         const payloads = await processInBatches(checked, 5, cb => {
             const idsStr = cb.value;
             const ids = idsStr.split(',').map(id => id.trim());
@@ -920,7 +887,6 @@ async function bulkDownloadBlueform() {
                 : buildBlueformDataGroup(ids, sharedData);
         });
 
-        // Render satu-satu: Blueform diikuti terus halaman quotation PDF dia (kalau ada)
         for (const payload of payloads) {
             const wrap = document.createElement('div');
             wrap.innerHTML = buildBlueformHTML(payload);
@@ -928,8 +894,6 @@ async function bulkDownloadBlueform() {
             if (bfEl) container.appendChild(bfEl);
 
             const workIdList = (payload.data.work_id || '').split(',').map(w => w.trim()).filter(Boolean);
-// Cari pdf_url terus dari allWO (dah dimuat dalam fungsi ni) - tiada perlu lagi
-// jadual quotations berasingan.
 const linkedPdfs = workIdList
     .map(wid => (allWO.find(w => (w.work_id || '').trim() === wid) || {}).pdf_url)
     .filter(Boolean);
@@ -1072,19 +1036,6 @@ function sortWorkOrders(data, areaPriority){
     });
 }
 
-// ============================================================
-// INDEXEDDB CACHE: work_orders + interims (per contract_id)
-//
-// Database berasingan daripada dashboard.html sebab bentuk data
-// berbeza (select column lain + tiada tapisan status di server).
-//
-// Versi cache = contract.claim_usage_summary.updated_at.
-// Worker mengemas kini nilai ini setiap kali ada POST/PATCH/
-// DELETE pada work_orders atau interims untuk kontrak berkenaan
-// (termasuk updateStatus di page ni). Row contract memang sudah
-// di-fetch dalam loadSingleContract(), jadi semakan versi tidak
-// menambah query/rows read.
-// ============================================================
 const USAGE_IDB_NAME = 'me-connect-cache-usage';
 const USAGE_IDB_STORE = 'usage';
 
@@ -1124,12 +1075,10 @@ async function getUsageData(id, contract) {
     let cached = null;
     try { cached = await usageIdbGet(contract.id); } catch (e) {}
 
-    // Tiada perubahan -> guna IndexedDB
     if (fp && cached && cached.fp === fp) {
         return { works: cached.works, interims: cached.interims };
     }
 
-    // Ada perubahan (atau belum ada cache) -> fetch penuh
     const [woRes, intRes] = await Promise.all([
         fetch(
         `${API_URL}/rest/v1/work_orders?contract_id=eq.${id}&select=id,contract_id,work_id,status,section_category,additional,amount_spent,qpb_date,blueform_created_at,created_at,district,sequence_no,interim_no,location,description,pdf_url`,
@@ -1169,12 +1118,8 @@ async function loadSingleContract(id){
         document.getElementById('viewSubtitle').innerText = c.contract_name;
         document.getElementById('tableWrapper').style.display = 'block';
         const { works: rawWorks, interims } = await getUsageData(id, c);
-// Halaman ni untuk Usage Schedule (BLUEFORM ke atas) - fasa quotation
-// (QUOTATION / QUO-APP / QUO-REJ) belum sesuai dipaparkan di sini lagi.
 allWorks = rawWorks.filter(w => !['QUOTATION', 'QUO-APP', 'QUO-REJ'].includes((w.status || '').toUpperCase().trim()));
 
-// Simpan reference supaya updateStatus/updateStatusGroup boleh
-// render semula tanpa fetch semula seluruh kontrak.
 currentContractData = c;
 currentInterimsData = interims;
 
@@ -1350,7 +1295,7 @@ function renderMobileCards(data){
                         <i class="fa-solid fa-print"></i> Blueform
                     </button>
                 </div>
-            </div>`;
+            `;
         }
     });
     container.innerHTML = html;
@@ -1419,8 +1364,6 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
     if (st === 'CLAIMED' || w.interim_no) return false;
     if (st === 'CANCEL') return false;
     if (st.includes('REJ')) return false;
-    // Fasa quotation (QUOTATION / QUO-APP) belum lagi jadi Blueform - jangan
-    // tolak baki kontrak lagi buat rekod di fasa ni.
     if (st === 'QUOTATION' || st === 'QUO-APP') return false;
     return true;
 });
@@ -1625,16 +1568,6 @@ function openSummary(){
     window.location.href = `contract_summary.html?id=${id}`;
 }
 
-// ============================================================
-// UPDATE STATUS
-//
-// FIX: tiada lagi loadSingleContract(currentContractId) selepas
-// PATCH. Kemaskini local state (allWorks) sahaja, kemudian render
-// semula table + matrix guna currentContractData/currentInterimsData
-// yang sudah ada dalam memori. Ini elak fetch semula seluruh
-// contract + work_orders (unfiltered) + interims setiap kali satu
-// status ditukar.
-// ============================================================
 async function updateStatus(id, status){
     try{
         await fetch(`${API_URL}/rest/v1/work_orders?id=eq.${id}`,{
@@ -1644,7 +1577,6 @@ async function updateStatus(id, status){
         const row = allWorks.find(w => Number(w.id) === Number(id));
         if(row) row.status = status;
 
-        // Render semula guna data sedia ada — TIADA network call
         renderTable(currentTableData, currentView === "AREA");
         buildInterimMatrix(currentContractData, currentInterimsData, allWorks, currentContractData.vo_breakdown || {});
     }catch(e){ console.error(e); alert("Gagal update status"); }
@@ -1664,7 +1596,6 @@ async function updateStatusGroup(idsStr, status){
             if(row) row.status = status;
         });
 
-        // Render semula guna data sedia ada — TIADA network call
         renderTable(currentTableData, currentView === "AREA");
         buildInterimMatrix(currentContractData, currentInterimsData, allWorks, currentContractData.vo_breakdown || {});
     }catch(e){ console.error(e); alert("Gagal update status group"); }
