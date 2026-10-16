@@ -124,10 +124,10 @@
         try {
             const a = await getAccess();
             if (isAllowed(a)) { document.documentElement.style.visibility = ''; return true; }
-        } catch (e) { console.error('Semakan akses gagal:', e); }
+        } catch (e) { console.error('Access authorisation failed:', e); }
         document.documentElement.style.visibility = '';
         await showPopup('You do not have access to this page.');
-        window.location.replace('sections.html');
+        window.location.replace('dashboard-contract.html');
         return false;
     }
 
