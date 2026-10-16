@@ -1,615 +1,1494 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<head> 
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://fonts.gstatic.com https://me-connect-api.mech-elec-ranhill.workers.dev; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; script-src 'self' 'unsafe-inline';">
-
-<title>M&E Connect Sign In</title>
-
-<link rel="preload" href="Submarine.png" as="image" type="image/png">
-<link rel="preload" href="logo.svg" as="image" type="image/svg+xml">
-<link href="https://fonts.googleapis.com/css?family=Lato:300,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https:;">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>User Directory</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
 <style>
-html, body{
-    margin:0;
-    padding:0;
-    width:100%;
-    height:100dvh;
-    overflow:hidden;
-    overscroll-behavior:none;
+:root {
+    --bg-main: #f4f5f7;
+    --bg-card: #ffffff;
+    --text-main: #1d1d1f;
+    --text-muted: #86868b;
+    --accent-blue: #0071e3;
+    --accent-green: #34c759;
+    --accent-purple: #5856d6;
+    --accent-red: #ff3b30;
+    --accent-orange: #ff9500;
+    --radius-lg: 16px;
+    --radius-md: 12px;
+    --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.04);
+    --shadow-hover: 0 8px 30px rgba(0, 0, 0, 0.08);
+    --tree-line: #d1d1d6;
 }
 
-body{
-    font-family:'Lato',sans-serif;
-    background:#fff;
+*, *::before, *::after {
+    box-sizing: border-box;
 }
 
-.header{
-    position:relative;
-    text-align:center;
-    overflow:hidden;
-    background:
-    radial-gradient(circle at top,
-        rgba(255,255,255,.15),
-        transparent 35%),
-    linear-gradient(
-        60deg,
-        #0b3d91 0%,
-        #0077b6 40%,
-        #00b4d8 100%
-    );
-    color:white;
-    overflow:visible;
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg-main);
+    color: var(--text-main);
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    width: 100vw;
 }
 
-.header::before{
-    content:"";
-    position:absolute;
-    inset:0;
-    background:
-    radial-gradient(circle at 20% 80%,
-        rgba(255,255,255,.18),
-        transparent 25%),
-    radial-gradient(circle at 80% 20%,
-        rgba(255,255,255,.10),
-        transparent 30%);
-    filter:blur(40px);
-    animation:fogMove 10s ease-in-out infinite alternate;
+.header {
+    height: 65px;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }
 
-@keyframes fogMove{
-    from{ transform:translateX(-30px) translateY(0); }
-    to{ transform:translateX(30px) translateY(-20px); }
+.header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.2px;
 }
 
-.flex{
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    text-align:center;
+.back-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+    background: rgba(0,0,0,0.03);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--accent-blue);
+    transition: background 0.2s;
 }
 
-.inner-header{
-    position:relative;
-    z-index:20; 
-    height:65dvh;
-    width:100%;
-    margin:0;
-    padding:0;
-    flex-direction:column;
+.back-btn:hover {
+    background: rgba(0,0,0,0.06);
 }
 
-.login-box{
-    position:absolute;
-    top:calc(50% + 90px);
-    left:50%;
-    transform:translateX(-50%) translateY(20px);
-    width:320px;
-    max-width:90%;
-    display:flex;
-    flex-direction:column;
-    gap:10px;
-    opacity:0;
-    pointer-events:none;
-    z-index:10000;
+.container {
+    padding: 16px;
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
 }
 
-.login-box input{
-    width:100%;
-    padding:14px 16px;
-    background:rgba(255,255,255,.15);
-    border:1px solid rgba(255,255,255,.20);
-    border-radius:14px;
-    color:white;
-    backdrop-filter:blur(10px);
-    -webkit-backdrop-filter:blur(10px);
-    box-sizing:border-box;
-    outline:none;
-    transition:.25s;
+.search-box {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: var(--radius-md);
+    margin-bottom: 20px;
+    font-size: 15px;
+    background: var(--bg-card);
+    transition: all 0.2s;
+    outline: none;
+    box-shadow: var(--shadow-soft);
 }
 
-.login-box input::placeholder{
-    color:rgba(255,255,255,.75);
+.search-box:focus {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.1);
 }
 
-.login-box input:focus{
-    border-color:rgba(255,255,255,.45);
-    background:rgba(255,255,255,.20);
-    box-shadow:0 0 0 3px rgba(255,255,255,.10);
+.tree-group {
+    margin-bottom: 24px;
+    background: var(--bg-card);
+    padding: 16px;
+    border-radius: 20px;
+    box-shadow: var(--shadow-soft);
+    border: 1px solid rgba(0,0,0,0.02);
+    width: 100%;
 }
 
-.password-wrapper{
-    position:relative;
-    width:100%;
+.section-container {
+    position: relative;
+    padding-left: 12px;
+    border-left: 2px dashed var(--tree-line);
+    margin-left: 6px;
+    margin-top: 12px;
 }
 
-.password-wrapper input{
-    padding-right:50px;
+.unit-container {
+    position: relative;
+    padding-left: 14px;
+    border-left: 2px solid var(--tree-line);
+    margin-left: 12px;
+    margin-top: 16px;
 }
 
-.toggle-password{
-    position:absolute;
-    right:16px;
-    top:50%;
-    transform:translateY(-50%);
-    width:24px;
-    height:24px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    cursor:pointer;
-    color:rgba(255,255,255,.85);
+.section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-main);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 10px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    word-break: break-word;
 }
 
-.toggle-password i{
-    font-size:18px;
-    line-height:1;
+.section-title i {
+    color: var(--accent-blue);
+    font-size: 14px;
 }
 
-.login-box button{
-    margin-top:5px;
-    border-radius:14px;
-    height:48px;
-    padding:0 16px;
-    cursor:pointer;
-    background:rgba(34,197,94,0.18);
-    backdrop-filter:blur(14px);
-    -webkit-backdrop-filter:blur(14px);
-    border:1px solid rgba(34,197,94,0.35);
-    color:rgba(0,0,0,0.85);
-    font-weight:700;
-    box-shadow:0 8px 25px rgba(34,197,94,0.25);
-    transition:.25s;
+.unit-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent-blue);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 10px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    position: relative;
+    word-break: break-word;
 }
 
-.login-box button:hover{
-    transform:translateY(-2px);
-    filter:brightness(1.08);
+.unit-title::before {
+    content: "";
+    position: absolute;
+    left: -16px;
+    top: 50%;
+    width: 10px;
+    height: 2px;
+    background: var(--tree-line);
 }
 
-.login-box.show{
-    animation:fadeLogin .8s ease forwards;
-    pointer-events:auto;
+.tree-wrapper {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+    width: 100%;
 }
 
-@keyframes fadeLogin {
-    from {
-        opacity:0;
-        transform:translateX(-50%) translateY(30px);
-    }
-    to {
-        opacity:1;
-        transform:translateX(-50%) translateY(0);
-    }
-}
-
-.fish{
-    position:absolute;
-    width:180px;
-    height:auto;
-    right:-250px;
-    top:42%;
-    transform:translateY(-50%);
-    z-index:30;
-    opacity:0;
-    filter:drop-shadow(0 8px 20px rgba(0,0,0,.25));
-}
-
-.fish.start{
-    animation:fishSwim 3s ease forwards;
-}
-
-@keyframes fishSwim{
-    0%{
-        right:-250px;
-        opacity:0;
-        transform:translateY(-50%);
-    }
-    10%{
-        opacity:1;
-    }
-    45%{
-        right:50%;
-        transform:translate(50%,-50%);
-    }
-    60%{
-        right:50%;
-        opacity:1;
-        transform:translate(50%,-50%) scale(1.05);
-    }
-    100%{
-        right:120%;
-        opacity:0;
-        transform:translateY(-50%);
+@media (max-width: 480px) {
+    .tree-wrapper {
+        grid-template-columns: 1fr;
     }
 }
 
-h1{
-    font-weight:300;
-    letter-spacing:2px;
-    font-size:48px;
-    margin-top:20px;
-    opacity:0;
-    filter:drop-shadow(0 0 12px rgba(255,255,255,.35));
+.staff-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+    border: 1px solid rgba(0,0,0,0.04);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    width: 100%;
 }
 
-h1.start{
-    animation:fadeUp 1s ease forwards;
-    animation-delay:2s;
+.staff-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
 }
 
-.logo{
-    width:140px;
-    height:auto;
-    opacity:0;
-    clip-path:circle(0% at 50% 50%);
-    filter:drop-shadow(0 0 20px rgba(255,255,255,.35)) drop-shadow(0 10px 25px rgba(0,0,0,.2));
+.staff-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    overflow: hidden;
 }
 
-.logo.start{
-    animation:waterReveal 1.4s cubic-bezier(.2,.8,.2,1) forwards, floatLogo 7s ease-in-out infinite 4s;
-    animation-delay:2s,4s;
+.staff-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    font-size: 16px;
+    background: #f2f2f7;
+    color: #a1a1a6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 1px solid rgba(0,0,0,0.03);
 }
 
-@keyframes waterReveal{
-    0%{
-        opacity:0;
-        clip-path:circle(0% at 50% 50%);
-        filter:blur(10px);
-        transform:scale(.8);
+.staff-info {
+    flex-grow: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.staff-info h4 {
+    margin: 0 0 4px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-main);
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.3;
+}
+
+.staff-info p {
+    margin: 0;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.badge-acting {
+    background: var(--accent-orange);
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 4px;
+}
+
+.expand-hint {
+    color: #c7c7cc;
+    font-size: 11px;
+    transition: transform 0.2s;
+    margin-left: 4px;
+    flex-shrink: 0;
+}
+
+.staff-card.expanded .expand-hint {
+    transform: rotate(180deg);
+}
+
+.staff-details {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 100%;
+}
+
+.staff-card.expanded .staff-details {
+    max-height: 300px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(0,0,0,0.05);
+}
+
+.staff-details p {
+    margin: 8px 0;
+    font-size: 12px;
+    color: #48484a;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    word-break: break-all;
+}
+
+.staff-details p i {
+    width: 16px;
+    color: var(--text-muted);
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.action-group {
+    margin-top: 12px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.icon-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    transition: opacity 0.2s, transform 0.1s;
+}
+
+.icon-btn:hover {
+    opacity: 0.9;
+    transform: scale(1.05);
+}
+
+.edit-btn { background: var(--accent-blue); }
+.delete-btn { background: var(--accent-red); }
+.acting-btn { background: var(--accent-orange); }
+
+body.guest .fab,
+body.guest .action-group {
+    display: none !important;
+}
+
+.login-top-btn,
+.logout-top-btn {
+    display: none;
+    margin-left: auto;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: none;
+    border-radius: var(--radius-md);
+    background: var(--accent-blue);
+    color: white;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+body.guest .login-top-btn,
+body:not(.guest) .logout-top-btn {
+    display: flex;
+}
+
+.logout-top-btn {
+    background: var(--accent-red);
+}
+
+.fab {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: var(--text-main);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 18px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s;
+    z-index: 99;
+}
+
+.empty-state {
+    text-align: center;
+    color: var(--text-muted);
+    margin-top: 40px;
+    font-size: 14px;
+}
+
+.modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    justify-content: center;
+    align-items: flex-end; 
+    z-index: 9999;
+}
+
+.modal-content {
+    background: var(--bg-card);
+    width: 100%;
+    max-width: 480px;
+    border-radius: 20px 20px 0 0; 
+    padding: 20px;
+    box-shadow: 0 -10px 30px rgba(0,0,0,0.1);
+    animation: slideUp 0.25s ease-out;
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+@media (min-width: 481px) {
+    .modal-overlay {
+        align-items: center;
     }
-    40%{
-        opacity:1;
-    }
-    100%{
-        opacity:1;
-        clip-path:circle(150% at 50% 50%);
-        filter:blur(0px);
-        transform:scale(1);
+    .modal-content {
+        border-radius: var(--radius-lg);
+        width: 400px;
     }
 }
 
-@keyframes floatLogo{
-    0%{ transform:translateY(0px); }
-    50%{ transform:translateY(-10px); }
-    100%{ transform:translateY(0px); }
+.modal-content h3 {
+    margin: 0 0 16px 0;
+    font-size: 17px;
+    font-weight: 600;
 }
 
-.waves{
-    position:relative;
-    width:100%;
-    height:15vh;
-    margin-bottom:-7px;
-    min-height:100px;
-    max-height:150px;
-    z-index:1;
+.modal-content .search-box {
+    margin-bottom: 10px;
+    box-shadow: none;
+    background: #f2f2f7;
+    padding: 12px;
 }
 
-.parallax > use{
-    animation:move-forever 25s cubic-bezier(.55,.5,.45,.5) infinite;
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 16px;
 }
 
-.parallax > use:nth-child(1){ animation-delay:-2s; animation-duration:7s; }
-.parallax > use:nth-child(2){ animation-delay:-3s; animation-duration:10s; }
-.parallax > use:nth-child(3){ animation-delay:-4s; animation-duration:13s; }
-.parallax > use:nth-child(4){ animation-delay:-5s; animation-duration:20s; }
-
-@keyframes move-forever{
-    0%{ transform:translate3d(-90px,0,0); }
-    100%{ transform:translate3d(85px,0,0); }
+.modal-actions button {
+    padding: 12px 20px;
+    border-radius: 10px;
+    border: none;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    flex: 1; 
 }
 
-.login-options {
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    width:100%;
-    margin-top:2px;
-}
-
-.content{
-    position:relative;
-    height:20dvh;
-    text-align:center;
-    background:white;
-}
-
-p{
-    letter-spacing:1px;
-    font-size:14px;
-    color:#333;
-}
-
-@keyframes fadeUp{
-    from{
-        opacity:0;
-        transform:translateY(20px);
-    }
-    to{
-        opacity:1;
-        transform:translateY(0);
+@media (min-width: 481px) {
+    .modal-actions button {
+        flex: none;
     }
 }
 
-.back-text{
-    font-size:12px;
-    color:white;
-    opacity:0.8;
-    text-decoration:none;
-    display:flex;
-    align-items:center;
-    gap:6px;
-    cursor:pointer;
+.modal-actions button:first-child {
+    background: #f2f2f7;
+    color: var(--text-main);
 }
 
-.back-text:hover{
-    opacity:1;
-    text-decoration:underline;
+.modal-actions button:last-child {
+    background: var(--accent-blue);
+    color: white;
 }
 
-@media(max-width:768px){
-    .waves{
-        height:40px;
-        min-height:40px;
-    }
-    .content{
-        height:30vh;
-    }
-    h1{
-        font-size:24px;
-    }
-    .logo{
-        width:110px;
-    }
+.modal-group-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin: 12px 0 6px 0;
+    padding-left: 4px;
 }
 
-input{
-    width:100%;
-    margin-top:12px;
-    padding:12px;
-    border:none;
-    border-radius:14px;
-    box-sizing:border-box;
-    outline:none;
+.modal-option-label {
+    display: flex; 
+    gap: 10px; 
+    padding: 12px; 
+    background: #f2f2f7; 
+    border-radius: 10px; 
+    margin-bottom: 8px; 
+    font-size: 14px; 
+    cursor: pointer;
+    align-items: center;
+    transition: background 0.2s;
 }
 
-.logo-click{
-    position:relative;
-    z-index:20;
-    display:flex;
-    justify-content:center;
-    align-items:center;
+.modal-option-label:hover {
+    background: #e5e5ea;
 }
 
-.logo-ripple{
-    position:absolute;
-    width:140px;
-    height:140px;
-    border-radius:50%;
-    border:2px solid rgba(255,255,255,.45);
-    opacity:0;
-    pointer-events:none;
+.alert-box {
+    background: rgba(255, 255, 255, 0.95);
+    width: 85%;
+    max-width: 320px;
+    border-radius: 20px;
+    padding: 24px;
+    text-align: center;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
 }
-
-.logo-ripple.start.ripple-a{
-    animation:logoRipple 3s ease-out infinite;
-    animation-delay:3.2s;
+.alert-title { font-size: 17px; font-weight: 700; margin-bottom: 8px; color: #1d1d1f; }
+.alert-desc { font-size: 13.5px; color: #666; margin-bottom: 20px; line-height: 1.4; }
+.alert-btns { display: flex; gap: 10px; }
+.alert-btn {
+    flex: 1; padding: 12px; border: none; border-radius: 12px;
+    font-size: 14px; font-weight: bold; cursor: pointer;
 }
+.alert-btn-ok { background: #007AFF; color: white; width: 100%; }
+.alert-btn-cancel { background: #e5e5ea; color: #1d1d1f; }
+.alert-btn-danger { background: #FF3B30; color: white; }
 
-.logo-ripple.start.ripple-b{
-    animation:logoRipple 3s ease-out infinite;
-    animation-delay:4.2s;
-}
-
-@keyframes logoRipple{
-    0%{
-        transform:scale(.8);
-        opacity:0;
-    }
-    15%{
-        opacity:.6;
-    }
-    100%{
-        transform:scale(2.2);
-        opacity:0;
-    }
+@keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
 }
 </style>
 </head>
 
 <body>
+
 <div class="header">
-    <div class="inner-header flex">
-        <img src="Submarine.png" class="fish">
-
-        <div class="logo-click">
-            <div class="logo-ripple ripple-a"></div>
-            <div class="logo-ripple ripple-b"></div>
-            <img src="logo.svg" class="logo">
-        </div>
-
-        <h1>M&E Connect</h1>
-
-        <div id="loginBox" class="login-box">
-            <input id="username" type="text" placeholder="Employee ID">
-            <div class="password-wrapper">
-                <input id="password" type="password" placeholder="Password">
-                <span id="togglePassword" class="toggle-password">
-                    <i class="fa-solid fa-eye"></i>
-                </span>
-            </div>
-
-            <div class="login-options">
-                <div>
-                    <a href="#" onclick="goBack()" class="back-text">
-                        <i class="fa fa-arrow-left"></i> Main Menu
-                    </a>
-                </div>
-                <div style="font-size:12px;">
-                    <a href="#" onclick="forgotPassword()" style="color:#fff; opacity:0.8; text-decoration:none;">
-                        Forgot password?
-                    </a>
-                </div>
-            </div>
-
-            <button onclick="login()">Login</button>
-        </div>
+    <div class="back-btn" onclick="location.href='index.html'">
+        <i class="fa fa-chevron-left"></i>
     </div>
+    <h3>User Directory</h3>
+    <button class="login-top-btn" onclick="goLogin()">
+        <i class="fa fa-right-to-bracket"></i> Login
+    </button>
+    <button class="logout-top-btn" onclick="logoutUser()">
+        <i class="fa fa-right-from-bracket"></i> Logout
+    </button>
+</div>
 
-    <div>
-        <svg class="waves"
-             xmlns="http://www.w3.org/2000/svg"
-             xmlns:xlink="http://www.w3.org/1999/xlink"
-             viewBox="0 24 150 28"
-             preserveAspectRatio="none"
-             shape-rendering="auto">
-            <defs>
-                <path id="gentle-wave"
-                      d="M-160 44c30 0 58-18 88-18s58 18 88 18
-                         58-18 88-18 58 18 88 18v44h-352z" />
-            </defs>
-            <g class="parallax">
-                <use xlink:href="#gentle-wave" x="48" y="0" fill="rgba(255,255,255,0.7)" />
-                <use xlink:href="#gentle-wave" x="48" y="3" fill="rgba(255,255,255,0.5)" />
-                <use xlink:href="#gentle-wave" x="48" y="5" fill="rgba(255,255,255,0.3)" />
-                <use xlink:href="#gentle-wave" x="48" y="7" fill="#ffffff" />
-            </g>
-        </svg>
+<div class="container">
+    <input id="searchStaff" class="search-box" placeholder="Search staff or position..." onkeyup="renderStaff()">
+    <div id="staffList"></div>
+</div>
+
+<div class="fab" onclick="addStaff()">
+    <i class="fa fa-plus"></i>
+</div>
+
+<div id="staffModal" class="modal-overlay">
+    <div class="modal-content">
+        <h3 id="modalTitle">Staff</h3>
+        <input id="fName" class="search-box" placeholder="Staff Name">
+
+        <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+            <select id="fPosition" class="search-box" style="margin-bottom: 0; flex-grow: 1; -webkit-appearance: polyfill; height: 48px; padding: 12px 16px;">
+            </select>
+            <button type="button" onclick="addNewPositionOption()" style="padding: 0 16px; background: var(--text-main); color: white; border: none; border-radius: var(--radius-md); cursor: pointer;" title="Add New Position">
+                <i class="fa fa-plus"></i>
+            </button>
+        </div>
+
+        <input id="fEmployee" class="search-box" placeholder="Employee ID">
+        <input id="fPhone" class="search-box" placeholder="Phone No">
+        <input id="fEmail" class="search-box" placeholder="Email">
+        <div style="margin-bottom: 16px;">
+            <label style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; display:block;">Signature (JPG)</label>
+            <div id="signatureDropzone" onclick="document.getElementById('fSignatureFile').click()" style="border: 2px dashed rgba(0,0,0,0.1); border-radius: 12px; padding: 12px; text-align:center; cursor:pointer; background:#fafafa;">
+                <input type="file" id="fSignatureFile" accept="image/jpeg,image/png" style="display:none;" onchange="handleSignatureFileChange(this)">
+                <div id="signatureEmptyState">
+                    <i class="fa-solid fa-signature" style="font-size: 22px; color: #c7c7cc; display:block; margin-bottom:6px;"></i>
+                    <p style="font-size:12px; font-weight:600; color: var(--accent-blue); margin:0;">Select Signature JPG File</p>
+                </div>
+                <div id="signaturePreviewWrap" style="display:none; align-items:center; justify-content:center; flex-direction:column; gap:8px;">
+                    <img id="signaturePreviewImg" src="" style="max-height:60px; max-width:100%; object-fit:contain; background:white; border-radius:6px; border:1px solid rgba(0,0,0,0.05); padding:4px;">
+                    <button type="button" onclick="event.stopPropagation(); clearSignaturePreview()" style="font-size:11px; color:var(--accent-red); background:none; border:none; cursor:pointer;">
+                        <i class="fa fa-xmark"></i> Remove Signature
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div style="margin-bottom: 16px;">
+            <label style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; display:block;">Initial (JPG)</label>
+            <div id="initialDropzone" onclick="document.getElementById('fInitialFile').click()" style="border: 2px dashed rgba(0,0,0,0.1); border-radius: 12px; padding: 12px; text-align:center; cursor:pointer; background:#fafafa;">
+                <input type="file" id="fInitialFile" accept="image/jpeg,image/png" style="display:none;" onchange="handleInitialFileChange(this)">
+                <div id="initialEmptyState">
+                    <i class="fa-solid fa-pen-fancy" style="font-size: 22px; color: #c7c7cc; display:block; margin-bottom:6px;"></i>
+                    <p style="font-size:12px; font-weight:600; color: var(--accent-blue); margin:0;">Select Initial JPG File</p>
+                </div>
+                <div id="initialPreviewWrap" style="display:none; align-items:center; justify-content:center; flex-direction:column; gap:8px;">
+                    <img id="initialPreviewImg" src="" style="max-height:60px; max-width:100%; object-fit:contain; background:white; border-radius:6px; border:1px solid rgba(0,0,0,0.05); padding:4px;">
+                    <button type="button" onclick="event.stopPropagation(); clearInitialPreview()" style="font-size:11px; color:var(--accent-red); background:none; border:none; cursor:pointer;">
+                        <i class="fa fa-xmark"></i> Remove Initial
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button onclick="closeModal()">Cancel</button>
+            <button onclick="saveStaff()">Save</button>
+        </div>
     </div>
 </div>
 
-<div class="content flex">
-    <p>M&E | Mechanical & Electrical Department</p>
+<div id="assignModal" class="modal-overlay">
+    <div class="modal-content">
+        <h3 id="assignModalTitle">Assign</h3>
+        <div id="assignOptionsList"></div>
+        <div class="modal-actions">
+            <button onclick="closeAssignModal()">Cancel</button>
+            <button onclick="saveAssignment()" style="background:var(--accent-blue)!important;">Save</button>
+        </div>
+    </div>
+</div>
+
+<div id="actingModal" class="modal-overlay">
+    <div class="modal-content">
+        <h3>Appoint Acting Personnel</h3>
+        <p id="actingTargetLabel" style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;"></p>
+        <div id="actingStaffList" style="max-height: 300px; overflow-y: auto;"></div>
+        <div class="modal-actions">
+            <button onclick="closeActingModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div id="customAlertModal" class="modal-overlay" style="align-items: center;">
+    <div class="alert-box">
+        <div id="customAlertTitle" class="alert-title">Notification</div>
+        <div id="customAlertDesc" class="alert-desc">Message content...</div>
+        <div id="customAlertBtns" class="alert-btns">
+            <button id="customAlertOkBtn" class="alert-btn alert-btn-ok" onclick="closeCustomAlert()">OK</button>
+        </div>
+    </div>
 </div>
 
 <script>
-const API_URL = "https://me-connect-api.mech-elec-ranhill.workers.dev";
+const API_URL = 'https://me-connect-api.mech-elec-ranhill.workers.dev';
 
-function getRedirectTarget() {
-    const from = new URLSearchParams(window.location.search).get("from");
-    return from === "userdirectory" ? "userdirectory.html" : "sections.html";
+const isLoggedIn = localStorage.getItem("loggedIn") === "true";
+if (!isLoggedIn) document.body.classList.add("guest");
+
+function goLogin() {
+    location.href = "login.html?from=userdirectory";
 }
 
-async function login(){
-    const employeeId = document.getElementById("username").value.trim();
-    const pass = document.getElementById("password").value.trim();
+function logoutUser() {
+    localStorage.clear();
+    sessionStorage.clear();
+    location.reload();
+}
 
-    if(!employeeId || !pass){
-        alert("Please enter Employee ID and Password.");
-        return;
+const headers = {
+    'Content-Type': 'application/json'
+};
+
+const hierarki = {
+    "KETUA JABATAN": 1,
+    "KETUA SEKSYEN": 2,
+    "EKSEKUTIF KANAN": 3,
+    "EKSEKUTIF": 4,
+    "JURUTEKNIK": 5,
+    "PENYELIA PENTADBIRAN": 6,
+    "PEMBANTU PENTADBIRAN": 7,
+    "KERANI": 8
+};
+
+let staffData = [];
+let unitData = [];
+let sectionData = [];
+let staffSectionAssignments = [];
+let staffUnitAssignments = [];
+let currentTargetStaff = null;
+let deptHeadAssignments = [];
+
+let selectedSections = new Set();
+let selectedUnits = new Set();
+let currentSignatureBase64 = null;
+let currentInitialBase64 = null;
+let editingStaff = null;
+let currentActingType = null;
+let currentActingTargetId = null;
+
+let customAlertCallback = null;
+
+function showAlert(title, desc) {
+    document.getElementById("customAlertTitle").innerText = title;
+    document.getElementById("customAlertDesc").innerText = desc;
+    document.getElementById("customAlertBtns").innerHTML = `
+        <button class="alert-btn alert-btn-ok" onclick="closeCustomAlert()">OK</button>
+    `;
+    document.getElementById("customAlertModal").style.display = "flex";
+}
+
+function showConfirm(title, desc, onConfirm) {
+    document.getElementById("customAlertTitle").innerText = title;
+    document.getElementById("customAlertDesc").innerText = desc;
+    customAlertCallback = onConfirm;
+    document.getElementById("customAlertBtns").innerHTML = `
+        <button class="alert-btn alert-btn-cancel" onclick="closeCustomAlert()">Cancel</button>
+        <button class="alert-btn alert-btn-danger" onclick="executeCustomConfirm()">Proceed</button>
+    `;
+    document.getElementById("customAlertModal").style.display = "flex";
+}
+
+function closeCustomAlert() {
+    document.getElementById("customAlertModal").style.display = "none";
+    customAlertCallback = null;
+}
+
+function executeCustomConfirm() {
+    if (customAlertCallback) customAlertCallback();
+    closeCustomAlert();
+}
+
+window.onload = async () => {
+    try {
+        await loadUnits();
+        await loadSections();
+        await loadAssignments();
+        await loadDeptHead();
+        await loadStaff();
+        populatePositionDropdown();
+    } catch (err) {
+        console.error("Error loading initial data:", err);
+    }
+};
+
+async function loadDeptHead() {
+    let res = await fetch(`${API_URL}/department-head`, { cache: 'no-store' });
+    let raw = await res.json();
+    deptHeadAssignments = raw.map(r => ({ ...r, staff_id: Number(r.staff_id), is_acting: r.is_acting === 1 || r.is_acting === true }));
+}
+
+async function loadUnits() {
+    let res = await fetch(`${API_URL}/units`, { cache: 'no-store' });
+    let raw = await res.json();
+    unitData = raw.map(r => ({ ...r, id: Number(r.id), section_id: Number(r.section_id) }));
+}
+
+async function loadSections() {
+    let res = await fetch(`${API_URL}/me-sections`, { cache: 'no-store' });
+    let raw = await res.json();
+    sectionData = raw.map(r => ({ ...r, id: Number(r.id) }));
+}
+
+async function loadAssignments() {
+    let res1 = await fetch(`${API_URL}/staff-section-assignment`, { cache: 'no-store' });
+    let raw1 = await res1.json();
+    staffSectionAssignments = raw1.map(r => ({ ...r, staff_id: Number(r.staff_id), section_id: Number(r.section_id), is_acting: r.is_acting === 1 || r.is_acting === true }));
+
+    let res2 = await fetch(`${API_URL}/staff-unit-assignment`, { cache: 'no-store' });
+    let raw2 = await res2.json();
+    staffUnitAssignments = raw2.map(r => ({ ...r, staff_id: Number(r.staff_id), unit_id: Number(r.unit_id), is_acting: r.is_acting === 1 || r.is_acting === true }));
+}
+
+async function loadStaff() {
+    let res = await fetch(`${API_URL}/staff`, { cache: 'no-store' });
+    let raw = await res.json();
+    staffData = raw.map(r => ({ ...r, id: Number(r.id) }));
+    renderStaff();
+}
+
+function toggleCard(el, evt) {
+    if (evt.target.closest(".action-group")) return;
+    el.classList.toggle("expanded");
+}
+
+function staffCardHtml(s, isActing = false, actingType = "", targetId = null) {
+    let avatarHtml = `<i class="fa-solid fa-user"></i>`;
+    let positionUpper = s.position ? s.position.toUpperCase() : "";
+    let isKJ = positionUpper === "HEAD OF DEPARTMENT" || positionUpper === "KETUA JABATAN";
+
+    let leftLineColor = "rgba(0,0,0,0.04)"; 
+    if (isActing) {
+        leftLineColor = "var(--accent-orange)"; 
+    } else if (isKJ) {
+        leftLineColor = "var(--accent-blue)"; 
+    } else if (positionUpper.includes("HEAD OF SECTION") || positionUpper.includes("KETUA SEKSYEN")) {
+        leftLineColor = "var(--accent-purple)"; 
+    } else if (positionUpper.includes("SENIOR EXECUTIVE") || positionUpper.includes("EKSEKUTIF KANAN")) {
+        leftLineColor = "var(--accent-green)"; 
+    } else if (positionUpper.includes("EXECUTIVE") || positionUpper.includes("EKSEKUTIF")) {
+        leftLineColor = "#2bc4d9"; 
+    } else if (positionUpper.includes("TECHNICIAN") || positionUpper.includes("JURUTEKNIK") || positionUpper.includes("SUPERVISOR") || positionUpper.includes("PENYELIA")) {
+        leftLineColor = "var(--accent-orange)"; 
+    } else if (positionUpper.includes("ASSISTANT") || positionUpper.includes("PEMBANTU") || positionUpper.includes("CLERK") || positionUpper.includes("KERANI")) {
+        leftLineColor = "var(--text-muted)"; 
     }
 
-    if(employeeId === "@dm1n" && pass === "@AnakAnakSyurga1"){
-        localStorage.setItem("loggedIn","true");
-        localStorage.setItem("staff_id",0);
-        localStorage.setItem("userId","@dm1n");
-        localStorage.setItem("employee_id","@dm1n");
-        localStorage.setItem("staff_name","System Admin");
-        localStorage.setItem("role","admin");
-        localStorage.setItem("avatar_url","");
-        localStorage.setItem("me_user","@dm1n");
-        localStorage.setItem("lastActivity",Date.now());
+    return `
+    <div class="staff-card" onclick="toggleCard(this, event)" style="border-left: 4px solid ${leftLineColor};">
+        <div class="staff-left">
+            <div class="staff-avatar" ${isActing ? 'style="background:rgba(255,149,0,0.1); color:var(--accent-orange);"' : ''}>${avatarHtml}</div>
+            <div class="staff-info">
+                ${isActing ? `<span class="badge-acting"><i class="fa fa-gavel"></i> ACTING</span>` : ''}
+                <h4>${s.name}</h4>
+                <p>${isActing ? (actingType === 'section' ? 'ACTING HEAD OF SECTION' : 'ACTING UNIT EXECUTIVE') : s.position}</p>
+            </div>
+            <div class="expand-hint">
+                <i class="fa fa-chevron-down"></i>
+            </div>
+        </div>
+        <div class="staff-details">
+            <p><i class="fa fa-id-badge"></i> ${s.employee_id||'-'}</p>
+            <p><i class="fa fa-phone"></i> ${s.phone_no||'-'}</p>
+            <p><i class="fa fa-envelope"></i> ${s.email||'-'}</p>
+            <div class="action-group" onclick="event.stopPropagation()">
+                ${isActing ? `
+                    <button class="icon-btn" style="background:var(--accent-red);" onclick="removeActing('${actingType}', '${targetId}', '${s.id}', event)" title="Remove Acting Status">
+                        <i class="fa fa-user-minus"></i>
+                    </button>
+                ` : `
+                    ${!isKJ ? `
+                    <button class="icon-btn" style="background:var(--accent-blue)" onclick="openAssignModal('${s.id}')" title="Assign Placement">
+                        <i class="fa fa-sitemap"></i>
+                    </button>
+                    ` : ''}
+                    <button class="icon-btn edit-btn" onclick="editStaff('${s.id}')">
+                        <i class="fa fa-pen"></i>
+                    </button>
+                    <button class="icon-btn delete-btn" onclick="deleteStaff('${s.id}', decodeURIComponent('${encodeURIComponent(s.name || '')}'))">
+                    <i class="fa fa-trash"></i>
+                    </button>
+                `}
+            </div>
+        </div>
+    </div>
+    `;
+}
 
-        window.location.href = getRedirectTarget();
-        return;
+function sortByHierarki(a, b) {
+    return ((hierarki[a.position?.toUpperCase()] || 99) - (hierarki[b.position?.toUpperCase()] || 99));
+}
+
+function renderStaff() {
+    let keyword = document.getElementById("searchStaff").value.toLowerCase();
+
+    function emptyCardHtml(position, type, targetId = null) {
+        return `
+        <div class="staff-card" style="border: 1px dashed #d1d1d6; background: #fafafa; opacity: 0.8; cursor: default;">
+            <div class="staff-left">
+                <div class="staff-avatar" style="background: #e5e5ea; color: #aeaeb2;">
+                    <i class="fa-solid fa-user-slash"></i>
+                </div>
+                <div class="staff-info">
+                    <h4 style="color: #8e8e93; font-style: italic;">Vacant</h4>
+                    <p style="color: #8e8e93; font-weight: 600;">${position}</p>
+                </div>
+            </div>
+            <div class="action-group" style="margin-top: 10px;" onclick="event.stopPropagation()">
+                <button class="icon-btn acting-btn" onclick="openActingModal('${type}', '${targetId}', '${position}')" title="Appoint Acting Person from List" style="width: auto; padding: 0 10px; gap: 4px;">
+                    <i class="fa fa-user-plus"></i> Acting
+                </button>
+            </div>
+        </div>
+        `;
     }
 
-    try{
-        const res = await fetch(`${API_URL}/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                employee_id: employeeId,
-                password: pass
-            })
+    let html = "";
+
+    let kjStaff = staffData.find(s => s.position?.toUpperCase() === "HEAD OF DEPARTMENT" || s.position?.toUpperCase() === "KETUA JABATAN");
+    let actingKjRow = deptHeadAssignments.find(a => (a.is_acting === true || a.is_acting === 'true'));
+    let actingKjStaff = (!kjStaff && actingKjRow) ? staffData.find(x => x.id === actingKjRow.staff_id) : null;
+
+    let matchKj = kjStaff && (kjStaff.name.toLowerCase().includes(keyword) || kjStaff.position.toLowerCase().includes(keyword));
+    let matchActingKj = actingKjStaff && (actingKjStaff.name.toLowerCase().includes(keyword) || actingKjStaff.position.toLowerCase().includes(keyword));
+
+    if (!keyword || matchKj || matchActingKj) {
+        html += `
+        <div class="tree-group" style="border-left: 4px solid var(--accent-blue);">
+            <div class="section-title" style="margin-top:0;"><i class="fa fa-user-tie" style="color:#004b93;"></i> Head of Department</div>
+            <div class="tree-wrapper">
+                ${kjStaff ? staffCardHtml(kjStaff) : (actingKjStaff ? staffCardHtml(actingKjStaff, true, 'kj', 'kj') : emptyCardHtml("HEAD OF DEPARTMENT", "kj", "kj"))}
+            </div>
+        </div>`;
+    }
+
+    sectionData.forEach(sec => {
+        let secAssignments = staffSectionAssignments.filter(a => a.section_id === sec.id);
+        
+        let ksAssignment = secAssignments.find(a => {
+            let s = staffData.find(x => x.id === a.staff_id);
+            let pos = s?.position?.toUpperCase() || "";
+            return (pos === "HEAD OF SECTION" || pos === "KETUA SEKSYEN") && (!a.is_acting || a.is_acting === 'false' || a.is_acting === false);
+        });
+        let ksStaff = ksAssignment ? staffData.find(x => x.id === ksAssignment.staff_id) : null;
+
+        let actingKsAssignment = secAssignments.find(a => a.is_acting === true || a.is_acting === 'true');
+        let actingKsStaff = actingKsAssignment ? staffData.find(x => x.id === actingKsAssignment.staff_id) : null;
+
+        let otherSecStaffIds = secAssignments.filter(a => {
+            let isActing = a.is_acting === true || a.is_acting === 'true';
+            return !isActing && a.staff_id !== ksStaff?.id;
+        }).map(a => a.staff_id);
+
+        let otherSecStaff = staffData.filter(s => {
+            let pos = s.position?.toUpperCase() || "";
+            return otherSecStaffIds.includes(s.id) && 
+                pos !== "HEAD OF DEPARTMENT" && pos !== "KETUA JABATAN" &&
+                (s.name.toLowerCase().includes(keyword) || s.position.toLowerCase().includes(keyword));
+        }).sort(sortByHierarki);
+
+        let unitBlocks = "";
+        let sectionHasMatch = false;
+        let unitsInSection = unitData.filter(u => u.section_id === sec.id);
+        
+        unitsInSection.forEach(u => {
+            let unitAssignments = staffUnitAssignments.filter(a => a.unit_id === u.id);
+            
+            let eksekutifAssignment = unitAssignments.find(a => {
+                let s = staffData.find(x => x.id === a.staff_id);
+                let pos = s?.position?.toUpperCase() || "";
+                return (pos.includes("EXECUTIVE") || pos.includes("EKSEKUTIF")) && (!a.is_acting || a.is_acting === false || a.is_acting === 'false');
+            });
+            let eksekutifUnit = eksekutifAssignment ? staffData.find(x => x.id === eksekutifAssignment.staff_id) : null;
+
+            let actingUnitAssignment = unitAssignments.find(a => a.is_acting === true || a.is_acting === 'true');
+            let actingUnitStaff = actingUnitAssignment ? staffData.find(x => x.id === actingUnitAssignment.staff_id) : null;
+
+            let otherUnitStaffIds = unitAssignments.filter(a => {
+                let isActing = a.is_acting === true || a.is_acting === 'true';
+                return !isActing && a.staff_id !== eksekutifUnit?.id;
+            }).map(a => a.staff_id);
+
+            let otherUnitStaff = staffData.filter(s => 
+                otherUnitStaffIds.includes(s.id) && 
+                (s.name.toLowerCase().includes(keyword) || s.position.toLowerCase().includes(keyword))
+            ).sort(sortByHierarki);
+
+            let matchKsInUnit = eksekutifUnit && (eksekutifUnit.name.toLowerCase().includes(keyword) || eksekutifUnit.position.toLowerCase().includes(keyword));
+            
+            if (!keyword || matchKsInUnit || otherUnitStaff.length > 0 || actingUnitStaff) {
+                sectionHasMatch = true;
+                
+                unitBlocks += `
+                <div class="unit-container">
+                    <div class="unit-title"><i class="fa fa-sitemap"></i> ${u.unit_name}</div>
+                    <div class="tree-wrapper">`;
+                
+                if (eksekutifUnit) {
+                    unitBlocks += staffCardHtml(eksekutifUnit);
+                } else if (actingUnitStaff) {
+                    unitBlocks += staffCardHtml(actingUnitStaff, true, 'unit', u.id);
+                } else {
+                    unitBlocks += emptyCardHtml("UNIT EXECUTIVE", "unit", u.id);
+                }
+
+                unitBlocks += otherUnitStaff.map(s => staffCardHtml(s, false)).join("") + `
+                    </div>
+                </div>`;
+            }
         });
 
-        const result = await res.json();
+        let matchKs = ksStaff && (ksStaff.name.toLowerCase().includes(keyword) || ksStaff.position.toLowerCase().includes(keyword));
+        
+        if (!keyword || matchKs || otherSecStaff.length > 0 || sectionHasMatch || actingKsStaff) {
+            html += `
+            <div class="tree-group">
+                <div class="section-title"><i class="fa fa-building"></i> ${sec.section_name}</div>
+                <div class="section-container">`;
+            
+            let hasHighLevelStaff = otherSecStaff.some(s => {
+                let pos = s.position?.toUpperCase() || "";
+                return pos.includes("SENIOR EXECUTIVE") || pos.includes("EKSEKUTIF KANAN") || pos.includes("EXECUTIVE") || pos.includes("EKSEKUTIF");
+            });
 
-        if(!res.ok || !result.success || !result.staff){
-            alert(result.error || "Employee ID atau Password tidak sah.");
-            return;
+            if (ksStaff) {
+                html += `<div class="tree-wrapper">${staffCardHtml(ksStaff)}</div>`;
+            } else if (actingKsStaff) {
+                html += `<div class="tree-wrapper">${staffCardHtml(actingKsStaff, true, 'section', sec.id)}</div>`;
+            } else if (hasHighLevelStaff || (!ksStaff && otherSecStaff.length === 0 && unitsInSection.length > 0)) {
+                html += `<div class="tree-wrapper">${emptyCardHtml("HEAD OF SECTION", "section", sec.id)}</div>`;
+            }
+
+            if (otherSecStaff.length > 0) {
+                html += `<div class="tree-wrapper" style="margin-top: 12px;">
+                    ${otherSecStaff.map(s => staffCardHtml(s, false)).join("")}
+                </div>`;
+            }
+
+            html += `${unitBlocks}
+                </div>
+            </div>`;
+        }
+    });
+
+    let assignedIds = new Set([
+        ...staffSectionAssignments.map(a => a.staff_id),
+        ...staffUnitAssignments.map(a => a.staff_id),
+        ...(kjStaff ? [kjStaff.id] : [])
+    ]);
+
+    let unassigned = staffData.filter(s => !assignedIds.has(s.id) && (s.name.toLowerCase().includes(keyword) || s.position.toLowerCase().includes(keyword))).sort(sortByHierarki);
+    
+    if (unassigned.length) {
+        html += `
+        <div class="tree-group" style="border-left: 4px solid var(--text-muted);">
+            <div class="section-title"><i class="fa fa-circle-question"></i> Unassigned (No Hierarchy Assigned)</div>
+            <div class="tree-wrapper">
+                ${unassigned.map(s => staffCardHtml(s, false)).join("")}
+            </div>
+        </div>`;
+    }
+
+    if (!html) {
+        html = `<div class="empty-state">No records found</div>`;
+    }
+
+    document.getElementById("staffList").innerHTML = html;
+}
+
+function openActingModal(type, targetId, positionName) {
+    currentActingType = type;
+    currentActingTargetId = targetId;
+    document.getElementById("actingTargetLabel").innerText = `Select existing staff to act for position: ${positionName}`;
+    
+    let html = "";
+    if (staffData.length === 0) {
+        html = "<p style='text-align:center;color:var(--text-muted);font-size:13px;'>No existing staff found in system.</p>";
+    } else {
+        staffData.forEach(s => {
+            html += `
+            <div class="modal-option-label" onclick="assignActingStaff('${s.id}')">
+                <i class="fa fa-user" style="color:var(--accent-blue);margin-right:6px;"></i>
+                <div style="flex-grow:1;">
+                    <div style="font-weight:600; font-size:13px;">${s.name}</div>
+                    <div style="font-size:11px; color:var(--text-muted);">${s.position}</div>
+                </div>
+                <i class="fa fa-chevron-right" style="color:#c7c7cc;font-size:12px;"></i>
+            </div>`;
+        });
+    }
+    document.getElementById("actingStaffList").innerHTML = html;
+    document.getElementById("actingModal").style.display = "flex";
+}
+
+function closeActingModal() {
+    document.getElementById("actingModal").style.display = "none";
+    currentActingType = null;
+    currentActingTargetId = null;
+}
+
+async function assignActingStaff(staffId) {
+    let url = "";
+    let body = {};
+    let cleanTargetId = isNaN(currentActingTargetId) ? currentActingTargetId : Number(currentActingTargetId);
+
+    if (currentActingType === 'kj') {
+        let res = await fetch(`${API_URL}/department-head`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ staff_id: staffId, active: true, is_acting: true })
+        });
+        if (res.ok) {
+            closeActingModal();
+            await loadDeptHead();
+            renderStaff();
+        } else {
+            let errRes = await res.json().catch(() => ({}));
+            showAlert("System Error", "Failed to appoint acting Head of Department: " + (errRes.message || "Database error."));
+        }
+        return;
+    }
+
+    if (currentActingType === 'section') {
+        url = `${API_URL}/staff-section-assignment`;
+        body = { staff_id: staffId, section_id: cleanTargetId, is_acting: true };
+    } else if (currentActingType === 'unit') {
+        url = `${API_URL}/staff-unit-assignment`;
+        body = { staff_id: staffId, unit_id: cleanTargetId, is_acting: true };
+    } else {
+        closeActingModal();
+        return;
+    }
+
+    let res = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body)
+    });
+
+    if (res.ok) {
+        closeActingModal();
+        await loadAssignments();
+        renderStaff();
+    } else {
+        let errRes = await res.json().catch(() => ({}));
+        showAlert("System Error", "Failed to appoint acting staff: " + (errRes.message || "Database error."));
+    }
+}
+
+async function removeActing(type, targetId, staffId, event) {
+    if (event) event.stopPropagation();
+    
+    showConfirm("Remove Acting Status", "Are you sure you want to remove the acting status for this position?", async () => {
+        let cleanTargetId = isNaN(targetId) ? targetId : Number(targetId);
+        let url = "";
+        
+        if (type === 'section') {
+            url = `${API_URL}/staff-section-assignment-acting?staff_id=${staffId}&section_id=${cleanTargetId}`;
+        } else if (type === 'unit') {
+            url = `${API_URL}/staff-unit-assignment-acting?staff_id=${staffId}&unit_id=${cleanTargetId}`;
+        } else if (type === 'kj') {
+            url = `${API_URL}/department-head-acting?staff_id=${staffId}`;
         }
 
-        const staffData = result.staff;
+        try {
+            let res = await fetch(url, { method: "DELETE" });
+            if (res.ok) {
+                if (type === 'kj') { await loadDeptHead(); } else { await loadAssignments(); }
+                renderStaff();
+            } else {
+                let errorData = await res.json().catch(() => ({}));
+                showAlert("Error", `Failed to remove acting status: ${errorData.message || res.statusText}`);
+            }
+        } catch (err) {
+            showAlert("System Error", "Failed to connect to the database server.");
+        }
+    });
+}
 
-        localStorage.setItem("loggedIn","true");
-        localStorage.setItem("staff_id",staffData.id);
-        localStorage.setItem("userId",staffData.employee_id);
-        localStorage.setItem("employee_id",staffData.employee_id);
-        localStorage.setItem("staff_name",staffData.name);
-        localStorage.setItem("role",staffData.position || "");
-        localStorage.setItem("avatar_url",staffData.avatar_url || "");
-        localStorage.setItem("phone_no",staffData.phone_no || "");
-        localStorage.setItem("initial",staffData.initial || "");
-        localStorage.setItem("signature",staffData.signature || "");
-        localStorage.setItem("me_user",staffData.employee_id);
-        localStorage.setItem("lastActivity",Date.now());
+async function openAssignModal(staffId) {
+    currentTargetStaff = staffData.find(x => x.id === Number(staffId) || x.id === staffId);
+    if (!currentTargetStaff) return;
+    
+    document.getElementById("assignModalTitle").innerText = `Assign Placement: ${currentTargetStaff.name}`;
+    
+    let assignedSecs = staffSectionAssignments.filter(a => a.staff_id === currentTargetStaff.id && (!a.is_acting || a.is_acting === 'false')).map(a => a.section_id);
+    let assignedUnits = staffUnitAssignments.filter(a => a.staff_id === currentTargetStaff.id && (!a.is_acting || a.is_acting === 'false')).map(a => a.unit_id);
 
-        window.location.href = getRedirectTarget();
+    selectedSections = new Set(assignedSecs.map(Number));
+    selectedUnits = new Set(assignedUnits.map(Number));
 
-    }catch(err){
-        console.error(err);
-        alert("Server Error");
+    renderAssignOptions();
+    document.getElementById("assignModal").style.display = "flex";
+}
+
+function renderAssignOptions() {
+    let posUpper = currentTargetStaff.position?.toUpperCase() || "";
+    let isKetuaSeksyen = posUpper === "HEAD OF SECTION" || posUpper === "KETUA SEKSYEN";
+    let html = `<div class="modal-group-title">Select Placement</div>`;
+    
+    sectionData.forEach(sec => {
+        let unitsInSection = unitData.filter(u => u.section_id === sec.id);
+        let hasUnits = unitsInSection.length > 0;
+        
+        html += `<div style="margin-bottom: 12px; background: #f2f2f7; border-radius: 10px; padding: 4px; overflow: hidden;">`;
+        
+        if (isKetuaSeksyen) {
+            let isSecChecked = selectedSections.has(Number(sec.id)) ? "checked" : "";
+            html += `
+            <label class="modal-option-label" style="margin-bottom: 0; background: transparent; width: 100%;">
+                <input type="checkbox" class="sectionCheck" value="${sec.id}" ${isSecChecked} onchange="toggleSectionSelection(this, ${sec.id})">
+                <span style="font-weight: 600; color: var(--accent-blue);"><i class="fa fa-building"></i> ${sec.section_name}</span>
+            </label>`;
+        } else {
+            if (!hasUnits) {
+                let isSecChecked = selectedSections.has(Number(sec.id)) ? "checked" : "";
+                html += `
+                <label class="modal-option-label" style="margin-bottom: 0; background: transparent; width: 100%;">
+                    <input type="checkbox" class="sectionCheck" value="${sec.id}" ${isSecChecked} onchange="toggleSectionSelection(this, ${sec.id})">
+                    <span style="font-weight: 600;"><i class="fa fa-building"></i> ${sec.section_name} <small style="color:var(--text-muted); font-weight:normal;">(Direct to Section)</small></span>
+                </label>`;
+            } else {
+                let isOpen = selectedSections.has(Number(sec.id));
+                html += `
+                <div onclick="toggleSectionDropdown(${sec.id})" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; cursor: pointer; user-select: none;">
+                    <span style="font-weight: 600; color: var(--text-main);"><i class="fa fa-folder-open" style="color: var(--accent-orange); margin-right: 6px;"></i> ${sec.section_name}</span>
+                    <i class="fa ${isOpen ? 'fa-chevron-up' : 'fa-chevron-down'}" style="color: var(--text-muted); font-size: 12px;"></i>
+                </div>`;
+                
+                if (isOpen) {
+                    html += `<div class="unit-sub-group" style="padding: 4px 12px 10px 16px; border-top: 1px solid rgba(0,0,0,0.05); background: rgba(255,255,255,0.5);">`;
+                    unitsInSection.forEach(u => {
+                        let isUnitChecked = selectedUnits.has(Number(u.id)) ? "checked" : "";
+                        html += `
+                        <label class="modal-option-label" style="padding: 10px 12px; margin-bottom: 6px; background: #ffffff; font-size: 13px; border: 1px solid rgba(0,0,0,0.03);">
+                            <input type="checkbox" class="unitCheck" value="${u.id}" ${isUnitChecked} onchange="toggleUnitSelection(this, ${u.id})">
+                            <span><i class="fa fa-sitemap" style="color: var(--accent-blue); margin-right:4px;"></i> ${u.unit_name}</span>
+                        </label>`;
+                    });
+                    html += `</div>`;
+                }
+            }
+        }
+        html += `</div>`;
+    });
+
+    document.getElementById("assignOptionsList").innerHTML = html;
+}
+
+function toggleSectionDropdown(sectionId) {
+    if (selectedSections.has(Number(sectionId))) {
+        selectedSections.delete(Number(sectionId));
+    } else {
+        selectedSections.add(Number(sectionId));
+    }
+    renderAssignOptions();
+}
+
+function toggleSectionSelection(checkbox, sectionId) {
+    if (checkbox.checked) {
+        selectedSections.add(Number(sectionId));
+    } else {
+        selectedSections.delete(Number(sectionId));
     }
 }
 
-function forgotPassword() {
-    alert("Please contact administrator to change password");
+function toggleUnitSelection(checkbox, unitId) {
+    if (checkbox.checked) {
+        selectedUnits.add(Number(unitId));
+    } else {
+        selectedUnits.delete(Number(unitId));
+    }
 }
 
-window.addEventListener("load", () => {
-    const savedUser = localStorage.getItem("me_user");
-    if(savedUser){
-        document.getElementById("username").value = savedUser;
-    }
+async function saveAssignment() {
+    if (!currentTargetStaff) return;
+    let id = currentTargetStaff.id;
+    let posUpper = currentTargetStaff.position?.toUpperCase() || "";
+    let isKetuaSeksyen = posUpper === "HEAD OF SECTION" || posUpper === "KETUA SEKSYEN";
 
-    const fish = document.querySelector(".fish");
-    const logo = document.querySelector(".logo");
-    const title = document.querySelector("h1");
-    const ripples = document.querySelectorAll(".logo-ripple");
+    await fetch(`${API_URL}/staff-section-assignment/${id}`, { method: "DELETE" });
+    await fetch(`${API_URL}/staff-unit-assignment/${id}`, { method: "DELETE" });
 
-    function startAnimation(){
-        fish.classList.add("start");
-        logo.classList.add("start");
-        title.classList.add("start");
-        ripples.forEach(r => {
-            r.classList.add("start");
+    let finalSections = Array.from(selectedSections);
+
+    if (!isKetuaSeksyen) {
+        finalSections = finalSections.filter(secId => {
+            let hasUnits = unitData.some(u => u.section_id === secId);
+            return !hasUnits; 
         });
-        setTimeout(()=>{
-            document.getElementById("loginBox").classList.add("show");
-        },3200);
     }
 
-    if(fish.complete){
-        startAnimation();
+    let checkedSections = finalSections.map(secId => ({ staff_id: id, section_id: secId, is_acting: false }));
+    if (checkedSections.length) {
+        await fetch(`${API_URL}/staff-section-assignment`, { method: "POST", headers, body: JSON.stringify(checkedSections) });
+    }
+
+    let checkedUnits = Array.from(selectedUnits).map(unitId => ({ staff_id: id, unit_id: unitId, is_acting: false }));
+    if (checkedUnits.length) {
+        await fetch(`${API_URL}/staff-unit-assignment`, { method: "POST", headers, body: JSON.stringify(checkedUnits) });
+    }
+
+    closeAssignModal();
+    await loadAssignments();
+    renderStaff();
+}
+
+function closeAssignModal() { 
+    document.getElementById("assignModal").style.display = "none"; 
+    currentTargetStaff = null;
+    selectedSections.clear();
+    selectedUnits.clear();
+}
+
+function populatePositionDropdown(selectedValue = "") {
+    let selectEl = document.getElementById("fPosition");
+    let normalized = (selectedValue || "").trim().toUpperCase();
+    let matchFound = Object.keys(hierarki).some(pos => pos.toUpperCase() === normalized);
+
+    let html = `<option value="" disabled ${(!normalized || !matchFound) ? 'selected' : ''}>-- Select Position --</option>`;
+
+    Object.keys(hierarki).forEach(pos => {
+        let selected = pos.toUpperCase() === normalized ? "selected" : "";
+        html += `<option value="${pos}" ${selected}>${pos}</option>`;
+    });
+
+    selectEl.innerHTML = html;
+
+    if (normalized && !matchFound) {
+        showAlert(
+            "Position Mismatch",
+            `The staff's original position ("${selectedValue}") does not match any preset option in the list. Please select the correct position before saving, otherwise the old position record may be lost.`
+        );
+    }
+}
+
+function addNewPositionOption() {
+    let newPos = prompt("Enter new position title:");
+    if (!newPos) return;
+    
+    newPos = newPos.trim().toUpperCase();
+    
+    if (!hierarki[newPos]) {
+        hierarki[newPos] = Object.keys(hierarki).length + 1; 
+    }
+    
+    populatePositionDropdown(newPos);
+}
+
+function addStaff(existing = null) {
+    editingStaff = existing;
+    document.getElementById("modalTitle").innerText = existing ? "Edit Staff" : "New Staff";
+    document.getElementById("fName").value = existing?.name || "";
+    document.getElementById("fEmployee").value = existing?.employee_id || "";
+    document.getElementById("fPhone").value = existing?.phone_no || "";
+    document.getElementById("fEmail").value = existing?.email || "";
+    
+    populatePositionDropdown(existing?.position || "");
+
+    document.getElementById('fSignatureFile').value = '';
+    if (existing?.signature) {
+        currentSignatureBase64 = existing.signature;
+        showSignaturePreview(existing.signature);
     } else {
-        fish.onload = startAnimation;
+        clearSignaturePreview();
     }
-});
 
-const togglePassword = document.getElementById("togglePassword");
-const passwordInput = document.getElementById("password");
-const icon = togglePassword.querySelector("i");
-
-togglePassword.addEventListener("click", () => {
-    if(passwordInput.type === "password"){
-        passwordInput.type = "text";
-        icon.classList.remove("fa-eye");
-        icon.classList.add("fa-eye-slash");
+    document.getElementById('fInitialFile').value = '';
+    if (existing?.initial) {
+        currentInitialBase64 = existing.initial;
+        showInitialPreview(existing.initial);
     } else {
-        passwordInput.type = "password";
-        icon.classList.remove("fa-eye-slash");
-        icon.classList.add("fa-eye");
+        clearInitialPreview();
     }
-});
 
-function goBack(){
-    window.location.href = "index.html";
+    document.getElementById("staffModal").style.display = "flex";
+}
+
+function editStaff(id) {
+    let staff = staffData.find(x => x.id === Number(id) || x.id === id);
+    if (staff) addStaff(staff);
+}
+
+function closeModal() { 
+    document.getElementById("staffModal").style.display = "none"; 
+}
+
+function handleSignatureFileChange(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (file.type !== 'image/jpeg' && file.type !== 'image/png') { showAlert('Invalid File', 'Please select JPG or PNG files only.'); input.value = ''; return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        currentSignatureBase64 = e.target.result;
+        showSignaturePreview(currentSignatureBase64);
+    };
+    reader.readAsDataURL(file);
+}
+
+function showSignaturePreview(base64) {
+    document.getElementById('signatureEmptyState').style.display = 'none';
+    const wrap = document.getElementById('signaturePreviewWrap');
+    wrap.style.display = 'flex';
+    document.getElementById('signaturePreviewImg').src = base64;
+}
+
+function clearSignaturePreview() {
+    currentSignatureBase64 = null;
+    document.getElementById('fSignatureFile').value = '';
+    document.getElementById('signatureEmptyState').style.display = 'block';
+    document.getElementById('signaturePreviewWrap').style.display = 'none';
+    document.getElementById('signaturePreviewImg').src = '';
+}
+
+function handleInitialFileChange(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (file.type !== 'image/jpeg' && file.type !== 'image/png') { showAlert('Invalid File', 'Please select JPG or PNG files only.'); input.value = ''; return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        currentInitialBase64 = e.target.result;
+        showInitialPreview(currentInitialBase64);
+    };
+    reader.readAsDataURL(file);
+}
+
+function showInitialPreview(base64) {
+    document.getElementById('initialEmptyState').style.display = 'none';
+    const wrap = document.getElementById('initialPreviewWrap');
+    wrap.style.display = 'flex';
+    document.getElementById('initialPreviewImg').src = base64;
+}
+
+function clearInitialPreview() {
+    currentInitialBase64 = null;
+    document.getElementById('fInitialFile').value = '';
+    document.getElementById('initialEmptyState').style.display = 'block';
+    document.getElementById('initialPreviewWrap').style.display = 'none';
+    document.getElementById('initialPreviewImg').src = '';
+}
+
+async function saveStaff() {
+    let fName = document.getElementById("fName");
+    let fEmail = document.getElementById("fEmail");
+    let fPhone = document.getElementById("fPhone");
+    let fEmployee = document.getElementById("fEmployee");
+    let fPosition = document.getElementById("fPosition");
+
+    let trimmedName = fName.value ? fName.value.trim() : "";
+    let trimmedEmail = fEmail.value ? fEmail.value.trim() : "";
+    let trimmedPhone = fPhone.value ? fPhone.value.trim() : "";
+    let trimmedEmployee = fEmployee.value ? fEmployee.value.trim() : "";
+
+    let emailValue = trimmedEmail !== "" ? trimmedEmail : null;
+    let phoneValue = trimmedPhone !== "" ? trimmedPhone : null;
+    let employeeValue = trimmedEmployee !== "" ? trimmedEmployee : null;
+
+    let selectedPosition = fPosition.value;
+
+    let body = { 
+        name: trimmedName, 
+        position: selectedPosition, 
+        employee_id: employeeValue, 
+        phone_no: phoneValue, 
+        email: emailValue,
+        signature: currentSignatureBase64,
+        initial: currentInitialBase64
+    };
+    
+    if (!body.name || !body.position) { 
+        showAlert("Incomplete Information", "Name and Position are required fields."); 
+        return; 
+    }
+
+    let res;
+    let treatAsNew = !editingStaff;
+    let savedStaffId = null;
+
+    if (treatAsNew) {
+        res = await fetch(`${API_URL}/staff`, { method: "POST", headers, body: JSON.stringify(body) });
+        if (res && res.ok) {
+            const resultData = await res.json().catch(() => ({}));
+            savedStaffId = resultData.id;
+        }
+    } else {
+        savedStaffId = editingStaff.id;
+        res = await fetch(`${API_URL}/staff/${editingStaff.id}`, { 
+            method: "PATCH", 
+            headers, 
+            body: JSON.stringify(body) 
+        });
+    }
+
+    if (!res || !res.ok) { 
+        let dbErr = res ? await res.json().catch(() => ({})) : {};
+        showAlert("Save Error", "Failed to save record to database: " + (dbErr.error || "Unknown error.")); 
+        return; 
+    }
+
+    let posUpper = selectedPosition ? selectedPosition.toUpperCase() : "";
+    if (posUpper === "HEAD OF DEPARTMENT" || posUpper === "KETUA JABATAN") {
+        await fetch(`${API_URL}/department-head`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ 
+                staff_id: savedStaffId, 
+                active: true 
+            })
+        });
+    } else {
+        await fetch(`${API_URL}/department-head/${savedStaffId}`, {
+            method: "DELETE"
+        });
+    }
+
+    closeModal();
+    await loadAssignments(); 
+    await loadStaff();
+}
+
+async function deleteStaff(id, name) {
+    showConfirm("Delete Record", `Are you sure you want to delete ${name}?`, async () => {
+        try {
+            let res = await fetch(`${API_URL}/staff/${id}`, { 
+                method: "DELETE" 
+            });
+
+            if (res.ok) {
+                if (typeof loadAssignments === "function") await loadAssignments();
+                if (typeof loadDeptHead === "function") await loadDeptHead();
+                if (typeof loadStaff === "function") await loadStaff();
+                
+                showAlert("Success", "Staff record deleted successfully.");
+            } else {
+                let errData = await res.json().catch(() => ({}));
+                showAlert("Delete Error", `Failed to delete staff: ${errData.error || res.statusText}`);
+            }
+        } catch (err) {
+            console.error("Delete staff error:", err);
+            showAlert("System Error", "Connection error while deleting record.");
+        }
+    });
 }
 </script>
+
 </body>
 </html>
