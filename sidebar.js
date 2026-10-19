@@ -14,7 +14,7 @@ class AppSidebar extends HTMLElement {
             <div class="sidebar" id="sidebar">
 
                 <div class="sidebar-profile">
-                    <div class="profile-img-wrapper">
+                    <div class="profile-img-wrapper" id="profileBtn" title="Edit profile">
                         ${avatarHtml}
                     </div>
                     <div class="profile-name">${staffName.toUpperCase()}</div>
@@ -72,6 +72,19 @@ class AppSidebar extends HTMLElement {
                     </div>
                 </div>
             </div>
+
+            <div class="logout-modal" id="profileModal">
+                <div class="logout-box">
+                    <div class="profile-box-avatar">${avatarHtml}</div>
+                    <h3>${staffName.toUpperCase()}</h3>
+                    <p class="profile-box-role">${staffRole.toUpperCase()}</p>
+                    <p>Update staff &amp; signature data</p>
+                    <div class="logout-actions">
+                        <button class="cancel-btn" id="cancelProfile">Tutup</button>
+                        <button class="edit-btn" id="editProfile">Edit Staff &amp; Signature</button>
+                    </div>
+                </div>
+            </div>
         `;
 
         this.cacheDOM();
@@ -88,13 +101,13 @@ class AppSidebar extends HTMLElement {
 
         this.logoutBtn = this.querySelector("#logoutBtn");
         this.logoutModal = this.querySelector("#logoutModal");
+        this.profileBtn = this.querySelector("#profileBtn");
+        this.profileModal = this.querySelector("#profileModal");
 
-        // Dashboard Elements
         this.dashboardBtn = this.querySelector("#dashboardBtn");
         this.dashboardMenu = this.querySelector("#dashboardMenu");
         this.dashArrow = this.querySelector("#dashboardBtn .arrow");
 
-        // Quotation Elements
         this.quotationBtn = this.querySelector("#quotationBtn");
         this.quotationMenu = this.querySelector("#quotationMenu");
         this.quoteArrow = this.querySelector("#quotationBtn .arrow");
@@ -107,30 +120,35 @@ class AppSidebar extends HTMLElement {
         this.btn.addEventListener("click", () => this.toggle());
         this.overlay.addEventListener("click", () => this.close());
 
-        // Toggle Dashboard Menu
         this.dashboardBtn.addEventListener("click", (e) => {
             e.preventDefault();
             const isOpen = this.dashboardMenu.classList.toggle("open");
             this.dashArrow.innerText = isOpen ? "▲" : "▼";
         });
 
-        // Toggle Quotation Menu
         this.quotationBtn.addEventListener("click", (e) => {
             e.preventDefault();
             const isOpen = this.quotationMenu.classList.toggle("open");
             this.quoteArrow.innerText = isOpen ? "▲" : "▼";
         });
 
-        // Logout
         this.logoutBtn.addEventListener("click", (e) => {
             e.preventDefault();
             this.logoutModal.classList.add("active");
         });
 
+        this.profileBtn.addEventListener("click", () => {
+            this.profileModal.classList.add("active");
+        });
+        this.querySelector("#cancelProfile").onclick = () => this.profileModal.classList.remove("active");
+        this.querySelector("#editProfile").onclick = () => this.goEditProfile();
+        this.profileModal.addEventListener("click", (e) => {
+            if (e.target === this.profileModal) this.profileModal.classList.remove("active");
+        });
+
         this.querySelector("#cancelLogout").onclick = () => this.logoutModal.classList.remove("active");
         this.querySelector("#confirmLogout").onclick = () => this.logout();
 
-        // Section Links Click
         this.subLinks.forEach(link => {
             link.addEventListener("click", (e) => {
                 e.preventDefault();
@@ -152,7 +170,6 @@ class AppSidebar extends HTMLElement {
                 if (match) a.dataset.sectionId = match.id;
             });
 
-            // Kemas kini semula status aktif selepas sectionId dimasukkan
             this.setActiveMenu();
         } catch (e) { 
             console.error("Error loading dashboard links:", e); 
@@ -164,10 +181,8 @@ class AppSidebar extends HTMLElement {
         const urlParams = new URLSearchParams(window.location.search);
         const currentSectionId = urlParams.get("section");
 
-        // Bersihkan kelas active terdahulu
         this.menuLinks.forEach(link => link.classList.remove("active"));
 
-        // 1. Semakan untuk Submenu Dashboard-Contracts
         if (fullPath === "dashboard-contract.html") {
             this.dashboardMenu.classList.add("open");
             this.dashArrow.innerText = "▲";
@@ -181,14 +196,12 @@ class AppSidebar extends HTMLElement {
             }
         }
 
-        // 2. Semakan untuk Submenu Dashboard-Approvals
         const quotePages = ['app-tech.html', 'app-exec.html', 'app-sect.html', 'app-dept.html'];
         if (quotePages.includes(fullPath)) {
             this.quotationMenu.classList.add("open");
             this.quoteArrow.innerText = "▲";
         }
 
-        // 3. Highlight pautan halaman biasa
         this.menuLinks.forEach(link => {
             const href = link.getAttribute("href");
             if (href && href !== "#" && href === fullPath) {
@@ -207,6 +220,15 @@ class AppSidebar extends HTMLElement {
         this.sidebar.classList.remove("active");
         this.overlay.classList.remove("active");
         this.checkbox.checked = false;
+    }
+
+    goEditProfile() {
+        const staffId = localStorage.getItem("staff_id");
+        if (!staffId) {
+            alert("ID staff tidak dijumpai. Sila login semula.");
+            return;
+        }
+        window.location.href = `userdirectory.html?edit=${staffId}`;
     }
 
     logout() {
