@@ -2396,11 +2396,16 @@
                             const staffRows = await apiQuery('staff', `id=eq.${encodeURIComponent(staffId)}&select=initial`);
                             hasInitial = !!(staffRows && staffRows[0] && String(staffRows[0].initial || '').trim());
                         } catch(initErr) {
-                            console.error('Gagal semak initial:', initErr);
+                            console.error('Error check for initial:', initErr);
                         }
                     }
                     if(!hasInitial){
-                        showAppToast('Submit disekat: initial anda belum wujud. Sila muat naik initial dahulu.', 'error');
+                        const sb = document.querySelector('app-sidebar');
+                        if(sb && sb.promptMissing){
+                            sb.promptMissing('initial');
+                        } else {
+                            showAppToast('Submit blocked: Your initial does not exist yet. Please upload your initial first.', 'error');
+                        }
                         return;
                     }
                 }
