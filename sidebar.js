@@ -112,8 +112,8 @@ class AppSidebar extends HTMLElement {
             <div class="logout-modal" id="sigWarnModal">
                 <div class="logout-box notice-box">
                     <div class="notice-icon warning"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                    <h3>Signature Not Found</h3>
-                    <p>You need a signature before you can approve. Upload your signature now?</p>
+                    <h3 id="sigWarnTitle">Signature Not Found</h3>
+                    <p id="sigWarnMsg">You need a signature before you can approve. Upload your signature now?</p>
                     <div class="logout-actions">
                         <button class="cancel-btn" id="sigWarnNo">Later</button>
                         <button class="edit-btn" id="sigWarnYes">Upload Now</button>
@@ -343,6 +343,15 @@ class AppSidebar extends HTMLElement {
     }
 
     promptSignature() {
+        this.promptMissing("signature");
+    }
+
+    promptMissing(type) {
+        const isInitial = type === "initial";
+        this.querySelector("#sigWarnTitle").textContent = isInitial ? "Initial Not Found" : "Signature Not Found";
+        this.querySelector("#sigWarnMsg").textContent = isInitial
+            ? "You need an initial before you can submit. Upload your initial now?"
+            : "You need a signature before you can approve. Upload your signature now?";
         this.sigWarnModal.classList.add("active");
     }
 
