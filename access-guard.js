@@ -127,7 +127,7 @@
         } catch (e) { console.error('Access authorisation failed:', e); }
         document.documentElement.style.visibility = '';
         await showPopup('You do not have access to this page.');
-        window.location.replace('dashboard-contract.html?section=SEKSYEN+SELENGGARA');
+        window.location.replace('dashboard-contract.html?section=1');
         return false;
     }
 
