@@ -1,5 +1,5 @@
 class AppSidebar extends HTMLElement {
-    connectedCallback() { 
+    connectedCallback() {
         const staffName = localStorage.getItem("staff_name") || "USER";
         const staffRole = localStorage.getItem("role") || "STAFF";
         const staffAvatar = localStorage.getItem("avatar_url") || "";
@@ -14,7 +14,7 @@ class AppSidebar extends HTMLElement {
             <div class="sidebar" id="sidebar">
 
                 <div class="sidebar-profile">
-                    <div class="profile-img-wrapper" id="profileBtn" title="Edit profile">
+                    <div class="profile-img-wrapper" id="profileBtn" title="Edit profil">
                         ${avatarHtml}
                     </div>
                     <div class="profile-name">${staffName.toUpperCase()}</div>
@@ -32,7 +32,7 @@ class AppSidebar extends HTMLElement {
                         <a href="#" data-section="Seksyen Pematuhan Peraturan" class="menu-link">Seksyen Pematuhan Peraturan</a>
                         <a href="#" data-section="Seksyen Pengurusan Aset & Kewangan" class="menu-link">Seksyen Pengurusan Aset & Kewangan</a>
                         <a href="#" data-section="Seksyen Projek & Perkhidmatan Teknikal" class="menu-link">Seksyen Projek & Perkhidmatan Teknikal</a>
-                    </div> 
+                    </div>
                 </div>
 
                 <div class="menu-group">
@@ -74,14 +74,37 @@ class AppSidebar extends HTMLElement {
             </div>
 
             <div class="logout-modal" id="profileModal">
-                <div class="logout-box">
-                    <div class="profile-box-avatar">${avatarHtml}</div>
-                    <h3>${staffName.toUpperCase()}</h3>
-                    <p class="profile-box-role">${staffRole.toUpperCase()}</p>
-                    <p>Update staff &amp; signature data</p>
+                <div class="logout-box profile-edit-box">
+                    <h3>Edit Profil Staff</h3>
+
+                    <input id="peName" class="pe-input" placeholder="Nama staff">
+                    <input id="peEmployee" class="pe-input" placeholder="Employee ID">
+                    <input id="pePhone" class="pe-input" placeholder="No. telefon">
+                    <input id="peEmail" class="pe-input" placeholder="Email">
+
+                    <label class="pe-label">Signature (JPG/PNG)</label>
+                    <div class="pe-drop" id="peSigDrop">
+                        <input type="file" id="peSigFile" accept="image/jpeg,image/png" style="display:none;">
+                        <div id="peSigEmpty"><i class="fa-solid fa-signature"></i>Select signature file</div>
+                        <div class="pe-wrap" id="peSigWrap">
+                            <img id="peSigImg" src="" alt="Signature">
+                            <button type="button" class="pe-remove" id="peSigClear">Remove signature</button>
+                        </div>
+                    </div>
+
+                    <label class="pe-label">Initial (JPG/PNG)</label>
+                    <div class="pe-drop" id="peInitDrop">
+                        <input type="file" id="peInitFile" accept="image/jpeg,image/png" style="display:none;">
+                        <div id="peInitEmpty"><i class="fa-solid fa-pen-fancy"></i>Select initial file</div>
+                        <div class="pe-wrap" id="peInitWrap">
+                            <img id="peInitImg" src="" alt="Initial">
+                            <button type="button" class="pe-remove" id="peInitClear">Remove initial</button>
+                        </div>
+                    </div>
+
                     <div class="logout-actions">
-                        <button class="cancel-btn" id="cancelProfile">Tutup</button>
-                        <button class="edit-btn" id="editProfile">Edit Staff &amp; Signature</button>
+                        <button class="cancel-btn" id="cancelProfile">Cancel</button>
+                        <button class="edit-btn" id="saveProfile">Save</button>
                     </div>
                 </div>
             </div>
@@ -101,6 +124,7 @@ class AppSidebar extends HTMLElement {
 
         this.logoutBtn = this.querySelector("#logoutBtn");
         this.logoutModal = this.querySelector("#logoutModal");
+
         this.profileBtn = this.querySelector("#profileBtn");
         this.profileModal = this.querySelector("#profileModal");
 
@@ -137,17 +161,26 @@ class AppSidebar extends HTMLElement {
             this.logoutModal.classList.add("active");
         });
 
-        this.profileBtn.addEventListener("click", () => {
-            this.profileModal.classList.add("active");
-        });
-        this.querySelector("#cancelProfile").onclick = () => this.profileModal.classList.remove("active");
-        this.querySelector("#editProfile").onclick = () => this.goEditProfile();
-        this.profileModal.addEventListener("click", (e) => {
-            if (e.target === this.profileModal) this.profileModal.classList.remove("active");
-        });
-
         this.querySelector("#cancelLogout").onclick = () => this.logoutModal.classList.remove("active");
         this.querySelector("#confirmLogout").onclick = () => this.logout();
+
+        this.profileBtn.addEventListener("click", () => this.openProfile());
+        this.querySelector("#cancelProfile").onclick = () => this.closeProfile();
+        this.querySelector("#saveProfile").onclick = () => this.saveProfile();
+        this.profileModal.addEventListener("click", (e) => {
+            if (e.target === this.profileModal) this.closeProfile();
+        });
+
+        ["peSig", "peInit"].forEach(p => {
+            const drop = this.querySelector(`#${p}Drop`);
+            const file = this.querySelector(`#${p}File`);
+            drop.addEventListener("click", () => file.click());
+            file.addEventListener("change", () => this.readImage(file, p));
+            this.querySelector(`#${p}Clear`).addEventListener("click", (e) => {
+                e.stopPropagation();
+                this.setImage(p, null);
+            });
+        });
 
         this.subLinks.forEach(link => {
             link.addEventListener("click", (e) => {
@@ -164,15 +197,15 @@ class AppSidebar extends HTMLElement {
             const res = await fetch(`${API_URL}/rest/v1/me_sections?select=id,section_name`);
             if (!res.ok) return;
             const sections = await res.json();
-            
+
             this.subLinks.forEach(a => {
                 const match = sections.find(s => s.section_name === a.dataset.section);
                 if (match) a.dataset.sectionId = match.id;
             });
 
             this.setActiveMenu();
-        } catch (e) { 
-            console.error("Error loading dashboard links:", e); 
+        } catch (e) {
+            console.error("Error loading dashboard links:", e);
         }
     }
 
@@ -222,13 +255,108 @@ class AppSidebar extends HTMLElement {
         this.checkbox.checked = false;
     }
 
-    goEditProfile() {
+    async openProfile() {
         const staffId = localStorage.getItem("staff_id");
         if (!staffId) {
-            alert("ID staff tidak dijumpai. Sila login semula.");
+            alert("ID staff not found. Please relogin.");
             return;
         }
-        window.location.href = `userdirectory.html?edit=${staffId}`;
+
+        this.profileModal.classList.add("active");
+
+        try {
+            const res = await fetch(
+                `${API_URL}/rest/v1/staff?id=eq.${encodeURIComponent(staffId)}&select=id,name,position,employee_id,phone_no,email,signature,initial`
+            );
+            if (!res.ok) throw new Error("Error fetching staff data");
+            const rows = await res.json();
+            const row = rows && rows[0];
+            if (!row) throw new Error("Staff not found");
+
+            this.staffRow = row;
+            this.querySelector("#peName").value = row.name || "";
+            this.querySelector("#peEmployee").value = row.employee_id || "";
+            this.querySelector("#pePhone").value = row.phone_no || "";
+            this.querySelector("#peEmail").value = row.email || "";
+            this.setImage("peSig", row.signature || null);
+            this.setImage("peInit", row.initial || null);
+        } catch (e) {
+            console.error(e);
+            alert("Unable to load staff data. Please try again.");
+            this.closeProfile();
+        }
+    }
+
+    closeProfile() {
+        this.profileModal.classList.remove("active");
+    }
+
+    readImage(input, prefix) {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        if (file.type !== "image/jpeg" && file.type !== "image/png") {
+            alert("Please select JPG or PNG only.");
+            input.value = "";
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => this.setImage(prefix, e.target.result);
+        reader.readAsDataURL(file);
+    }
+
+    setImage(prefix, base64) {
+        if (!this.images) this.images = {};
+        this.images[prefix] = base64;
+        this.querySelector(`#${prefix}Img`).src = base64 || "";
+        this.querySelector(`#${prefix}Empty`).style.display = base64 ? "none" : "block";
+        this.querySelector(`#${prefix}Wrap`).style.display = base64 ? "flex" : "none";
+        if (!base64) this.querySelector(`#${prefix}File`).value = "";
+    }
+
+    async saveProfile() {
+        const row = this.staffRow;
+        if (!row) return;
+
+        const name = this.querySelector("#peName").value.trim();
+        if (!name) {
+            alert("Staff name is compulsory.");
+            return;
+        }
+
+        const val = (id) => this.querySelector(id).value.trim() || null;
+
+        const body = {
+            name,
+            position: row.position,
+            employee_id: val("#peEmployee"),
+            phone_no: val("#pePhone"),
+            email: val("#peEmail"),
+            signature: this.images.peSig || null,
+            initial: this.images.peInit || null
+        };
+
+        try {
+            const res = await fetch(`${API_URL}/staff/${row.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || "Gagal simpan");
+            }
+
+            localStorage.setItem("staff_name", name);
+            this.querySelector(".profile-name").textContent = name.toUpperCase();
+
+            this.closeProfile();
+            const msg = "Staff information saved.";
+            if (window.showAppToast) window.showAppToast(msg, "success");
+            else alert(msg);
+        } catch (e) {
+            console.error(e);
+            alert("Failed save: " + e.message);
+        }
     }
 
     logout() {
