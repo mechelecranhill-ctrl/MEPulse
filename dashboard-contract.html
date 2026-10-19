@@ -373,6 +373,20 @@
         #analysis-panel.flipped .flip-card-inner {
             transform: rotateY(180deg);
         }
+
+        /* Animasi pusingan kecil (subtle peek) sebanyak 2 kali */
+        @keyframes subtlePeek {
+            0% { transform: rotateY(0deg); }
+            20% { transform: rotateY(12deg); }
+            40% { transform: rotateY(0deg); }
+            60% { transform: rotateY(12deg); }
+            80% { transform: rotateY(0deg); }
+            100% { transform: rotateY(0deg); }
+        }
+        .peeking .flip-card-inner {
+            animation: subtlePeek 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
         .flip-card-front, .flip-card-back {
             position: absolute;
             inset: 0;
@@ -385,7 +399,7 @@
             flex-direction: column;
             overflow: hidden;
         }
-        .flip-card-front { padding: 20px 20px 20px; } /* Dikurangkan padding bawah kerana flip-hint dibuang */
+        .flip-card-front { padding: 20px 20px 20px; }
 
         .flip-card-back {
             transform: rotateY(180deg);
@@ -1105,6 +1119,19 @@
         return { wo, interims };
     }
 
+    // Fungsi untuk kesan pusingan kecil (subtle peek) apabila dibuka
+    function triggerSubtlePeek() {
+        const panel = document.getElementById('analysis-panel');
+        if (!panel) return;
+        panel.classList.remove('flipped');
+        panel.classList.remove('peeking');
+        void panel.offsetWidth;
+        panel.classList.add('peeking');
+        setTimeout(() => {
+            panel.classList.remove('peeking');
+        }, 1200);
+    }
+
     async function openAnalysis(contract) {
         const mobileBtn = document.getElementById('mobileUsageBtn');
         if (mobileBtn) mobileBtn.classList.remove('expanded');
@@ -1119,6 +1146,9 @@
         document.getElementById('panel-title').innerText = contract.contract_code;
         document.getElementById('panel-vendor').innerText = contract.contract_name;
         currentContract = contract;
+
+        // Cetuskan kesan pusingan kecil (subtle peek)
+        triggerSubtlePeek();
 
         if (cacheAnalysis[contract.id]) {
             currentWO = cacheAnalysis[contract.id].wo;
