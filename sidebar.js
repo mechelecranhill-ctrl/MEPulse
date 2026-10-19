@@ -14,7 +14,7 @@ class AppSidebar extends HTMLElement {
             <div class="sidebar" id="sidebar">
 
                 <div class="sidebar-profile">
-                    <div class="profile-img-wrapper" id="profileBtn" title="Edit profil">
+                    <div class="profile-img-wrapper" id="profileBtn" title="Edit profile">
                         ${avatarHtml}
                     </div>
                     <div class="profile-name">${staffName.toUpperCase()}</div>
@@ -75,11 +75,11 @@ class AppSidebar extends HTMLElement {
 
             <div class="logout-modal" id="profileModal">
                 <div class="logout-box profile-edit-box">
-                    <h3>Edit Profil Staff</h3>
+                    <h3>Edit Staff Profile</h3>
 
-                    <input id="peName" class="pe-input" placeholder="Nama staff">
+                    <input id="peName" class="pe-input" placeholder="Staff name">
                     <input id="peEmployee" class="pe-input" placeholder="Employee ID">
-                    <input id="pePhone" class="pe-input" placeholder="No. telefon">
+                    <input id="pePhone" class="pe-input" placeholder="Phone number">
                     <input id="peEmail" class="pe-input" placeholder="Email">
 
                     <label class="pe-label">Signature (JPG/PNG)</label>
@@ -108,6 +108,29 @@ class AppSidebar extends HTMLElement {
                     </div>
                 </div>
             </div>
+
+            <div class="logout-modal" id="sigWarnModal">
+                <div class="logout-box notice-box">
+                    <div class="notice-icon warning"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <h3>Signature Not Found</h3>
+                    <p>You need a signature before you can approve. Upload your signature now?</p>
+                    <div class="logout-actions">
+                        <button class="cancel-btn" id="sigWarnNo">Later</button>
+                        <button class="edit-btn" id="sigWarnYes">Upload Now</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="logout-modal" id="noticeModal">
+                <div class="logout-box notice-box">
+                    <div class="notice-icon" id="noticeIcon"></div>
+                    <h3 id="noticeTitle"></h3>
+                    <p id="noticeMsg"></p>
+                    <div class="logout-actions">
+                        <button class="edit-btn" id="noticeOk">OK</button>
+                    </div>
+                </div>
+            </div>
         `;
 
         this.cacheDOM();
@@ -127,6 +150,9 @@ class AppSidebar extends HTMLElement {
 
         this.profileBtn = this.querySelector("#profileBtn");
         this.profileModal = this.querySelector("#profileModal");
+        this.sigWarnModal = this.querySelector("#sigWarnModal");
+        this.noticeModal = this.querySelector("#noticeModal");
+        this.saveBtn = this.querySelector("#saveProfile");
 
         this.dashboardBtn = this.querySelector("#dashboardBtn");
         this.dashboardMenu = this.querySelector("#dashboardMenu");
@@ -166,9 +192,20 @@ class AppSidebar extends HTMLElement {
 
         this.profileBtn.addEventListener("click", () => this.openProfile());
         this.querySelector("#cancelProfile").onclick = () => this.closeProfile();
-        this.querySelector("#saveProfile").onclick = () => this.saveProfile();
+        this.saveBtn.onclick = () => this.saveProfile();
         this.profileModal.addEventListener("click", (e) => {
             if (e.target === this.profileModal) this.closeProfile();
+        });
+
+        this.querySelector("#sigWarnNo").onclick = () => this.sigWarnModal.classList.remove("active");
+        this.querySelector("#sigWarnYes").onclick = () => {
+            this.sigWarnModal.classList.remove("active");
+            this.openProfile();
+        };
+
+        this.querySelector("#noticeOk").onclick = () => this.noticeModal.classList.remove("active");
+        this.noticeModal.addEventListener("click", (e) => {
+            if (e.target === this.noticeModal) this.noticeModal.classList.remove("active");
         });
 
         ["peSig", "peInit"].forEach(p => {
@@ -255,10 +292,24 @@ class AppSidebar extends HTMLElement {
         this.checkbox.checked = false;
     }
 
+    showNotice(type, title, message) {
+        const icons = {
+            success: "fa-circle-check",
+            error: "fa-circle-xmark",
+            warning: "fa-triangle-exclamation"
+        };
+        const icon = this.querySelector("#noticeIcon");
+        icon.className = `notice-icon ${type}`;
+        icon.innerHTML = `<i class="fa-solid ${icons[type] || icons.warning}"></i>`;
+        this.querySelector("#noticeTitle").textContent = title;
+        this.querySelector("#noticeMsg").textContent = message;
+        this.noticeModal.classList.add("active");
+    }
+
     async openProfile() {
         const staffId = localStorage.getItem("staff_id");
         if (!staffId) {
-            alert("ID staff not found. Please relogin.");
+            this.showNotice("warning", "Staff ID Not Found", "Please log in again and try once more.");
             return;
         }
 
@@ -268,7 +319,7 @@ class AppSidebar extends HTMLElement {
             const res = await fetch(
                 `${API_URL}/rest/v1/staff?id=eq.${encodeURIComponent(staffId)}&select=id,name,position,employee_id,phone_no,email,signature,initial`
             );
-            if (!res.ok) throw new Error("Error fetching staff data");
+            if (!res.ok) throw new Error("Failed to load staff data");
             const rows = await res.json();
             const row = rows && rows[0];
             if (!row) throw new Error("Staff not found");
@@ -282,8 +333,8 @@ class AppSidebar extends HTMLElement {
             this.setImage("peInit", row.initial || null);
         } catch (e) {
             console.error(e);
-            alert("Unable to load staff data. Please try again.");
             this.closeProfile();
+            this.showNotice("error", "Unable to Load", "Staff information could not be loaded. Please try again.");
         }
     }
 
@@ -291,12 +342,16 @@ class AppSidebar extends HTMLElement {
         this.profileModal.classList.remove("active");
     }
 
+    promptSignature() {
+        this.sigWarnModal.classList.add("active");
+    }
+
     readImage(input, prefix) {
         const file = input.files && input.files[0];
         if (!file) return;
         if (file.type !== "image/jpeg" && file.type !== "image/png") {
-            alert("Please select JPG or PNG only.");
             input.value = "";
+            this.showNotice("warning", "Invalid File", "Please select a JPG or PNG file only.");
             return;
         }
         const reader = new FileReader();
@@ -319,7 +374,7 @@ class AppSidebar extends HTMLElement {
 
         const name = this.querySelector("#peName").value.trim();
         if (!name) {
-            alert("Staff name is compulsory.");
+            this.showNotice("warning", "Name Required", "Please enter the staff name before saving.");
             return;
         }
 
@@ -335,6 +390,9 @@ class AppSidebar extends HTMLElement {
             initial: this.images.peInit || null
         };
 
+        this.saveBtn.disabled = true;
+        this.saveBtn.textContent = "Saving...";
+
         try {
             const res = await fetch(`${API_URL}/staff/${row.id}`, {
                 method: "PATCH",
@@ -343,19 +401,20 @@ class AppSidebar extends HTMLElement {
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
-                throw new Error(err.error || "Gagal simpan");
+                throw new Error(err.error || "Failed to save");
             }
 
             localStorage.setItem("staff_name", name);
             this.querySelector(".profile-name").textContent = name.toUpperCase();
 
             this.closeProfile();
-            const msg = "Staff information saved.";
-            if (window.showAppToast) window.showAppToast(msg, "success");
-            else alert(msg);
+            this.showNotice("success", "Saved", "Your staff information has been updated successfully.");
         } catch (e) {
             console.error(e);
-            alert("Failed save: " + e.message);
+            this.showNotice("error", "Save Failed", e.message);
+        } finally {
+            this.saveBtn.disabled = false;
+            this.saveBtn.textContent = "Save";
         }
     }
 
