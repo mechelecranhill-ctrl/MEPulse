@@ -417,10 +417,26 @@
 
                 const workOrders = await apiQuery(
                     'work_orders',
-                    `status=eq.APP-HOS&select=id,work_id,status,sequence_no,district,pdf_url,pending_status,contract(id,contract_name,contract_code,unit_id)`
+                    `status=eq.APP-HOS&select=id,work_id,status,sequence_no,district,pdf_url,pending_status,contract_id`
                 ) || [];
 
-                workOrders.forEach(item => { item.mapped_pdf_url = item.pdf_url || null; });
+                const contractIds = [...new Set(
+                    workOrders.map(o => o.contract_id).filter(v => v !== null && v !== undefined)
+                )];
+                
+                let contractsData = [];
+                if (contractIds.length > 0) {
+                    contractsData = await apiQuery(
+                        'contract',
+                        `id=${buildInFilter(contractIds)}&select=id,contract_name,contract_code,unit_id`
+                    );
+                }
+                const contractMap = new Map((contractsData || []).map(c => [String(c.id), c]));
+
+                workOrders.forEach(item => {
+                    item.contract = contractMap.get(String(item.contract_id)) || null;  
+                    item.mapped_pdf_url = item.pdf_url || null;
+                });
                 
                 renderSectionUnitContractView('table-dept-container', sectionsPreset, unitsPreset, workOrders, perm.canActDept, {
                     approveStatus: 'APP-HOD',
