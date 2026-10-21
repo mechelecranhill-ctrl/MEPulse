@@ -720,6 +720,10 @@ function executeCustomConfirm() {
 
 window.onload = async () => {
     try {
+        if (!isLoggedIn) {
+            await loadPublicDirectory();
+            return;
+        }
         await loadUnits();
         await loadSections();
         await loadAssignments();
@@ -759,6 +763,26 @@ async function loadAssignments() {
     staffUnitAssignments = raw2.map(r => ({ ...r, staff_id: Number(r.staff_id), unit_id: Number(r.unit_id), is_acting: r.is_acting === 1 || r.is_acting === true }));
 }
 
+    async function loadPublicDirectory() {
+    const res = await fetch(`${API_URL}/public/directory`, { cache: 'no-store' });
+    const d = await res.json();
+    const act = v => v === 1 || v === true;
+
+    unitData = d.units.map(r => ({ ...r, id: Number(r.id), section_id: Number(r.section_id) }));
+    sectionData = d.sections.map(r => ({ ...r, id: Number(r.id) }));
+    staffSectionAssignments = d.staffSectionAssignments.map(r => ({
+        ...r, staff_id: Number(r.staff_id), section_id: Number(r.section_id), is_acting: act(r.is_acting)
+    }));
+    staffUnitAssignments = d.staffUnitAssignments.map(r => ({
+        ...r, staff_id: Number(r.staff_id), unit_id: Number(r.unit_id), is_acting: act(r.is_acting)
+    }));
+    deptHeadAssignments = d.departmentHead.map(r => ({
+        ...r, staff_id: Number(r.staff_id), is_acting: act(r.is_acting)
+    }));
+    staffData = d.staff.map(r => ({ ...r, id: Number(r.id) }));
+    renderStaff();
+}
+    
 async function loadStaff() {
     let res = await fetch(`${API_URL}/staff`, { cache: 'no-store' });
     let raw = await res.json();
@@ -807,9 +831,9 @@ function staffCardHtml(s, isActing = false, actingType = "", targetId = null) {
             </div>
         </div>
         <div class="staff-details">
-            <p><i class="fa fa-id-badge"></i> ${s.employee_id||'-'}</p>
+            ${isLoggedIn ? `<p><i class="fa fa-id-badge"></i> ${s.employee_id||'-'}</p>` : ''}
             <p><i class="fa fa-phone"></i> ${s.phone_no||'-'}</p>
-            <p><i class="fa fa-envelope"></i> ${s.email||'-'}</p>
+            ${isLoggedIn ? `<p><i class="fa fa-envelope"></i> ${s.email||'-'}</p>` : ''}
             <div class="action-group" onclick="event.stopPropagation()">
                 ${isActing ? `
                     <button class="icon-btn" style="background:var(--accent-red);" onclick="removeActing('${actingType}', '${targetId}', '${s.id}', event)" title="Remove Acting Status">
