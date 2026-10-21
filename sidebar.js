@@ -137,6 +137,12 @@ class AppSidebar extends HTMLElement {
         this.bindEvents();
         this.loadDashboardLinks();
         this.setActiveMenu();
+
+        if (localStorage.getItem("role") === "guest") {
+    this.querySelector("#quotationBtn").closest(".menu-group").style.display = "none";
+    this.querySelector('a[href="contract-closing.html"]').style.display = "none";
+    this.profileBtn.style.pointerEvents = "none";   // guest tak boleh edit profil
+}
     }
 
     cacheDOM() {
