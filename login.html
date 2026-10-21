@@ -222,6 +222,12 @@ body{
     transform:translateY(-2px);
     filter:brightness(1.08);
 }
+    .login-box .guest-btn{
+    background:rgba(255,255,255,0.15);
+    border:1px solid rgba(255,255,255,0.45);
+    box-shadow:none;
+    color:#fff;
+}
 
 .login-box.show{
     animation:fadeLogin .8s ease forwards;
@@ -492,6 +498,7 @@ input{
             </div>
 
             <button onclick="login()">Login</button>
+            <button class="guest-btn" onclick="guestLogin()">Continue as Guest</button>
         </div>
     </div>
 
@@ -644,6 +651,35 @@ async function login(){
     }
 }
 
+    async function guestLogin(){
+    try{
+        const res = await fetch(`${API_URL}/guest-login`, { method: "POST" });
+        const result = await res.json();
+
+        if(!res.ok || !result.success || !result.token){
+            await showCustomPopup("Guest access is not available right now.");
+            return;
+        }
+
+        // Buang sesi lama tetapi kekalkan nama pengguna yang diingat
+        const keepUser = localStorage.getItem("me_user");
+        localStorage.clear();
+        if (keepUser) localStorage.setItem("me_user", keepUser);
+
+        localStorage.setItem("loggedIn", "true");
+        localStorage.setItem("role", "guest");
+        localStorage.setItem("staff_name", "Guest");
+        localStorage.setItem("me_token", result.token);
+        localStorage.setItem("lastActivity", Date.now());
+
+        window.location.href = "sections.html";
+
+    }catch(err){
+        console.error(err);
+        await showCustomPopup("Server Error");
+    }
+}
+    
 async function forgotPassword() {
     await showCustomPopup("Please contact administrator to change password");
 }
