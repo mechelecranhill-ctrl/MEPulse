@@ -23,7 +23,8 @@ async function uploadQuotationToR2(fileInputId, workIdValue, unitValue, statusDi
         const response = await fetch(`${workerBaseUrl}/upload?filename=${encodeURIComponent(filename)}`, {
             method: "PUT",
             headers: {
-                "Content-Type": file.type || "application/pdf"
+                "Content-Type": file.type || "application/pdf",
+                "Authorization": "Bearer " + (localStorage.getItem("me_token") || "")
             },
             body: file
         });
