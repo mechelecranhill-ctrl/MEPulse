@@ -262,6 +262,8 @@ function clearAuthStates() {
     localStorage.removeItem("loggedIn");
     localStorage.removeItem("lastActivity");
     localStorage.removeItem("sessionExpired");
+    localStorage.removeItem("me_token");
+    localStorage.removeItem("role");
 }
 
 /* =========================
@@ -311,5 +313,24 @@ setInterval(() => {
     }
 }, CHECK_INTERVAL);
 
-// Jalankan semakan keselamatan sebaik fail ini dimuat turun
-checkSession();
+/* =========================
+   GUEST GUARD
+========================= */
+const GUEST_ALLOWED_PAGES = [
+    "sections.html",
+    "dashboard-contract.html",
+    "dashboard-usageschedule.html"
+];
+
+function guestGuard() {
+    if (localStorage.getItem("role") !== "guest") return true;
+
+    const page = window.location.pathname.split("/").pop() || "";
+    if (!GUEST_ALLOWED_PAGES.includes(page)) {
+        window.location.replace("sections.html");
+        return false;
+    }
+    return true;
+}
+
+if (guestGuard()) checkSession();
