@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Indent</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="sidebar.css">
+<script src="api-auth.js"></script>
+<script src="session.js" defer></script>
+<script src="sidebar.js" defer></script>
+<style>
+:root{--ios-blue:#007AFF;--ios-green:#34C759;--ios-orange:#FF9500;--ios-red:#FF3B30;--card-bg:#fff}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f2f2f7;color:#1c1c1e;height:100vh;display:flex;flex-direction:column}
+.glass-header{height:calc(60px + env(safe-area-inset-top));padding:env(safe-area-inset-top) 25px 0;background:linear-gradient(60deg,#1d4ed8,#3b82f6 40%,#60a5fa);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.unit-container{display:flex;gap:8px;overflow-x:auto}
+.unit-pill{border:none;border-radius:999px;padding:7px 16px;font-size:12px;font-weight:700;background:rgba(255,255,255,.25);color:#fff;cursor:pointer;white-space:nowrap}
+.unit-pill.active{background:#fff;color:#1d4ed8}
+.main{flex:1;display:flex;min-height:0}
+.side{width:260px;padding:12px;overflow-y:auto;border-right:1px solid #e5e5ea;background:#fafafa;flex-shrink:0}
+.c-card{background:var(--card-bg);border-radius:12px;padding:10px;margin-bottom:8px;cursor:pointer;border:1px solid rgba(0,0,0,.05)}
+.c-card.active{border-color:var(--ios-blue);background:#f0f7ff}
+.c-card h4{margin:0;font-size:12px}.sub{font-size:10px;color:#888;margin-top:2px}
+.mini{height:5px;border-radius:3px;background:#e5e5ea;margin-top:6px;overflow:hidden}.mini i{display:block;height:100%;background:var(--ios-green)}
+.mini i.over{background:var(--ios-red)}
+.detail{flex:1;padding:16px;overflow-y:auto}
+.panel{background:#fff;border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.panel h3{margin:0 0 4px;font-size:16px}.meta{font-size:11px;color:#888}
+.stats{display:flex;gap:10px;margin:12px 0;flex-wrap:wrap}
+.stat{flex:1;min-width:110px;background:#f2f2f7;border-radius:12px;padding:10px}
+.stat b{display:block;font-size:15px;margin-top:2px}.stat small{font-size:10px;color:#666}
+.bar{height:10px;border-radius:6px;background:#e5e5ea;overflow:hidden}.bar i{display:block;height:100%;background:var(--ios-green)}
+.bar i.warn{background:var(--ios-orange)}.bar i.over{background:var(--ios-red)}
+.alert{margin-top:10px;padding:8px 12px;border-radius:10px;background:#fff1f0;color:#c0281d;font-size:12px;font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;font-size:10px;color:#888;padding:6px;border-bottom:1px solid #eee}
+td{padding:8px 6px;border-bottom:1px solid #f0f0f0;vertical-align:top}
+.tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:#8E8E9320;color:#636366}
+.tag.APPROVED,.tag.APP-HOD{background:#34C75920;color:#1f8a3b}.tag.BLUEFORM{background:#007AFF20;color:#0060d0}
+.tag.QUOTATION,.tag.QUO-APP{background:#FF950020;color:#b56a00}
+.btn{border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;background:var(--ios-blue);color:#fff}
+.btn.ghost{background:#f2f2f7;color:#1c1c1e}.btn.red{background:#fff1f0;color:var(--ios-red);padding:5px 10px}
+input,select{border:1px solid #ddd;border-radius:10px;padding:8px 10px;font-size:12px;width:100%;background:#fff}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.grid .full{grid-column:1/-1}
+.picker{max-height:300px;overflow-y:auto;margin-top:8px;border:1px solid #eee;border-radius:10px}
+.picker label{display:flex;gap:8px;padding:7px 10px;border-bottom:1px solid #f5f5f5;font-size:12px;cursor:pointer}
+.empty{color:#999;text-align:center;padding:30px;font-size:12px}
+body.is-guest .admin{display:none!important}
+@media(max-width:768px){.main{flex-direction:column}.side{width:100%;max-height:170px;border-right:0;border-bottom:1px solid #e5e5ea}}
+</style>
+</head>
+<body>
+<app-sidebar></app-sidebar>
+<div class="glass-header"><div class="unit-container" id="unitNav"></div></div>
+<div class="main">
+  <div class="side">
+    <button class="btn admin" style="width:100%;margin-bottom:10px" onclick="showNew()"><i class="fa fa-plus"></i> Daftar Indent</button>
+    <div id="list"></div>
+  </div>
+  <div class="detail" id="detail"><div class="empty">Pilih indent atau cipta yang baru.</div></div>
+</div>
+
+<script>
+var API_URL = 'https://me-connect-api.mech-elec-ranhill.workers.dev';
+const headers = { 'Content-Type': 'application/json' };
+const IS_GUEST = localStorage.getItem('role') === 'guest';
+if (IS_GUEST) document.body.classList.add('is-guest');
+const MAX_SUM = 250000;
+const STAGES = ['PLANNING', 'QUOTATION', 'BLUEFORM', 'APPROVED'];
+
+let editingId = null, editingHadSec = false;
+let unitId = null, indents = [], contracts = {}, current = null, members = [];
+const usedOf = {};
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rm = n => 'RM ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB') : '-';
+const rowAmt = w => Number(w.amount_spent || 0);
+const sumRows = rows => rows.filter(w => w.status !== 'CANCEL').reduce((a, w) => a + rowAmt(w), 0);
+
+async function api(path, opt) {
+  const r = await fetch(API_URL + '/rest/v1/' + path, { headers, ...opt });
+  if (!r.ok) throw new Error(await r.text());
+  return r.status === 204 ? null : r.json().catch(() => null);
+}
+
+async function fetchUnits() {
+  const units = await api('units?select=id,unit_name,section_id');
+  document.getElementById('unitNav').innerHTML = units.map(u =>
+    `<button class="unit-pill" id="unit-${u.id}" onclick="selectUnit(${u.id})">${esc(u.unit_name)}</button>`).join('');
+  if (units.length) selectUnit(units[0].id);
+}
+
+async function selectUnit(id) {
+  unitId = id; current = null;
+  document.querySelectorAll('.unit-pill').forEach(b => b.classList.toggle('active', b.id === 'unit-' + id));
+  document.getElementById('detail').innerHTML = '<div class="empty">Pilih indent atau cipta yang baru.</div>';
+  const [cs, ins] = await Promise.all([
+    api(`contract?unit_id=eq.${id}&select=id,contract_code`),
+    api(`indents?unit_id=eq.${id}&order=indent_start.desc&select=*`)
+  ]);
+  contracts = {}; cs.forEach(c => contracts[c.id] = c.contract_code);
+  indents = ins;
+  // anggaran guna untuk bar kecil di senarai
+  const all = indents.length ? await api(`work_orders?indent_id=in.(${indents.map(i => i.id).join(',')})&select=indent_id,status,amount_spent`) : [];
+  Object.keys(usedOf).forEach(k => delete usedOf[k]);
+  all.forEach(w => { if (w.status !== 'CANCEL') usedOf[w.indent_id] = (usedOf[w.indent_id] || 0) + rowAmt(w); });
+  renderList();
+}
+
+function renderList() {
+  const el = document.getElementById('list');
+  if (!indents.length) { el.innerHTML = '<div class="empty">Tiada indent.</div>'; return; }
+  el.innerHTML = indents.map(i => {
+    const used = usedOf[i.id] || 0, pct = Math.min(100, used / i.indent_sum * 100);
+    return `<div class="c-card ${current && current.id === i.id ? 'active' : ''}" onclick="openIndent(${i.id})">
+      <h4>${esc(i.indent_code)}</h4><div class="sub">${esc(i.indent_name)}</div>
+      <div class="mini"><i class="${used > i.indent_sum ? 'over' : ''}" style="width:${pct}%"></i></div></div>`;
+  }).join('');
+}
+
+async function openIndent(id) {
+  current = indents.find(i => i.id === id);
+  members = await api(`work_orders?indent_id=eq.${id}&select=id,contract_id,work_id,status,description,location,amount_spent&order=work_id.asc`);
+  usedOf[id] = sumRows(members);
+  renderList(); renderDetail();
+}
+
+function renderDetail() {
+  const i = current, used = sumRows(members), baki = i.indent_sum - used;
+  const pct = Math.min(100, used / i.indent_sum * 100);
+  const cls = used > i.indent_sum ? 'over' : pct >= 90 ? 'warn' : '';
+  document.getElementById('detail').innerHTML = `
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center"><h3>${esc(i.indent_code)} <span class="meta">${esc(i.indent_name)}</span></h3><button class="btn ghost admin" onclick="showNew(current)"><i class="fa fa-pen"></i> Edit</button></div>
+    <div class="meta">${fmtDate(i.indent_start)} – ${fmtDate(i.indent_end)}</div>
+    <div class="stats">
+      <div class="stat"><small>Had Indent</small><b>${rm(i.indent_sum)}</b></div>
+      <div class="stat"><small>Digunakan</small><b>${rm(used)}</b></div>
+      <div class="stat"><small>Baki</small><b style="color:${baki < 0 ? 'var(--ios-red)' : 'var(--ios-green)'}">${rm(baki)}</b></div>
+      <div class="stat"><small>Bilangan ID</small><b>${members.length}</b></div>
+    </div>
+    <div class="bar"><i class="${cls}" style="width:${pct}%"></i></div>
+    ${baki < 0 ? `<div class="alert"><i class="fa fa-triangle-exclamation"></i> Melebihi had indent sebanyak ${rm(-baki)}.</div>` : ''}
+  </div>
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <b style="font-size:13px">ID dalam indent</b>
+      <span class="admin" style="display:flex;gap:6px"><button class="btn ghost" onclick="openNewId()"><i class="fa fa-file-circle-plus"></i> ID Baharu</button><button class="btn" onclick="openPicker()"><i class="fa fa-plus"></i> Tambah ID</button></span>
+    </div>
+    <div id="picker"></div>
+    ${members.length ? `<div style="overflow-x:auto"><table><thead><tr><th>Work ID</th><th>Kontrak</th><th>Keterangan</th><th>Status</th><th>Jumlah</th><th class="admin"></th></tr></thead><tbody>
+      ${members.map(w => `<tr><td><b>${esc(w.work_id)}</b></td><td>${esc(w.contract_id ? (contracts[w.contract_id] || '-') : 'INDENT SAHAJA')}</td>
+        <td>${esc(w.description)}<div class="meta">${esc(w.location)}</div></td>
+        <td>${w.contract_id ? `<span class="tag ${esc(w.status)}">${esc(w.status)}</span>` : `<select ${IS_GUEST ? 'disabled' : ''} style="width:auto" onchange="setStage(${w.id}, this.value)">${[...new Set([...STAGES, w.status])].map(x => `<option ${x === w.status ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`}</td><td><b>${rm(rowAmt(w))}</b></td>
+        <td class="admin"><button class="btn red" onclick="unassign(${w.id})">${w.contract_id ? '<i class="fa fa-arrow-rotate-left"></i> Keluarkan' : '<i class="fa fa-trash"></i> Padam'}</button></td></tr>`).join('')}
+    </tbody></table></div>` : '<div class="empty">Belum ada ID dalam indent ini.</div>'}
+  </div>`;
+}
+
+async function openPicker() {
+  const ids = Object.keys(contracts);
+  const box = document.getElementById('picker');
+  if (!ids.length) { box.innerHTML = '<div class="empty">Tiada kontrak dalam unit ini.</div>'; return; }
+  box.innerHTML = '<div class="empty">Memuatkan...</div>';
+  const rows = await api(`work_orders?contract_id=in.(${ids.join(',')})&indent_id=is.null&status=not.in.(CLAIMED,CANCEL)&select=id,contract_id,work_id,status,description,amount_spent&order=work_id.asc`);
+  window._pickRows = rows;
+  box.innerHTML = `<input id="pickSearch" placeholder="Cari Work ID / keterangan" oninput="filterPicker()">
+    <div class="picker" id="pickList"></div>
+    <div style="display:flex;gap:8px;align-items:center;margin:8px 0 12px"><button class="btn" onclick="assign()">Masukkan ke Indent</button>
+    <button class="btn ghost" onclick="document.getElementById('picker').innerHTML=''">Batal</button><span class="meta" id="pickTotal"></span></div>`;
+  filterPicker();
+}
+
+function filterPicker() {
+  const q = (document.getElementById('pickSearch').value || '').toLowerCase();
+  const checked = new Set([...document.querySelectorAll('.pk:checked')].map(c => c.value));
+  const rows = window._pickRows.filter(w => !q || (w.work_id + ' ' + (w.description || '')).toLowerCase().includes(q));
+  document.getElementById('pickList').innerHTML = rows.length ? rows.map(w => `<label>
+    <input type="checkbox" class="pk" style="width:auto" value="${w.id}" ${checked.has(String(w.id)) ? 'checked' : ''} onchange="pickTotal()">
+    <span><b>${esc(w.work_id)}</b> <span class="tag ${esc(w.status)}">${esc(w.status)}</span> ${rm(rowAmt(w))}
+    <div class="meta">${esc(contracts[w.contract_id] || '')} · ${esc(w.description)}</div></span></label>`).join('') : '<div class="empty">Tiada ID tersedia.</div>';
+  pickTotal();
+}
+
+function pickTotal() {
+  const sel = new Set([...document.querySelectorAll('.pk:checked')].map(c => Number(c.value)));
+  const add = window._pickRows.filter(w => sel.has(w.id)).reduce((a, w) => a + rowAmt(w), 0);
+  const after = sumRows(members) + add, over = after > current.indent_sum;
+  document.getElementById('pickTotal').innerHTML = sel.size
+    ? `${sel.size} dipilih (+${rm(add)}) → ${rm(after)}${over ? ' <b style="color:var(--ios-red)">melebihi had</b>' : ''}` : '';
+}
+
+async function assign() {
+  if (IS_GUEST) return;
+  const ids = [...document.querySelectorAll('.pk:checked')].map(c => c.value);
+  if (!ids.length) return;
+  const add = window._pickRows.filter(w => ids.includes(String(w.id))).reduce((a, w) => a + rowAmt(w), 0);
+  if (sumRows(members) + add > current.indent_sum &&
+      !confirm('Jumlah akan melebihi had indent. Teruskan?')) return;
+  try {
+    await api(`work_orders?id=in.(${ids.join(',')})`, { method: 'PATCH', body: JSON.stringify({ indent_id: current.id }) });
+    await openIndent(current.id);
+  } catch (e) { console.error(e); alert('Gagal memasukkan ID ke indent.'); }
+}
+
+async function unassign(id) {
+  if (IS_GUEST) return;
+  const row = members.find(w => w.id === id);
+  const own = row && !row.contract_id;
+  const msg = own
+    ? 'ID ini didaftar khas untuk indent dan tiada kontrak. Memadam akan membuang ID ini sepenuhnya. Teruskan?'
+    : 'Keluarkan ID ini dari indent? Ia akan kembali dikira dalam bajet kontrak dengan status asalnya.';
+  if (!confirm(msg)) return;
+  try {
+    if (own) await api(`work_orders?id=eq.${id}`, { method: 'DELETE' });
+    else await api(`work_orders?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ indent_id: null }) });
+    await openIndent(current.id);
+  } catch (e) { console.error(e); alert('Gagal mengeluarkan ID.'); }
+}
+
+async function setStage(id, status) {
+  if (IS_GUEST) return;
+  try {
+    await api(`work_orders?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+    const r = members.find(w => w.id === id); if (r) r.status = status;
+    usedOf[current.id] = sumRows(members); renderList(); renderDetail();
+  } catch (e) { console.error(e); alert('Gagal menukar peringkat.'); }
+}
+
+function getSecs(i) {
+  let x = i.indent_sections_breakdown;
+  if (typeof x === 'string') { try { x = JSON.parse(x); } catch (_) { x = null; } }
+  return x && Object.keys(x).length ? x : null;
+}
+
+function openNewId() {
+  const secs = getSecs(current);
+  document.getElementById('picker').innerHTML = `<div class="grid" style="margin:8px 0 14px">
+    <input id="rId" placeholder="Work ID (cth: C123 / K45A)">
+    <select id="rStage">${STAGES.map(x => `<option>${x}</option>`).join('')}</select>
+    <input id="rDesc" class="full" placeholder="Keterangan">
+    <input id="rLoc" placeholder="Lokasi">
+    <input id="rAmt" type="number" min="0" step="0.01" placeholder="Jumlah (RM)">
+    ${secs ? `<select id="rSec" class="full">${Object.entries(secs).map(([k, x]) => `<option value="${esc(k)}">${esc(k)}: ${esc(x.desc)}</option>`).join('')}</select>` : ''}
+    <div class="full"><div class="meta">Tarikh (pilihan, untuk carta bulanan)</div><input id="rDate" type="date"></div>
+    <div class="full" style="display:flex;gap:8px"><button class="btn" onclick="saveNewId()">Daftar ID</button>
+      <button class="btn ghost" onclick="document.getElementById('picker').innerHTML=''">Batal</button></div></div>`;
+}
+
+async function saveNewId() {
+  if (IS_GUEST) return;
+  const v = id => (document.getElementById(id)?.value || '').trim();
+  const wid = v('rId').toUpperCase(), amt = Number(v('rAmt') || 0);
+  if (!/^[CK]\d+[A-Z]?$/.test(wid)) return alert('Format Work ID tidak sah (cth: C123 atau K45A).');
+  if (!(amt >= 0)) return alert('Jumlah tidak sah.');
+  if (sumRows(members) + amt > current.indent_sum && !confirm('Jumlah akan melebihi had indent. Teruskan?')) return;
+  try {
+    const dup = await api(`work_orders?work_id=eq.${encodeURIComponent(wid)}&select=id,contract_id,indent_id`);
+    if (dup && dup.length) {
+      return alert(`Work ID ${wid} sudah wujud${dup[0].indent_id ? ' dalam sebuah indent' : dup[0].contract_id ? ' dalam sebuah kontrak' : ''}.` +
+        (dup[0].indent_id ? '' : ' Gunakan "Tambah ID" untuk memasukkannya ke indent ini.'));
+    }
+    const sec = v('rSec');
+    const body = { work_id: wid, indent_id: current.id, status: v('rStage') || 'PLANNING',
+      description: v('rDesc').toUpperCase(), location: v('rLoc').toUpperCase(), amount_spent: amt, additional: 0 };
+    if (sec) body.section_category = { [sec]: { amt, extra: 0 } };
+    if (v('rDate')) body.qpb_date = v('rDate');
+    await api('work_orders', { method: 'POST', body: JSON.stringify(body) });
+    await openIndent(current.id);
+  } catch (e) {
+    console.error(e);
+    alert('Gagal mendaftar ID. Jika ralat menyebut contract_id NOT NULL, lajur itu perlu dibenarkan kosong (lihat indent-backend.md).');
+  }
+}
+
+
+function secRow(c = '', d = '', a = '') {
+  return `<div class="secrow" style="display:grid;grid-template-columns:64px 1fr 120px 34px;gap:6px;margin-bottom:6px">
+    <input class="sc" placeholder="Kod" value="${esc(c)}"><input class="sd" placeholder="Keterangan" value="${esc(d)}">
+    <input class="sa" type="number" min="0" step="0.01" placeholder="RM" value="${esc(a)}" oninput="secTotal()">
+    <button type="button" class="btn red" onclick="this.parentNode.remove();secTotal()">×</button></div>`;
+}
+function addSecRow() { document.getElementById('secRows').insertAdjacentHTML('beforeend', secRow()); }
+
+function secTotal() {
+  const t = [...document.querySelectorAll('.sa')].reduce((a, i) => a + Number(i.value || 0), 0);
+  const el = document.getElementById('secSum'), sum = document.getElementById('nSum');
+  el.textContent = t > 0 ? 'Jumlah seksyen: ' + rm(t) + (t > MAX_SUM ? ' (melebihi RM 250,000)' : '') : '';
+  el.style.color = t > MAX_SUM ? 'var(--ios-red)' : '#888';
+  sum.readOnly = t > 0;
+  if (t > 0) sum.value = t.toFixed(2);
+}
+
+function showNew(edit) {
+  const i = edit || {};
+  let secs = i.indent_sections_breakdown;
+  if (typeof secs === 'string') { try { secs = JSON.parse(secs); } catch (_) { secs = null; } }
+  editingId = edit ? edit.id : null;
+  editingHadSec = !!(secs && Object.keys(secs).length);
+  const rows = editingHadSec ? Object.entries(secs).map(([k, x]) => secRow(k, x.desc, x.amt)).join('') : '';
+  document.getElementById('detail').innerHTML = `<div class="panel"><h3>${edit ? 'Edit' : 'Daftar'} Indent</h3><div class="grid" style="margin-top:10px">
+    <input id="nCode" placeholder="Kod Indent" value="${esc(i.indent_code)}">
+    <input id="nSum" type="number" min="0" max="${MAX_SUM}" step="0.01" placeholder="Had (maks RM 250,000)" value="${esc(i.indent_sum)}">
+    <input id="nName" class="full" placeholder="Nama Indent" value="${esc(i.indent_name)}">
+    <div><div class="meta">Mula</div><input id="nStart" type="date" value="${esc((i.indent_start || '').slice(0, 10))}"></div>
+    <div><div class="meta">Tamat</div><input id="nEnd" type="date" value="${esc((i.indent_end || '').slice(0, 10))}"></div>
+    <div class="full"><div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0">
+      <b style="font-size:12px">Pecahan Seksyen <span class="meta">(pilihan)</span></b>
+      <button type="button" class="btn ghost" onclick="addSecRow()"><i class="fa fa-plus"></i> Seksyen</button></div>
+      <div id="secRows">${rows}</div><div id="secSum" class="meta"></div></div>
+    <div class="full" style="display:flex;gap:8px"><button class="btn" onclick="saveIndent()">Simpan</button>
+      <button class="btn ghost" onclick="${edit ? 'openIndent(' + edit.id + ')' : "document.getElementById('detail').innerHTML=''"}">Batal</button></div></div></div>`;
+  secTotal();
+}
+
+async function saveIndent() {
+  if (IS_GUEST) return;
+  const v = id => document.getElementById(id).value.trim();
+  const secs = {};
+  document.querySelectorAll('.secrow').forEach(r => {
+    const c = r.querySelector('.sc').value.trim().toUpperCase(), a = Number(r.querySelector('.sa').value || 0);
+    if (c && a > 0) secs[c] = { desc: r.querySelector('.sd').value.trim().toUpperCase(), amt: a };
+  });
+  const hasSec = Object.keys(secs).length > 0;
+  const sum = hasSec ? Object.values(secs).reduce((a, x) => a + x.amt, 0) : Number(v('nSum'));
+  if (!v('nCode') || !v('nName')) return alert('Kod dan nama diperlukan.');
+  if (!(sum > 0) || sum > MAX_SUM) return alert('Had mesti antara RM 1 dan RM 250,000.');
+  if (v('nStart') && v('nEnd') && v('nEnd') < v('nStart')) return alert('Tarikh tamat sebelum tarikh mula.');
+  if (editingId && sum < (usedOf[editingId] || 0) && !confirm('Had baharu lebih rendah daripada jumlah digunakan. Teruskan?')) return;
+
+  const body = { unit_id: unitId, indent_code: v('nCode').toUpperCase(), indent_name: v('nName').toUpperCase(),
+    indent_start: v('nStart') || null, indent_end: v('nEnd') || null, indent_sum: sum };
+  if (hasSec) body.indent_sections_breakdown = secs;
+  else if (editingHadSec) body.indent_sections_breakdown = null;
+  try {
+    if (editingId) {
+      await api(`indents?id=eq.${editingId}`, { method: 'PATCH', body: JSON.stringify(body) });
+    } else {
+      body.created_at = new Date().toISOString();
+      await api('indents', { method: 'POST', body: JSON.stringify(body) });
+    }
+    const keep = editingId;
+    await selectUnit(unitId);
+    if (keep) openIndent(keep);
+  } catch (e) { console.error(e); alert('Gagal menyimpan indent. Jika ada pecahan seksyen, pastikan lajur indent_sections_breakdown sudah dicipta.'); }
+}
+
+window.onload = () => fetchUnits().catch(e => console.error('Error units:', e));
+</script>
+</body>
+</html>
