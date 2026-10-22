@@ -1086,11 +1086,12 @@
                 });
 
                 const inList = currentWorkIds.map(id => encodeURIComponent(id)).join(',');
-                const checkRes = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=in.(${inList})&select=id,work_id,status`, { headers });
+                const checkRes = await fetch(`${API_URL}/rest/v1/work_orders?contract_id=eq.${contractId}&work_id=in.(${inList})&select=id,work_id,status,blueform_created_at`, { headers });
                 const existingRows = await checkRes.json();
                 const existingMap = {};
                 (Array.isArray(existingRows) ? existingRows : []).forEach(r => { existingMap[r.work_id] = r; });
 
+                const nowIso = new Date().toISOString();
                 try {
                     for(const workIdValue of currentWorkIds){
                         const payload = perWorkIdPayload[workIdValue]; if(!payload) continue;
@@ -1112,10 +1113,16 @@
                                 patchPayload.revision_in_progress = false;
                             }
 
+                            if(!existing.blueform_created_at){
+                                patchPayload.blueform_created_at = nowIso;
+                            }
+
                             wr = await fetch(`${API_URL}/rest/v1/work_orders?id=eq.${existing.id}&nosync=1`, {
                                 method: 'PATCH', headers, body: JSON.stringify(patchPayload)
                             });
                         }else{
+                            payload.created_at = nowIso;
+                            payload.blueform_created_at = nowIso;
                             wr = await fetch(`${API_URL}/rest/v1/work_orders?nosync=1`, {
                                 method: 'POST', headers, body: JSON.stringify(payload)
                             });
