@@ -46,6 +46,12 @@ body {
     -webkit-tap-highlight-color: transparent;
 }
 
+@property --blue-top {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 70dvh;
+}
+
 .bg-maint {
     background-color: #ffffff;
     background-image:
@@ -67,6 +73,9 @@ body {
 }
 
 @media (max-width:768px){
+    body {
+        transition: background-image 0.6s ease-in-out, --blue-top 0.5s cubic-bezier(.22,1,.36,1);
+    }
     .bg-maint {
         background-image:
             radial-gradient(circle 20vw at 100% 100%, #0077b6 calc(20vw - 0.5px), transparent 20vw),
@@ -76,13 +85,13 @@ body {
         background-size:
             20vw 20vw,
             20vw 20vw,
-            100vw calc(30dvh - 20vw),
+            100vw calc(100dvh - var(--blue-top, 70dvh) - 20vw),
             60vw 20vw;
         background-position:
-            0 70dvh,
-            80vw 70dvh,
-            0 calc(70dvh + 20vw),
-            20vw 70dvh;
+            0 var(--blue-top, 70dvh),
+            80vw var(--blue-top, 70dvh),
+            0 calc(var(--blue-top, 70dvh) + 20vw),
+            20vw var(--blue-top, 70dvh);
     }
 }
 
@@ -489,6 +498,9 @@ drop-shadow(0 0 20px rgba(56,189,248,.5));
         opacity: 0;
         visibility: hidden;
         transform: translateY(40px);
+        background: transparent;
+        backdrop-filter: none;
+        border: none;
         transition: opacity .35s ease, transform .35s ease, visibility .35s;
         box-sizing: border-box; 
     }
@@ -521,10 +533,43 @@ body.hide-wheel .item.active{
 opacity:0 !important;
 }
     .nav-controls{
-    position: fixed;
-    bottom: 30px;
-    left: 50%;
-    transform: translateX(-50%);}
+        position: fixed;
+        top: 50%;
+        bottom: auto;
+        left: 0;
+        width: 100vw;
+        transform: translateY(-50%);
+        justify-content: center;
+        gap: min(250px, calc(100vw - 128px));
+        pointer-events: none;
+        transition: opacity .3s ease;
+    }
+    .nav-controls button {
+        pointer-events: auto;
+        color: #0077b6;
+        border: 1px solid rgba(0,119,182,.35);
+        background: rgba(0,119,182,.08);
+    }
+    body.hide-wheel .nav-controls { opacity: 0; }
+    body.hide-wheel .nav-controls button { pointer-events: none; }
+
+    .item { color: #0f3d6b; }
+    .item:not(.active) { opacity: 0; }
+    .item.active .section-helm { filter: drop-shadow(0 8px 18px rgba(0,119,182,.35)); }
+
+    .detail-panel {
+        background: #0077b6;
+        backdrop-filter: none;
+    }
+    .detail-panel-title {
+        padding: 5px 12px;
+        border-radius: 999px;
+        background: rgba(0, 40, 80, 0.45);
+    }
+    .detail-item {
+        background: rgba(0, 40, 80, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+    }
 }
 
 @media (min-width: 769px) {
@@ -838,7 +883,7 @@ const isMobile = window.innerWidth <= 768;
 
 let radius;
 if (isMobile) {
-    radius = 180;
+    radius = window.innerWidth * 0.5;
 } else {
     radius = window.innerWidth * 0.25;
 }
@@ -1140,6 +1185,7 @@ function createWheel(){
                         const cardTop = window.innerHeight - cardH - 20;
                         fl.style.left = (window.innerWidth / 2 - r.width / 2) + "px";
                         fl.style.top = (cardTop - r.height - 12) + "px";
+                        document.body.style.setProperty("--blue-top", cardTop + "px");
                     });
                 });
             }
@@ -1296,6 +1342,7 @@ document.addEventListener("click", e => {
     if(!card.contains(e.target) && !e.target.closest(".item") && e.target.id !== "openBtn"){
         card.classList.remove("show-mobile");
         document.body.classList.remove("hide-wheel");
+        document.body.style.removeProperty("--blue-top");
         dismissFloating();
         closeDetail();
     }
