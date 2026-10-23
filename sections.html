@@ -806,10 +806,7 @@ let radius;
 if (isMobile) {
     radius = 180;
 } else {
-    radius = Math.min(
-        Math.max(window.innerWidth * 0.16, 240),
-        340
-    );
+    radius = window.innerWidth * 0.25;
 }
 
 let index = 0;
@@ -1125,12 +1122,19 @@ function dismissFloating(){
     if(currentFloating){ currentFloating.remove(); currentFloating = null; }
 }
 
-function positionItems(){
+if (!isMobile) {
+    window.addEventListener("resize", () => {
+        radius = window.innerWidth * 0.25;
+        positionItems(window.innerWidth >= 1800 ? 160 : 120);
+    });
+}
+
+function positionItems(finalSize){
     itemEls.forEach((el, i) => {
         const theta = (i / items.length) * Math.PI * 2;
         const x = Math.cos(theta) * radius;
         const y = Math.sin(theta) * radius;
-        const size = el.offsetWidth;
+        const size = finalSize || el.offsetWidth;
 
         el.style.left = `calc(50% + ${x}px - ${size/2}px)`;
         el.style.top = `calc(50% + ${y}px - ${size/2}px)`;
