@@ -53,11 +53,7 @@ body {
 }
 
 :root {
-    --side-l: clamp(220px, 25vw, 520px);
-    --side-r: clamp(260px, 31vw, 640px);
-
-    --grad-left: linear-gradient(160deg, #1a9be0 0%, #0077b6 45%, #014f80 100%);
-    --grad-right: linear-gradient(200deg, #1a9be0 0%, #0077b6 45%, #014f80 100%);
+    --side-w: clamp(230px, 28vw, 600px);
 
     /* hiasan panel biru: cahaya lembut sahaja */
     --decor-left: radial-gradient(circle at 0 0, rgba(255,255,255,.16), transparent 55%);
@@ -66,12 +62,36 @@ body {
 
 .bg-maint {
     background-color: #ffffff;
+    background-image:
+        /* kiri: lengkuk bucu atas & bawah (sisi kanan panel kiri) */
+        radial-gradient(circle 150px at 0 100%, #0077b6 149.5px, transparent 150px),
+        radial-gradient(circle 150px at 0 0, #0077b6 149.5px, transparent 150px),
+        linear-gradient(#0077b6, #0077b6),
+        linear-gradient(#0077b6, #0077b6),
+        /* kanan: lengkuk bucu atas & bawah (sisi kiri panel kanan) */
+        radial-gradient(circle 150px at 100% 100%, #0077b6 149.5px, transparent 150px),
+        radial-gradient(circle 150px at 100% 0, #0077b6 149.5px, transparent 150px),
+        linear-gradient(#0077b6, #0077b6),
+        linear-gradient(#0077b6, #0077b6);
+    background-size:
+        150px 150px,
+        150px 150px,
+        calc(var(--side-w) - 150px) 100dvh,
+        var(--side-w) calc(100dvh - 300px),
+        150px 150px,
+        150px 150px,
+        calc(var(--side-w) - 150px) 100dvh,
+        var(--side-w) calc(100dvh - 300px);
+    background-position:
+        calc(var(--side-w) - 150px) 0,
+        calc(var(--side-w) - 150px) calc(100dvh - 150px),
+        0 0,
+        0 150px,
+        calc(100vw - var(--side-w)) 0,
+        calc(100vw - var(--side-w)) calc(100dvh - 150px),
+        calc(100vw - var(--side-w) + 150px) 0,
+        calc(100vw - var(--side-w)) 150px;
     background-repeat: no-repeat;
-}
-
-.blue-bg,
-.watermark {
-    display: none;
 }
 
 @media (max-width:768px){
@@ -458,8 +478,8 @@ drop-shadow(0 0 20px rgba(56,189,248,.5));
 .page-indicator{
     position: fixed;
     bottom: 32px;
-    left: var(--side-l);
-    width: calc(100vw - var(--side-l) - var(--side-r));
+    left: var(--side-w);
+    width: calc(100vw - 2 * var(--side-w));
     display: flex;
     justify-content: center;
     align-items: center;
@@ -579,75 +599,6 @@ opacity:0 !important;
 }
 
 @media (min-width: 769px) {
-    .blue-bg {
-        display: block;
-        position: fixed;
-        top: 0;
-        height: 100vh;
-        z-index: 0;
-        pointer-events: none;
-    }
-    .blue-left {
-        left: 0;
-        width: var(--side-l);
-        border-radius: 0 150px 150px 0;
-        background: var(--grad-left);
-    }
-    .blue-right {
-        right: 0;
-        width: var(--side-r);
-        border-radius: 150px 0 0 150px;
-        background: var(--grad-right);
-    }
-
-    /* cahaya spotlight di belakang helmet */
-    .stage::before {
-        content: "";
-        position: absolute;
-        top: 50%;
-        left: calc(50% + (var(--side-l) - var(--side-r)) / 2);
-        width: min(72vh, 42vw);
-        aspect-ratio: 1;
-        transform: translate(-50%, -50%);
-        border-radius: 50%;
-        background: radial-gradient(circle, rgba(0,119,182,.17) 0%, rgba(0,119,182,.07) 52%, transparent 70%);
-    }
-
-    /* nama seksyen besar & pudar di belakang helmet */
-    .watermark {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: var(--side-l);
-        right: var(--side-r);
-        padding: 0 24px;
-        overflow: hidden;
-        text-align: center;
-        font-size: clamp(56px, 6.2vw, 130px);
-        font-weight: 900;
-        line-height: .92;
-        letter-spacing: -0.02em;
-        text-transform: uppercase;
-        word-break: break-word;
-        color: rgba(0,119,182,.07);
-        user-select: none;
-    }
-    .watermark.swap { animation: wmIn .6s cubic-bezier(.22,1,.36,1); }
-    @keyframes wmIn {
-        from { opacity: 0; transform: translateY(16px); }
-        to { opacity: 1; transform: none; }
-    }
-
-    /* helmet terapung perlahan */
-    @keyframes floaty {
-        0%, 100% { translate: 0 0; }
-        50% { translate: 0 -10px; }
-    }
-    .item.active .section-helm { animation: floaty 4.5s ease-in-out infinite; }
-
     .panel {
         display: flex;
         flex-direction: column;
@@ -656,7 +607,7 @@ opacity:0 !important;
         top: 0;
         left: 0;
         right: auto;
-        width: var(--side-l);
+        width: var(--side-w);
         height: 100vh;
         padding: 40px 40px 40px 56px;
         z-index: 10;
@@ -716,14 +667,14 @@ opacity:0 !important;
     }
 
     .wheel {
-        left: calc(50% + (var(--side-l) - var(--side-r)) / 2 - 325px);
+        left: calc(50% - 325px);
         right: auto;
         top: calc(50% + 25vw);
         pointer-events: none;
     }
 
     .item { width:190px; height:190px; }
-    .section-helm { width:min(320px, 26vw); height:min(320px, 26vw); }
+    .section-helm { width:min(250px, 24vw); height:min(250px, 24vw); }
 
     .item { color: #0f3d6b; }
     .item:not(.active) { opacity: 0; }
@@ -735,7 +686,7 @@ opacity:0 !important;
         left: auto !important;
         right: 0 !important;
         transform: none !important;
-        width: var(--side-r) !important;
+        width: var(--side-w) !important;
         height: 100vh !important;
         max-height: 100vh !important;
         padding: 40px 36px !important;
@@ -764,7 +715,7 @@ opacity:0 !important;
 
     .detail-panel {
         border-radius: 150px 0 0 150px !important;
-        background: var(--decor-right), var(--grad-right);
+        background: var(--decor-right), #0077b6;
         backdrop-filter: none;
         padding: 56px 36px;
     }
@@ -847,7 +798,7 @@ opacity:0 !important;
     .wheel{
         width: 820px;
         height: 820px;
-        left: calc(50% + (var(--side-l) - var(--side-r)) / 2 - 410px);
+        left: calc(50% - 410px);
         right:auto;
     }
 
@@ -857,8 +808,8 @@ opacity:0 !important;
     }
 
     .section-helm{
-        width:380px;
-        height:380px;
+        width:250px;
+        height:250px;
     }
 
     .item.active{
@@ -900,11 +851,7 @@ opacity:0 !important;
 
 <app-sidebar></app-sidebar>
 
-<div class="blue-bg blue-left"></div>
-<div class="blue-bg blue-right"></div>
-
 <div class="stage">
-<div class="watermark" id="watermark"></div>
 <div class="wheel" id="wheel"></div>
 </div>
 
@@ -941,7 +888,6 @@ const API_URL = "https://me-connect-api.mech-elec-ranhill.workers.dev";
 
 const wheel = document.getElementById("wheel");
 const sectionList = document.getElementById("sectionList");
-const watermark = document.getElementById("watermark");
 const card = document.getElementById("infoCard");
 const cardTitle = document.getElementById("cardTitle");
 const cardDesc = document.getElementById("cardDesc");
@@ -1414,10 +1360,6 @@ function update() {
     document.body.classList.add(newBgClass);
 
     sectionList.querySelectorAll(".section-link").forEach((b, i) => b.classList.toggle("active", i === index));
-    watermark.textContent = item.title;
-    watermark.classList.remove("swap");
-    void watermark.offsetWidth;
-    watermark.classList.add("swap");
     cardTitle.innerText = isMobile ? item.title : "Contract Overview";
 
     currentLists = { ongoing: [], renewal: [], cpc: [], risk: [] };
