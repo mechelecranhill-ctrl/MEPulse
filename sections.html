@@ -453,32 +453,48 @@ drop-shadow(0 0 10px rgba(56,189,248,.8))
 drop-shadow(0 0 20px rgba(56,189,248,.5));
 }
 
-.nav-controls{
+.page-indicator{
     position: fixed;
-    bottom: 30px;
-    left: 75%;
-    transform: translateX(-50%);
+    bottom: 32px;
+    left: 0;
+    width: 50vw;
     display: flex;
-    gap: 18px;
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
     z-index: 9999;
+    pointer-events: none;
+    --dot-color: #0077b6;
+    transition: opacity .3s ease;
 }
 
-.nav-controls button{
-    width: 52px;
-    height: 52px;
-    border-radius: 14px;
-    border: 1px solid rgba(255,255,255,0.2);
-    background: rgba(255,255,255,0.08);
-    color: white;
-    font-size: 18px;
-    backdrop-filter: blur(10px);
+.page-dot{
+    pointer-events: auto;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: none;
+    background: transparent;
     cursor: pointer;
-    transition: 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
 }
 
-.nav-controls button:active{
-    transform: scale(0.92);
+.page-dot::after{
+    content: "";
+    display: block;
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: var(--dot-color);
+    opacity: .3;
+    transition: width .35s cubic-bezier(.22,1,.36,1), opacity .3s;
 }
+
+.page-dot:hover::after{ opacity: .6; }
+.page-dot.active::after{ width: 26px; opacity: 1; }
 
 @media (max-width:768px){
     .panel { display:none; }
@@ -532,26 +548,13 @@ transition:0.3s ease;
 body.hide-wheel .item.active{
 opacity:0 !important;
 }
-    .nav-controls{
-        position: fixed;
-        top: 50%;
-        bottom: auto;
-        left: 0;
+    .page-indicator{
         width: 100vw;
-        transform: translateY(-50%);
-        justify-content: center;
-        gap: min(400px, calc(100vw - 116px));
-        pointer-events: none;
-        transition: opacity .3s ease;
+        bottom: 28px;
+        --dot-color: #ffffff;
     }
-    .nav-controls button {
-        pointer-events: auto;
-        color: #0077b6;
-        border: 1px solid rgba(0,119,182,.35);
-        background: rgba(0,119,182,.08);
-    }
-    body.hide-wheel .nav-controls { opacity: 0; }
-    body.hide-wheel .nav-controls button { pointer-events: none; }
+    body.hide-wheel .page-indicator { opacity: 0; }
+    body.hide-wheel .page-dot { pointer-events: none; }
 
     .item { color: #0f3d6b; }
     .item:not(.active) { opacity: 0; }
@@ -578,22 +581,6 @@ opacity:0 !important;
     .item { width:190px; height:190px; }
     .section-helm { width:250px; height:250px; }
 
-    .nav-controls {
-        top: 50%;
-        bottom: auto;
-        left: 0;
-        width: 50vw;
-        transform: translateY(-50%);
-        justify-content: center;
-        gap: max(18px, min(560px, calc(50vw - 116px)));
-        pointer-events: none;
-    }
-    .nav-controls button {
-        pointer-events: auto;
-        color: #0077b6;
-        border: 1px solid rgba(0,119,182,.35);
-        background: rgba(0,119,182,.08);
-    }
     .item { color: #0f3d6b; }
     .item:not(.active) { opacity: 0; }
     .item.active .section-helm { filter: drop-shadow(0 8px 18px rgba(0,119,182,.35)); }
@@ -749,10 +736,7 @@ opacity:0 !important;
 <p>Department Sections</p>
 </div>
 
-<div class="nav-controls">
-    <button id="prevBtn"><i class="fa fa-chevron-left"></i></button>
-    <button id="nextBtn"><i class="fa fa-chevron-right"></i></button>
-</div>
+<div class="page-indicator" id="pageIndicator"></div>
 
 <div class="info-card" id="infoCard">
     <h2 id="cardTitle"></h2>
@@ -784,8 +768,7 @@ const card = document.getElementById("infoCard");
 const cardTitle = document.getElementById("cardTitle");
 const cardDesc = document.getElementById("cardDesc");
 const openBtn = document.getElementById("openBtn");
-const prevBtn = document.getElementById("prevBtn");
-const nextBtn = document.getElementById("nextBtn");
+const pageIndicator = document.getElementById("pageIndicator");
 const detailPanel = document.getElementById("detailPanel");
 const detailPanelTitle = document.getElementById("detailPanelTitle");
 const detailList = document.getElementById("detailList");
@@ -903,9 +886,6 @@ let currentLists = {
     cpc: [],
     risk: []
 };
-
-prevBtn.addEventListener("click", () => { prev(); });
-nextBtn.addEventListener("click", () => { next(); });
 
 detailBackBtn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -1146,6 +1126,15 @@ function createWheel(){
         wheel.appendChild(el);
     });
 
+    pageIndicator.innerHTML = "";
+    items.forEach((item, i) => {
+        const dot = document.createElement("button");
+        dot.className = "page-dot";
+        dot.setAttribute("aria-label", "Go to " + item.title);
+        dot.addEventListener("click", () => goTo(i));
+        pageIndicator.appendChild(dot);
+    });
+
     itemEls = document.querySelectorAll(".item");
 
     itemEls.forEach((el, i) => {
@@ -1228,6 +1217,7 @@ function update() {
 
     itemEls.forEach(e => e.classList.remove("active"));
     itemEls[index].classList.add("active");
+    pageIndicator.querySelectorAll(".page-dot").forEach((d, i) => d.classList.toggle("active", i === index));
 
     const item = items[index];
     activeSection = { id: item.id, name: item.title };
@@ -1308,6 +1298,16 @@ function render(){
 
 function next(){ index=(index+1)%items.length; baseAngle-=stepAngle; closeDetail(); update(); render(); }
 function prev(){ index=(index-1+items.length)%items.length; baseAngle+=stepAngle; closeDetail(); update(); render(); }
+
+function goTo(i){
+    if(i === index) return;
+    let diff = i - index;
+    if (diff > items.length / 2) diff -= items.length;
+    if (diff < -items.length / 2) diff += items.length;
+    baseAngle -= diff * stepAngle;
+    index = i;
+    closeDetail(); update(); render();
+}
 
 let buffer = 0;
 window.addEventListener("wheel", e => {
