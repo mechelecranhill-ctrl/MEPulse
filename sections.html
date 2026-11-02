@@ -52,27 +52,42 @@ body {
     initial-value: 70dvh;
 }
 
+:root {
+    --side-w: clamp(230px, 28vw, 600px);
+}
+
 .bg-maint {
     background-color: #ffffff;
     background-image:
+        /* kiri: lengkuk bucu atas & bawah (sisi kanan panel kiri) */
         radial-gradient(circle 150px at 0 100%, #0077b6 149.5px, transparent 150px),
         radial-gradient(circle 150px at 0 0, #0077b6 149.5px, transparent 150px),
         linear-gradient(#0077b6, #0077b6),
         linear-gradient(#0077b6, #0077b6),
-        radial-gradient(circle at center, rgba(0,119,182,.18) 1.3px, transparent 1.8px);
+        /* kanan: lengkuk bucu atas & bawah (sisi kiri panel kanan) */
+        radial-gradient(circle 150px at 100% 100%, #0077b6 149.5px, transparent 150px),
+        radial-gradient(circle 150px at 100% 0, #0077b6 149.5px, transparent 150px),
+        linear-gradient(#0077b6, #0077b6),
+        linear-gradient(#0077b6, #0077b6);
     background-size:
         150px 150px,
         150px 150px,
-        calc(50vw - 150px) 100dvh,
-        50vw calc(100dvh - 300px),
-        26px 26px;
+        calc(var(--side-w) - 150px) 100dvh,
+        var(--side-w) calc(100dvh - 300px),
+        150px 150px,
+        150px 150px,
+        calc(var(--side-w) - 150px) 100dvh,
+        var(--side-w) calc(100dvh - 300px);
     background-position:
-        calc(50vw - 150px) 0,
-        calc(50vw - 150px) calc(100dvh - 150px),
+        calc(var(--side-w) - 150px) 0,
+        calc(var(--side-w) - 150px) calc(100dvh - 150px),
         0 0,
         0 150px,
-        0 0;
-    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat;
+        calc(100vw - var(--side-w)) 0,
+        calc(100vw - var(--side-w)) calc(100dvh - 150px),
+        calc(100vw - var(--side-w) + 150px) 0,
+        calc(100vw - var(--side-w)) 150px;
+    background-repeat: no-repeat;
 }
 
 @media (max-width:768px){
@@ -459,8 +474,8 @@ drop-shadow(0 0 20px rgba(56,189,248,.5));
 .page-indicator{
     position: fixed;
     bottom: 32px;
-    left: 50vw;
-    width: 50vw;
+    left: var(--side-w);
+    width: calc(100vw - 2 * var(--side-w));
     display: flex;
     justify-content: center;
     align-items: center;
@@ -580,15 +595,65 @@ opacity:0 !important;
 }
 
 @media (min-width: 769px) {
-    .panel { display:none; }
+    .panel {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: auto;
+        width: var(--side-w);
+        height: 100vh;
+        padding: 40px 40px 40px 56px;
+        z-index: 10;
+        pointer-events: none;
+    }
+    .panel-label {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        margin-bottom: 14px;
+    }
+    .panel h1 {
+        font-size: clamp(28px, 2.7vw, 48px);
+        line-height: 1.15;
+        font-weight: 800;
+        word-break: break-word;
+    }
+    .panel h1.swap { animation: titleIn .5s cubic-bezier(.22,1,.36,1); }
+    .panel-count {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-top: 26px;
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 1.5px;
+        opacity: .8;
+    }
+    .panel-count::before {
+        content: "";
+        width: 36px;
+        height: 2px;
+        background: #fff;
+        opacity: .7;
+    }
+    @keyframes titleIn {
+        from { opacity: 0; transform: translateY(14px); }
+        to { opacity: 1; transform: none; }
+    }
 
     .wheel {
-        left: auto;
-        right: -325px;
+        left: calc(50% - 325px);
+        right: auto;
+        top: calc(50% + 25vw);
+        pointer-events: none;
     }
 
     .item { width:190px; height:190px; }
-    .section-helm { width:250px; height:250px; }
+    .section-helm { width:min(250px, 24vw); height:min(250px, 24vw); }
 
     .item { color: #0f3d6b; }
     .item:not(.active) { opacity: 0; }
@@ -597,13 +662,13 @@ opacity:0 !important;
     .info-card {
         position: fixed !important;
         top: 0 !important;
-        left: 0 !important;
-        right: auto !important;
+        left: auto !important;
+        right: 0 !important;
         transform: none !important;
-        width: 50vw !important;
+        width: var(--side-w) !important;
         height: 100vh !important;
         max-height: 100vh !important;
-        padding: 40px !important;
+        padding: 40px 36px !important;
         border-radius: 30px !important;
         border-left: none;
         border-top: none !important;
@@ -620,10 +685,10 @@ opacity:0 !important;
     }
 
     .detail-panel {
-        border-radius: 0 150px 150px 0 !important;
+        border-radius: 150px 0 0 150px !important;
         background: #0077b6;
         backdrop-filter: none;
-        padding: 56px 48px;
+        padding: 56px 36px;
     }
     .detail-panel-title {
         padding: 5px 12px;
@@ -652,9 +717,9 @@ opacity:0 !important;
     }
 
     .status-row {
-        padding: 16px 20px;
+        padding: 14px 16px;
         margin-bottom: 8px;
-        font-size: 16px;
+        font-size: 15px;
     }
 
     .status-badge {
@@ -669,13 +734,13 @@ opacity:0 !important;
         flex-shrink: 0;
     }
 
-    @keyframes fadeInLeftDesktop {
-        from { opacity: 0; transform: translateX(-100%); }
+    @keyframes fadeInRightDesktop {
+        from { opacity: 0; transform: translateX(100%); }
         to { opacity: 1; transform: translateX(0); }
     }
 
     .info-card.show {
-        animation: fadeInLeftDesktop .45s cubic-bezier(.22, 1, .36, 1) forwards !important;
+        animation: fadeInRightDesktop .45s cubic-bezier(.22, 1, .36, 1) forwards !important;
     }
 }
 
@@ -683,8 +748,8 @@ opacity:0 !important;
     .wheel{
         width: 820px;
         height: 820px;
-        left:auto;
-        right:-410px;
+        left: calc(50% - 410px);
+        right:auto;
     }
 
     .item{
@@ -702,9 +767,7 @@ opacity:0 !important;
     }
 
     .info-card{
-        width:calc(50vw - 60px) !important;
-        max-width:900px;
-        padding:38px !important;
+        padding:38px 40px !important;
     }
 
     .info-card h2{
@@ -743,8 +806,9 @@ opacity:0 !important;
 </div>
 
 <div class="panel">
+<p class="panel-label">Department Sections</p>
 <h1 id="title">M&E</h1>
-<p>Department Sections</p>
+<div class="panel-count" id="panelCount"></div>
 </div>
 
 <div class="page-indicator" id="pageIndicator"></div>
@@ -775,6 +839,7 @@ const API_URL = "https://me-connect-api.mech-elec-ranhill.workers.dev";
 
 const wheel = document.getElementById("wheel");
 const title = document.getElementById("title");
+const panelCount = document.getElementById("panelCount");
 const card = document.getElementById("infoCard");
 const cardTitle = document.getElementById("cardTitle");
 const cardDesc = document.getElementById("cardDesc");
@@ -1211,7 +1276,7 @@ if (!isMobile) {
 
 function positionItems(finalSize){
     itemEls.forEach((el, i) => {
-        const theta = (i / items.length) * Math.PI * 2 + (isMobile ? 0 : Math.PI);
+        const theta = (i / items.length) * Math.PI * 2 + (isMobile ? 0 : -Math.PI / 2);
         const x = Math.cos(theta) * radius;
         const y = Math.sin(theta) * radius;
         const size = finalSize || el.offsetWidth;
@@ -1238,7 +1303,11 @@ function update() {
     document.body.classList.add(newBgClass);
 
     title.innerText = item.title;
-    cardTitle.innerText = item.title;
+    title.classList.remove("swap");
+    void title.offsetWidth;
+    title.classList.add("swap");
+    panelCount.innerText = String(index + 1).padStart(2, "0") + " / " + String(items.length).padStart(2, "0");
+    cardTitle.innerText = isMobile ? item.title : "Contract Overview";
 
     currentLists = { ongoing: [], renewal: [], cpc: [], risk: [] };
 
