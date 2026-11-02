@@ -616,13 +616,42 @@ opacity:0 !important;
         text-transform: uppercase;
         margin-bottom: 14px;
     }
-    .panel h1 {
-        font-size: clamp(28px, 2.7vw, 48px);
-        line-height: 1.15;
-        font-weight: 800;
-        word-break: break-word;
+    .section-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-height: 68vh;
+        overflow-y: auto;
+        scrollbar-width: none;
+        padding: 6px 0;
     }
-    .panel h1.swap { animation: titleIn .5s cubic-bezier(.22,1,.36,1); }
+    .section-list::-webkit-scrollbar { display: none; }
+    .section-link {
+        pointer-events: auto;
+        text-align: left;
+        background: none;
+        border: none;
+        border-left: 3px solid transparent;
+        padding: 4px 0 4px 16px;
+        color: #fff;
+        font-family: inherit;
+        font-size: clamp(14px, 1.2vw, 18px);
+        font-weight: 600;
+        line-height: 1.2;
+        word-break: break-word;
+        opacity: .5;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition: font-size .35s cubic-bezier(.22,1,.36,1), opacity .3s, border-color .3s;
+    }
+    .section-link:hover { opacity: .8; }
+    .section-link.active {
+        font-size: clamp(24px, 2.7vw, 44px);
+        font-weight: 800;
+        opacity: 1;
+        border-left-color: #fff;
+        cursor: default;
+    }
     .panel-count {
         display: flex;
         align-items: center;
@@ -639,10 +668,6 @@ opacity:0 !important;
         height: 2px;
         background: #fff;
         opacity: .7;
-    }
-    @keyframes titleIn {
-        from { opacity: 0; transform: translateY(14px); }
-        to { opacity: 1; transform: none; }
     }
 
     .wheel {
@@ -807,7 +832,7 @@ opacity:0 !important;
 
 <div class="panel">
 <p class="panel-label">Department Sections</p>
-<h1 id="title">M&E</h1>
+<div class="section-list" id="sectionList"></div>
 <div class="panel-count" id="panelCount"></div>
 </div>
 
@@ -838,7 +863,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 const API_URL = "https://me-connect-api.mech-elec-ranhill.workers.dev";
 
 const wheel = document.getElementById("wheel");
-const title = document.getElementById("title");
+const sectionList = document.getElementById("sectionList");
 const panelCount = document.getElementById("panelCount");
 const card = document.getElementById("infoCard");
 const cardTitle = document.getElementById("cardTitle");
@@ -1211,6 +1236,15 @@ function createWheel(){
         pageIndicator.appendChild(dot);
     });
 
+    sectionList.innerHTML = "";
+    items.forEach((item, i) => {
+        const btn = document.createElement("button");
+        btn.className = "section-link";
+        btn.textContent = item.title;
+        btn.addEventListener("click", () => goTo(i));
+        sectionList.appendChild(btn);
+    });
+
     itemEls = document.querySelectorAll(".item");
 
     itemEls.forEach((el, i) => {
@@ -1302,10 +1336,7 @@ function update() {
     document.body.classList.remove("bg-maint");
     document.body.classList.add(newBgClass);
 
-    title.innerText = item.title;
-    title.classList.remove("swap");
-    void title.offsetWidth;
-    title.classList.add("swap");
+    sectionList.querySelectorAll(".section-link").forEach((b, i) => b.classList.toggle("active", i === index));
     panelCount.innerText = String(index + 1).padStart(2, "0") + " / " + String(items.length).padStart(2, "0");
     cardTitle.innerText = isMobile ? item.title : "Contract Overview";
 
