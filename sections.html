@@ -53,8 +53,6 @@ body {
 }
 
 :root {
-    --side-w: clamp(230px, 28vw, 600px);
-
     /* hiasan panel biru: cahaya lembut sahaja */
     --decor-left: radial-gradient(circle at 0 0, rgba(255,255,255,.16), transparent 55%);
     --decor-right: radial-gradient(circle at 100% 100%, rgba(255,255,255,.16), transparent 55%);
@@ -62,35 +60,6 @@ body {
 
 .bg-maint {
     background-color: #ffffff;
-    background-image:
-        /* kiri: lengkuk bucu atas & bawah (sisi kanan panel kiri) */
-        radial-gradient(circle 150px at 0 100%, #0077b6 149.5px, transparent 150px),
-        radial-gradient(circle 150px at 0 0, #0077b6 149.5px, transparent 150px),
-        linear-gradient(#0077b6, #0077b6),
-        linear-gradient(#0077b6, #0077b6),
-        /* kanan: lengkuk bucu atas & bawah (sisi kiri panel kanan) */
-        radial-gradient(circle 150px at 100% 100%, #0077b6 149.5px, transparent 150px),
-        radial-gradient(circle 150px at 100% 0, #0077b6 149.5px, transparent 150px),
-        linear-gradient(#0077b6, #0077b6),
-        linear-gradient(#0077b6, #0077b6);
-    background-size:
-        150px 150px,
-        150px 150px,
-        calc(var(--side-w) - 150px) 100dvh,
-        var(--side-w) calc(100dvh - 300px),
-        150px 150px,
-        150px 150px,
-        calc(var(--side-w) - 150px) 100dvh,
-        var(--side-w) calc(100dvh - 300px);
-    background-position:
-        calc(var(--side-w) - 150px) 0,
-        calc(var(--side-w) - 150px) calc(100dvh - 150px),
-        0 0,
-        0 150px,
-        calc(100vw - var(--side-w)) 0,
-        calc(100vw - var(--side-w)) calc(100dvh - 150px),
-        calc(100vw - var(--side-w) + 150px) 0,
-        calc(100vw - var(--side-w)) 150px;
     background-repeat: no-repeat;
 }
 
@@ -478,8 +447,8 @@ drop-shadow(0 0 20px rgba(56,189,248,.5));
 .page-indicator{
     position: fixed;
     bottom: 32px;
-    left: var(--side-w);
-    width: calc(100vw - 2 * var(--side-w));
+    left: 0;
+    width: 100vw;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -517,6 +486,8 @@ drop-shadow(0 0 20px rgba(56,189,248,.5));
 
 .page-dot:hover::after{ opacity: .6; }
 .page-dot.active::after{ width: 26px; opacity: 1; }
+
+.cs-page { display: none; }
 
 @media (max-width:768px){
     .panel { display:none; }
@@ -599,43 +570,113 @@ opacity:0 !important;
 }
 
 @media (min-width: 769px) {
-    .panel {
+    /* shell mobile disembunyikan di desktop */
+    .stage, .page-indicator { display: none; }
+
+    /* ---------- halaman gaya "character select" ---------- */
+    .cs-page {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: auto;
-        width: var(--side-w);
-        height: 100vh;
-        padding: 40px 40px 40px 56px;
-        z-index: 10;
-        pointer-events: none;
-        border-radius: 0 150px 150px 0;
-        overflow: hidden;
+        padding: 20px 4%;
+        color: #0f3d6b;
+        background:
+            radial-gradient(ellipse at 50% 45%, rgba(0,119,182,.12) 0%, transparent 60%),
+            #ffffff;
+        isolation: isolate;
     }
-    .panel::before {
+    .cs-page::before {
         content: "";
         position: absolute;
         inset: 0;
-        background: var(--decor-left);
         z-index: -1;
+        pointer-events: none;
+        background-image:
+            linear-gradient(rgba(0,119,182,.10) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0,119,182,.10) 1px, transparent 1px);
+        background-size: 45px 45px;
+        -webkit-mask-image: linear-gradient(to bottom, transparent, #000);
+        mask-image: linear-gradient(to bottom, transparent, #000);
+    }
+
+    /* header */
+    .cs-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+    }
+    .cs-logo img {
+        display: block;
+        height: 38px;
+        width: auto;
+    }
+    .cs-header-info {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 2px;
+        color: rgba(15,61,107,.6);
+    }
+
+    /* grid utama */
+    .cs-main {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, 1fr);
+        gap: 24px;
+        align-items: stretch;
+        padding: 18px 0;
+    }
+
+    .cs-side {
+        position: relative;
+        min-width: 0;
+        overflow: hidden;
+        border-radius: 32px;
+        color: #ffffff;
+        box-shadow: 0 20px 44px rgba(0,119,182,.28);
+    }
+    .cs-left  { background: var(--decor-left), #0077b6; }
+    .cs-right { background: var(--decor-right), #0077b6; }
+    .cs-side::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 32px;
+        width: 34px;
+        height: 3px;
+        background: #ffffff;
+        z-index: 3;
+    }
+
+    /* ---------- kiri: senarai seksyen ---------- */
+    .cs-left .panel {
+        position: absolute;
+        inset: 0;
+        display: block;
+        padding: 0;
+        pointer-events: none;
     }
     .section-viewport {
         position: absolute;
         left: 0;
         right: 0;
-        top: 96px;
-        bottom: 96px;
+        top: 32px;
+        bottom: 32px;
         overflow: hidden;
         -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 16%, #000 84%, transparent 100%);
         mask-image: linear-gradient(to bottom, transparent 0, #000 16%, #000 84%, transparent 100%);
     }
     .section-list {
         position: absolute;
-        left: 56px;
-        right: 40px;
+        left: 34px;
+        right: 22px;
         top: 50%;
         display: flex;
         flex-direction: column;
@@ -683,83 +724,234 @@ opacity:0 !important;
         line-height: 1.15;
     }
 
-    /* trek coverflow di lajur putih tengah */
-    .wheel {
-        left: var(--side-w);
-        right: var(--side-w);
-        top: 0;
-        bottom: 0;
-        width: auto;
-        height: auto;
-        transform: none !important;
-        transition: none;
-        overflow: hidden;
-        perspective: 1400px;
-        pointer-events: none;
+    /* ---------- tengah: hero + roster ---------- */
+    .cs-center {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
     }
-
-    /* bayang lembut di lantai bawah helmet */
-    .wheel::after {
+    .cs-stage {
+        position: relative;
+        width: 100%;
+        height: min(53vh, 430px);
+        min-height: 200px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .cs-glow {
+        position: absolute;
+        width: 80%;
+        height: 80%;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(0,119,182,.18), transparent 70%);
+    }
+    .cs-stage::after {
         content: "";
         position: absolute;
+        bottom: 4%;
         left: 50%;
-        top: calc(50% + min(250px, 24vw) * .72 + 14px);
-        width: 240px;
-        height: 24px;
+        width: 46%;
+        height: 22px;
         transform: translateX(-50%);
         border-radius: 50%;
         background: radial-gradient(ellipse at center, rgba(0,119,182,.28), transparent 70%);
-        pointer-events: none;
+    }
+    .hero-img {
+        position: relative;
+        z-index: 1;
+        height: 100%;
+        max-width: 100%;
+        object-fit: contain;
+        filter: drop-shadow(0 18px 28px rgba(0,119,182,.35));
+        transition: opacity .2s;
+    }
+    .hero-img.enter { animation: csEnter .5s ease; }
+    .hero-fallback {
+        position: relative;
+        z-index: 1;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        width: min(60%, 260px);
+        aspect-ratio: 1;
+        border-radius: 50%;
+        background: rgba(0,119,182,.12);
+        color: #0077b6;
+        font-size: 96px;
+        font-weight: 800;
+        transition: opacity .2s;
+    }
+    @keyframes csEnter {
+        from { opacity: 0; transform: translateY(15px); }
+        to { opacity: 1; transform: translateY(0); }
     }
 
-    .item { width:190px; height:190px; }
-    .section-helm { width:min(250px, 24vw); height:min(250px, 24vw); }
-
-    .item {
+    .cs-name {
+        text-align: center;
+        max-width: 100%;
+        padding: 0 8px;
+        font-size: clamp(18px, 1.9vw, 28px);
+        font-weight: 800;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        line-height: 1.2;
+        text-wrap: balance;
         color: #0f3d6b;
-        cursor: pointer;
-        transition: transform .7s cubic-bezier(.22,1,.36,1), opacity .5s ease, filter .5s ease;
     }
-    .item.active .section-helm { filter: drop-shadow(0 8px 18px rgba(0,119,182,.35)); }
+    .cs-role {
+        text-align: center;
+        margin-top: 6px;
+        color: #0077b6;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 4px;
+    }
 
+    .cs-grid {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .cs-card {
+        position: relative;
+        width: clamp(48px, 6vw, 72px);
+        aspect-ratio: 1;
+        padding: 3px;
+        border: 1px solid rgba(0,119,182,.25);
+        border-radius: 6px;
+        background: #f1f8fc;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-family: inherit;
+        -webkit-tap-highlight-color: transparent;
+        transition: .2s;
+    }
+    .cs-card img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        pointer-events: none;
+        filter: grayscale(1) opacity(.55);
+        transition: filter .2s;
+    }
+    .cs-card-fallback {
+        font-size: 22px;
+        font-weight: 800;
+        color: rgba(0,119,182,.5);
+    }
+    .cs-card:hover,
+    .cs-card.active {
+        border-color: #0077b6;
+        background: #e3f2fb;
+        box-shadow: 0 0 15px rgba(0,119,182,.4);
+        transform: translateY(-3px);
+    }
+    .cs-card:hover img,
+    .cs-card.active img { filter: none; }
+
+    /* ---------- kanan: ringkasan kontrak ---------- */
     .info-card {
-        position: fixed !important;
-        top: 0 !important;
-        left: auto !important;
-        right: 0 !important;
-        transform: none !important;
-        width: var(--side-w) !important;
-        height: 100vh !important;
-        max-height: 100vh !important;
-        padding: 40px 36px !important;
-        border-radius: 150px 0 0 150px !important;
-        border-left: none;
-        border-top: none !important;
-        border-right: none !important;
-        border-bottom: none !important;
+        position: relative;
+        z-index: 1;
+        top: auto;
+        right: auto;
+        transform: none;
+        width: 100%;
+        height: 100%;
+        max-height: none;
+        padding: 28px;
+        border-radius: 0;
         background: transparent;
+        border: none;
         backdrop-filter: none;
         display: flex;
         flex-direction: column;
         justify-content: center;
-        overflow: hidden !important;
-        opacity: 0;
-        visibility: visible !important;
+        overflow: hidden;
+        opacity: 1;
+        visibility: visible;
+        animation: none;
     }
+    .info-card.show { animation: none; }
+    .info-card.show #cardDesc { animation: csFadeUp .45s cubic-bezier(.22,1,.36,1); }
+    @keyframes csFadeUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: none; }
+    }
+    .info-card h2 {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        opacity: .65;
+        margin-bottom: 18px;
+        line-height: 1.2;
+        flex-shrink: 0;
+    }
+    #openBtn { display: none; }
 
-    .info-card::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: var(--decor-right);
-        z-index: -1;
+    #cardDesc {
+        flex: none;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
     }
+    .cs-stat {
+        padding: 11px 12px;
+        border-radius: 14px;
+        cursor: pointer;
+        outline: none;
+        transition: background .2s;
+    }
+    .cs-stat:hover,
+    .cs-stat:focus-visible { background: rgba(255,255,255,.1); }
+    .cs-stat-label {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        letter-spacing: .5px;
+    }
+    .cs-stat-label span:first-child { min-width: 0; word-break: break-word; }
+    .cs-stat-label span:last-child { flex-shrink: 0; font-size: 17px; font-weight: 700; }
+    .cs-bar {
+        height: 5px;
+        border-radius: 3px;
+        background: rgba(255,255,255,.2);
+        overflow: hidden;
+    }
+    .cs-bar-fill {
+        height: 100%;
+        width: 0;
+        border-radius: 3px;
+        transition: width .6s cubic-bezier(.22,1,.36,1);
+    }
+    .cs-total {
+        margin-top: 14px;
+        padding: 16px 12px 0;
+        border-top: 1px solid rgba(255,255,255,.2);
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+    }
+    .cs-total span { font-size: 11px; font-weight: 600; letter-spacing: 2px; opacity: .65; }
+    .cs-total strong { font-size: 22px; font-weight: 800; }
 
     .detail-panel {
-        border-radius: 150px 0 0 150px !important;
+        border-radius: 0;
         background: var(--decor-right), #0077b6;
         backdrop-filter: none;
-        padding: 56px 36px;
+        padding: 30px 26px 26px;
     }
     .detail-panel-title {
         padding: 5px 12px;
@@ -771,108 +963,51 @@ opacity:0 !important;
         border: 1px solid rgba(255, 255, 255, 0.14);
     }
 
-    .info-card h2 {
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 2px;
-        text-transform: uppercase;
-        opacity: .65;
-        margin-bottom: 14px;
-        line-height: 1.2;
+    /* ---------- footer ---------- */
+    .cs-footer {
         flex-shrink: 0;
-    }
-
-    #cardDesc {
-        flex: none;
-        overflow: hidden !important;
         display: flex;
-        flex-direction: column;
-        justify-content: flex-start;
-        gap: 4px;
+        justify-content: space-between;
+        align-items: center;
+        gap: 15px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(0,119,182,.18);
     }
-
-    .status-row {
-        padding: 14px 16px;
-        margin-bottom: 8px;
-        font-size: 15px;
+    .cs-hint {
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: 1px;
+        color: rgba(15,61,107,.6);
     }
-
-    .status-badge {
-        font-size: 14px;
-        padding: 5px 12px;
+    .cs-start {
+        padding: 12px 35px;
+        border: none;
+        background: #0077b6;
+        color: #ffffff;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 2px;
+        cursor: pointer;
+        clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px),
+                           calc(100% - 10px) 100%, 0 100%, 0 10px);
+        transition: .2s;
     }
-
-    .status-row {
-        border-radius: 16px;
-        background: rgba(255,255,255,.08);
-        border-color: rgba(255,255,255,.16);
-        transition: background .2s, transform .2s;
-    }
-    .status-row:hover {
-        background: rgba(255,255,255,.16);
-        transform: translateX(-4px);
-    }
-
-    #openBtn {
-        margin-top: 24px;
-        padding: 16px 0;
-        font-size: 16px;
-        flex-shrink: 0;
-        background: #ffffff;
-        color: #0077b6;
-        border: 1px solid #ffffff;
-        font-weight: 700;
-    }
-    #openBtn:hover { background: #e8f6ff; }
-    #openBtn:active { background: #d6eefc; }
-
-    @keyframes fadeInRightDesktop {
-        from { opacity: 0; transform: translateX(100%); }
-        to { opacity: 1; transform: translateX(0); }
-    }
-
-    .info-card.show {
-        animation: fadeInRightDesktop .45s cubic-bezier(.22, 1, .36, 1) forwards !important;
+    .cs-start:hover {
+        background: #0f3d6b;
+        transform: translateY(-2px);
     }
 }
 
-@media (min-width: 1800px){
-    .item{
-        width:190px;
-        height:190px;
-    }
+@media (min-width: 769px) and (max-width: 1000px) {
+    .cs-main { gap: 14px; grid-template-columns: .9fr 1.4fr .9fr; }
+    .cs-hint { display: none; }
+}
 
-    .section-helm{
-        width:250px;
-        height:250px;
-    }
-
-    .item.active{
-        transform:scale(1.25);
-    }
-
-    .info-card{
-        padding:38px 40px !important;
-    }
-
-    .info-card h2{
-        font-size:13px;
-    }
-
-    .status-row{
-        padding:18px 22px;
-        font-size:18px;
-    }
-
-    .status-badge{
-        font-size:16px;
-        padding:6px 14px;
-    }
-
-    #openBtn{
-        font-size:18px;
-        padding:16px 0;
-    }
+@media (min-width: 769px) and (max-height: 600px) {
+    .cs-page { padding: 12px 4%; }
+    .cs-main { padding: 8px 0; }
+    .cs-stage { height: 40vh; }
 }
 </style>
 
@@ -886,17 +1021,59 @@ opacity:0 !important;
 
 <app-sidebar></app-sidebar>
 
+<!-- ===== mobile: wheel asal ===== -->
 <div class="stage">
 <div class="wheel" id="wheel"></div>
 </div>
 
-<div class="panel">
-<div class="section-viewport">
-    <div class="section-list" id="sectionList"></div>
-</div>
-</div>
-
 <div class="page-indicator" id="pageIndicator"></div>
+
+<!-- ===== desktop: gaya character select ===== -->
+<div class="cs-page" id="csPage">
+
+    <header class="cs-header">
+        <div class="cs-logo"><img src="icon.svg" alt="M&amp;E Connect"></div>
+        <div class="cs-header-info">
+            <span id="csDate"></span>
+            <span id="csCount"></span>
+        </div>
+    </header>
+
+    <main class="cs-main">
+
+        <section class="cs-side cs-left">
+            <div class="panel">
+                <div class="section-viewport">
+                    <div class="section-list" id="sectionList"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="cs-center">
+            <div class="cs-stage">
+                <div class="cs-glow"></div>
+                <img id="heroImg" class="hero-img" alt="" style="opacity:0">
+                <div id="heroFallback" class="hero-fallback"></div>
+            </div>
+
+            <div>
+                <div class="cs-name" id="csName"></div>
+                <div class="cs-role" id="csRole"></div>
+            </div>
+
+            <div class="cs-grid" id="csGrid"></div>
+        </section>
+
+        <section class="cs-side cs-right" id="csRight"></section>
+
+    </main>
+
+    <footer class="cs-footer">
+        <div class="cs-hint">&larr; &rarr; PILIH SEKSYEN &nbsp;|&nbsp; ENTER BUKA DASHBOARD</div>
+        <button class="cs-start" id="startButton">OPEN DASHBOARD &#8599;</button>
+    </footer>
+
+</div>
 
 <div class="info-card" id="infoCard">
     <h2 id="cardTitle"></h2>
@@ -932,6 +1109,14 @@ const pageIndicator = document.getElementById("pageIndicator");
 const detailPanel = document.getElementById("detailPanel");
 const detailPanelTitle = document.getElementById("detailPanelTitle");
 const detailList = document.getElementById("detailList");
+const heroImg = document.getElementById("heroImg");
+const heroFallback = document.getElementById("heroFallback");
+const csName = document.getElementById("csName");
+const csRole = document.getElementById("csRole");
+const csGrid = document.getElementById("csGrid");
+const csCount = document.getElementById("csCount");
+const csDate = document.getElementById("csDate");
+const startButton = document.getElementById("startButton");
 
 const contractTip = document.createElement("div");
 contractTip.className = "contract-tip";
@@ -1023,6 +1208,14 @@ document.addEventListener("click", e => {
 
 const detailBackBtn = document.getElementById("detailBackBtn");
 const isMobile = window.innerWidth <= 768;
+
+// desktop: kad ringkasan kontrak dipindah ke panel kanan
+if (!isMobile) {
+    document.getElementById("csRight").appendChild(card);
+    csDate.textContent = new Date()
+        .toLocaleDateString("ms-MY", { day: "2-digit", month: "short", year: "numeric" })
+        .toUpperCase();
+}
 
 let radius;
 if (isMobile) {
@@ -1246,11 +1439,16 @@ function getBackgroundClass(name) {
     return "bg-maint";
 }
 
-openBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
+function openDashboard() {
     if(!activeSection) { alert("Please select a section first."); return; }
     window.location.href = `dashboard-contract.html?section=${activeSection.id}`;
+}
+
+openBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    openDashboard();
 });
+startButton.addEventListener("click", openDashboard);
 
 async function loadSections(){
     try {
@@ -1306,6 +1504,21 @@ function createWheel(){
         btn.addEventListener("click", () => goTo(i));
         sectionList.appendChild(btn);
     });
+
+    csGrid.innerHTML = "";
+    items.forEach((item, i) => {
+        const b = document.createElement("button");
+        b.className = "cs-card";
+        b.title = item.title;
+        b.setAttribute("aria-label", item.title);
+        const src = getHelmSrc(item.title);
+        b.innerHTML = src
+            ? `<img src="${src}" alt="">`
+            : `<span class="cs-card-fallback">${escHtml(String(item.title).charAt(0))}</span>`;
+        b.addEventListener("click", () => { b.blur(); goTo(i); });
+        csGrid.appendChild(b);
+    });
+    csCount.textContent = items.length + " SEKSYEN";
 
     itemEls = document.querySelectorAll(".item");
 
@@ -1363,24 +1576,11 @@ function dismissFloating(){
     if(currentFloating){ currentFloating.remove(); currentFloating = null; }
 }
 
-if (!isMobile) {
-    window.addEventListener("resize", () => {
-        radius = window.innerWidth * 0.25;
-        positionItems(190);
-        render();
-    });
-}
-
 function positionItems(finalSize){
     itemEls.forEach((el, i) => {
         const size = finalSize || el.offsetWidth;
 
-        if (!isMobile) {
-            // desktop: semua item bertindih di tengah trek, kedudukan diatur oleh renderCoverflow()
-            el.style.left = `calc(50% - ${size/2}px)`;
-            el.style.top = `calc(50% - ${size/2}px)`;
-            return;
-        }
+        if (!isMobile) return;
 
         const theta = (i / items.length) * Math.PI * 2;
         const x = Math.cos(theta) * radius;
@@ -1409,6 +1609,7 @@ function update() {
 
     sectionList.querySelectorAll(".section-link").forEach((b, i) => b.classList.toggle("active", i === index));
     layoutSectionList();
+    if (!isMobile) updateHero();
     cardTitle.innerText = isMobile ? item.title : "Contract Overview";
 
     currentLists = { ongoing: [], renewal: [], cpc: [], risk: [] };
@@ -1434,32 +1635,36 @@ function update() {
         });
     });
 
-    cardDesc.innerHTML = `
-        <div class="status-row" onclick="openDetail('ongoing')">
-            <span>Ongoing Contracts</span>
-            <span class="status-badge" style="background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3);">
-                ${currentLists.ongoing.length}
-            </span>
-        </div>
-        <div class="status-row" onclick="openDetail('renewal')">
-            <span>Contracts Renewals (Within 6M)</span>
-            <span class="status-badge" style="background:rgba(234,179,8,0.15);color:#fde047;border:1px solid rgba(234,179,8,0.3);">
-                ${currentLists.renewal.length}
-            </span>
-        </div>
-        <div class="status-row" onclick="openDetail('cpc')">
-            <span>Available for Closing</span>
-            <span class="status-badge" style="background:rgba(147,51,234,0.15);color:#c084fc;border:1px solid rgba(147,51,234,0.3);">
-                ${currentLists.cpc.length}
-            </span>
-        </div>
-        <div class="status-row" onclick="openDetail('risk')">
-            <span>Financial Deficit Risk (S.O.R)</span>
-            <span class="status-badge" style="background:rgba(255,59,48,0.15);color:#ff6b6b;border:1px solid rgba(255,59,48,0.3);">
-                ${currentLists.risk.length}
-            </span>
-        </div>
-    `;
+    if (isMobile) {
+        cardDesc.innerHTML = `
+            <div class="status-row" onclick="openDetail('ongoing')">
+                <span>Ongoing Contracts</span>
+                <span class="status-badge" style="background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3);">
+                    ${currentLists.ongoing.length}
+                </span>
+            </div>
+            <div class="status-row" onclick="openDetail('renewal')">
+                <span>Contracts Renewals (Within 6M)</span>
+                <span class="status-badge" style="background:rgba(234,179,8,0.15);color:#fde047;border:1px solid rgba(234,179,8,0.3);">
+                    ${currentLists.renewal.length}
+                </span>
+            </div>
+            <div class="status-row" onclick="openDetail('cpc')">
+                <span>Available for Closing</span>
+                <span class="status-badge" style="background:rgba(147,51,234,0.15);color:#c084fc;border:1px solid rgba(147,51,234,0.3);">
+                    ${currentLists.cpc.length}
+                </span>
+            </div>
+            <div class="status-row" onclick="openDetail('risk')">
+                <span>Financial Deficit Risk (S.O.R)</span>
+                <span class="status-badge" style="background:rgba(255,59,48,0.15);color:#ff6b6b;border:1px solid rgba(255,59,48,0.3);">
+                    ${currentLists.risk.length}
+                </span>
+            </div>
+        `;
+    } else {
+        renderStats();
+    }
 
     openBtn.innerText = "Open Dashboard";
 
@@ -1470,40 +1675,89 @@ function update() {
     }
 }
 
-// Coverflow: yang aktif besar di tengah, jiran kiri/kanan kecil, pudar dan sedikit condong
-function renderCoverflow(){
-    const n = items.length;
-    const dx = Math.max(150, wheel.offsetWidth / 2 - 100);
-
-    itemEls.forEach((el, i) => {
-        let rel = i - index;
-        if (rel > n / 2) rel -= n;
-        if (rel < -n / 2) rel += n;
-
-        const abs = Math.abs(rel);
-        const sign = Math.sign(rel);
-        let tx, scale, ry, op, blur, z;
-
-        if (abs === 0)      { tx = 0;            scale = 1.25; ry = 0;          op = 1;   blur = 0;   z = 3; }
-        else if (abs === 1) { tx = sign * dx;    scale = 0.62; ry = -sign * 28; op = 0.5; blur = 1.5; z = 2; }
-        else                { tx = sign * dx * 1.6; scale = 0.4; ry = -sign * 40; op = 0;   blur = 3;   z = 1; }
-
-        el.style.transform = `translateX(${tx}px) rotateY(${ry}deg) scale(${scale})`;
-        el.style.opacity = op;
-        el.style.filter = blur ? `blur(${blur}px)` : "none";
-        el.style.zIndex = z;
-        el.style.pointerEvents = abs <= 1 ? "auto" : "none";
-    });
-}
-
 function render(){
     if(itemEls.length === 0) return;
-    if(!isMobile){ renderCoverflow(); return; }
+    if(!isMobile) return;
     wheel.style.transform = `translateY(-50%) rotate(${baseAngle}deg)`;
     itemEls.forEach(el => { el.style.transform = `rotate(${-baseAngle}deg) scale(0.9)`; });
     const activeScale = 1.25;
     itemEls[index].style.transform = `rotate(${-baseAngle}deg) scale(${activeScale})`;
 }
+
+let heroTimer = null;
+let heroFirst = true;
+
+// Hero di tengah: gambar + nama + ringkasan, roster di bawah
+function updateHero(){
+    const item = items[index];
+    if (!item) return;
+
+    const parts = splitSectionName(item.title);
+    const src = getHelmSrc(item.title);
+    const units = item.units.length;
+    const contracts = item.units.reduce((n, u) => n + (u.contract || []).length, 0);
+
+    csName.textContent = parts.main;
+    csRole.textContent = `${units} UNIT${units === 1 ? "" : "S"} \u2022 ${contracts} KONTRAK`;
+
+    csGrid.querySelectorAll(".cs-card").forEach((c, i) => c.classList.toggle("active", i === index));
+
+    clearTimeout(heroTimer);
+    heroImg.style.opacity = 0;
+    heroFallback.style.opacity = 0;
+
+    heroTimer = setTimeout(() => {
+        if (src) {
+            heroFallback.style.display = "none";
+            heroImg.style.display = "";
+            heroImg.src = src;
+            heroImg.alt = item.title;
+            heroImg.classList.remove("enter");
+            void heroImg.offsetWidth;
+            heroImg.classList.add("enter");
+            heroImg.style.opacity = 1;
+        } else {
+            heroImg.style.display = "none";
+            heroFallback.textContent = parts.main.charAt(0);
+            heroFallback.style.display = "flex";
+            heroFallback.style.opacity = 1;
+        }
+    }, heroFirst ? 0 : 150);
+    heroFirst = false;
+}
+
+// Panel kanan (desktop): baris statistik dengan bar, boleh diklik untuk buka senarai
+function renderStats(){
+    const L = currentLists;
+    const total = L.ongoing.length + L.renewal.length + L.cpc.length;
+    const rows = [
+        { key: "ongoing", label: "Ongoing Contracts",              color: "#4ade80", n: L.ongoing.length },
+        { key: "renewal", label: "Contracts Renewals (Within 6M)", color: "#fde047", n: L.renewal.length },
+        { key: "cpc",     label: "Available for Closing",          color: "#c084fc", n: L.cpc.length },
+        { key: "risk",    label: "Financial Deficit Risk (S.O.R)", color: "#ff6b6b", n: L.risk.length }
+    ];
+
+    cardDesc.innerHTML = rows.map(r => `
+        <div class="cs-stat" role="button" tabindex="0" onclick="openDetail('${r.key}')">
+            <div class="cs-stat-label"><span>${r.label}</span><span style="color:${r.color}">${r.n}</span></div>
+            <div class="cs-bar"><div class="cs-bar-fill" data-w="${total ? Math.round(r.n / total * 100) : 0}" style="background:${r.color}"></div></div>
+        </div>
+    `).join("") + `
+        <div class="cs-total"><span>TOTAL CONTRACTS</span><strong>${total}</strong></div>
+    `;
+
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        cardDesc.querySelectorAll(".cs-bar-fill").forEach(b => { b.style.width = b.dataset.w + "%"; });
+    }));
+}
+
+cardDesc.addEventListener("keydown", e => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const el = e.target.closest(".cs-stat");
+    if (!el) return;
+    e.preventDefault();
+    el.click();
+});
 
 function next(){ index=(index+1)%items.length; baseAngle-=stepAngle; closeDetail(); update(); render(); }
 function prev(){ index=(index-1+items.length)%items.length; baseAngle+=stepAngle; closeDetail(); update(); render(); }
@@ -1605,6 +1859,7 @@ document.addEventListener("click", e => {
 
 window.addEventListener("keydown", (e) => {
     if(e.key === "Escape") closeDetail();
+    if(e.key === "Enter" && !isMobile && !e.target.closest("#cardDesc, .detail-panel, .cs-start")) openDashboard();
     if(e.key === "ArrowLeft" || e.key === "ArrowUp") prev();
     if(e.key === "ArrowRight" || e.key === "ArrowDown") next();
 });
