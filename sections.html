@@ -623,25 +623,40 @@ opacity:0 !important;
         z-index: -1;
     }
     .panel-label {
+        position: absolute;
+        top: 56px;
+        left: 56px;
         font-size: 12px;
         font-weight: 700;
         letter-spacing: 2px;
         text-transform: uppercase;
-        margin-bottom: 14px;
+        margin: 0;
+    }
+    .section-viewport {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 96px;
+        bottom: 96px;
+        overflow: hidden;
+        -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 16%, #000 84%, transparent 100%);
+        mask-image: linear-gradient(to bottom, transparent 0, #000 16%, #000 84%, transparent 100%);
     }
     .section-list {
+        position: absolute;
+        left: 56px;
+        right: 40px;
+        top: 50%;
         display: flex;
         flex-direction: column;
-        gap: 12px;
-        max-height: 68vh;
-        overflow-y: auto;
-        scrollbar-width: none;
-        padding: 6px 0;
+        gap: 14px;
+        transform: translateY(var(--list-y, 0px));
+        transition: transform .55s cubic-bezier(.22,1,.36,1);
     }
-    .section-list::-webkit-scrollbar { display: none; }
     .section-link {
         pointer-events: auto;
         text-align: left;
+        white-space: normal;
         background: none;
         border: none;
         border-left: 3px solid transparent;
@@ -651,19 +666,31 @@ opacity:0 !important;
         font-size: clamp(14px, 1.2vw, 18px);
         font-weight: 600;
         line-height: 1.2;
-        word-break: break-word;
-        opacity: .5;
+        opacity: clamp(.18, calc(.62 - var(--d, 0) * .16), .62);
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
-        transition: font-size .35s cubic-bezier(.22,1,.36,1), opacity .3s, border-color .3s;
+        transition: opacity .3s, border-color .3s;
     }
-    .section-link:hover { opacity: .8; }
+    .section-link:hover { opacity: .9; }
+    .section-link .sl-pre { display: none; }
+    .section-link .sl-name { display: block; text-wrap: balance; }
     .section-link.active {
-        font-size: clamp(24px, 2.7vw, 44px);
-        font-weight: 800;
         opacity: 1;
         border-left-color: #fff;
         cursor: default;
+    }
+    .section-link.active .sl-pre {
+        display: block;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        opacity: .7;
+        margin-bottom: 6px;
+    }
+    .section-link.active .sl-name {
+        font-size: var(--fit, clamp(24px, 2.7vw, 44px));
+        font-weight: 800;
+        line-height: 1.15;
     }
 
     .wheel {
@@ -857,7 +884,9 @@ opacity:0 !important;
 
 <div class="panel">
 <p class="panel-label">Department Sections</p>
-<div class="section-list" id="sectionList"></div>
+<div class="section-viewport">
+    <div class="section-list" id="sectionList"></div>
+</div>
 </div>
 
 <div class="page-indicator" id="pageIndicator"></div>
@@ -1263,7 +1292,10 @@ function createWheel(){
     items.forEach((item, i) => {
         const btn = document.createElement("button");
         btn.className = "section-link";
-        btn.textContent = item.title;
+        const parts = splitSectionName(item.title);
+        btn.innerHTML =
+            (parts.pre ? `<span class="sl-pre">${escHtml(parts.pre)}</span>` : "") +
+            `<span class="sl-name">${escHtml(parts.main)}</span>`;
         btn.addEventListener("click", () => goTo(i));
         sectionList.appendChild(btn);
     });
@@ -1360,6 +1392,7 @@ function update() {
     document.body.classList.add(newBgClass);
 
     sectionList.querySelectorAll(".section-link").forEach((b, i) => b.classList.toggle("active", i === index));
+    layoutSectionList();
     cardTitle.innerText = isMobile ? item.title : "Contract Overview";
 
     currentLists = { ongoing: [], renewal: [], cpc: [], risk: [] };
@@ -1431,6 +1464,52 @@ function render(){
 
 function next(){ index=(index+1)%items.length; baseAngle-=stepAngle; closeDetail(); update(); render(); }
 function prev(){ index=(index-1+items.length)%items.length; baseAngle+=stepAngle; closeDetail(); update(); render(); }
+
+function splitSectionName(name){
+    const m = String(name).match(/^\s*(SEKSYEN)\s+(.+)$/i);
+    return m ? { pre: m[1], main: m[2] } : { pre: "", main: String(name) };
+}
+
+// Senarai kiri: yang aktif dilaraskan saiznya supaya perkataan tak terpotong
+// dan tak lebih 3 baris, kemudian senarai digelongsor supaya yang aktif sentiasa di tengah.
+function layoutSectionList(){
+    if (isMobile) return;
+    const links = sectionList.querySelectorAll(".section-link");
+    if (!links.length || !links[index]) return;
+
+    links.forEach((b, i) => {
+        b.style.setProperty("--d", Math.abs(i - index));
+        b.style.removeProperty("--fit");
+    });
+
+    const a = links[index];
+    const nameEl = a.querySelector(".sl-name");
+    const maxF = Math.floor(Math.min(44, Math.max(24, window.innerWidth * 0.027)));
+    const minF = 18;
+    let f = maxF;
+    a.style.setProperty("--fit", f + "px");
+    while (f > minF) {
+        const lines = Math.round(nameEl.offsetHeight / (f * 1.15));
+        if (nameEl.scrollWidth <= nameEl.clientWidth + 1 && lines <= 3) break;
+        f -= 2;
+        a.style.setProperty("--fit", f + "px");
+    }
+
+    const y = a.offsetTop + a.offsetHeight / 2;
+    if (!sectionList.dataset.ready) {
+        sectionList.style.transition = "none";
+        sectionList.style.setProperty("--list-y", (-y) + "px");
+        void sectionList.offsetWidth;
+        sectionList.style.transition = "";
+        sectionList.dataset.ready = "1";
+    } else {
+        sectionList.style.setProperty("--list-y", (-y) + "px");
+    }
+}
+
+window.addEventListener("resize", () => {
+    if (!isMobile && items.length) layoutSectionList();
+});
 
 function goTo(i){
     if(i === index) return;
