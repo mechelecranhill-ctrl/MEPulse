@@ -683,18 +683,43 @@ opacity:0 !important;
         line-height: 1.15;
     }
 
+    /* trek coverflow di lajur putih tengah */
     .wheel {
-        left: calc(50% - 325px);
-        right: auto;
-        top: calc(50% + 25vw);
+        left: var(--side-w);
+        right: var(--side-w);
+        top: 0;
+        bottom: 0;
+        width: auto;
+        height: auto;
+        transform: none !important;
+        transition: none;
+        overflow: hidden;
+        perspective: 1400px;
+        pointer-events: none;
+    }
+
+    /* bayang lembut di lantai bawah helmet */
+    .wheel::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: calc(50% + min(250px, 24vw) * .72 + 14px);
+        width: 240px;
+        height: 24px;
+        transform: translateX(-50%);
+        border-radius: 50%;
+        background: radial-gradient(ellipse at center, rgba(0,119,182,.28), transparent 70%);
         pointer-events: none;
     }
 
     .item { width:190px; height:190px; }
     .section-helm { width:min(250px, 24vw); height:min(250px, 24vw); }
 
-    .item { color: #0f3d6b; }
-    .item:not(.active) { opacity: 0; }
+    .item {
+        color: #0f3d6b;
+        cursor: pointer;
+        transition: transform .7s cubic-bezier(.22,1,.36,1), opacity .5s ease, filter .5s ease;
+    }
     .item.active .section-helm { filter: drop-shadow(0 8px 18px rgba(0,119,182,.35)); }
 
     .info-card {
@@ -812,13 +837,6 @@ opacity:0 !important;
 }
 
 @media (min-width: 1800px){
-    .wheel{
-        width: 820px;
-        height: 820px;
-        left: calc(50% - 410px);
-        right:auto;
-    }
-
     .item{
         width:190px;
         height:190px;
@@ -1349,15 +1367,24 @@ if (!isMobile) {
     window.addEventListener("resize", () => {
         radius = window.innerWidth * 0.25;
         positionItems(190);
+        render();
     });
 }
 
 function positionItems(finalSize){
     itemEls.forEach((el, i) => {
-        const theta = (i / items.length) * Math.PI * 2 + (isMobile ? 0 : -Math.PI / 2);
+        const size = finalSize || el.offsetWidth;
+
+        if (!isMobile) {
+            // desktop: semua item bertindih di tengah trek, kedudukan diatur oleh renderCoverflow()
+            el.style.left = `calc(50% - ${size/2}px)`;
+            el.style.top = `calc(50% - ${size/2}px)`;
+            return;
+        }
+
+        const theta = (i / items.length) * Math.PI * 2;
         const x = Math.cos(theta) * radius;
         const y = Math.sin(theta) * radius;
-        const size = finalSize || el.offsetWidth;
 
         el.style.left = `calc(50% + ${x}px - ${size/2}px)`;
         el.style.top = `calc(50% + ${y}px - ${size/2}px)`;
@@ -1443,8 +1470,35 @@ function update() {
     }
 }
 
+// Coverflow: yang aktif besar di tengah, jiran kiri/kanan kecil, pudar dan sedikit condong
+function renderCoverflow(){
+    const n = items.length;
+    const dx = Math.max(150, wheel.offsetWidth / 2 - 100);
+
+    itemEls.forEach((el, i) => {
+        let rel = i - index;
+        if (rel > n / 2) rel -= n;
+        if (rel < -n / 2) rel += n;
+
+        const abs = Math.abs(rel);
+        const sign = Math.sign(rel);
+        let tx, scale, ry, op, blur, z;
+
+        if (abs === 0)      { tx = 0;            scale = 1.25; ry = 0;          op = 1;   blur = 0;   z = 3; }
+        else if (abs === 1) { tx = sign * dx;    scale = 0.62; ry = -sign * 28; op = 0.5; blur = 1.5; z = 2; }
+        else                { tx = sign * dx * 1.6; scale = 0.4; ry = -sign * 40; op = 0;   blur = 3;   z = 1; }
+
+        el.style.transform = `translateX(${tx}px) rotateY(${ry}deg) scale(${scale})`;
+        el.style.opacity = op;
+        el.style.filter = blur ? `blur(${blur}px)` : "none";
+        el.style.zIndex = z;
+        el.style.pointerEvents = abs <= 1 ? "auto" : "none";
+    });
+}
+
 function render(){
     if(itemEls.length === 0) return;
+    if(!isMobile){ renderCoverflow(); return; }
     wheel.style.transform = `translateY(-50%) rotate(${baseAngle}deg)`;
     itemEls.forEach(el => { el.style.transform = `rotate(${-baseAngle}deg) scale(0.9)`; });
     const activeScale = 1.25;
