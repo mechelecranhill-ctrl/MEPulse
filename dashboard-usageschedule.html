@@ -602,6 +602,112 @@
                 display: none !important;
             }
         }
+    
+        /* ---- maklumat kontrak (Contract No, Contractor, Period, Sum, PGS + Insurance No) ---- */
+        .contract-info {
+            background: #fff;
+            border-radius: 15px;
+            border-left: 4px solid var(--ios-blue);
+            padding: 18px 20px;
+            margin-top: 15px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+        }
+        .contract-info .ci-name {
+            font-size: 15px;
+            font-weight: 800;
+            line-height: 1.4;
+            color: #1c1c1e;
+            margin-bottom: 14px;
+            overflow-wrap: anywhere;
+        }
+        .contract-info .ci-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 14px 20px;
+        }
+        .contract-info .ci-label {
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: .8px;
+            text-transform: uppercase;
+            color: #8e8e93;
+            margin-bottom: 3px;
+        }
+        .contract-info .ci-value {
+            font-size: 13px;
+            font-weight: 700;
+            color: #1c1c1e;
+            overflow-wrap: anywhere;
+        }
+        .contract-info .ci-sub {
+            margin-top: 2px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #666;
+            overflow-wrap: anywhere;
+        }
+    
+        /* ---- kad ringkasan (KPI) ---- */
+        .contract-kpi {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 12px;
+            margin-top: 15px;
+        }
+        .kpi-card {
+            background: #fff;
+            border-radius: 15px;
+            padding: 14px 16px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+        }
+        .kpi-label {
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: .8px;
+            text-transform: uppercase;
+            color: #8e8e93;
+        }
+        .kpi-value {
+            margin-top: 4px;
+            font-size: 18px;
+            font-weight: 800;
+            color: #1c1c1e;
+            font-variant-numeric: tabular-nums;
+            overflow-wrap: anywhere;
+        }
+        .kpi-value.neg { color: var(--ios-red); }
+        .kpi-sub { margin-top: 2px; font-size: 11px; font-weight: 600; color: #666; }
+        .kpi-bar { height: 6px; margin-top: 8px; border-radius: 3px; background: #e5e5ea; overflow: hidden; }
+        .kpi-bar > span { display: block; height: 100%; border-radius: 3px; background: var(--ios-blue); }
+
+        /* ---- jadual kewangan: header dan 2 lajur pertama melekat ketika scroll ---- */
+        .fin-scroll { max-height: 70vh; border-radius: 20px; overscroll-behavior: contain; }
+        #interimTable { overflow: visible; }
+        #interimTable thead th:nth-child(1),
+        #interimTable tbody td:nth-child(1) { position: sticky; left: 0; min-width: 45px; }
+        #interimTable thead th:nth-child(2),
+        #interimTable tbody td:nth-child(2) { position: sticky; left: 45px; box-shadow: 2px 0 4px rgba(0,0,0,0.05); }
+        #interimTable thead th:nth-child(1),
+        #interimTable thead th:nth-child(2) { z-index: 30; }
+        #interimTable tbody td:nth-child(1),
+        #interimTable tbody td:nth-child(2) { z-index: 15; }
+        #interimTable tr.adj-row td { color: #64748b; background: #fafbfc; }
+
+        /* ---- tab district: bilangan WO ---- */
+        .dt-count {
+            margin-left: 6px;
+            padding: 1px 7px;
+            border-radius: 10px;
+            background: rgba(0,0,0,0.08);
+            font-size: 10px;
+        }
+        .district-tab.active .dt-count { background: rgba(255,255,255,0.28); }
+
+        /* ---- kotak carian: ikon ---- */
+        #tableSearch {
+            padding-left: 34px !important;
+            background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.5' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E") no-repeat 11px center;
+        }
     </style>
     
     <link rel="stylesheet" href="sidebar.css">
@@ -652,6 +758,8 @@
 
         <div class="glass-card" id="tableWrapper" style="display: none;">
             <div id="contractDashboard" style="margin-bottom:20px;">
+                <div id="contractInfo" class="contract-info"></div>
+                <div id="contractKpi" class="contract-kpi"></div>
                 <div style="background:white; border-radius:15px; padding:20px; margin-top:15px; box-shadow:0 3px 8px rgba(0,0,0,0.08);">
                     <div class="header-actions" style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
                         <button class="btn-action" style="background:#333;" onclick="openTemplate()">
@@ -669,7 +777,7 @@
                         <i class="fa-solid fa-calculator" style="margin-right: 5px; color: var(--ios-blue);"></i> CONTRACT FINANCIAL TABLE
                     </div>
                     
-                    <div style="overflow:auto;">
+                    <div class="fin-scroll" style="overflow:auto;">
                         <table id="interimTable" style="border-collapse:collapse; font-size:11px; min-width:1200px; width:100%;">
                             <thead id="interimHead"></thead>
                             <tbody id="interimBody"></tbody>
@@ -1097,6 +1205,33 @@ async function getUsageData(id, contract) {
     return { works, interims };
 }
 
+function renderContractInfo(c){
+    const box = document.getElementById('contractInfo');
+    if (!box) return;
+    const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+    ));
+    const rm = n => 'RM ' + Number(n || 0).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const dt = v => {
+        if (!v) return '-';
+        const d = new Date(v);
+        return isNaN(d) ? '-' : d.toLocaleDateString('en-MY', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+    const item = (label, value, sub) =>
+        `<div><div class="ci-label">${label}</div><div class="ci-value">${value}</div>` +
+        (sub ? `<div class="ci-sub">${sub}</div>` : '') + `</div>`;
+
+    box.innerHTML = `
+        <div class="ci-name">${esc(c.contract_name || '-')}</div>
+        <div class="ci-grid">
+            ${item('Contract No.', esc(c.contract_code || '-'))}
+            ${item('Contractor', esc(c.contractor || '-'))}
+            ${item('Contract Period', dt(c.contract_start) + ' ~ ' + dt(c.contract_end))}
+            ${item('Contract Sum', rm(c.contract_sum))}
+            ${item('Performance Guarantee Sum', rm(c.performance_guarantee_total), 'Insurance No: ' + esc(c.insurance_no || '-'))}
+        </div>`;
+}
+
 async function loadSingleContract(id){
     currentContractId = id;
     try{
@@ -1108,6 +1243,7 @@ async function loadSingleContract(id){
         areaList.forEach((a,i)=>{ areaPriority[a] = i + 1; });
         document.getElementById('viewTitle').innerText = c.contract_code;
         document.getElementById('viewSubtitle').innerText = c.contract_name;
+        renderContractInfo(c);
         document.getElementById('tableWrapper').style.display = 'block';
         const { works: rawWorks, interims } = await getUsageData(id, c);
 allWorks = rawWorks.filter(w => !['QUOTATION', 'QUO-APP', 'QUO-REJ'].includes((w.status || '').toUpperCase().trim()));
@@ -1294,8 +1430,11 @@ function renderMobileCards(data){
 function generateDistrictTabs(data){
     const container = document.getElementById("districtTabs");
     let districts = [...new Set(data.map(w => w.district || "LAIN"))];
-    let html = `<div class="district-tab active" onclick="filterDistrict('ALL',this)">SEMUA</div>`;
-    districts.forEach(d=>{ html += `<div class="district-tab" onclick="filterDistrict('${d}',this)">${d}</div>`; });
+    let html = `<div class="district-tab active" onclick="filterDistrict('ALL',this)">SEMUA<span class="dt-count">${data.length}</span></div>`;
+    districts.forEach(d=>{
+        const n = data.filter(w => (w.district || "LAIN") === d).length;
+        html += `<div class="district-tab" onclick="filterDistrict('${d}',this)">${d}<span class="dt-count">${n}</span></div>`;
+    });
     container.innerHTML = html;
 }
 
@@ -1489,7 +1628,7 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
     });
 
     let salvageTotal = 0;
-    let salvageRow = `<tr><td></td><td>SALVAGE VALUE</td><td style="text-align:right;">-</td>`;
+    let salvageRow = `<tr class="adj-row"><td></td><td>SALVAGE VALUE</td><td style="text-align:right;">-</td>`;
     interims.forEach((int, i) => {
         const val = Number(int.salvage_value || 0);
         salvageTotal += val;
@@ -1500,7 +1639,7 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
     body += salvageRow;
 
     let pgTotal = 0;
-    let pgRow = `<tr><td></td><td>PERFORMANCE GUARANTEE SUM</td><td style="text-align:right;">-</td>`;
+    let pgRow = `<tr class="adj-row"><td></td><td>PERFORMANCE GUARANTEE SUM</td><td style="text-align:right;">-</td>`;
     interims.forEach((int, i) => {
         const val = Number(int.performance_guarantee_sum || 0);
         pgTotal += val;
@@ -1511,7 +1650,7 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
     body += pgRow;
 
     let taxTotal = 0;
-    let taxRow = `<tr><td></td><td>TAX</td><td style="text-align:right;">-</td>`;
+    let taxRow = `<tr class="adj-row"><td></td><td>TAX</td><td style="text-align:right;">-</td>`;
     interims.forEach((int, i) => {
         const val = Number(int.tax || 0);
         taxTotal += val;
@@ -1522,7 +1661,7 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
     body += taxRow;
 
     let penaltyTotal = 0;
-    let penaltyRow = `<tr><td></td><td>PENALTY</td><td style="text-align:right;">-</td>`;
+    let penaltyRow = `<tr class="adj-row"><td></td><td>PENALTY</td><td style="text-align:right;">-</td>`;
     interims.forEach((int, i) => {
         const val = Number(int.penalty || 0);
         penaltyTotal += val;
@@ -1550,6 +1689,31 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
     body += totalRow;
 
     document.getElementById("interimBody").innerHTML = body;
+
+    const kpiBox = document.getElementById("contractKpi");
+    if (kpiBox) {
+        const contractBalance = grandTotalContractBalance + salvageTotal + pgTotal - taxTotal - penaltyTotal;
+        const pct = grandTotalContract > 0 ? Math.max(0, Math.min(100, grandTotalClaim / grandTotalContract * 100)) : 0;
+        kpiBox.innerHTML = `
+            <div class="kpi-card">
+                <div class="kpi-label">Total Claim</div>
+                <div class="kpi-value">${formatRM(grandTotalClaim)}</div>
+                <div class="kpi-bar"><span style="width:${pct.toFixed(1)}%"></span></div>
+                <div class="kpi-sub">${pct.toFixed(1)}% daripada contract sum</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Contract Balance</div>
+                <div class="kpi-value ${contractBalance < 0 ? 'neg' : ''}">${formatRM(contractBalance)}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">On Going Works</div>
+                <div class="kpi-value">${formatRM(grandTotalOngoing)}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">On Going Contract Balance</div>
+                <div class="kpi-value ${grandTotalOngoingBalance < 0 ? 'neg' : ''}">${formatRM(grandTotalOngoingBalance)}</div>
+            </div>`;
+    }
 }
 
 function openSummary(){
