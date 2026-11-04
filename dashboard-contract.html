@@ -2069,7 +2069,17 @@
 
             buildUsageChart(months, planned, actual);
             buildUsageTable(months, planned, actual, false);
-            updateUsageLifecycle(contract, safeInterims, validWorkOrders);
+
+            let closing = null;
+            try {
+                const rc = await fetch(
+                    `${API_URL}/rest/v1/contract_closing?contract_id=eq.${encodeURIComponent(contract.id)}&select=cpc_status,cmgd_date,sfa_date,status`,
+                    { headers }
+                );
+                if (rc.ok) { const rows = await rc.json(); closing = Array.isArray(rows) && rows.length ? rows[0] : null; }
+            } catch (e) { console.warn('Unable to load contract_closing:', e); }
+
+            updateUsageLifecycle(contract, safeInterims, validWorkOrders, closing);
 
             [['.u-step-wo', validWorkOrders.length], ['.u-step-interim', safeInterims.length]].forEach(([sel, n]) => {
                 const dot = document.querySelector('#flipCardBack ' + sel + ' .u-dot');
@@ -2172,7 +2182,7 @@
         return value;
     }
 
-    function updateUsageLifecycle(contract, interims, validWorkOrders = []) {
+    function updateUsageLifecycle(contract, interims, validWorkOrders = [], closing = null) {
         const root = document.getElementById('flipCardBack');
         if (!root) return;
 
@@ -2225,53 +2235,40 @@
             interimNode.classList.add('u-current');
         }
 
-        if (!contract || !contract.contract_end) return;
+        const setDone = n => {
+            if (!n) return;
+            n.classList.remove('u-current');
+            n.classList.add('u-done');
+            const d = n.querySelector('.u-dot');
+            if (d) d.innerHTML = '<i class="fa fa-check"></i>';
+        };
+        const addMonths = (date, months) => {
+            const r = new Date(date);
+            const day = r.getDate();
+            r.setMonth(r.getMonth() + months);
+            if (r.getDate() !== day) r.setDate(0);
+            return r;
+        };
 
+        const cpcDone  = String((closing && closing.cpc_status) || '').toUpperCase() === 'COMPLETED';
+        const cmgdDone = !!(closing && closing.cmgd_date);
+        const sfaDone  = !!(closing && closing.sfa_date);
+
+        const endDate = contract && contract.contract_end ? new Date(contract.contract_end) : null;
+        const valid = !!endDate && !isNaN(endDate.getTime());
         const today = new Date();
-        const endDate = new Date(contract.contract_end);
-        if (isNaN(endDate.getTime())) return;
+        const ended = valid && today > endDate;
 
-        if (today > endDate) {
-            if (interimNode) {
-                interimNode.classList.remove('u-current');
-                interimNode.classList.add('u-done');
-                const dot = interimNode.querySelector('.u-dot');
-                if (dot) dot.innerHTML = `<i class="fa fa-check"></i>`;
-            }
-            if (cpcNode) cpcNode.classList.add('u-current');
-        }
+        if (ended) setDone(interimNode);
 
-        const cmgdDate = new Date(endDate);
-        cmgdDate.setMonth(cmgdDate.getMonth() + 6);
+        if (cpcDone) setDone(cpcNode);
+        else if (ended && cpcNode) cpcNode.classList.add('u-current');
 
-        if (today >= cmgdDate) {
-            if (cpcNode) {
-                cpcNode.classList.remove('u-current');
-                cpcNode.classList.add('u-done');
-                const dot = cpcNode.querySelector('.u-dot');
-                if (dot) dot.innerHTML = `<i class="fa fa-check"></i>`;
-            }
-            if (cmgdNode) cmgdNode.classList.add('u-current');
-        }
+        if (cmgdDone) setDone(cmgdNode);
+        else if (cpcDone && valid && today >= addMonths(endDate, 6) && cmgdNode) cmgdNode.classList.add('u-current');
 
-        const sfaDate = new Date(endDate);
-        sfaDate.setMonth(sfaDate.getMonth() + 18);
-
-        if (today >= sfaDate) {
-            if (cpcNode) {
-                cpcNode.classList.remove('u-current');
-                cpcNode.classList.add('u-done');
-                const cpcDot = cpcNode.querySelector('.u-dot');
-                if (cpcDot) cpcDot.innerHTML = `<i class="fa fa-check"></i>`;
-            }
-            if (cmgdNode) {
-                cmgdNode.classList.remove('u-current');
-                cmgdNode.classList.add('u-done');
-                const cmgdDot = cmgdNode.querySelector('.u-dot');
-                if (cmgdDot) cmgdDot.innerHTML = `<i class="fa fa-check"></i>`;
-            }
-            if (sfaNode) sfaNode.classList.add('u-current');
-        }
+        if (sfaDone) setDone(sfaNode);
+        else if (cmgdDone && valid && today >= addMonths(endDate, 18) && sfaNode) sfaNode.classList.add('u-current');
     }
 </script>
 </body>
