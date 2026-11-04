@@ -34,6 +34,16 @@ class AppSidebar extends HTMLElement {
                 </div>
 
                 <div class="menu-group">
+                    <a href="#" class="menu-parent" id="indentsBtn">
+                        Dashboard-Indents <span class="arrow">▼</span>
+                    </a>
+                    <div class="submenu" id="indentsMenu">
+                        <a href="#" data-section="Seksyen Selenggara" class="menu-link">Seksyen Selenggara</a>
+                        <a href="#" data-section="Seksyen Pematuhan Peraturan" class="menu-link">Seksyen Pematuhan Peraturan</a>
+                    </div>
+                </div>
+
+                <div class="menu-group">
                     <a href="#" class="menu-parent" id="quotationBtn">
                         Blueform Approvals <span class="arrow">▼</span>
                     </a>
@@ -42,16 +52,6 @@ class AppSidebar extends HTMLElement {
                         <a href="app-exec.html" class="menu-link">Request for Approval</a>
                         <a href="app-sect.html" class="menu-link">Review & Verification</a>
                         <a href="app-dept.html" class="menu-link">Approval Endorsement</a>
-                    </div>
-                </div>
-
-                <div class="menu-group">
-                    <a href="#" class="menu-parent" id="indentsBtn">
-                        Dashboard-Indents <span class="arrow">▼</span>
-                    </a>
-                    <div class="submenu" id="indentsMenu">
-                        <a href="#" data-section="Seksyen Selenggara" class="menu-link">Seksyen Selenggara</a>
-                        <a href="#" data-section="Seksyen Pematuhan Peraturan" class="menu-link">Seksyen Pematuhan Peraturan</a>
                     </div>
                 </div>
 
