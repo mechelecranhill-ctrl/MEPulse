@@ -405,6 +405,9 @@ animation:fadeInRight .45s ease forwards;
 .detail-item-sub.warn { color: #fde047; }
 .detail-item-sub.danger { color: #ff6b6b; }
 .detail-item-sub.safe { color: #4ade80; }
+.detail-item-sub .sub-k { margin-right: 4px; font-weight: 500; opacity: .65; }
+.detail-item-sub b { font-weight: 700; }
+.detail-item-sub .sub-note { margin-top: 2px; font-size: 10.5px; opacity: .8; }
 
 .section-helm{
 width:160px;
@@ -659,7 +662,11 @@ opacity:0 !important;
         box-shadow: 0 20px 44px rgba(0,119,182,.28);
     }
     .cs-left  { background: var(--decor-left), #0077b6; }
-    .cs-right { background: var(--decor-right), #0077b6; }
+    .cs-right {
+        background: var(--decor-right), #0077b6;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+    }
     .cs-side::before {
         content: "";
         position: absolute;
@@ -934,6 +941,13 @@ opacity:0 !important;
         font-weight: 800;
         line-height: 1;
         letter-spacing: -1px;
+        font-variant-numeric: tabular-nums;
+    }
+    .cs-hero-sub {
+        margin-top: 8px;
+        font-size: 12px;
+        font-weight: 500;
+        opacity: .7;
     }
     .cs-seg {
         display: flex;
@@ -985,13 +999,19 @@ opacity:0 !important;
         background: color-mix(in srgb, var(--c) 20%, transparent);
     }
     .cs-stat-main { flex: 1; min-width: 0; }
-    .cs-stat-label {
-        margin-bottom: 8px;
-        font-size: 13.5px;
-        font-weight: 500;
-        letter-spacing: .3px;
+    .cs-stat-title {
+        font-size: 14.5px;
+        font-weight: 600;
         line-height: 1.25;
+        letter-spacing: .1px;
         word-break: break-word;
+    }
+    .cs-stat-sub {
+        margin: 2px 0 9px;
+        font-size: 11.5px;
+        font-weight: 500;
+        line-height: 1.3;
+        opacity: .62;
     }
     .cs-bar {
         height: 5px;
@@ -1010,9 +1030,10 @@ opacity:0 !important;
         flex-shrink: 0;
         min-width: 2ch;
         text-align: right;
-        font-size: 22px;
+        font-size: 24px;
         font-weight: 800;
         color: var(--c);
+        font-variant-numeric: tabular-nums;
     }
     .cs-stat-go {
         flex-shrink: 0;
@@ -1065,8 +1086,9 @@ opacity:0 !important;
         padding: 0;
         border-radius: 0;
         background: none;
-        font-size: 14px;
-        letter-spacing: .6px;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: .4px;
     }
     .detail-panel-title::before {
         content: "";
@@ -1136,8 +1158,24 @@ opacity:0 !important;
         background: rgba(0, 40, 80, 0.55);
         transform: translateX(-2px);
     }
-    .detail-item-sub { overflow-wrap: anywhere; word-break: normal; }
-    .detail-item-sub .sub-note { margin-top: 2px; font-size: 10.5px; opacity: .8; }
+    .detail-item-code {
+        font-size: 13px;
+        letter-spacing: .2px;
+        font-variant-numeric: tabular-nums;
+    }
+    .detail-item-sub {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+        word-break: normal;
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 1.4;
+        opacity: .88;
+        font-variant-numeric: tabular-nums;
+    }
     @keyframes csItemIn {
         from { opacity: 0; transform: translateY(8px); }
         to { opacity: 1; transform: none; }
@@ -1272,7 +1310,7 @@ opacity:0 !important;
         </div>
         <label class="detail-search" id="detailSearchWrap">
             <i class="fa-solid fa-magnifying-glass"></i>
-            <input id="detailSearch" type="search" placeholder="Cari kod / nama kontrak" autocomplete="off">
+            <input id="detailSearch" type="search" placeholder="Search contract code or name" autocomplete="off">
         </label>
         <div class="detail-list" id="detailList"></div>
     </div>
@@ -1546,7 +1584,7 @@ function openDetail(type) {
             color: "#fde047",
             render: (c) => ({
                 code: c.contract_code || c.id,
-                sub: c.contract_end ? "Ends: " + formatDate(c.contract_end) + daysNote(c.contract_end, "left") : "",
+                sub: c.contract_end ? '<span class="sub-k">Ends</span><b>' + formatDate(c.contract_end) + "</b>" + daysNote(c.contract_end, "left") : "",
                 subClass: "warn"
             })
         },
@@ -1555,7 +1593,7 @@ function openDetail(type) {
             color: "#c084fc",
             render: (c) => ({
                 code: c.contract_code || c.id,
-                sub: c.contract_end ? "Ended: " + formatDate(c.contract_end) + daysNote(c.contract_end, "ago") : "",
+                sub: c.contract_end ? '<span class="sub-k">Ended</span><b>' + formatDate(c.contract_end) + "</b>" + daysNote(c.contract_end, "ago") : "",
                 subClass: ""
             })
         },
@@ -1627,7 +1665,7 @@ function openDetail(type) {
                     <span class="detail-item-sub ${rendered.subClass}">${rendered.sub}</span>
                 </div>
             `;
-        }).join("") + `<div class="detail-empty detail-nomatch" hidden><i class="fa-solid fa-magnifying-glass"></i><span>Tiada padanan</span></div>`;
+        }).join("") + `<div class="detail-empty detail-nomatch" hidden><i class="fa-solid fa-magnifying-glass"></i><span>No matching contracts</span></div>`;
     }
 
     detailList.scrollTop = 0;
@@ -1960,16 +1998,18 @@ function renderStats(){
     const L = currentLists;
     const total = L.ongoing.length + L.renewal.length + L.cpc.length;
     const rows = [
-        { key: "ongoing", label: "Ongoing Contracts",              color: "#4ade80", icon: "fa-file-contract",        n: L.ongoing.length },
-        { key: "renewal", label: "Contracts Renewals (Within 6M)", color: "#fde047", icon: "fa-rotate",               n: L.renewal.length },
-        { key: "cpc",     label: "Available for Closing",          color: "#c084fc", icon: "fa-flag-checkered",       n: L.cpc.length },
-        { key: "risk",    label: "Financial Deficit Risk (S.O.R)", color: "#ff6b6b", icon: "fa-triangle-exclamation", n: L.risk.length }
+        { key: "ongoing", label: "Ongoing Contracts",              sub: "Ending in more than 6 months",      color: "#4ade80", icon: "fa-file-contract",        n: L.ongoing.length },
+        { key: "renewal", label: "Contract Renewals",              sub: "Ending within 6 months",            color: "#fde047", icon: "fa-rotate",               n: L.renewal.length },
+        { key: "cpc",     label: "Available for Closing",          sub: "Contract period has ended",         color: "#c084fc", icon: "fa-flag-checkered",       n: L.cpc.length },
+        { key: "risk",    label: "Financial Deficit Risk (S.O.R)", sub: "Provisional sum usage ahead of plan", color: "#ff6b6b", icon: "fa-triangle-exclamation", n: L.risk.length }
     ];
+    const unitCount = items[index] ? items[index].units.length : 0;
 
     cardDesc.innerHTML = `
         <div class="cs-hero">
             <div class="cs-hero-label">Total Contracts</div>
             <div class="cs-hero-num" id="csHeroNum">0</div>
+            <div class="cs-hero-sub">across ${unitCount} unit${unitCount === 1 ? "" : "s"}</div>
             <div class="cs-seg">
                 ${rows.slice(0, 3).map(r => `<span style="background:${r.color}" data-g="${r.n}" title="${r.label}: ${r.n}"></span>`).join("")}
             </div>
@@ -1978,7 +2018,8 @@ function renderStats(){
             <div class="cs-stat${r.n === 0 ? " zero" : ""}" role="button" tabindex="0" style="--c:${r.color}" onclick="openDetail('${r.key}')">
                 <span class="cs-stat-ico"><i class="fa-solid ${r.icon}"></i></span>
                 <div class="cs-stat-main">
-                    <div class="cs-stat-label">${r.label}</div>
+                    <div class="cs-stat-title">${r.label}</div>
+                    <div class="cs-stat-sub">${r.sub}</div>
                     <div class="cs-bar"><div class="cs-bar-fill" data-w="${total ? Math.round(r.n / total * 100) : 0}"></div></div>
                 </div>
                 <span class="cs-stat-num">${r.n}</span>
