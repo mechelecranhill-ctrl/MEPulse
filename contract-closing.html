@@ -270,6 +270,10 @@ function addMonthsSafe(date, months){
     return result;
 }
 
+function isCpcDone(){
+    return !!currentClosing && String(currentClosing.cpc_status || "").toUpperCase() === "COMPLETED";
+}
+
 async function apiFetch(url, options = {}){
     const config = { ...options, headers: { ...headers, ...(options.headers || {}) } };
     const response = await fetch(url, config);
@@ -435,6 +439,7 @@ async function loadData(){
         const cmgdEligible = today >= cmgdDate;
         const sfaDate = addMonthsSafe(contractEnd, 18);         /* SFA: +18 bulan */
         const sfaEligible = today >= sfaDate;
+        const cpcDone = isCpcDone();                            /* CMGD & SFA wajib CPC siap */
 
         /* ---- CPC ---- */
         if (currentClosing && String(currentClosing.cpc_status || "").toUpperCase() === "COMPLETED") {
@@ -457,6 +462,10 @@ async function loadData(){
             if (currentClosing.defect_status) getEl("defect").value = currentClosing.defect_status;
             if (currentClosing.cmgd_remarks) getEl("cmgdRemark").value = currentClosing.cmgd_remarks;
             getEl("btnCMGD").style.display = "none";
+        } else if (!cpcDone) {
+            getEl("cmgdStatus").innerHTML =
+                "🔒 CPC mesti disiapkan dahulu<br>" + "<small>CMGD hanya boleh dibuat selepas CPC selesai</small>";
+            getEl("btnCMGD").style.display = "none";
         } else if (cmgdEligible) {
             getEl("cmgdStatus").innerHTML =
                 "✅ Eligible for CMGD<br>" + `<small>Eligible date: ${formatDate(cmgdDate)}</small>`;
@@ -476,6 +485,10 @@ async function loadData(){
             if (currentClosing.retention_release != null) getEl("retention").value = currentClosing.retention_release;
             if (currentClosing.pg_release != null) getEl("pg").value = currentClosing.pg_release;
             if (currentClosing.sfa_remarks) getEl("sfaRemark").value = currentClosing.sfa_remarks;
+            getEl("btnSFA").style.display = "none";
+        } else if (!cpcDone) {
+            getEl("sfaStatus").innerHTML =
+                "🔒 CPC mesti disiapkan dahulu<br>" + "<small>SFA hanya boleh dibuat selepas CPC selesai</small>";
             getEl("btnSFA").style.display = "none";
         } else if (sfaEligible) {
             getEl("sfaStatus").innerHTML =
@@ -526,6 +539,8 @@ async function saveCPC(){
 async function saveCMGD(){
     if (!contract) { alert("Sila pilih contract dahulu."); return; }
 
+    if (!isCpcDone()) { alert("CPC mesti disiapkan dahulu sebelum CMGD."); return; }
+
     const cmgdDateValue = getEl("cmgd").value;
     if (!cmgdDateValue) { alert("Sila masukkan CMGD Date."); return; }
 
@@ -566,6 +581,8 @@ async function saveCMGD(){
 /* ===================== SAVE SFA ===================== */
 async function saveSFA(){
     if (!contract) { alert("Sila pilih contract dahulu."); return; }
+
+    if (!isCpcDone()) { alert("CPC mesti disiapkan dahulu sebelum SFA."); return; }
 
     const sfaDateValue = getEl("sfa").value;
     if (!sfaDateValue) { alert("Sila masukkan SFA Date."); return; }
