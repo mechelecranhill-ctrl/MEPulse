@@ -741,7 +741,8 @@
         .empty-row { text-align: center; color: #94a3b8; padding: 36px 10px !important; }
 
         /* --- Section: chip + hover tooltip + popup --- */
-        .sec-chip { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 3px 10px; border: 0; border-radius: 999px; background: #eef2ff; color: #4f46e5; font-size: 10.5px; font-weight: 700; font-family: inherit; cursor: pointer; }
+        .sec-slot { display: flex; align-items: center; height: 22px; margin-top: 6px; }
+        .sec-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 0; border-radius: 999px; background: #eef2ff; color: #4f46e5; font-size: 10.5px; font-weight: 700; font-family: inherit; cursor: pointer; }
         .sec-chip:hover, .sec-chip.active { background: #e0e7ff; }
         .sec-chip i { font-size: 10px; }
         #secPop { position: fixed; z-index: 1300; width: 260px; max-width: calc(100vw - 16px); background: #fff; color: #0f172a; border-radius: 14px; padding: 12px; box-shadow: 0 12px 32px rgba(15,23,42,.22), 0 0 0 1px rgba(15,23,42,.06); opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(4px); transition: opacity .12s ease, transform .12s ease; font-weight: 500; }
@@ -1373,7 +1374,7 @@ function renderTable(data, showArea = true){
             </td>
             <td><strong>${w.interim_no ? 'INT-' + w.interim_no : '-'}</strong></td>
             <td><strong>RM ${(w.amount_spent || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</strong>${sectionChipHtml(w,'work')}</td>
-            <td style="font-weight:bold;color:var(--ios-green);">RM ${(w.interim_no ? w.amount_spent : 0).toLocaleString(undefined,{minimumFractionDigits:2})}${w.interim_no ? sectionChipHtml(w,'claim') : ''}</td>
+            <td style="font-weight:bold;color:var(--ios-green);">RM ${(w.interim_no ? w.amount_spent : 0).toLocaleString(undefined,{minimumFractionDigits:2})}${w.interim_no ? sectionChipHtml(w,'claim') : '<div class="sec-slot"></div>'}</td>
             <td>${formatTarikhBM(w.qpb_date)}</td>
             <td>${actionHtml}</td>
             <td style="text-align:center;">${checkboxHtml}</td>
@@ -1616,9 +1617,10 @@ function sectionCount(work){
     return n;
 }
 function sectionChipHtml(work, kind){
+    // ruang chip sentiasa ada (walaupun kosong) supaya jumlah RM sentiasa di atas & sejajar
     const n = sectionCount(work);
-    if(!n) return '';
-    return `<button type="button" class="sec-chip" data-wid="${work.id}" data-kind="${kind}" aria-haspopup="dialog"><i class="fa-solid fa-circle-info"></i>${n} section</button>`;
+    const chip = n ? `<button type="button" class="sec-chip" data-wid="${work.id}" data-kind="${kind}" aria-haspopup="dialog"><i class="fa-solid fa-circle-info"></i>${n} section</button>` : '';
+    return `<div class="sec-slot">${chip}</div>`;
 }
 
 let secPopPinned = false, secPopChip = null;
