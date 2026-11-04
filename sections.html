@@ -282,6 +282,21 @@ animation:fadeInRight .45s ease forwards;
     background: rgba(255,255,255,0.2);
 }
 
+.detail-head-text { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.detail-count { display: none; }
+.detail-search { display: none; }
+.detail-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin-top: 28px;
+    font-size: 13px;
+    opacity: .55;
+}
+.detail-empty i { font-size: 26px; }
+.detail-nomatch[hidden] { display: none; }
+
 .detail-list {
     flex: 1;
     min-height: 0;
@@ -558,6 +573,7 @@ opacity:0 !important;
         background: #0077b6;
         backdrop-filter: none;
     }
+    .detail-panel-header { flex-direction: row-reverse; }
     .detail-panel-title {
         padding: 5px 12px;
         border-radius: 999px;
@@ -901,29 +917,82 @@ opacity:0 !important;
         flex: none;
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 8px;
     }
+    /* ringkasan: nombor besar + bar segmen */
+    .cs-hero { padding: 4px 12px 14px; }
+    .cs-hero-label {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        opacity: .65;
+    }
+    .cs-hero-num {
+        margin-top: 4px;
+        font-size: clamp(44px, 4.6vw, 64px);
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: -1px;
+    }
+    .cs-seg {
+        display: flex;
+        gap: 3px;
+        height: 8px;
+        margin-top: 14px;
+        border-radius: 6px;
+        overflow: hidden;
+        background: rgba(255,255,255,.15);
+    }
+    .cs-seg span {
+        display: block;
+        flex: 0 1 0;
+        min-width: 0;
+        height: 100%;
+        transition: flex-grow .7s cubic-bezier(.22,1,.36,1);
+    }
+
+    /* baris status */
     .cs-stat {
-        padding: 11px 12px;
-        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        background: rgba(255,255,255,.07);
+        border: 1px solid rgba(255,255,255,.12);
         cursor: pointer;
         outline: none;
-        transition: background .2s;
+        transition: background .2s, border-color .2s, transform .25s cubic-bezier(.22,1,.36,1);
     }
     .cs-stat:hover,
-    .cs-stat:focus-visible { background: rgba(255,255,255,.1); }
-    .cs-stat-label {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-        gap: 12px;
-        margin-bottom: 8px;
-        font-size: 14px;
-        font-weight: 500;
-        letter-spacing: .5px;
+    .cs-stat:focus-visible {
+        background: rgba(255,255,255,.14);
+        border-color: rgba(255,255,255,.28);
+        transform: translateX(-3px);
     }
-    .cs-stat-label span:first-child { min-width: 0; word-break: break-word; }
-    .cs-stat-label span:last-child { flex-shrink: 0; font-size: 17px; font-weight: 700; }
+    .cs-stat.zero { opacity: .6; }
+    .cs-stat-ico {
+        flex-shrink: 0;
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        font-size: 15px;
+        color: var(--c);
+        background: rgba(255,255,255,.12);
+        background: color-mix(in srgb, var(--c) 20%, transparent);
+    }
+    .cs-stat-main { flex: 1; min-width: 0; }
+    .cs-stat-label {
+        margin-bottom: 8px;
+        font-size: 13.5px;
+        font-weight: 500;
+        letter-spacing: .3px;
+        line-height: 1.25;
+        word-break: break-word;
+    }
     .cs-bar {
         height: 5px;
         border-radius: 3px;
@@ -934,33 +1003,144 @@ opacity:0 !important;
         height: 100%;
         width: 0;
         border-radius: 3px;
+        background: var(--c);
         transition: width .6s cubic-bezier(.22,1,.36,1);
     }
-    .cs-total {
-        margin-top: 14px;
-        padding: 16px 12px 0;
-        border-top: 1px solid rgba(255,255,255,.2);
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
+    .cs-stat-num {
+        flex-shrink: 0;
+        min-width: 2ch;
+        text-align: right;
+        font-size: 22px;
+        font-weight: 800;
+        color: var(--c);
     }
-    .cs-total span { font-size: 11px; font-weight: 600; letter-spacing: 2px; opacity: .65; }
-    .cs-total strong { font-size: 22px; font-weight: 800; }
+    .cs-stat-go {
+        flex-shrink: 0;
+        font-size: 11px;
+        opacity: .45;
+        transition: transform .25s, opacity .2s;
+    }
+    .cs-stat:hover .cs-stat-go { opacity: .9; transform: translateX(3px); }
 
     .detail-panel {
         border-radius: 0;
         background: var(--decor-right), #0077b6;
         backdrop-filter: none;
-        padding: 30px 26px 26px;
+        padding: 28px 24px 0;
+        gap: 14px;
+        transform: translateX(28px);
+        transition: opacity .25s ease, transform .4s cubic-bezier(.22,1,.36,1);
+    }
+    .detail-panel.visible { transform: none; }
+
+    .detail-panel-header {
+        justify-content: flex-start;
+        gap: 12px;
+        padding-top: 6px;
+    }
+    .detail-back-btn {
+        flex-shrink: 0;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        transition: background .2s, transform .2s;
+    }
+    .detail-back-btn span { display: none; }
+    .detail-back-btn:hover {
+        background: rgba(255,255,255,.22);
+        transform: translateX(-2px);
+    }
+    .detail-head-text {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
     }
     .detail-panel-title {
-        padding: 5px 12px;
-        border-radius: 999px;
-        background: rgba(0, 40, 80, 0.45);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0;
+        border-radius: 0;
+        background: none;
+        font-size: 14px;
+        letter-spacing: .6px;
     }
-    .detail-item {
+    .detail-panel-title::before {
+        content: "";
+        flex-shrink: 0;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--accent, #fff);
+        box-shadow: 0 0 10px var(--accent, #fff);
+    }
+    .detail-count {
+        display: block;
+        padding-left: 16px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        opacity: .6;
+    }
+
+    .detail-search {
+        align-items: center;
+        gap: 10px;
+        flex-shrink: 0;
+        height: 40px;
+        padding: 0 14px;
+        border-radius: 12px;
         background: rgba(0, 40, 80, 0.35);
         border: 1px solid rgba(255, 255, 255, 0.14);
+        transition: border-color .2s, background .2s;
+    }
+    .detail-search.on { display: flex; }
+    .detail-search:focus-within {
+        border-color: rgba(255,255,255,.4);
+        background: rgba(0, 40, 80, 0.5);
+    }
+    .detail-search i { font-size: 13px; opacity: .6; }
+    .detail-search input {
+        flex: 1;
+        min-width: 0;
+        background: none;
+        border: none;
+        outline: none;
+        color: #ffffff;
+        font-family: inherit;
+        font-size: 13px;
+    }
+    .detail-search input::placeholder { color: rgba(255,255,255,.5); }
+
+    .detail-list {
+        gap: 8px;
+        padding-bottom: 28px;
+        -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+        mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+    }
+    .detail-item {
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: rgba(0, 40, 80, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-left: 3px solid var(--accent, rgba(255,255,255,.4));
+        animation: csItemIn .4s cubic-bezier(.22,1,.36,1) both;
+        animation-delay: calc(min(var(--i, 0), 12) * 35ms);
+        transition: background .2s, transform .2s;
+    }
+    .detail-item:hover {
+        background: rgba(0, 40, 80, 0.55);
+        transform: translateX(-2px);
+    }
+    .detail-item-sub { overflow-wrap: anywhere; word-break: normal; }
+    .detail-item-sub .sub-note { margin-top: 2px; font-size: 10.5px; opacity: .8; }
+    @keyframes csItemIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: none; }
     }
 
     /* ---------- footer ---------- */
@@ -1082,11 +1262,18 @@ opacity:0 !important;
 
     <div class="detail-panel" id="detailPanel">
         <div class="detail-panel-header">
-            <span class="detail-panel-title" id="detailPanelTitle"></span>
-            <button class="detail-back-btn" id="detailBackBtn">
-                <i class="fa fa-chevron-left"></i> Back
+            <button class="detail-back-btn" id="detailBackBtn" aria-label="Back">
+                <i class="fa fa-chevron-left"></i> <span>Back</span>
             </button>
+            <div class="detail-head-text">
+                <span class="detail-panel-title" id="detailPanelTitle"></span>
+                <span class="detail-count" id="detailCount"></span>
+            </div>
         </div>
+        <label class="detail-search" id="detailSearchWrap">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input id="detailSearch" type="search" placeholder="Cari kod / nama kontrak" autocomplete="off">
+        </label>
         <div class="detail-list" id="detailList"></div>
     </div>
 </div>
@@ -1117,6 +1304,9 @@ const csGrid = document.getElementById("csGrid");
 const csCount = document.getElementById("csCount");
 const csDate = document.getElementById("csDate");
 const startButton = document.getElementById("startButton");
+const detailCount = document.getElementById("detailCount");
+const detailSearch = document.getElementById("detailSearch");
+const detailSearchWrap = document.getElementById("detailSearchWrap");
 
 const contractTip = document.createElement("div");
 contractTip.className = "contract-tip";
@@ -1201,6 +1391,23 @@ detailList.addEventListener("keydown", e => {
 });
 
 detailList.addEventListener("scroll", hideContractTip, { passive: true });
+
+detailSearch.addEventListener("input", () => {
+    const q = detailSearch.value.trim().toLowerCase();
+    const rows = detailList.querySelectorAll(".detail-item");
+    let shown = 0;
+    rows.forEach(el => {
+        const hit = !q || el.dataset.q.includes(q);
+        el.style.display = hit ? "" : "none";
+        if (hit) shown++;
+    });
+    const noMatch = detailList.querySelector(".detail-nomatch");
+    if (noMatch) noMatch.hidden = shown > 0;
+    detailCount.textContent = q
+        ? shown + " / " + rows.length
+        : rows.length + (rows.length === 1 ? " contract" : " contracts");
+    hideContractTip();
+});
 window.addEventListener("resize", hideContractTip);
 document.addEventListener("click", e => {
     if (!e.target.closest(".detail-item-code")) hideContractTip();
@@ -1339,7 +1546,7 @@ function openDetail(type) {
             color: "#fde047",
             render: (c) => ({
                 code: c.contract_code || c.id,
-                sub: c.contract_end ? "Ends: " + formatDate(c.contract_end) : "",
+                sub: c.contract_end ? "Ends: " + formatDate(c.contract_end) + daysNote(c.contract_end, "left") : "",
                 subClass: "warn"
             })
         },
@@ -1348,7 +1555,7 @@ function openDetail(type) {
             color: "#c084fc",
             render: (c) => ({
                 code: c.contract_code || c.id,
-                sub: c.contract_end ? "Ended: " + formatDate(c.contract_end) : "",
+                sub: c.contract_end ? "Ended: " + formatDate(c.contract_end) + daysNote(c.contract_end, "ago") : "",
                 subClass: ""
             })
         },
@@ -1400,24 +1607,36 @@ function openDetail(type) {
     detailPanelTitle.textContent = cfg.title;
     detailPanelTitle.style.color = cfg.color;
     detailPanelTitle.style.opacity = "1";
+    detailPanel.style.setProperty("--accent", cfg.color);
+    detailCount.textContent = list.length + (list.length === 1 ? " contract" : " contracts");
+
+    detailSearch.value = "";
+    detailSearchWrap.classList.toggle("on", list.length > 5);
 
     if (list.length === 0) {
-        detailList.innerHTML = `<div style="opacity:0.4; font-size:13px; text-align:center; margin-top:20px;">No contracts</div>`;
+        detailList.innerHTML = `<div class="detail-empty"><i class="fa-regular fa-folder-open"></i><span>No contracts</span></div>`;
     } else {
-        detailList.innerHTML = list.map(c => {
+        detailList.innerHTML = list.map((c, i) => {
             const rendered = cfg.render(c);
+            const q = escHtml((String(c.contract_code || c.id || "") + " " + String(c.contract_name || "")).toLowerCase());
             return `
-                <div class="detail-item">
+                <div class="detail-item" style="--i:${i}" data-q="${q}">
                     <span class="detail-item-code" tabindex="0" role="button"
                           aria-label="Show contract name"
-                          data-name="${escHtml(c.contract_name || '')}">${rendered.code}</span>
+                          data-name="${escHtml(c.contract_name || '')}">${escHtml(rendered.code)}</span>
                     <span class="detail-item-sub ${rendered.subClass}">${rendered.sub}</span>
                 </div>
             `;
-        }).join("");
+        }).join("") + `<div class="detail-empty detail-nomatch" hidden><i class="fa-solid fa-magnifying-glass"></i><span>Tiada padanan</span></div>`;
     }
 
+    detailList.scrollTop = 0;
     detailPanel.classList.add("visible");
+}
+
+function daysNote(dateStr, mode) {
+    const d = Math.round(Math.abs(new Date(dateStr) - new Date()) / 86400000);
+    return `<div class="sub-note">${d} day${d === 1 ? "" : "s"} ${mode === "left" ? "left" : "ago"}</div>`;
 }
 
 function formatDate(dateStr) {
@@ -1726,29 +1945,53 @@ function updateHero(){
     heroFirst = false;
 }
 
-// Panel kanan (desktop): baris statistik dengan bar, boleh diklik untuk buka senarai
+function countUp(el, to){
+    if (!el) return;
+    const dur = 550, t0 = performance.now();
+    (function tick(t){
+        const p = Math.min(1, (t - t0) / dur);
+        el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3)));
+        if (p < 1) requestAnimationFrame(tick);
+    })(t0);
+}
+
+// Panel kanan (desktop): nombor jumlah + bar segmen + baris status yang boleh diklik
 function renderStats(){
     const L = currentLists;
     const total = L.ongoing.length + L.renewal.length + L.cpc.length;
     const rows = [
-        { key: "ongoing", label: "Ongoing Contracts",              color: "#4ade80", n: L.ongoing.length },
-        { key: "renewal", label: "Contracts Renewals (Within 6M)", color: "#fde047", n: L.renewal.length },
-        { key: "cpc",     label: "Available for Closing",          color: "#c084fc", n: L.cpc.length },
-        { key: "risk",    label: "Financial Deficit Risk (S.O.R)", color: "#ff6b6b", n: L.risk.length }
+        { key: "ongoing", label: "Ongoing Contracts",              color: "#4ade80", icon: "fa-file-contract",        n: L.ongoing.length },
+        { key: "renewal", label: "Contracts Renewals (Within 6M)", color: "#fde047", icon: "fa-rotate",               n: L.renewal.length },
+        { key: "cpc",     label: "Available for Closing",          color: "#c084fc", icon: "fa-flag-checkered",       n: L.cpc.length },
+        { key: "risk",    label: "Financial Deficit Risk (S.O.R)", color: "#ff6b6b", icon: "fa-triangle-exclamation", n: L.risk.length }
     ];
 
-    cardDesc.innerHTML = rows.map(r => `
-        <div class="cs-stat" role="button" tabindex="0" onclick="openDetail('${r.key}')">
-            <div class="cs-stat-label"><span>${r.label}</span><span style="color:${r.color}">${r.n}</span></div>
-            <div class="cs-bar"><div class="cs-bar-fill" data-w="${total ? Math.round(r.n / total * 100) : 0}" style="background:${r.color}"></div></div>
+    cardDesc.innerHTML = `
+        <div class="cs-hero">
+            <div class="cs-hero-label">Total Contracts</div>
+            <div class="cs-hero-num" id="csHeroNum">0</div>
+            <div class="cs-seg">
+                ${rows.slice(0, 3).map(r => `<span style="background:${r.color}" data-g="${r.n}" title="${r.label}: ${r.n}"></span>`).join("")}
+            </div>
         </div>
-    `).join("") + `
-        <div class="cs-total"><span>TOTAL CONTRACTS</span><strong>${total}</strong></div>
+        ${rows.map(r => `
+            <div class="cs-stat${r.n === 0 ? " zero" : ""}" role="button" tabindex="0" style="--c:${r.color}" onclick="openDetail('${r.key}')">
+                <span class="cs-stat-ico"><i class="fa-solid ${r.icon}"></i></span>
+                <div class="cs-stat-main">
+                    <div class="cs-stat-label">${r.label}</div>
+                    <div class="cs-bar"><div class="cs-bar-fill" data-w="${total ? Math.round(r.n / total * 100) : 0}"></div></div>
+                </div>
+                <span class="cs-stat-num">${r.n}</span>
+                <i class="fa-solid fa-chevron-right cs-stat-go"></i>
+            </div>
+        `).join("")}
     `;
 
     requestAnimationFrame(() => requestAnimationFrame(() => {
         cardDesc.querySelectorAll(".cs-bar-fill").forEach(b => { b.style.width = b.dataset.w + "%"; });
+        cardDesc.querySelectorAll(".cs-seg span").forEach(g => { g.style.flexGrow = g.dataset.g; });
     }));
+    countUp(document.getElementById("csHeroNum"), total);
 }
 
 cardDesc.addEventListener("keydown", e => {
@@ -1859,6 +2102,7 @@ document.addEventListener("click", e => {
 
 window.addEventListener("keydown", (e) => {
     if(e.key === "Escape") closeDetail();
+    if(e.target.closest && e.target.closest("input, textarea")) return;
     if(e.key === "Enter" && !isMobile && !e.target.closest("#cardDesc, .detail-panel, .cs-start")) openDashboard();
     if(e.key === "ArrowLeft" || e.key === "ArrowUp") prev();
     if(e.key === "ArrowRight" || e.key === "ArrowDown") next();
