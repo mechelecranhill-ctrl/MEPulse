@@ -3,449 +3,382 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://fonts.gstatic.com https://me-connect-api.mech-elec-ranhill.workers.dev; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'; img-src 'self' data: https:;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://fonts.gstatic.com https://me-connect-api.mech-elec-ranhill.workers.dev; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'; img-src 'self' data: https:;">
 <title>Contract Closing System</title>
-
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
 <style>
+:root{
+  --navy:#0b3d91; --blue:#007AFF; --green:#34C759; --orange:#FF9500;
+  --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; --soft:#f1f5f9;
+}
+*{box-sizing:border-box}
 body{
-margin:0;
-font-family:-apple-system,system-ui,sans-serif;
-background:linear-gradient(60deg,#0b3d91,#0077b6,#00b4d8);
-min-height:100vh;
+  margin:0; min-height:100vh; color:var(--ink);
+  font-family:-apple-system,system-ui,"Segoe UI",sans-serif;
+  background:linear-gradient(60deg,#0b3d91,#0077b6,#00b4d8) fixed;
 }
 
-.glass{
-background:rgba(255,255,255,0.18);
-backdrop-filter:blur(15px);
-border-radius:18px;
-padding:20px;
-max-width:1000px;
-margin:20px auto;
+.glass-header{
+  width:100%; height:60px; position:relative; z-index:1000;
+  display:flex; align-items:center; justify-content:center; padding:0 12px;
+  background:radial-gradient(circle at top,rgba(255,255,255,.15),transparent 35%),
+             linear-gradient(60deg,#0b3d91 0%,#0077b6 40%,#00b4d8 100%);
+  box-shadow:0 4px 15px rgba(0,0,0,.1);
 }
+.form-tabs{display:flex;gap:6px;padding:4px;border-radius:999px;background:rgba(255,255,255,.16)}
+.form-tabs button{
+  display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border:0;border-radius:999px;
+  background:transparent;color:#fff;font:600 13px inherit;font-family:inherit;cursor:pointer;
+  transition:background .2s,color .2s;
+}
+.form-tabs button:hover{background:rgba(255,255,255,.18)}
+.form-tabs button.active{background:#fff;color:var(--navy)}
+.form-tabs button[data-state]:not([data-state=idle])::after{content:"";width:7px;height:7px;border-radius:50%}
+.form-tabs button[data-state=done]::after{background:var(--green)}
+.form-tabs button[data-state=eligible]::after{background:var(--blue)}
+.form-tabs button[data-state=waiting]::after{background:var(--orange)}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid rgba(255,255,255,.9);outline-offset:2px}
 
-h2{color:white}
 
+.wrap{max-width:900px;margin:22px auto 60px;padding:0 16px}
+.title{display:flex;align-items:center;gap:14px;color:#fff;margin:6px 4px 18px}
+.title .ico{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:20px;background:rgba(255,255,255,.2)}
+.title h2{margin:0;font-size:22px;font-weight:800;letter-spacing:.2px}
+.title p{margin:2px 0 0;font-size:13px;opacity:.8}
+
+.panel{
+  background:rgba(255,255,255,.94); border-radius:20px; padding:20px;
+  box-shadow:0 10px 30px rgba(11,61,145,.18); margin-bottom:16px;
+}
+.panel h3{margin:0 0 12px;font-size:14px;font-weight:700;color:var(--navy);display:flex;align-items:center;gap:8px}
+
+
+.pick{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.field label{display:block;margin:0 0 6px;font-size:12px;font-weight:600;color:var(--muted)}
 select,input,textarea{
-width:100%;
-padding:10px;
-border-radius:10px;
-border:none;
-margin-top:5px;
+  width:100%;padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);
+  background:#fff;color:var(--ink);font:500 14px inherit;font-family:inherit;margin:0;
+  transition:border-color .15s,box-shadow .15s;
 }
+select{
+  appearance:none;padding-right:36px;
+  background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M1 1l5 5 5-5'/%3E%3C/svg%3E") no-repeat right 14px center;
+}
+select:focus,input:focus,textarea:focus{outline:0;border-color:var(--blue);box-shadow:0 0 0 4px rgba(0,122,255,.14)}
+textarea{min-height:88px;resize:vertical}
 
-label{
-font-size:11px;
-font-weight:700;
-color:#fff;
-margin-top:10px;
-display:block;
+.stepper{display:grid;grid-template-columns:repeat(3,1fr);margin:0 0 16px}
+.step{position:relative;border:0;background:none;color:#fff;font:inherit;text-align:center;padding:0 6px;cursor:pointer}
+.step::after{content:"";position:absolute;top:19px;left:calc(50% + 26px);right:calc(-50% + 26px);height:2px;background:rgba(255,255,255,.35)}
+.step:last-child::after{display:none}
+.step .dot{
+  width:40px;height:40px;margin:0 auto 8px;border-radius:50%;display:grid;place-items:center;
+  font-weight:800;font-size:14px;background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.55);
+  transition:box-shadow .2s,background .2s;
 }
+.step strong{display:block;font-size:13px}
+.step .st{display:block;font-size:11px;opacity:.8;margin-top:1px}
+.step.active .dot{box-shadow:0 0 0 5px rgba(255,255,255,.3)}
+.step[data-state=done] .dot{background:var(--green);border-color:var(--green)}
+.step[data-state=done] .dot span{display:none}
+.step[data-state=done] .dot::after{content:"\2713"}
+.step[data-state=eligible] .dot{background:#fff;border-color:#fff;color:var(--navy)}
+.step[data-state=waiting] .dot{background:var(--orange);border-color:var(--orange)}
 
-/* HEADER */
-.glass-header {
-width: 100%; height: 60px;
-background: radial-gradient(circle at top, rgba(255,255,255,.15), transparent 35%),
-linear-gradient(60deg, #0b3d91 0%, #0077b6 40%, #00b4d8 100%);
-display:flex;
-align-items:center;
-justify-content:center;
-position: relative; /* WAJIB supaya z-index di bawah berkesan (tanpa ini, z-index diabaikan sebab elemen 'static') */
-z-index: 1000;
+.status{
+  padding:14px 16px;border-radius:14px;border-left:4px solid #cbd5e1;background:var(--soft);
+  color:#334155;font-weight:700;font-size:14px;line-height:1.5;
 }
+.status:empty::before{content:"Tiada status untuk dipaparkan";font-weight:500;color:#94a3b8}
+.status small{display:block;margin-top:2px;font-weight:500;opacity:.85}
+.status[data-state=done]{background:#ecfdf3;border-color:var(--green);color:#15803d}
+.status[data-state=eligible]{background:#eff6ff;border-color:var(--blue);color:#0a64d6}
+.status[data-state=waiting]{background:#fff7ed;border-color:var(--orange);color:#b45309}
 
-.form-tabs {
-display:flex;
-gap:8px;
-}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.stack{display:grid;gap:14px;margin-top:16px}
+.rm{position:relative}
+.rm span{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:700;color:var(--muted)}
+.rm input{padding-left:42px}
 
-.form-tabs button {
-padding:8px 16px;
-border-radius:15px;
-background:rgba(255,255,255,.2);
-color:white;
-border:none;
-font-size:12px;
-cursor:pointer;
+.checklist{display:grid;gap:8px}
+.check{
+  display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;cursor:pointer;
+  border:1.5px solid var(--line);background:#fff;font-size:14px;font-weight:600;color:#334155;
+  transition:background .15s,border-color .15s;
 }
-
-.form-tabs button.active{
-background:white;
-color:#0b3d91;
+.check input{
+  appearance:none;width:22px;height:22px;flex:none;padding:0;border-radius:7px;border:2px solid #cbd5e1;
+  display:grid;place-items:center;background:#fff;cursor:pointer;
 }
-
-.card{
-background:rgba(255,255,255,0.25);
-padding:12px;
-border-radius:12px;
-margin-top:10px;
-}
+.check input:checked{background:var(--blue);border-color:var(--blue)}
+.check input:checked::after{content:"";width:5px;height:10px;border:solid #fff;border-width:0 2px 2px 0;transform:translate(-.5px,-1px) rotate(45deg)}
+.check:has(input:checked){background:#eff6ff;border-color:var(--blue)}
 
 .btn{
-width:100%;
-padding:12px;
-border:none;
-border-radius:12px;
-font-weight:700;
-cursor:pointer;
-margin-top:10px;
+  width:100%;margin-top:18px;padding:14px;border:0;border-radius:14px;color:#fff;cursor:pointer;
+  font:700 15px inherit;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:9px;
+  box-shadow:0 8px 18px rgba(0,122,255,.28);transition:transform .15s,box-shadow .15s,opacity .15s;
 }
+.btn::before{font-family:"Font Awesome 6 Free";font-weight:900;content:var(--ico)}
+.btn:hover{transform:translateY(-1px)}
+.btn:active{transform:none}
+.btn:disabled{opacity:.6;cursor:wait;transform:none}
+.primary{background:linear-gradient(135deg,#007AFF,#2f9bff)}
+.green{background:linear-gradient(135deg,#1fae47,#34C759);box-shadow:0 8px 18px rgba(52,199,89,.3)}
+#btnCPC{--ico:"\f00c"} #btnCMGD{--ico:"\f00c"} #btnSFA{--ico:"\f023"}
 
-.primary{background:#007AFF;color:white}
-.green{background:#34C759;color:white}
+.empty{display:none;text-align:center;color:#fff;padding:34px 16px;border-radius:20px;border:2px dashed rgba(255,255,255,.4)}
+.empty i{font-size:28px;margin-bottom:10px;opacity:.85}
+.empty p{margin:0;font-size:14px;opacity:.9}
+body[data-has="0"] .empty{display:block}
+body[data-has="0"] .case{display:none !important}
 
-.checklist label{
-display:flex;
-gap:10px;
-align-items:center;
-font-size:12px;
-color:white;
-margin:6px 0;
+@media (max-width:640px){
+  .pick{grid-template-columns:1fr}
+  .wrap{margin-top:14px}
+  .form-tabs button{padding:8px 12px}
+  .panel{padding:16px}
 }
-    </style>
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+</style>
 
-    <link rel="stylesheet" href="sidebar.css">
-
-    <script src="api-auth.js"></script>
-    <script src="session.js"></script>
-    <script src="sidebar.js" defer>
-
-    </script>
+<link rel="stylesheet" href="sidebar.css">
+<script src="api-auth.js"></script>
+<script src="session.js"></script>
+<script src="sidebar.js" defer></script>
 </head>
 
-<body>
+<body data-has="0">
 
-    <app-sidebar></app-sidebar>
+<app-sidebar></app-sidebar>
 
 <div class="glass-header">
-<div class="form-tabs">
-<button class="active" onclick="showTab(event,'cpc')">CPC</button>
-<button onclick="showTab(event,'cmgd')">CMGD</button>
-<button onclick="showTab(event,'sfa')">SFA</button>
-</div>
-</div>
-
-<div class="glass">
-
-<h2><i class="fa fa-file-contract"></i> Closing Contract</h2>
-
-<label>Unit</label>
-<select id="unit" onchange="loadContracts()"></select>
-
-<label>Contract</label>
-<select id="contract" onchange="loadData()"></select>
-
-<!-- CPC -->
-<div id="cpcTab">
-
-<div class="card">
-<b style="color:white">Contract Status</b>
-<div id="contractEnd" style="color:#fff"></div>
+  <div class="form-tabs">
+    <button class="active" data-tab="cpc" onclick="showTab(event,'cpc')"><i class="fa fa-file-circle-check"></i> CPC</button>
+    <button data-tab="cmgd" onclick="showTab(event,'cmgd')"><i class="fa fa-screwdriver-wrench"></i> CMGD</button>
+    <button data-tab="sfa" onclick="showTab(event,'sfa')"><i class="fa fa-flag-checkered"></i> SFA</button>
+  </div>
 </div>
 
-<div class="card checklist">
-<b style="color:white">CPC Checklist</b>
+<div class="wrap">
 
-<label><input type="checkbox" id="c1"> Tracking Form</label>
-<label><input type="checkbox" id="c2"> CPC Form</label>
-<label><input type="checkbox" id="c3"> LPK</label>
+  <div class="title">
+    <div class="ico"><i class="fa fa-file-contract"></i></div>
+    <div>
+      <h2>Closing Contract</h2>
+      <p>CPC selepas kontrak tamat, CMGD +6 bulan, SFA +18 bulan</p>
+    </div>
+  </div>
 
-</div>
+  <div class="panel">
+    <div class="pick">
+      <div class="field">
+        <label for="unit">Unit</label>
+        <select id="unit" onchange="loadContracts()"></select>
+      </div>
+      <div class="field">
+        <label for="contract">Contract</label>
+        <select id="contract" onchange="loadData()"></select>
+      </div>
+    </div>
+  </div>
 
-<button id="btnCPC" class="btn primary" onclick="saveCPC()">Submit CPC</button>
-</div>
+  <div class="empty"><i class="fa fa-hand-pointer"></i><p>Pilih unit dan contract untuk mula proses closing.</p></div>
 
-<!-- CMGD -->
-<div id="cmgdTab" style="display:none">
+  <div class="case">
+    <div class="stepper">
+      <button class="step active" data-tab="cpc" onclick="showTab(event,'cpc')"><div class="dot"><span>1</span></div><strong>CPC</strong><span class="st">-</span></button>
+      <button class="step" data-tab="cmgd" onclick="showTab(event,'cmgd')"><div class="dot"><span>2</span></div><strong>CMGD</strong><span class="st">-</span></button>
+      <button class="step" data-tab="sfa" onclick="showTab(event,'sfa')"><div class="dot"><span>3</span></div><strong>SFA</strong><span class="st">-</span></button>
+    </div>
 
-<div class="card">
-<b style="color:white">CMGD Status</b>
-<div id="cmgdStatus"></div>
-</div>
+    <!-- CPC -->
+    <div id="cpcTab" class="panel">
+      <h3><i class="fa fa-circle-info"></i> Contract Status</h3>
+      <div id="contractEnd" class="status"></div>
 
-<label>CMGD Date</label>
-<input type="date" id="cmgd">
+      <h3 style="margin-top:20px"><i class="fa fa-list-check"></i> CPC Checklist</h3>
+      <div class="checklist">
+        <label class="check"><input type="checkbox" id="c1"> Tracking Form</label>
+        <label class="check"><input type="checkbox" id="c2"> CPC Form</label>
+        <label class="check"><input type="checkbox" id="c3"> LPK</label>
+      </div>
 
-<label>Defect Status</label>
-<select id="defect">
-<option>Completed</option>
-<option>Pending</option>
-</select>
+      <button id="btnCPC" class="btn primary" onclick="saveCPC()">Submit CPC</button>
+    </div>
 
-<label>Remarks</label>
-<textarea id="cmgdRemark"></textarea>
+    <!-- CMGD -->
+    <div id="cmgdTab" class="panel" style="display:none">
+      <h3><i class="fa fa-circle-info"></i> CMGD Status</h3>
+      <div id="cmgdStatus" class="status"></div>
 
-<button id="btnCMGD" class="btn primary" onclick="saveCMGD()">Submit CMGD</button>
-</div>
+      <div class="stack">
+        <div class="grid">
+          <div class="field"><label for="cmgd">CMGD Date</label><input type="date" id="cmgd"></div>
+          <div class="field"><label for="defect">Defect Status</label>
+            <select id="defect"><option>Completed</option><option>Pending</option></select>
+          </div>
+        </div>
+        <div class="field"><label for="cmgdRemark">Remarks</label><textarea id="cmgdRemark" placeholder="Catatan (jika ada)"></textarea></div>
+      </div>
 
-<!-- SFA -->
-<div id="sfaTab" style="display:none">
+      <button id="btnCMGD" class="btn primary" onclick="saveCMGD()">Submit CMGD</button>
+    </div>
 
-<div class="card">
-<b style="color:white">SFA Status</b>
-<div id="sfaStatus"></div>
-</div>
+    <!-- SFA -->
+    <div id="sfaTab" class="panel" style="display:none">
+      <h3><i class="fa fa-circle-info"></i> SFA Status</h3>
+      <div id="sfaStatus" class="status"></div>
 
-<label>SFA Date</label>
-<input type="date" id="sfa">
+      <div class="stack">
+        <div class="field"><label for="sfa">SFA Date</label><input type="date" id="sfa"></div>
+        <div class="grid">
+          <div class="field"><label for="final">Final Account</label><div class="rm"><span>RM</span><input type="number" id="final" step="any"></div></div>
+          <div class="field"><label for="retention">Retention</label><div class="rm"><span>RM</span><input type="number" id="retention" step="any"></div></div>
+          <div class="field"><label for="pg">PG Release</label><div class="rm"><span>RM</span><input type="number" id="pg" step="any"></div></div>
+        </div>
+        <div class="field"><label for="sfaRemark">Remarks</label><textarea id="sfaRemark" placeholder="Catatan (jika ada)"></textarea></div>
+      </div>
 
-<label>Final Account</label>
-<input type="number" id="final">
-
-<label>Retention</label>
-<input type="number" id="retention">
-
-<label>PG Release</label>
-<input type="number" id="pg">
-
-<label>Remarks</label>
-<textarea id="sfaRemark"></textarea>
-
-<button id="btnSFA" class="btn green" onclick="saveSFA()">CLOSE CONTRACT</button>
-</div>
+      <button id="btnSFA" class="btn green" onclick="saveSFA()">CLOSE CONTRACT</button>
+    </div>
+  </div>
 
 </div>
 
 <script>
 const API_URL = "https://me-connect-api.mech-elec-ranhill.workers.dev";
-
-const headers = {
-    "Content-Type": "application/json"
-};
+const headers = { "Content-Type": "application/json" };
 
 let contract = null;
 let currentClosing = null;
 
+function getEl(id){ return document.getElementById(id); }
 
-/* =========================================================
-   HELPERS
-========================================================= */
-
-function getEl(id) {
-    return document.getElementById(id);
+function formatDate(date){
+    if (!(date instanceof Date) || isNaN(date.getTime())) return "-";
+    return date.toLocaleDateString("en-GB", { day:"2-digit", month:"2-digit", year:"numeric" });
 }
 
-function formatDate(date) {
-    if (!(date instanceof Date) || isNaN(date.getTime())) {
-        return "-";
-    }
-
-    return date.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric"
-    });
-}
-
-function addMonthsSafe(date, months) {
+function addMonthsSafe(date, months){
     const result = new Date(date);
-
     const originalDay = result.getDate();
-
     result.setMonth(result.getMonth() + months);
-
-    /*
-     * Handle month overflow.
-     * Contoh:
-     * 31 Jan + 1 bulan tidak boleh menjadi 03 Mac.
-     */
-    if (result.getDate() !== originalDay) {
-        result.setDate(0);
-    }
-
+    if (result.getDate() !== originalDay) result.setDate(0);
     return result;
 }
 
-async function apiFetch(url, options = {}) {
-
-    const config = {
-        ...options,
-        headers: {
-            ...headers,
-            ...(options.headers || {})
-        }
-    };
-
+async function apiFetch(url, options = {}){
+    const config = { ...options, headers: { ...headers, ...(options.headers || {}) } };
     const response = await fetch(url, config);
-
     if (!response.ok) {
         let errorText = "";
-
-        try {
-            errorText = await response.text();
-        } catch (e) {
-            errorText = "";
-        }
-
-        throw new Error(
-            `API Error ${response.status}: ${errorText || response.statusText}`
-        );
+        try { errorText = await response.text(); } catch (e) {}
+        throw new Error(`API Error ${response.status}: ${errorText || response.statusText}`);
     }
-
     return response;
 }
 
-
-/* =========================================================
-   TAB
-========================================================= */
-
-function showTab(event, type) {
-
-    document.querySelectorAll(".form-tabs button")
-        .forEach(button => {
-            button.classList.remove("active");
+/* PATCH jika closing record wujud, jika tidak POST baru */
+async function upsertClosing(payload){
+    if (currentClosing && currentClosing.id) {
+        await apiFetch(
+            `${API_URL}/rest/v1/contract_closing?id=eq.${encodeURIComponent(currentClosing.id)}`,
+            { method: "PATCH", body: JSON.stringify(payload) }
+        );
+    } else {
+        const response = await apiFetch(`${API_URL}/rest/v1/contract_closing`, {
+            method: "POST",
+            body: JSON.stringify({ contract_id: contract.id, ...payload })
         });
-
-    event.target.classList.add("active");
-
-    getEl("cpcTab").style.display =
-        type === "cpc" ? "block" : "none";
-
-    getEl("cmgdTab").style.display =
-        type === "cmgd" ? "block" : "none";
-
-    getEl("sfaTab").style.display =
-        type === "sfa" ? "block" : "none";
+        try {
+            const rows = await response.json();
+            if (Array.isArray(rows) && rows.length) currentClosing = rows[0];
+        } catch (e) { /* response kosong */ }
+    }
 }
 
+/* ===================== TAB ===================== */
+function showTab(event, type){
+    document.querySelectorAll("[data-tab]").forEach(el => {
+        el.classList.toggle("active", el.dataset.tab === type);
+    });
+    getEl("cpcTab").style.display  = type === "cpc"  ? "block" : "none";
+    getEl("cmgdTab").style.display = type === "cmgd" ? "block" : "none";
+    getEl("sfaTab").style.display  = type === "sfa"  ? "block" : "none";
+}
 
-/* =========================================================
-   LOAD UNITS
-========================================================= */
-
-async function loadUnits() {
-
+/* ===================== LOAD UNITS ===================== */
+async function loadUnits(){
     try {
-
-        const response = await apiFetch(
-            `${API_URL}/rest/v1/units?select=id,unit_name`
-        );
-
+        const response = await apiFetch(`${API_URL}/rest/v1/units?select=id,unit_name`);
         const data = await response.json();
-
         const unitSelect = getEl("unit");
-
-        unitSelect.innerHTML =
-            '<option value="">Select Unit</option>';
-
-        if (!Array.isArray(data)) {
-            throw new Error("Invalid units response");
-        }
+        unitSelect.innerHTML = '<option value="">Select Unit</option>';
+        if (!Array.isArray(data)) throw new Error("Invalid units response");
 
         data.forEach(unit => {
-
             const option = document.createElement("option");
-
             option.value = unit.id;
             option.textContent = unit.unit_name;
-
             unitSelect.appendChild(option);
         });
 
         if (data.length > 0) {
-
             unitSelect.value = data[0].id;
-
             await loadContracts();
         }
-
     } catch (error) {
-
         console.error("Error loading units:", error);
-
-        alert(
-            "Gagal mendapatkan Unit.\n\n" +
-            error.message
-        );
+        alert("Gagal mendapatkan Unit.\n\n" + error.message);
     }
 }
 
-
-/* =========================================================
-   LOAD CONTRACTS
-========================================================= */
-
-async function loadContracts() {
-
+/* ===================== LOAD CONTRACTS ===================== */
+async function loadContracts(){
     const unitId = getEl("unit").value;
-
     const contractSelect = getEl("contract");
-
-    contractSelect.innerHTML =
-        '<option value="">Loading...</option>';
-
+    contractSelect.innerHTML = '<option value="">Loading...</option>';
     resetClosingForm();
 
     if (!unitId) {
-
-        contractSelect.innerHTML =
-            '<option value="">Select Contract</option>';
-
+        contractSelect.innerHTML = '<option value="">Select Contract</option>';
         return;
     }
 
     try {
-
         const response = await apiFetch(
             `${API_URL}/rest/v1/contract` +
             `?unit_id=eq.${encodeURIComponent(unitId)}` +
             `&select=id,contract_code,contract_name,contract_start,contract_end,contract_sum` +
             `&order=contract_start.asc`
         );
-
         const data = await response.json();
-
-        contractSelect.innerHTML =
-            '<option value="">Select Contract</option>';
-
-        if (!Array.isArray(data)) {
-            throw new Error("Invalid contract response");
-        }
+        contractSelect.innerHTML = '<option value="">Select Contract</option>';
+        if (!Array.isArray(data)) throw new Error("Invalid contract response");
 
         data.forEach(item => {
-
             const option = document.createElement("option");
-
             option.value = item.id;
-            option.textContent =
-                item.contract_code +
-                (item.contract_name
-                    ? ` - ${item.contract_name}`
-                    : "");
-
+            option.textContent = item.contract_code + (item.contract_name ? ` - ${item.contract_name}` : "");
             contractSelect.appendChild(option);
         });
-
     } catch (error) {
-
         console.error("Error loading contracts:", error);
-
-        contractSelect.innerHTML =
-            '<option value="">Unable to load contracts</option>';
-
-        alert(
-            "Gagal mendapatkan Contract.\n\n" +
-            error.message
-        );
+        contractSelect.innerHTML = '<option value="">Unable to load contracts</option>';
+        alert("Gagal mendapatkan Contract.\n\n" + error.message);
     }
 }
 
-
-/* =========================================================
-   RESET FORM
-========================================================= */
-
-function resetClosingForm() {
-
+/* ===================== RESET FORM ===================== */
+function resetClosingForm(){
     contract = null;
     currentClosing = null;
 
     getEl("contractEnd").innerHTML = "";
-
     getEl("cmgdStatus").innerHTML = "";
-
     getEl("sfaStatus").innerHTML = "";
 
     getEl("cmgd").value = "";
@@ -467,759 +400,251 @@ function resetClosingForm() {
     getEl("btnSFA").style.display = "none";
 }
 
-
-/* =========================================================
-   LOAD CONTRACT DATA
-========================================================= */
-
-async function loadData() {
-
+/* ===================== LOAD CONTRACT DATA ===================== */
+async function loadData(){
     const contractId = getEl("contract").value;
-
     resetClosingForm();
-
-    if (!contractId) {
-        return;
-    }
+    if (!contractId) return;
 
     try {
-
-        /*
-         * Get contract
-         */
-
         const contractResponse = await apiFetch(
-            `${API_URL}/rest/v1/contract` +
-            `?id=eq.${encodeURIComponent(contractId)}` +
-            `&select=*`
+            `${API_URL}/rest/v1/contract?id=eq.${encodeURIComponent(contractId)}&select=*`
         );
-
         const contractRows = await contractResponse.json();
-
-        if (!Array.isArray(contractRows) || !contractRows.length) {
-
-            throw new Error("Contract tidak dijumpai.");
-        }
-
+        if (!Array.isArray(contractRows) || !contractRows.length) throw new Error("Contract tidak dijumpai.");
         contract = contractRows[0];
 
-
-        /*
-         * Get existing closing record.
-         *
-         * Ini penting supaya:
-         * - CPC status boleh dipaparkan semula
-         * - CMGD data boleh dipaparkan semula
-         * - SFA data boleh dipaparkan semula
-         */
-
+        /* closing record sedia ada: untuk papar semula status CPC / CMGD / SFA */
         try {
-
             const closingResponse = await apiFetch(
-                `${API_URL}/rest/v1/contract_closing` +
-                `?contract_id=eq.${encodeURIComponent(contract.id)}` +
-                `&select=*`
+                `${API_URL}/rest/v1/contract_closing?contract_id=eq.${encodeURIComponent(contract.id)}&select=*`
             );
-
             const closingRows = await closingResponse.json();
-
-            currentClosing =
-                Array.isArray(closingRows) && closingRows.length
-                    ? closingRows[0]
-                    : null;
-
+            currentClosing = Array.isArray(closingRows) && closingRows.length ? closingRows[0] : null;
         } catch (closingError) {
-
-            /*
-             * Jika endpoint closing belum wujud / belum support GET,
-             * contract masih boleh digunakan.
-             */
-
-            console.warn(
-                "Unable to load contract closing record:",
-                closingError
-            );
-
+            console.warn("Unable to load contract closing record:", closingError);
             currentClosing = null;
         }
 
-
-        /*
-         * Contract end date
-         */
-
         const today = new Date();
+        const contractEnd = new Date(contract.contract_end);
+        if (isNaN(contractEnd.getTime())) throw new Error("contract_end tidak sah untuk contract ini.");
 
-        const contractEnd = new Date(
-            contract.contract_end
-        );
+        const cpcEligible = today >= contractEnd;               /* CPC: kontrak telah tamat */
+        const cmgdDate = addMonthsSafe(contractEnd, 6);         /* CMGD: +6 bulan */
+        const cmgdEligible = today >= cmgdDate;
+        const sfaDate = addMonthsSafe(contractEnd, 18);         /* SFA: +18 bulan */
+        const sfaEligible = today >= sfaDate;
 
-        if (isNaN(contractEnd.getTime())) {
-
-            throw new Error(
-                "contract_end tidak sah untuk contract ini."
-            );
-        }
-
-
-        /*
-         * CPC
-         *
-         * CPC eligible apabila kontrak telah tamat.
-         */
-
-        const cpcEligible =
-            today >= contractEnd;
-
-
-        /*
-         * CMGD
-         *
-         * CMGD = 6 bulan selepas contract end.
-         */
-
-        const cmgdDate =
-            addMonthsSafe(contractEnd, 6);
-
-        const cmgdEligible =
-            today >= cmgdDate;
-
-
-        /*
-         * SFA
-         *
-         * SFA = 1 tahun 6 bulan
-         *      = 18 bulan selepas contract end.
-         */
-
-        const sfaDate =
-            addMonthsSafe(contractEnd, 18);
-
-        const sfaEligible =
-            today >= sfaDate;
-
-
-        /* =====================================================
-           CPC STATUS
-        ===================================================== */
-
-        if (currentClosing &&
-            String(currentClosing.cpc_status || "").toUpperCase() === "COMPLETED") {
-
-            getEl("contractEnd").innerHTML =
-                "✅ CPC COMPLETED";
-
+        /* ---- CPC ---- */
+        if (currentClosing && String(currentClosing.cpc_status || "").toUpperCase() === "COMPLETED") {
+            getEl("contractEnd").innerHTML = "✅ CPC COMPLETED";
             getEl("btnCPC").style.display = "none";
-
         } else if (cpcEligible) {
-
             getEl("contractEnd").innerHTML =
-                "✅ Eligible for CPC<br>" +
-                `<small>Contract ended: ${formatDate(contractEnd)}</small>`;
-
-            getEl("btnCPC").style.display = "block";
-
+                "✅ Eligible for CPC<br>" + `<small>Contract ended: ${formatDate(contractEnd)}</small>`;
+            getEl("btnCPC").style.display = "flex";
         } else {
-
-            getEl("contractEnd").innerHTML =
-                "⏳ Contract ends: " +
-                formatDate(contractEnd);
-
+            getEl("contractEnd").innerHTML = "⏳ Contract ends: " + formatDate(contractEnd);
             getEl("btnCPC").style.display = "none";
         }
 
-
-        /* =====================================================
-           CMGD STATUS
-        ===================================================== */
-
-        if (currentClosing &&
-            currentClosing.cmgd_date) {
-
+        /* ---- CMGD ---- */
+        if (currentClosing && currentClosing.cmgd_date) {
             getEl("cmgdStatus").innerHTML =
-                "✅ CMGD COMPLETED<br>" +
-                `<small>Date: ${formatDate(
-                    new Date(currentClosing.cmgd_date)
-                )}</small>`;
-
-            getEl("cmgd").value =
-                String(currentClosing.cmgd_date).substring(0, 10);
-
-            if (currentClosing.defect_status) {
-                getEl("defect").value =
-                    currentClosing.defect_status;
-            }
-
-            if (currentClosing.cmgd_remarks) {
-                getEl("cmgdRemark").value =
-                    currentClosing.cmgd_remarks;
-            }
-
+                "✅ CMGD COMPLETED<br>" + `<small>Date: ${formatDate(new Date(currentClosing.cmgd_date))}</small>`;
+            getEl("cmgd").value = String(currentClosing.cmgd_date).substring(0, 10);
+            if (currentClosing.defect_status) getEl("defect").value = currentClosing.defect_status;
+            if (currentClosing.cmgd_remarks) getEl("cmgdRemark").value = currentClosing.cmgd_remarks;
             getEl("btnCMGD").style.display = "none";
-
         } else if (cmgdEligible) {
-
             getEl("cmgdStatus").innerHTML =
-                "✅ Eligible for CMGD<br>" +
-                `<small>Eligible date: ${formatDate(cmgdDate)}</small>`;
-
-            getEl("btnCMGD").style.display = "block";
-
-            /*
-             * Default CMGD date = eligibility date.
-             */
-
-            getEl("cmgd").value =
-                cmgdDate.toISOString().substring(0, 10);
-
+                "✅ Eligible for CMGD<br>" + `<small>Eligible date: ${formatDate(cmgdDate)}</small>`;
+            getEl("btnCMGD").style.display = "flex";
+            getEl("cmgd").value = cmgdDate.toISOString().substring(0, 10);
         } else {
-
-            getEl("cmgdStatus").innerHTML =
-                "⏳ Available after: " +
-                formatDate(cmgdDate);
-
+            getEl("cmgdStatus").innerHTML = "⏳ Available after: " + formatDate(cmgdDate);
             getEl("btnCMGD").style.display = "none";
         }
 
-
-        /* =====================================================
-           SFA STATUS
-        ===================================================== */
-
-        if (currentClosing &&
-            currentClosing.sfa_date) {
-
+        /* ---- SFA ---- */
+        if (currentClosing && currentClosing.sfa_date) {
             getEl("sfaStatus").innerHTML =
-                "✅ SFA COMPLETED<br>" +
-                `<small>Date: ${formatDate(
-                    new Date(currentClosing.sfa_date)
-                )}</small>`;
-
-            getEl("sfa").value =
-                String(currentClosing.sfa_date).substring(0, 10);
-
-            if (currentClosing.final_account != null) {
-                getEl("final").value =
-                    currentClosing.final_account;
-            }
-
-            if (currentClosing.retention_release != null) {
-                getEl("retention").value =
-                    currentClosing.retention_release;
-            }
-
-            if (currentClosing.pg_release != null) {
-                getEl("pg").value =
-                    currentClosing.pg_release;
-            }
-
-            if (currentClosing.sfa_remarks) {
-                getEl("sfaRemark").value =
-                    currentClosing.sfa_remarks;
-            }
-
+                "✅ SFA COMPLETED<br>" + `<small>Date: ${formatDate(new Date(currentClosing.sfa_date))}</small>`;
+            getEl("sfa").value = String(currentClosing.sfa_date).substring(0, 10);
+            if (currentClosing.final_account != null) getEl("final").value = currentClosing.final_account;
+            if (currentClosing.retention_release != null) getEl("retention").value = currentClosing.retention_release;
+            if (currentClosing.pg_release != null) getEl("pg").value = currentClosing.pg_release;
+            if (currentClosing.sfa_remarks) getEl("sfaRemark").value = currentClosing.sfa_remarks;
             getEl("btnSFA").style.display = "none";
-
         } else if (sfaEligible) {
-
             getEl("sfaStatus").innerHTML =
-                "✅ Eligible for SFA<br>" +
-                `<small>Eligible date: ${formatDate(sfaDate)}</small>`;
-
-            getEl("btnSFA").style.display = "block";
-
-            /*
-             * Default SFA date = eligibility date.
-             */
-
-            getEl("sfa").value =
-                sfaDate.toISOString().substring(0, 10);
-
+                "✅ Eligible for SFA<br>" + `<small>Eligible date: ${formatDate(sfaDate)}</small>`;
+            getEl("btnSFA").style.display = "flex";
+            getEl("sfa").value = sfaDate.toISOString().substring(0, 10);
         } else {
-
-            getEl("sfaStatus").innerHTML =
-                "⏳ Available after: " +
-                formatDate(sfaDate);
-
+            getEl("sfaStatus").innerHTML = "⏳ Available after: " + formatDate(sfaDate);
             getEl("btnSFA").style.display = "none";
         }
-
     } catch (error) {
-
         console.error("Error loading contract data:", error);
-
-        alert(
-            "Gagal mendapatkan data contract.\n\n" +
-            error.message
-        );
+        alert("Gagal mendapatkan data contract.\n\n" + error.message);
     }
 }
 
+/* ===================== SAVE CPC ===================== */
+async function saveCPC(){
+    if (!contract) { alert("Sila pilih contract dahulu."); return; }
 
-/* =========================================================
-   SAVE CPC
-========================================================= */
-
-async function saveCPC() {
-
-    if (!contract) {
-
-        alert("Sila pilih contract dahulu.");
-
+    if (!getEl("c1").checked || !getEl("c2").checked || !getEl("c3").checked) {
+        alert("Sila lengkapkan semua CPC checklist.");
         return;
     }
-
-
-    /*
-     * Checklist
-     */
-
-    if (
-        !getEl("c1").checked ||
-        !getEl("c2").checked ||
-        !getEl("c3").checked
-    ) {
-
-        alert(
-            "Sila lengkapkan semua CPC checklist."
-        );
-
+    if (new Date() < new Date(contract.contract_end)) {
+        alert("Contract masih belum tamat. CPC belum boleh dibuat.");
         return;
     }
-
-
-    /*
-     * Double-check eligibility
-     */
-
-    const contractEnd =
-        new Date(contract.contract_end);
-
-    if (new Date() < contractEnd) {
-
-        alert(
-            "Contract masih belum tamat. CPC belum boleh dibuat."
-        );
-
-        return;
-    }
-
 
     const button = getEl("btnCPC");
-
     button.disabled = true;
     button.innerText = "Saving...";
 
-
     try {
-
-        /*
-         * Jika closing record sudah wujud,
-         * PATCH record tersebut.
-         *
-         * Jika belum wujud,
-         * POST record baru.
-         */
-
-        if (currentClosing && currentClosing.id) {
-
-            await apiFetch(
-                `${API_URL}/rest/v1/contract_closing` +
-                `?id=eq.${encodeURIComponent(currentClosing.id)}`,
-                {
-                    method: "PATCH",
-                    body: JSON.stringify({
-                        cpc_status: "COMPLETED"
-                    })
-                }
-            );
-
-        } else {
-
-            const response = await apiFetch(
-                `${API_URL}/rest/v1/contract_closing`,
-                {
-                    method: "POST",
-                    body: JSON.stringify({
-                        contract_id: contract.id,
-                        cpc_status: "COMPLETED"
-                    })
-                }
-            );
-
-            /*
-             * Simpan returned record jika Worker
-             * memulangkannya.
-             */
-
-            try {
-
-                const rows = await response.json();
-
-                if (Array.isArray(rows) && rows.length) {
-                    currentClosing = rows[0];
-                }
-
-            } catch (e) {
-                // Response mungkin kosong.
-            }
-        }
-
-
+        await upsertClosing({ cpc_status: "COMPLETED" });
         alert("CPC saved successfully.");
-
         await loadData();
-
     } catch (error) {
-
         console.error("Error saving CPC:", error);
-
-        alert(
-            "Gagal save CPC.\n\n" +
-            error.message
-        );
-
+        alert("Gagal save CPC.\n\n" + error.message);
     } finally {
-
         button.disabled = false;
         button.innerText = "Submit CPC";
     }
 }
 
+/* ===================== SAVE CMGD ===================== */
+async function saveCMGD(){
+    if (!contract) { alert("Sila pilih contract dahulu."); return; }
 
-/* =========================================================
-   SAVE CMGD
-========================================================= */
+    const cmgdDateValue = getEl("cmgd").value;
+    if (!cmgdDateValue) { alert("Sila masukkan CMGD Date."); return; }
 
-async function saveCMGD() {
-
-    if (!contract) {
-
-        alert("Sila pilih contract dahulu.");
-
-        return;
-    }
-
-
-    const cmgdDateValue =
-        getEl("cmgd").value;
-
-    if (!cmgdDateValue) {
-
-        alert("Sila masukkan CMGD Date.");
-
-        return;
-    }
-
-
-    /*
-     * CMGD eligibility:
-     * contract end + 6 months
-     */
-
-    const contractEnd =
-        new Date(contract.contract_end);
-
-    const eligibleDate =
-        addMonthsSafe(contractEnd, 6);
-
-    const selectedDate =
-        new Date(cmgdDateValue);
-
+    /* eligible: contract end + 6 bulan */
+    const eligibleDate = addMonthsSafe(new Date(contract.contract_end), 6);
+    const selectedDate = new Date(cmgdDateValue);
 
     if (new Date() < eligibleDate) {
-
-        alert(
-            "CMGD belum eligible.\n\n" +
-            "Available after: " +
-            formatDate(eligibleDate)
-        );
-
+        alert("CMGD belum eligible.\n\nAvailable after: " + formatDate(eligibleDate));
         return;
     }
-
-
-    /*
-     * CMGD date tidak boleh sebelum eligibility date.
-     */
-
     if (selectedDate < eligibleDate) {
-
-        alert(
-            "CMGD Date tidak boleh sebelum " +
-            formatDate(eligibleDate)
-        );
-
+        alert("CMGD Date tidak boleh sebelum " + formatDate(eligibleDate));
         return;
     }
-
 
     const button = getEl("btnCMGD");
-
     button.disabled = true;
     button.innerText = "Saving...";
 
-
     try {
-
-        const payload = {
-            contract_id: contract.id,
+        await upsertClosing({
             cmgd_date: cmgdDateValue,
             defect_status: getEl("defect").value,
             cmgd_remarks: getEl("cmgdRemark").value
-        };
-
-
-        /*
-         * Jika closing record sudah ada:
-         * update record contract tersebut.
-         */
-
-        if (currentClosing && currentClosing.id) {
-
-            await apiFetch(
-                `${API_URL}/rest/v1/contract_closing` +
-                `?id=eq.${encodeURIComponent(currentClosing.id)}`,
-                {
-                    method: "PATCH",
-                    body: JSON.stringify(payload)
-                }
-            );
-
-        } else {
-
-            const response = await apiFetch(
-                `${API_URL}/rest/v1/contract_closing`,
-                {
-                    method: "POST",
-                    body: JSON.stringify(payload)
-                }
-            );
-
-            try {
-
-                const rows = await response.json();
-
-                if (Array.isArray(rows) && rows.length) {
-                    currentClosing = rows[0];
-                }
-
-            } catch (e) {
-                // Empty response.
-            }
-        }
-
-
+        });
         alert("CMGD saved successfully.");
-
         await loadData();
-
     } catch (error) {
-
         console.error("Error saving CMGD:", error);
-
-        alert(
-            "Gagal save CMGD.\n\n" +
-            error.message
-        );
-
+        alert("Gagal save CMGD.\n\n" + error.message);
     } finally {
-
         button.disabled = false;
         button.innerText = "Submit CMGD";
     }
 }
 
+/* ===================== SAVE SFA ===================== */
+async function saveSFA(){
+    if (!contract) { alert("Sila pilih contract dahulu."); return; }
 
-/* =========================================================
-   SAVE SFA
-========================================================= */
+    const sfaDateValue = getEl("sfa").value;
+    if (!sfaDateValue) { alert("Sila masukkan SFA Date."); return; }
 
-async function saveSFA() {
-
-    if (!contract) {
-
-        alert("Sila pilih contract dahulu.");
-
-        return;
-    }
-
-
-    const sfaDateValue =
-        getEl("sfa").value;
-
-    if (!sfaDateValue) {
-
-        alert("Sila masukkan SFA Date.");
-
-        return;
-    }
-
-
-    /*
-     * SFA eligibility:
-     *
-     * Contract End
-     * +
-     * 18 months
-     */
-
-    const contractEnd =
-        new Date(contract.contract_end);
-
-    const eligibleDate =
-        addMonthsSafe(contractEnd, 18);
-
-    const selectedDate =
-        new Date(sfaDateValue);
-
+    /* eligible: contract end + 18 bulan */
+    const eligibleDate = addMonthsSafe(new Date(contract.contract_end), 18);
+    const selectedDate = new Date(sfaDateValue);
 
     if (new Date() < eligibleDate) {
-
-        alert(
-            "SFA belum eligible.\n\n" +
-            "Available after: " +
-            formatDate(eligibleDate)
-        );
-
+        alert("SFA belum eligible.\n\nAvailable after: " + formatDate(eligibleDate));
         return;
     }
-
-
-    /*
-     * SFA Date tidak boleh sebelum
-     * eligibility date.
-     */
-
     if (selectedDate < eligibleDate) {
-
-        alert(
-            "SFA Date tidak boleh sebelum " +
-            formatDate(eligibleDate)
-        );
-
+        alert("SFA Date tidak boleh sebelum " + formatDate(eligibleDate));
         return;
     }
-
-
-    /*
-     * Confirm sebelum close contract.
-     */
-
-    const confirmed =
-        confirm(
-            "Adakah anda pasti mahu CLOSE CONTRACT ini?"
-        );
-
-    if (!confirmed) {
-        return;
-    }
-
+    if (!confirm("Adakah anda pasti mahu CLOSE CONTRACT ini?")) return;
 
     const button = getEl("btnSFA");
-
     button.disabled = true;
     button.innerText = "Closing...";
 
+    const numOrNull = id => getEl(id).value === "" ? null : Number(getEl(id).value);
 
     try {
-
-        const payload = {
-            contract_id: contract.id,
-
+        await upsertClosing({
             sfa_date: sfaDateValue,
-
-            final_account:
-                getEl("final").value === ""
-                    ? null
-                    : Number(getEl("final").value),
-
-            retention_release:
-                getEl("retention").value === ""
-                    ? null
-                    : Number(getEl("retention").value),
-
-            pg_release:
-                getEl("pg").value === ""
-                    ? null
-                    : Number(getEl("pg").value),
-
-            sfa_remarks:
-                getEl("sfaRemark").value,
-
+            final_account: numOrNull("final"),
+            retention_release: numOrNull("retention"),
+            pg_release: numOrNull("pg"),
+            sfa_remarks: getEl("sfaRemark").value,
             status: "CLOSED"
-        };
-
-
-        /*
-         * Existing closing record
-         */
-
-        if (currentClosing && currentClosing.id) {
-
-            await apiFetch(
-                `${API_URL}/rest/v1/contract_closing` +
-                `?id=eq.${encodeURIComponent(currentClosing.id)}`,
-                {
-                    method: "PATCH",
-                    body: JSON.stringify(payload)
-                }
-            );
-
-        } else {
-
-            const response = await apiFetch(
-                `${API_URL}/rest/v1/contract_closing`,
-                {
-                    method: "POST",
-                    body: JSON.stringify(payload)
-                }
-            );
-
-            try {
-
-                const rows = await response.json();
-
-                if (Array.isArray(rows) && rows.length) {
-                    currentClosing = rows[0];
-                }
-
-            } catch (e) {
-                // Empty response.
-            }
-        }
-
-
-        alert(
-            "Contract Closed Successfully."
-        );
-
+        });
+        alert("Contract Closed Successfully.");
         await loadData();
-
     } catch (error) {
-
         console.error("Error closing contract:", error);
-
-        alert(
-            "Gagal close contract.\n\n" +
-            error.message
-        );
-
+        alert("Gagal close contract.\n\n" + error.message);
     } finally {
-
         button.disabled = false;
         button.innerText = "CLOSE CONTRACT";
     }
 }
 
+/* ===================== INIT ===================== */
+document.addEventListener("DOMContentLoaded", () => { loadUnits(); });
 
-/* =========================================================
-   INIT
-========================================================= */
+/* ===================== PAPARAN: sync status ke stepper / tab ===================== */
+(function(){
+    const map = [["contractEnd","cpc"], ["cmgdStatus","cmgd"], ["sfaStatus","sfa"]];
+    const label = { done:"Selesai", eligible:"Layak", waiting:"Menunggu", idle:"-" };
 
-document.addEventListener("DOMContentLoaded", () => {
-    loadUnits();
-});
+    function stateOf(text){
+        text = (text || "").trim();
+        if (!text) return "idle";
+        if (/COMPLETED/i.test(text)) return "done";
+        if (/Eligible/i.test(text)) return "eligible";
+        return "waiting";
+    }
+
+    function sync(){
+        map.forEach(([id, tab]) => {
+            const st = stateOf(getEl(id).textContent);
+            getEl(id).dataset.state = st;
+            document.querySelectorAll(`[data-tab="${tab}"]`).forEach(el => {
+                el.dataset.state = st;
+                const s = el.querySelector(".st");
+                if (s) s.textContent = label[st];
+            });
+        });
+        document.body.dataset.has = getEl("contract").value ? "1" : "0";
+    }
+
+    const obs = new MutationObserver(sync);
+    map.forEach(([id]) => obs.observe(getEl(id), { childList:true, characterData:true, subtree:true }));
+    obs.observe(getEl("contract"), { childList:true });
+    getEl("contract").addEventListener("change", sync);
+    sync();
+})();
 </script>
 </body>
 </html>
