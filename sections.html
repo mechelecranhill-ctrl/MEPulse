@@ -330,18 +330,34 @@ animation:fadeInRight .45s ease forwards;
     font-weight: 700;
     color: white;
     flex-shrink: 0;
-    cursor: pointer;
-    text-decoration: underline dotted rgba(255,255,255,0.45);
-    text-underline-offset: 3px;
     outline: none;
     -webkit-tap-highlight-color: transparent;
     transition: color .15s;
 }
-.detail-item-code:hover,
-.detail-item-code.active,
-.detail-item-code:focus-visible {
+.detail-item-code.has-tip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+.detail-item-code.has-tip::after {
+    content: "\f05a";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    font-size: 11px;
+    opacity: .45;
+    transition: opacity .15s, transform .15s;
+}
+.detail-item-code.has-tip:hover,
+.detail-item-code.has-tip.active,
+.detail-item-code.has-tip:focus-visible {
     color: #7dd3fc;
-    text-decoration-color: #7dd3fc;
+}
+.detail-item-code.has-tip:hover::after,
+.detail-item-code.has-tip.active::after,
+.detail-item-code.has-tip:focus-visible::after {
+    opacity: 1;
+    transform: scale(1.12);
 }
 
 .contract-tip {
@@ -408,6 +424,23 @@ animation:fadeInRight .45s ease forwards;
 .detail-item-sub .sub-k { margin-right: 4px; font-weight: 500; opacity: .65; }
 .detail-item-sub b { font-weight: 700; }
 .detail-item-sub .sub-note { margin-top: 2px; font-size: 10.5px; opacity: .8; }
+
+.detail-item.stack {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+.detail-item.stack .detail-item-sub {
+    display: block;
+    -webkit-line-clamp: unset;
+    overflow: visible;
+    flex: none;
+    width: 100%;
+    text-align: left;
+    word-break: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.4;
+}
 
 .section-helm{
 width:160px;
@@ -1405,24 +1438,24 @@ function toggleContractTip(el) {
 
 detailList.addEventListener("mouseover", e => {
     if (!canHover || tipPinned) return;
-    const el = e.target.closest(".detail-item-code");
+    const el = e.target.closest(".has-tip");
     if (el) showContractTip(el);
 });
 
 detailList.addEventListener("mouseout", e => {
     if (tipPinned) return;
-    const el = e.target.closest(".detail-item-code");
+    const el = e.target.closest(".has-tip");
     if (el && !el.contains(e.relatedTarget)) hideContractTip();
 });
 
 detailList.addEventListener("click", e => {
-    const el = e.target.closest(".detail-item-code");
+    const el = e.target.closest(".has-tip");
     if (el) toggleContractTip(el);
 });
 
 detailList.addEventListener("keydown", e => {
     if (e.key !== "Enter" && e.key !== " ") return;
-    const el = e.target.closest(".detail-item-code");
+    const el = e.target.closest(".has-tip");
     if (!el) return;
     e.preventDefault();
     toggleContractTip(el);
@@ -1448,7 +1481,7 @@ detailSearch.addEventListener("input", () => {
 });
 window.addEventListener("resize", hideContractTip);
 document.addEventListener("click", e => {
-    if (!e.target.closest(".detail-item-code")) hideContractTip();
+    if (!e.target.closest(".has-tip")) hideContractTip();
 });
 
 const detailBackBtn = document.getElementById("detailBackBtn");
@@ -1575,8 +1608,9 @@ function openDetail(type) {
             color: "#4ade80",
             render: (c) => ({
                 code: c.contract_code || c.id,
-                sub: c.contract_name || "",
-                subClass: ""
+                sub: escHtml(c.contract_name || ""),
+                subClass: "",
+                full: true
             })
         },
         renewal: {
@@ -1658,10 +1692,10 @@ function openDetail(type) {
             const rendered = cfg.render(c);
             const q = escHtml((String(c.contract_code || c.id || "") + " " + String(c.contract_name || "")).toLowerCase());
             return `
-                <div class="detail-item" style="--i:${i}" data-q="${q}">
-                    <span class="detail-item-code" tabindex="0" role="button"
+                <div class="detail-item${rendered.full ? ' stack' : ''}" style="--i:${i}" data-q="${q}">
+                    <span class="detail-item-code${rendered.full ? '' : ' has-tip'}"${rendered.full ? '' : ` tabindex="0" role="button"
                           aria-label="Show contract name"
-                          data-name="${escHtml(c.contract_name || '')}">${escHtml(rendered.code)}</span>
+                          data-name="${escHtml(c.contract_name || '')}"`}>${escHtml(rendered.code)}</span>
                     <span class="detail-item-sub ${rendered.subClass}">${rendered.sub}</span>
                 </div>
             `;
