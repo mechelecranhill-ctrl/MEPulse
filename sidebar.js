@@ -257,7 +257,7 @@ class AppSidebar extends HTMLElement {
             link.addEventListener("click", (e) => {
                 e.preventDefault();
                 if (link.dataset.sectionId) {
-                    window.location.href = `dashboard-indents.html?section=${link.dataset.sectionId}`;
+                    window.location.href = `dashboard-indent.html?section=${link.dataset.sectionId}`;
                 }
             });
         });
@@ -300,7 +300,7 @@ class AppSidebar extends HTMLElement {
             }
         }
 
-        if (fullPath === "dashboard-indents.html") {
+        if (fullPath === "dashboard-indent.html") {
             this.indentsMenu.classList.add("open");
             this.indentsArrow.innerText = "▲";
 
