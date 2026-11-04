@@ -469,6 +469,12 @@ function showNew(edit) {
   secTotal();
 }
 
+function errMsg(e) {
+  let m = String((e && e.message) || e);
+  try { const j = JSON.parse(m); m = j.message || j.error || m; } catch (_) {}
+  return m;
+}
+
 async function saveIndent() {
   if (IS_GUEST) return;
   const v = id => document.getElementById(id).value.trim();
@@ -486,7 +492,7 @@ async function saveIndent() {
 
   const body = { unit_id: unitId, indent_code: v('nCode').toUpperCase(), indent_name: v('nName').toUpperCase(),
     indent_start: v('nStart') || null, indent_end: v('nEnd') || null, indent_sum: sum };
-  if (hasSec) body.indent_sections_breakdown = secs;
+  if (hasSec) body.indent_sections_breakdown = JSON.stringify(secs);  // D1 tidak boleh bind objek; simpan sebagai teks JSON
   else if (editingHadSec) body.indent_sections_breakdown = null;
   try {
     if (editingId) {
@@ -498,7 +504,7 @@ async function saveIndent() {
     const keep = editingId;
     await selectUnit(unitId);
     if (keep) openIndent(keep);
-  } catch (e) { console.error(e); alert('Gagal menyimpan indent. Jika ada pecahan seksyen, pastikan lajur indent_sections_breakdown sudah dicipta.'); }
+  } catch (e) { console.error(e); alert('Gagal menyimpan indent.\n\n' + errMsg(e)); }
 }
 
 window.onload = () => fetchUnits().catch(e => console.error('Error units:', e));
