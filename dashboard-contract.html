@@ -1138,6 +1138,32 @@
         .usage-embed tbody tr:nth-child(even) td { background: #fafcfe; }
         .usage-embed tbody tr:hover td { background: #f1f7fd; }
         .var-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 800; }
+
+        /* ---- state tutup + toggle ---- */
+        .closed-wrap { flex-shrink: 0; }
+        .closed-toggle {
+            display: none;
+            align-items: center;
+            gap: 7px;
+            margin: 0 0 10px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,.28);
+            background: rgba(255,255,255,.14);
+            color: #fff;
+            font-family: inherit;
+            font-size: 10.5px;
+            font-weight: 700;
+            letter-spacing: .4px;
+            cursor: pointer;
+            transition: background .2s, color .2s;
+        }
+        .closed-toggle.has { display: inline-flex; }
+        .closed-toggle:hover { background: rgba(255,255,255,.26); }
+        .closed-toggle.on { background: #fff; color: var(--brand-deep); }
+        #contractList.hide-closed:not(.searching) .c-card.is-closed { display: none; }
+        .c-card.is-closed { opacity: .78; }
+        .c-card.is-closed:hover, .c-card.is-closed.active { opacity: 1; }
     </style>
 
     <link rel="stylesheet" href="sidebar.css">
@@ -1173,6 +1199,9 @@
                     <i class="fa fa-search"></i>
                     <input type="text" id="contractSearch" class="search-box" placeholder="Search Code/Contract" onkeyup="debouncedFilterContracts()">
                 </div>
+            </div>
+            <div class="closed-wrap">
+                <button type="button" class="closed-toggle" id="closedToggle" onclick="toggleClosed()"></button>
             </div>
             <div id="contractList"></div>
         </div>
@@ -1302,6 +1331,9 @@
     let currentInterims = [];
     let selectedSections = [];
     let searchTimeout = null;
+    let activeUnitId = null;
+    let showClosed = false;
+    try { showClosed = localStorage.getItem('showClosed') === '1'; } catch (e) {}
 
     const cacheContracts = {};
     const cacheAnalysis = {};
@@ -1343,13 +1375,15 @@
         const input = document.getElementById('contractSearch');
         if (!input) return;
         const query = input.value.toLowerCase();
+        const listEl = document.getElementById('contractList');
+        if (listEl) listEl.classList.toggle('searching', query.trim() !== '');
         const cards = document.querySelectorAll('.c-card');
 
         requestAnimationFrame(() => {
             cards.forEach(card => {
                 const code = card.querySelector('h4')?.innerText.toLowerCase() || '';
                 const name = card.querySelector('.sub-text')?.innerText.toLowerCase() || '';
-                card.style.display = (code.includes(query) || name.includes(query)) ? 'block' : 'none';
+                card.style.display = (!query || code.includes(query) || name.includes(query)) ? '' : 'none';
             });
         });
     }
@@ -1400,6 +1434,7 @@
         centerActiveUnit(btn);
 
         document.getElementById('contractSearch').value = '';
+        activeUnitId = unitId;
         document.body.classList.remove('analysis-active');
 
         const panel = document.getElementById('analysis-panel');
@@ -1418,7 +1453,10 @@
         document.getElementById('panel-vendor').innerText = '';
 
         if (cacheContracts[unitId]) {
-            renderContractList(cacheContracts[unitId]);
+            const cachedList = cacheContracts[unitId];
+            const cachedClosing = await fetchClosingMap(cachedList);
+            if (activeUnitId !== unitId) return;
+            renderContractList(cachedList, cachedClosing);
             return;
         }
 
@@ -1439,13 +1477,62 @@
             });
 
             cacheContracts[unitId] = data;
-            renderContractList(data);
+            const closingMap = await fetchClosingMap(data);
+            if (activeUnitId !== unitId) return;
+            renderContractList(data, closingMap);
         } catch (e) {
             console.error("Error contracts:", e);
         }
     }
 
-    function contractState(c) {
+    function closingStage(cl) {
+        if (!cl) return null;
+        if (cl.sfa_date || String(cl.status || '').toUpperCase() === 'CLOSED') return { label: 'Closed', color: '#64748b', stage: 'closed' };
+        if (cl.cmgd_date) return { label: 'CMGD', color: '#6366f1', stage: 'cmgd' };
+        if (String(cl.cpc_status || '').toUpperCase() === 'COMPLETED') return { label: 'CPC', color: '#0ea5e9', stage: 'cpc' };
+        return null;
+    }
+
+    /* Satu query untuk semua kontrak dalam unit; sentiasa terkini (tidak dicache) */
+    async function fetchClosingMap(list) {
+        const map = {};
+        if (!Array.isArray(list) || !list.length) return map;
+        try {
+            const ids = list.map(c => encodeURIComponent(c.id)).join(',');
+            const r = await fetch(
+                `${API_URL}/rest/v1/contract_closing?contract_id=in.(${ids})&select=contract_id,cpc_status,cmgd_date,sfa_date,status`,
+                { headers }
+            );
+            if (!r.ok) throw new Error(`Closing HTTP ${r.status}`);
+            const rows = await r.json();
+            (Array.isArray(rows) ? rows : []).forEach(row => { map[row.contract_id] = row; });
+        } catch (e) {
+            console.warn('Unable to load contract_closing list:', e);
+        }
+        return map;
+    }
+
+    function applyClosedVisibility(count, allClosed) {
+        const list = document.getElementById('contractList');
+        const btn = document.getElementById('closedToggle');
+        const effective = showClosed || allClosed;
+        if (list) list.classList.toggle('hide-closed', !effective);
+        if (btn) {
+            btn.classList.toggle('has', count > 0 && !allClosed);
+            btn.classList.toggle('on', showClosed);
+            btn.innerHTML = `<i class="fa ${showClosed ? 'fa-eye' : 'fa-eye-slash'}"></i> ${showClosed ? 'Hide' : 'Show'} closed (${count})`;
+        }
+    }
+
+    function toggleClosed() {
+        showClosed = !showClosed;
+        try { localStorage.setItem('showClosed', showClosed ? '1' : '0'); } catch (e) {}
+        applyClosedVisibility(document.querySelectorAll('#contractList .c-card.is-closed').length, false);
+    }
+
+    function contractState(c, closing) {
+        const cs = closingStage(closing);
+        if (cs) return cs;
         if (!c.contract_end) return { label: 'No end date', color: '#8e8e93' };
         const end = new Date(c.contract_end);
         const now = new Date();
@@ -1460,12 +1547,14 @@
         return new Date(d).toLocaleDateString('en-MY', { day: '2-digit', month: 'short', year: 'numeric' });
     }
 
-    function renderContractList(data) {
+    function renderContractList(data, closingMap = {}) {
         const list = document.getElementById('contractList');
+        list.classList.remove('searching');
         list.innerHTML = data.map((c, i) => {
-            const st = contractState(c);
+            const st = contractState(c, closingMap[c.id]);
+            const isClosed = st.stage === 'closed';
             return `
-            <div class="c-card" id="card-${c.id}" style="--i:${i}">
+            <div class="c-card${isClosed ? ' is-closed' : ''}" id="card-${c.id}" style="--i:${i}">
                 <h4>${c.contract_code}</h4>
                 <div class="sub-text">${c.contract_name}</div>
                 <div class="c-meta" style="--c:${st.color}">
@@ -1487,9 +1576,17 @@
             }
         });
 
-        if (data.length > 0 && window.innerWidth > 768) {
-            selectCard(data[0].id);
-            openAnalysis(data[0]);
+        const isClosedC = c => { const s = closingStage(closingMap[c.id]); return !!s && s.stage === 'closed'; };
+        const openContracts = data.filter(c => !isClosedC(c));
+        const closedCount = data.length - openContracts.length;
+        const allClosed = data.length > 0 && openContracts.length === 0;
+        applyClosedVisibility(closedCount, allClosed);
+
+        const visible = (showClosed || allClosed) ? data : openContracts;
+        const first = visible[0];
+        if (first && window.innerWidth > 768) {
+            selectCard(first.id);
+            openAnalysis(first);
         }
     }
 
@@ -2069,7 +2166,7 @@
 
             buildUsageChart(months, planned, actual);
             buildUsageTable(months, planned, actual, false);
-
+            /* Closing record: sentiasa fetch terkini (tidak dicache dalam IndexedDB) */
             let closing = null;
             try {
                 const rc = await fetch(
@@ -2250,6 +2347,7 @@
             return r;
         };
 
+        /* Status sebenar dari jadual contract_closing */
         const cpcDone  = String((closing && closing.cpc_status) || '').toUpperCase() === 'COMPLETED';
         const cmgdDone = !!(closing && closing.cmgd_date);
         const sfaDone  = !!(closing && closing.sfa_date);
