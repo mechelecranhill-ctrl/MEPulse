@@ -739,6 +739,28 @@
         @media (prefers-reduced-motion: reduce) { .skel::after { animation: none; } }
         .skel-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
         .empty-row { text-align: center; color: #94a3b8; padding: 36px 10px !important; }
+
+        /* --- Section: chip + hover tooltip + popup --- */
+        .sec-chip { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 3px 10px; border: 0; border-radius: 999px; background: #eef2ff; color: #4f46e5; font-size: 10.5px; font-weight: 700; font-family: inherit; cursor: pointer; }
+        .sec-chip:hover, .sec-chip.active { background: #e0e7ff; }
+        .sec-chip i { font-size: 10px; }
+        #secPop { position: fixed; z-index: 1300; width: 260px; max-width: calc(100vw - 16px); background: #fff; color: #0f172a; border-radius: 14px; padding: 12px; box-shadow: 0 12px 32px rgba(15,23,42,.22), 0 0 0 1px rgba(15,23,42,.06); opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(4px); transition: opacity .12s ease, transform .12s ease; font-weight: 500; }
+        #secPop.show { opacity: 1; visibility: visible; transform: none; }
+        #secPop.pinned { pointer-events: auto; }
+        #secPopBackdrop { position: fixed; inset: 0; z-index: 1250; display: none; }
+        #secPopBackdrop.show { display: block; }
+        #secPop .sp-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+        #secPop .sp-kicker { font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #64748b; }
+        #secPop .sp-title { font-size: 14px; font-weight: 800; color: #0f172a; }
+        #secPop .sp-close { display: none; border: 0; background: #f1f5f9; color: #475569; width: 26px; height: 26px; border-radius: 8px; font-size: 16px; line-height: 1; cursor: pointer; }
+        #secPop.pinned .sp-close { display: block; }
+        #secPop .sec-list { margin: 0; padding: 0; border: 0; }
+        #secPop .sp-total { display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0; font-size: 11px; color: #64748b; }
+        #secPop .sp-total b { font-size: 14px; color: #0f172a; font-variant-numeric: tabular-nums; }
+        @media (max-width: 768px) {
+            #secPopBackdrop.show { background: rgba(15,23,42,.35); }
+            #secPop.pinned { left: 12px !important; right: 12px !important; top: auto !important; bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important; width: auto; }
+        }
     </style>
     
     <link rel="stylesheet" href="sidebar.css">
@@ -758,6 +780,9 @@
 </head>
 <body>
     <app-sidebar></app-sidebar>
+    <div id="secPopBackdrop" class="no-print" onclick="closeSecPop()"></div>
+    <div id="secPop" class="no-print" role="dialog" aria-label="Pecahan section"></div>
+
     <div id="selBar" class="no-print" role="status" aria-live="polite">
         <div>
             <div class="sel-main"><span id="selCount">0</span> dipilih &middot; <b id="selTotal">RM 0.00</b></div>
@@ -1269,6 +1294,7 @@ async function loadSingleContract(id){
 }
 
 function renderTable(data, showArea = true){
+    if(typeof closeSecPop === 'function') closeSecPop();
     currentTableData = data;
     const tbody = document.getElementById('workOrderTbody');
     let html = '';
@@ -1346,8 +1372,8 @@ function renderTable(data, showArea = true){
                 <div style="font-size:12px;color:var(--ios-orange);"><i class="fa-solid fa-map-pin"></i> ${w.location || 'N/A'}</div>
             </td>
             <td><strong>${w.interim_no ? 'INT-' + w.interim_no : '-'}</strong></td>
-            <td><strong>RM ${(w.amount_spent || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</strong>${buildSectionBreakdown(w) || ''}</td>
-            <td style="font-weight:bold;color:var(--ios-green);">RM ${(w.interim_no ? w.amount_spent : 0).toLocaleString(undefined,{minimumFractionDigits:2})}${w.interim_no ? (buildSectionBreakdown(w) || '') : ''}</td>
+            <td><strong>RM ${(w.amount_spent || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</strong>${sectionChipHtml(w,'work')}</td>
+            <td style="font-weight:bold;color:var(--ios-green);">RM ${(w.interim_no ? w.amount_spent : 0).toLocaleString(undefined,{minimumFractionDigits:2})}${w.interim_no ? sectionChipHtml(w,'claim') : ''}</td>
             <td>${formatTarikhBM(w.qpb_date)}</td>
             <td>${actionHtml}</td>
             <td style="text-align:center;">${checkboxHtml}</td>
@@ -1577,6 +1603,90 @@ function showLoadError(){
     document.getElementById('workOrderTbody').innerHTML =
         '<tr><td colspan="10" class="empty-row">Data tidak dapat dimuatkan. <button type="button" class="btn-action" style="background:#333;" onclick="location.reload()">Cuba lagi</button></td></tr>';
 }
+
+/* ===== Section: chip, hover tooltip, popup ===== */
+function sectionCount(work){
+    const s = work.section_category || {};
+    let n = 0, extra = 0;
+    Object.keys(s).forEach(k => {
+        if(Number(s[k]?.amt || 0) > 0) n++;
+        extra += Number(s[k]?.extra || 0);
+    });
+    if(extra > 0) n++;
+    return n;
+}
+function sectionChipHtml(work, kind){
+    const n = sectionCount(work);
+    if(!n) return '';
+    return `<button type="button" class="sec-chip" data-wid="${work.id}" data-kind="${kind}" aria-haspopup="dialog"><i class="fa-solid fa-circle-info"></i>${n} section</button>`;
+}
+
+let secPopPinned = false, secPopChip = null;
+const canHover = window.matchMedia && window.matchMedia('(hover: hover)').matches;
+
+function showSecPop(chip, pinned){
+    const w = allWorks.find(x => String(x.id) === String(chip.dataset.wid));
+    if(!w) return;
+    const pop = document.getElementById('secPop');
+    const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    const isClaim = chip.dataset.kind === 'claim';
+    const total = Number(w.amount_spent || 0).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    pop.innerHTML = `
+        <div class="sp-head">
+            <div>
+                <div class="sp-kicker">${isClaim ? 'Claim Amount' + (w.interim_no ? ' \u00B7 INT-' + esc(w.interim_no) : '') : 'Work Amount'}</div>
+                <div class="sp-title">${esc(w.work_id)}</div>
+            </div>
+            <button type="button" class="sp-close" onclick="closeSecPop()" aria-label="Tutup">&times;</button>
+        </div>
+        ${buildSectionBreakdown(w)}
+        <div class="sp-total"><span>Jumlah</span><b>RM ${total}</b></div>`;
+
+    if(secPopChip && secPopChip !== chip) secPopChip.classList.remove('active');
+    secPopChip = chip; chip.classList.add('active');
+    secPopPinned = !!pinned;
+    pop.classList.toggle('pinned', secPopPinned);
+    document.getElementById('secPopBackdrop').classList.toggle('show', secPopPinned);
+    pop.classList.add('show');
+
+    // letak berhampiran chip (hover / desktop)
+    pop.style.left = ''; pop.style.top = '';
+    const r = chip.getBoundingClientRect();
+    const pw = pop.offsetWidth, ph = pop.offsetHeight;
+    let left = Math.min(Math.max(8, r.left + r.width / 2 - pw / 2), window.innerWidth - pw - 8);
+    let top = r.bottom + 8;
+    if(top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 8);
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+}
+function closeSecPop(){
+    const pop = document.getElementById('secPop');
+    if(!pop) return;
+    pop.classList.remove('show', 'pinned');
+    const bd = document.getElementById('secPopBackdrop');
+    if(bd) bd.classList.remove('show');
+    if(secPopChip){ secPopChip.classList.remove('active'); secPopChip = null; }
+    secPopPinned = false;
+}
+(function(){
+    const tb = document.getElementById('workOrderTbody');
+    tb.addEventListener('mouseover', e => {
+        if(!canHover || secPopPinned) return;
+        const chip = e.target.closest('.sec-chip');
+        if(chip && chip !== secPopChip) showSecPop(chip, false);
+    });
+    tb.addEventListener('mouseout', e => {
+        if(secPopPinned) return;
+        const chip = e.target.closest('.sec-chip');
+        if(chip && !chip.contains(e.relatedTarget)) closeSecPop();
+    });
+    tb.addEventListener('click', e => {
+        const chip = e.target.closest('.sec-chip');
+        if(chip) showSecPop(chip, true);
+    });
+    document.addEventListener('keydown', e => { if(e.key === 'Escape') closeSecPop(); });
+    document.addEventListener('scroll', () => { if(!secPopPinned) closeSecPop(); }, true);
+})();
 
 function buildSectionBreakdown(work){
     const s = work.section_category || {};
