@@ -326,7 +326,7 @@
         }
 
         .is-guest [onclick="openTemplate()"],
-        .is-guest [onclick="openSummary()"] { display: none !important; }
+        .is-guest [onclick="downloadCsv()"] { display: none !important; }
         
         .is-guest select[onchange^="updateStatus"] { pointer-events: none; opacity: .6; }
 
@@ -831,11 +831,8 @@
                         <button class="btn-action" style="background:#333;" onclick="openTemplate()">
                             <i class="fa-solid fa-sliders"></i> BF Template
                         </button>
-                        <button class="btn-action" id="btnBulkBlueform" style="background:var(--ios-green);" onclick="bulkDownloadBlueform()">
-                            <i class="fa-solid fa-download"></i> Bulk Blueform
-                        </button>
-                        <button class="btn-action" style="background:var(--ios-blue);" onclick="openSummary()">
-                            <i class="fa-solid fa-chart-line"></i> Contract Summary
+                        <button class="btn-action" style="background:var(--ios-blue);" onclick="downloadCsv()">
+                            <i class="fa-solid fa-file-csv"></i> Download CSV
                         </button>
                     </div>
 
@@ -1944,10 +1941,60 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
     }
 }
 
-function openSummary(){
-    const id = currentContractId;
-    if(!id){ alert("Tiada kontrak dipilih."); return; }
-    window.location.href = `contract_summary.html?id=${id}`;
+/* ===== Download CSV (senarai Work Orders & Claims yang sedang dipaparkan) ===== */
+function downloadCsv(){
+    const rows = Array.isArray(currentTableData) ? currentTableData : [];
+    if(!rows.length){ alert("Tiada data untuk dimuat turun."); return; }
+
+    const contract = currentContractData || {};
+    const sections = contract.contract_sections_breakdown || {};
+    const secKeys = Object.keys(sections);
+
+    // medan teks: elak formula Excel (=, +, -, @) dan escape tanda petik
+    const txt = v => {
+        let t = String(v == null ? '' : v).replace(/\r?\n/g, ' ');
+        if(/^[=+\-@\t]/.test(t)) t = "'" + t;
+        return '"' + t.replace(/"/g, '""') + '"';
+    };
+    const num = n => Number(n || 0).toFixed(2);
+
+    const header = ['Status','No.','Work ID','Description','Location','District','Interim No','Work Amount (RM)','Claim Amount (RM)','Date']
+        .concat(secKeys.map((k,i) => 'Section ' + String.fromCharCode(65 + i) + (sections[k]?.desc ? ' - ' + sections[k].desc : '') + ' (RM)'))
+        .concat(['NON SOR (RM)']);
+
+    const lines = [header.map(txt).join(',')];
+    rows.forEach(w => {
+        const cat = w.section_category || {};
+        let extra = 0;
+        Object.keys(cat).forEach(k => { extra += Number(cat[k]?.extra || 0); });
+        const status = w.interim_no ? 'CLAIMED' : (w.status || 'BLUEFORM');
+        const cols = [
+            txt(status),
+            txt(w.sequence_no || ''),
+            txt(w.work_id || ''),
+            txt(w.description || ''),
+            txt(w.location || ''),
+            txt(w.district || ''),
+            txt(w.interim_no ? 'INT-' + w.interim_no : ''),
+            num(w.amount_spent),
+            num(w.interim_no ? w.amount_spent : 0),
+            txt(w.qpb_date ? String(w.qpb_date).slice(0, 10) : '')
+        ];
+        secKeys.forEach(k => cols.push(num(cat[k]?.amt)));
+        cols.push(num(extra));
+        lines.push(cols.join(','));
+    });
+
+    const csv = '\uFEFF' + lines.join('\r\n');   // BOM supaya Excel baca UTF-8
+    const d = new Date();
+    const stamp = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+    const code = String(contract.contract_code || currentContractId || 'contract').replace(/[^\w.-]+/g, '_');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${code}_usage_schedule_${stamp}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 async function updateStatus(id, status){
