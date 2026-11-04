@@ -332,6 +332,9 @@
 
         @media (max-width:768px){
 
+            body{ height: auto; min-height: 100vh; }
+            .main-panel{ height: auto; overflow-y: visible; }
+
             body{
                 flex-direction: column;
                 overflow-x: hidden;  
@@ -681,7 +684,18 @@
         .kpi-bar > span { display: block; height: 100%; border-radius: 3px; background: var(--ios-blue); }
 
         /* ---- jadual kewangan: header dan 2 lajur pertama melekat ketika scroll ---- */
-        .fin-scroll { max-height: 70vh; border-radius: 20px; overscroll-behavior: contain; }
+        /* scroll menegak ikut whole page; hanya scroll mendatar dalam jadual */
+        .fin-scroll { max-height: none; overflow-x: auto; overflow-y: hidden; border-radius: 20px; overscroll-behavior: auto; -webkit-overflow-scrolling: touch; }
+
+        /* ---- paparan SECTION (Work Amount / Claim Amount) ---- */
+        .sec-list { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e2e8f0; display: flex; flex-direction: column; gap: 4px; }
+        .sec-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 8px; background: #f8fafc; border-radius: 8px; font-weight: 500; }
+        .sec-badge { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; background: #e0efff; color: #0a64d6; font-size: 10px; font-weight: 700; letter-spacing: .4px; white-space: nowrap; }
+        .sec-badge small { font-size: 8px; font-weight: 600; opacity: .7; }
+        .sec-amt { font-size: 11px; font-weight: 600; color: #475569; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+        .sec-row.non-sor { background: #fdecea; }
+        .sec-row.non-sor .sec-badge { background: #fbd5d0; color: #c0392b; }
+        .sec-row.non-sor .sec-amt { color: #c0392b; }
         #interimTable { overflow: visible; }
         #interimTable thead th:nth-child(1),
         #interimTable tbody td:nth-child(1) { position: sticky; left: 0; min-width: 45px; }
@@ -1465,22 +1479,23 @@ function filterDistrict(district, el){
 
 function buildSectionBreakdown(work){
     const s = work.section_category || {};
-    let html = '';
+    const fmt = n => n.toLocaleString(undefined,{minimumFractionDigits:2});
+    let rows = '';
     let totalExtra = 0;
 
     Object.keys(s).forEach(sec=>{
         const amt = Number(s[sec]?.amt || 0);
-        const extra = Number(s[sec]?.extra || 0);
-        totalExtra += extra;
+        totalExtra += Number(s[sec]?.extra || 0);
         if(amt <= 0) return;
-        html += `<div style="display:flex;justify-content:space-between;font-size:11px;color:#666;"><span>${sec}</span><span>RM ${amt.toLocaleString(undefined,{minimumFractionDigits:2})}</span></div>`;
+        const label = String(sec).replace(/^\s*section\s*/i,'').trim() || sec;
+        rows += `<div class="sec-row"><span class="sec-badge"><small>SEC</small>${label}</span><span class="sec-amt">RM ${fmt(amt)}</span></div>`;
     });
 
     if(totalExtra > 0){
-        html += `<div style="display:flex;justify-content:space-between;font-size:11px;color:#c0392b;"><span>NON SOR</span><span>RM ${totalExtra.toLocaleString(undefined,{minimumFractionDigits:2})}</span></div>`;
+        rows += `<div class="sec-row non-sor"><span class="sec-badge">NON SOR</span><span class="sec-amt">RM ${fmt(totalExtra)}</span></div>`;
     }
 
-    return html;
+    return rows ? `<div class="sec-list">${rows}</div>` : '';
 }
 
 function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
