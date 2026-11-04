@@ -33,8 +33,6 @@ class AppSidebar extends HTMLElement {
                     </div>
                 </div>
 
-                <a href="dashboard-indents.html" class="menu-link">Dashboard-Indents</a>
-
                 <div class="menu-group">
                     <a href="#" class="menu-parent" id="quotationBtn">
                         Blueform Approvals <span class="arrow">▼</span>
@@ -44,6 +42,16 @@ class AppSidebar extends HTMLElement {
                         <a href="app-exec.html" class="menu-link">Request for Approval</a>
                         <a href="app-sect.html" class="menu-link">Review & Verification</a>
                         <a href="app-dept.html" class="menu-link">Approval Endorsement</a>
+                    </div>
+                </div>
+
+                <div class="menu-group">
+                    <a href="#" class="menu-parent" id="indentsBtn">
+                        Dashboard-Indents <span class="arrow">▼</span>
+                    </a>
+                    <div class="submenu" id="indentsMenu">
+                        <a href="#" data-section="Seksyen Selenggara" class="menu-link">Seksyen Selenggara</a>
+                        <a href="#" data-section="Seksyen Pematuhan Peraturan" class="menu-link">Seksyen Pematuhan Peraturan</a>
                     </div>
                 </div>
 
@@ -164,12 +172,17 @@ class AppSidebar extends HTMLElement {
         this.dashboardMenu = this.querySelector("#dashboardMenu");
         this.dashArrow = this.querySelector("#dashboardBtn .arrow");
 
+        this.indentsBtn = this.querySelector("#indentsBtn");
+        this.indentsMenu = this.querySelector("#indentsMenu");
+        this.indentsArrow = this.querySelector("#indentsBtn .arrow");
+
         this.quotationBtn = this.querySelector("#quotationBtn");
         this.quotationMenu = this.querySelector("#quotationMenu");
         this.quoteArrow = this.querySelector("#quotationBtn .arrow");
 
         this.menuLinks = this.querySelectorAll(".menu-link");
         this.subLinks = this.querySelectorAll("#dashboardMenu a[data-section]");
+        this.indentLinks = this.querySelectorAll("#indentsMenu a[data-section]");
     }
 
     bindEvents() {
@@ -180,6 +193,12 @@ class AppSidebar extends HTMLElement {
             e.preventDefault();
             const isOpen = this.dashboardMenu.classList.toggle("open");
             this.dashArrow.innerText = isOpen ? "▲" : "▼";
+        });
+
+        this.indentsBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            const isOpen = this.indentsMenu.classList.toggle("open");
+            this.indentsArrow.innerText = isOpen ? "▲" : "▼";
         });
 
         this.quotationBtn.addEventListener("click", (e) => {
@@ -233,6 +252,15 @@ class AppSidebar extends HTMLElement {
                 }
             });
         });
+
+        this.indentLinks.forEach(link => {
+            link.addEventListener("click", (e) => {
+                e.preventDefault();
+                if (link.dataset.sectionId) {
+                    window.location.href = `dashboard-indents.html?section=${link.dataset.sectionId}`;
+                }
+            });
+        });
     }
 
     async loadDashboardLinks() {
@@ -241,7 +269,7 @@ class AppSidebar extends HTMLElement {
             if (!res.ok) return;
             const sections = await res.json();
 
-            this.subLinks.forEach(a => {
+            [...this.subLinks, ...this.indentLinks].forEach(a => {
                 const match = sections.find(s => s.section_name === a.dataset.section);
                 if (match) a.dataset.sectionId = match.id;
             });
@@ -265,6 +293,19 @@ class AppSidebar extends HTMLElement {
 
             if (currentSectionId) {
                 this.subLinks.forEach(link => {
+                    if (link.dataset.sectionId === currentSectionId) {
+                        link.classList.add("active");
+                    }
+                });
+            }
+        }
+
+        if (fullPath === "dashboard-indents.html") {
+            this.indentsMenu.classList.add("open");
+            this.indentsArrow.innerText = "▲";
+
+            if (currentSectionId) {
+                this.indentLinks.forEach(link => {
                     if (link.dataset.sectionId === currentSectionId) {
                         link.classList.add("active");
                     }
