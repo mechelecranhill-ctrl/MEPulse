@@ -260,7 +260,7 @@ function renderList() {
     const used = usedOf[i.id] || 0, pct = Math.min(100, used / i.indent_sum * 100);
     const cls = used > i.indent_sum ? 'over' : pct >= 90 ? 'warn' : '';
     return `<div class="c-card ${current && current.id === i.id ? 'active' : ''}" onclick="openIndent(${i.id})">
-      <h4>${esc(i.indent_code)}</h4><div class="sub">${esc(i.indent_name)}</div>
+      <h4>${esc(i.contract_code || i.indent_code)}</h4><div class="sub">${i.contract_code ? esc(i.indent_code) + ' · ' : ''}${esc(i.indent_name)}</div>
       <div class="mini"><i class="${cls}" style="width:${pct}%"></i></div>
       <div class="c-foot"><span>${pct.toFixed(0)}% digunakan</span><span>Had ${rm(i.indent_sum)}</span></div></div>`;
   }).join('');
@@ -282,8 +282,8 @@ function renderDetail() {
   <div class="panel">
     <div class="ph">
       <div>
-        <h3 class="ph-title">${esc(i.indent_code)}</h3>
-        <p class="ph-sub">${esc(i.indent_name)}</p>
+        <h3 class="ph-title">${esc(i.contract_code || i.indent_code)}</h3>
+        <p class="ph-sub">${i.contract_code ? esc(i.indent_code) + ' · ' : ''}${esc(i.indent_name)}</p>
         <div class="chip"><i class="fa-regular fa-calendar"></i> ${fmtDate(i.indent_start)} – ${fmtDate(i.indent_end)}</div>
       </div>
       <button class="btn ghost admin" onclick="showNew(current)"><i class="fa fa-pen"></i> Edit</button>
@@ -455,9 +455,11 @@ function showNew(edit) {
   editingHadSec = !!(secs && Object.keys(secs).length);
   const rows = editingHadSec ? Object.entries(secs).map(([k, x]) => secRow(k, x.desc, x.amt)).join('') : '';
   document.getElementById('detail').innerHTML = `<div class="panel"><h3>${edit ? 'Edit' : 'Daftar'} Indent</h3><div class="grid" style="margin-top:10px">
+    <input id="nContract" list="contractCodes" placeholder="Kod Kontrak" value="${esc(i.contract_code)}">
+    <datalist id="contractCodes">${[...new Set(Object.values(contracts).filter(Boolean))].map(c => `<option value="${esc(c)}">`).join('')}</datalist>
     <input id="nCode" placeholder="Kod Indent" value="${esc(i.indent_code)}">
-    <input id="nSum" type="number" min="0" max="${MAX_SUM}" step="0.01" placeholder="Had (maks RM 300,000)" value="${esc(i.indent_sum)}">
     <input id="nName" class="full" placeholder="Nama Indent" value="${esc(i.indent_name)}">
+    <input id="nSum" class="full" type="number" min="0" max="${MAX_SUM}" step="0.01" placeholder="Had (maks RM 300,000)" value="${esc(i.indent_sum)}">
     <div><div class="meta">Mula</div><input id="nStart" type="date" value="${esc((i.indent_start || '').slice(0, 10))}"></div>
     <div><div class="meta">Tamat</div><input id="nEnd" type="date" value="${esc((i.indent_end || '').slice(0, 10))}"></div>
     <div class="full"><div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0">
@@ -490,7 +492,7 @@ async function saveIndent() {
   if (v('nStart') && v('nEnd') && v('nEnd') < v('nStart')) return alert('Tarikh tamat sebelum tarikh mula.');
   if (editingId && sum < (usedOf[editingId] || 0) && !confirm('Had baharu lebih rendah daripada jumlah digunakan. Teruskan?')) return;
 
-  const body = { unit_id: unitId, indent_code: v('nCode').toUpperCase(), indent_name: v('nName').toUpperCase(),
+  const body = { unit_id: unitId, contract_code: v('nContract').toUpperCase() || null, indent_code: v('nCode').toUpperCase(), indent_name: v('nName').toUpperCase(),
     indent_start: v('nStart') || null, indent_end: v('nEnd') || null, indent_sum: sum };
   if (hasSec) body.indent_sections_breakdown = JSON.stringify(secs);  // D1 tidak boleh bind objek; simpan sebagai teks JSON
   else if (editingHadSec) body.indent_sections_breakdown = null;
