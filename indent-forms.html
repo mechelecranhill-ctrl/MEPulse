@@ -214,7 +214,7 @@ const MAX_SUM = 300000;
 const STAGES = ['PLANNING', 'QUOTATION', 'BLUEFORM', 'APPROVED'];
 
 let editingId = null, editingHadSec = false;
-let unitId = null, indents = [], contracts = {}, contractNames = {}, current = null, members = [];
+let unitId = null, indents = [], contracts = {}, current = null, members = [];
 const usedOf = {};
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -241,10 +241,10 @@ async function selectUnit(id) {
   document.querySelectorAll('.unit-pill').forEach(b => b.classList.toggle('active', b.id === 'unit-' + id));
   document.getElementById('detail').innerHTML = '<div class="empty"><i class="fa-regular fa-file-lines"></i><b>Pilih indent</b><span>atau cipta yang baru.</span></div>';
   const [cs, ins] = await Promise.all([
-    api(`contract?unit_id=eq.${id}&select=id,contract_code,contract_name`),
+    api(`contract?unit_id=eq.${id}&select=id,contract_code`),
     api(`indents?unit_id=eq.${id}&order=indent_start.desc&select=*`)
   ]);
-  contracts = {}; contractNames = {}; cs.forEach(c => { contracts[c.id] = c.contract_code; contractNames[c.id] = c.contract_name; });
+  contracts = {}; cs.forEach(c => contracts[c.id] = c.contract_code);
   indents = ins;
   // anggaran guna untuk bar kecil di senarai
   const all = indents.length ? await api(`work_orders?indent_id=in.(${indents.map(i => i.id).join(',')})&select=indent_id,status,amount_spent`) : [];
@@ -284,7 +284,7 @@ function renderDetail() {
       <div>
         <h3 class="ph-title">${esc(i.contract_code || i.indent_code)}</h3>
         <p class="ph-sub">${i.contract_code ? esc(i.indent_code) + ' · ' : ''}${esc(i.indent_name)}</p>
-        <div class="chip" style="margin-right:6px"><i class="fa-regular fa-calendar"></i> ${fmtDate(i.indent_start)} – ${fmtDate(i.indent_end)}</div>${i.contract_id && contracts[i.contract_id] ? `<div class="chip" style="background:#fff0d9;border-color:#f3dcb8;color:#a15c00"><i class="fa fa-link"></i> Sub kontrak ${esc(contracts[i.contract_id])}</div>` : ''}
+        <div class="chip"><i class="fa-regular fa-calendar"></i> ${fmtDate(i.indent_start)} – ${fmtDate(i.indent_end)}</div>
       </div>
       <button class="btn ghost admin" onclick="showNew(current)"><i class="fa fa-pen"></i> Edit</button>
     </div>
@@ -455,8 +455,6 @@ function showNew(edit) {
   editingHadSec = !!(secs && Object.keys(secs).length);
   const rows = editingHadSec ? Object.entries(secs).map(([k, x]) => secRow(k, x.desc, x.amt)).join('') : '';
   document.getElementById('detail').innerHTML = `<div class="panel"><h3>${edit ? 'Edit' : 'Daftar'} Indent</h3><div class="grid" style="margin-top:10px">
-    <div class="full"><div class="meta">Kontrak Induk <span>(indent ini sub kepada kontrak ini, tidak menggunakan bajet kontrak)</span></div>
-      <select id="nContractId"><option value="">— Tiada / pilih kontrak —</option>${Object.keys(contracts).map(id => `<option value="${esc(id)}" ${String(i.contract_id ?? '') === String(id) ? 'selected' : ''}>${esc(contracts[id])}${contractNames[id] ? ' · ' + esc(contractNames[id]) : ''}</option>`).join('')}</select></div>
     <input id="nContract" list="contractCodes" placeholder="Kod Kontrak" value="${esc(i.contract_code)}">
     <datalist id="contractCodes">${[...new Set(Object.values(contracts).filter(Boolean))].map(c => `<option value="${esc(c)}">`).join('')}</datalist>
     <input id="nCode" placeholder="Kod Indent" value="${esc(i.indent_code)}">
@@ -496,8 +494,6 @@ async function saveIndent() {
 
   const body = { unit_id: unitId, contract_code: v('nContract').toUpperCase() || null, indent_code: v('nCode').toUpperCase(), indent_name: v('nName').toUpperCase(),
     indent_start: v('nStart') || null, indent_end: v('nEnd') || null, indent_sum: sum };
-  const cid = v('nContractId');
-  body.contract_id = cid ? (/^\d+$/.test(cid) ? Number(cid) : cid) : null;
   if (hasSec) body.indent_sections_breakdown = JSON.stringify(secs);  // D1 tidak boleh bind objek; simpan sebagai teks JSON
   else if (editingHadSec) body.indent_sections_breakdown = null;
   try {
