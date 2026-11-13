@@ -793,6 +793,16 @@
 
                         </div>
 
+                        <div class="health-grid">
+                            <div style="display: flex; flex-direction: column; overflow: hidden;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; flex-shrink: 0; margin-bottom: 8px;">
+                                    <h3 style="margin:0; font-size: 16px;">Sections</h3>
+                                    
+                                </div>
+                                <div id="selectedSectionContainer"></div>
+                            </div>
+                        </div>
+
                         </div>
                     </div>
 
@@ -1031,6 +1041,7 @@
             selectedSections = (currentContract.selected_sections && currentContract.selected_sections.length > 0)
                 ? [...currentContract.selected_sections]
                 : Object.keys(currentContract.contract_sections_breakdown || {});
+            renderUI(currentInterims);
             loadUsageEmbedded();
             return;
         }
@@ -1049,9 +1060,95 @@
                 ? [...currentContract.selected_sections]
                 : Object.keys(currentContract.contract_sections_breakdown || {});
 
+            renderUI(currentInterims);
             loadUsageEmbedded();
         } catch (error) {
             console.error("Error fetching analysis data:", error);
+        }
+    }
+
+    async function renderUI(interimsData = currentInterims) {
+        if (!currentContract) return;
+
+        try {
+            updateAdminUI();
+
+            const sections = currentContract.contract_sections_breakdown || {};
+            const start = new Date(currentContract.contract_start);
+            const end = new Date(currentContract.contract_end);
+            const today = new Date();
+
+            const totalMonths = Math.max(1, ((end.getFullYear() - start.getFullYear()) * 12) + (end.getMonth() - start.getMonth()));
+            let monthsElapsed = ((today.getFullYear() - start.getFullYear()) * 12) + (today.getMonth() - start.getMonth()) + 1;
+            monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
+
+            
+            const mainContainer = document.getElementById('selectedSectionContainer');
+            let htmlBuilder = '';
+
+            const interimMap = {};
+            (interimsData || []).forEach(int => {
+                if (!int.claim_breakdown) return;
+                Object.keys(int.claim_breakdown).forEach(s => {
+                    interimMap[s] = (interimMap[s] || 0) + (int.claim_breakdown[s].amt || 0);
+                });
+            });
+
+            const woMap = {};
+            currentWO.forEach(wo => {
+                if (!wo.interim_no && wo.section_category) {
+                    Object.keys(wo.section_category).forEach(s => {
+                        woMap[s] = (woMap[s] || 0) + (wo.section_category[s].amt || 0);
+                    });
+                }
+            });
+
+            selectedSections.sort().forEach(s => {
+                if (!sections[s]) return;
+
+                const totalInterimClaim = interimMap[s] || 0;
+                const totalPendingWO = woMap[s] || 0;
+                const used = totalInterimClaim + totalPendingWO;
+                const budget = sections[s].amt || 0;
+
+                const plannedTotalToDate = (budget / totalMonths) * monthsElapsed;
+                const variance = used - plannedTotalToDate;
+                const variancePercent = plannedTotalToDate ? (variance / plannedTotalToDate) * 100 : 0;
+
+                const color = used > plannedTotalToDate ? 'var(--ios-red)' : 'var(--ios-green)';
+                const progressPercent = budget ? (used / budget) * 100 : 0;
+
+                htmlBuilder += `
+                    <div class="section-row">
+                        <div style="display:flex; justify-content:space-between; align-items:start;">
+                            <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">
+                                ${s}: ${sections[s].desc || s}
+                            </div>
+                        </div>
+                        <div class="avg-stats">
+                            <div class="avg-item">BUDGET: RM ${budget.toLocaleString()}</div>
+                            <div class="avg-item" style="color:#8e8e93;">PLANNED: RM ${plannedTotalToDate.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
+                        </div>
+                        <div class="avg-stats">
+                            <div class="avg-item">ACTUAL: RM ${used.toLocaleString()}</div>
+                            <div class="avg-item" style="color:${color};">VARIANCE: ${variancePercent > 0 ? '+' : ''}${variancePercent.toFixed(1)}%</div>
+                        </div>
+                        <div class="prog-bar-bg">
+                            <div class="prog-bar-fill" data-width="${Math.min(100, progressPercent)}%" style="background:${color}"></div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            mainContainer.innerHTML = htmlBuilder;
+
+            requestAnimationFrame(() => {
+                document.querySelectorAll('.prog-bar-fill').forEach(bar => {
+                    bar.style.setProperty('width', bar.getAttribute('data-width'), 'important');
+                });
+            });
+        } catch (error) {
+            console.error("Error processing UI:", error);
         }
     }
 
