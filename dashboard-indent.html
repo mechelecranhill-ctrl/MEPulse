@@ -4,11 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://me-connect-api.mech-elec-ranhill.workers.dev; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https:;">
-    <title>Indent Dashboard</title>
+    <title>Contract Dashboard</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0" defer></script>
     <style>
         :root { 
             --ios-blue: #007AFF; --ios-green: #34C759; --ios-orange: #FF9500; --ios-red: #FF3B30;
@@ -92,7 +90,7 @@
                 display: none !important; 
             }
 
-            .flip-card-front > div:first-child {
+            .panel-front > div:first-child {
                 position: relative;
             }
 
@@ -345,10 +343,9 @@
             flex: 1;
             overflow: hidden;
             position: relative;
-            perspective: 2200px;
         }
 
-        .health-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; flex: 1; overflow: hidden; margin-top: 5px; cursor: pointer; }
+        .health-grid { display: grid; grid-template-columns: 1fr; gap: 20px; flex: 1; overflow: hidden; margin-top: 5px; }
         
         .chart-box { padding: 10px; background: #f9f9fb; border-radius: 15px; flex: 1; position: relative; min-height: 0; display: flex; flex-direction: column; transform: translateZ(0); }
 
@@ -364,364 +361,27 @@
         .sel-chip.active { background: var(--ios-blue); color: white; }
         .selector-warning { font-size: 10px; color: var(--ios-red); font-weight: 700; margin-bottom: 8px; line-height: 1.4; }
 
-        .flip-card-inner {
+        .panel-inner {
             position: absolute;
             inset: 0;
-            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-            transform-style: preserve-3d;
-        }
-        #analysis-panel.flipped .flip-card-inner {
-            transform: rotateY(180deg);
         }
 
-        /* Animasi pusingan kecil (subtle peek) sekali sahaja */
-        @keyframes subtlePeek {
-            0% { transform: rotateY(0deg); }
-            50% { transform: rotateY(12deg); }
-            100% { transform: rotateY(0deg); }
-        }
-        .peeking .flip-card-inner {
-            animation: subtlePeek 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-        }
-
-        .flip-card-front, .flip-card-back {
+        .panel-front {
             position: absolute;
             inset: 0;
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
             background: white;
             border-radius: 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.05);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-        }
-        .flip-card-front { padding: 20px 20px 20px; }
-
-        .flip-card-back {
-            transform: rotateY(180deg);
-            padding: 15px;
-            overflow-y: auto;
-            cursor: pointer;
+            padding: 20px 20px 20px;
         }
 
         @media (max-width: 768px) {
-            .flip-card-front, .flip-card-back {
+            .panel-front {
                 border-radius: 20px 20px 0 0 !important;
             }
-        }
-
-        .usage-embed {
-            font-family: -apple-system, system-ui, sans-serif;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-        }
-
-        .usage-embed .u-lifecycle {
-            display: flex;
-            align-items: flex-start;
-            width: 100%;
-            background: #f9f9fb;
-            padding: 14px 8px;
-            border-radius: 14px;
-            margin-bottom: 12px;
-            flex-shrink: 0;
-            overflow: hidden;
-            box-sizing: border-box;
-        }
-
-        .usage-embed .u-step-award,
-        .usage-embed .u-step-cpc,
-        .usage-embed .u-step-cmgd,
-        .usage-embed .u-step-sfa {
-            flex: 1 1 0;
-            min-width: 0;
-        }
-
-        .usage-embed .u-step {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            flex: 1 1 0;
-            min-width: 0;
-            text-align: center;
-        }
-
-        .usage-embed .u-step span {
-            font-size: 10px;
-            font-weight: 800;
-            color: #1c1c1e;
-            margin-top: 5px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 100%;
-        }
-
-        .usage-embed .u-dot {
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            background: #e5e5ea;
-            color: #8e8e93;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 11px;
-            flex-shrink: 0;
-        }
-
-        .usage-embed .u-done .u-dot {
-            background: var(--ios-green);
-            color: white;
-        }
-
-        .usage-embed .u-current .u-dot {
-            background: var(--ios-blue);
-            color: white;
-        }
-
-        .usage-embed .u-branch-group .u-step span {
-            margin-top: 5px;
-            font-size: 14px;
-            font-weight: 900;
-            letter-spacing: 0.3px;
-        }
-
-        .usage-embed .u-branch-group .u-step span strong {
-            font-weight: 900;
-            color: var(--ios-blue);
-        }
-
-        .usage-embed .u-connector {
-            flex: 0 0 12px;
-            height: 3px;
-            background: #e5e5ea;
-            margin: 13px 3px 0;
-            align-self: flex-start;
-        }
-
-        .usage-embed .u-branch-group {
-            flex: 1 1 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            gap: 10px;
-            min-width: 0;
-        }
-
-        .usage-embed .u-branch-group .u-step {
-            flex: none;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            width: 100%;
-        }
-
-        .usage-embed .u-branch-group .u-step-wo {
-            margin-top: 0;
-        }
-
-        .usage-embed .u-branch-group .u-step-interim {
-            margin-top: 0;
-        }
-
-        .usage-embed .u-branch-group .u-step span {
-            margin-top: 5px;
-            font-size: 14px;
-            font-weight: 900;
-            letter-spacing: 0.3px;
-            white-space: nowrap;
-        }
-
-        .usage-embed .u-branch-group .u-step span strong {
-            font-weight: 900;
-            color: var(--ios-blue);
-        }
-
-        .usage-embed .u-branch-group .u-step-wo .u-dot {
-            width: 34px;
-            height: 34px;
-            font-size: 13px;
-        }
-
-        .usage-embed .u-branch-group .u-step-interim .u-dot {
-            width: 24px;
-            height: 24px;
-            font-size: 10px;
-        }
-
-        @media (min-width: 769px) {
-            .usage-embed .u-step-award span,
-            .usage-embed .u-branch-group .u-step-wo span,
-            .usage-embed .u-branch-group .u-step-interim span,
-            .usage-embed .u-step-cpc span,
-            .usage-embed .u-step-cmgd span,
-            .usage-embed .u-step-sfa span {
-                font-size: 14px;
-                font-weight: 900;
-                letter-spacing: 0.3px;
-            }
-
-            .usage-embed .u-step-award .u-dot,
-            .usage-embed .u-branch-group .u-step-wo .u-dot,
-            .usage-embed .u-step-cpc .u-dot,
-            .usage-embed .u-step-cmgd .u-dot,
-            .usage-embed .u-step-sfa .u-dot {
-                width: 34px;
-                height: 34px;
-                font-size: 13px;
-            }
-
-            .usage-embed .u-branch-group .u-step-interim .u-dot {
-                width: 24px;
-                height: 24px;
-                font-size: 10px;
-            }
-
-            .usage-embed .u-connector {
-                margin-top: 16px;
-            }
-
-            .usage-embed .u-branch-group {
-                flex: 1 1 0;
-                padding-top: 0;
-                gap: 10px;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .usage-embed .u-lifecycle {
-                padding: 14px 4px;
-            }
-
-            .usage-embed .u-step-award,
-            .usage-embed .u-step-cpc,
-            .usage-embed .u-step-cmgd,
-            .usage-embed .u-step-sfa {
-                flex: 1 1 0;
-                min-width: 0;
-            }
-
-            .usage-embed .u-dot {
-                width: 24px;
-                height: 24px;
-                font-size: 9px;
-            }
-
-            .usage-embed .u-step span {
-                font-size: 8px;
-                margin-top: 4px;
-            }
-
-            .usage-embed .u-branch-group .u-step-wo .u-dot {
-                width: 24px;
-                height: 24px;
-            }
-
-            .usage-embed .u-branch-group .u-step-interim .u-dot {
-                width: 19px;
-                height: 19px;
-            }
-
-            .usage-embed .u-connector {
-                flex: 0 0 6px;
-                margin: 11px 1px 0;
-            }
-        }
-
-        .usage-embed .u-summary {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-            margin-bottom: 12px;
-            flex-shrink: 0;
-        }
-
-        .usage-embed .u-card {
-            background: #f9f9fb;
-            padding: 12px 8px;
-            border-radius: 12px;
-            text-align: center;
-            min-width: 0;
-        }
-
-        .usage-embed .u-label {
-            font-size: 9px;
-            color: #8e8e93;
-            font-weight: 800;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .usage-embed .u-value {
-            font-size: 15px;
-            font-weight: 800;
-            margin-top: 5px;
-            color: var(--ios-blue);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .usage-embed .u-chartBox {
-            background: #f9f9fb;
-            padding: 12px;
-            border-radius: 14px;
-            margin-bottom: 12px;
-            flex-shrink: 0;
-            height: 190px;
-            position: relative;
-        }
-
-        .usage-embed .u-tableWrap {
-            flex: 1 1 auto;
-            min-height: 0;
-            overflow-y: auto;
-            border-radius: 12px;
-        }
-
-        .usage-embed table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            font-size: 11px;
-        }
-
-        .usage-embed th,
-        .usage-embed td {
-            padding: 9px 10px;
-            text-align: left;
-            border-bottom: 1px solid #f2f2f7;
-        }
-
-        .usage-embed th {
-            background: #f9f9fb;
-            position: sticky;
-            top: 0;
-            font-size: 10px;
-            font-weight: 800;
-        }
-
-        .usage-embed .u-count-dot {
-            width: auto !important;
-            min-width: 34px;
-            padding: 0 6px;
-            border-radius: 999px;
-            font-size: 13px;
-            font-weight: 800;
-            box-sizing: border-box;
-        }
-        .usage-embed .u-step-interim .u-count-dot { min-width: 24px; font-size: 10px; }
-        @media (max-width:768px){
-            .usage-embed .u-step-wo .u-count-dot { min-width: 24px; font-size: 10px; }
-            .usage-embed .u-step-interim .u-count-dot { min-width: 19px; font-size: 9px; }
         }
     </style>
 
@@ -748,16 +408,16 @@
     <div class="main-wrapper">
         <div class="contract-sidebar">
             <div class="search-container">
-                <input type="text" id="contractSearch" class="search-box" placeholder="Search Code/Indent" onkeyup="debouncedFilterContracts()">
+                <input type="text" id="contractSearch" class="search-box" placeholder="Search Code/Contract" onkeyup="debouncedFilterContracts()">
             </div>
             <div id="contractList"></div>
         </div>
 
         <div class="analysis-container">
             <div id="analysis-panel">
-                <div class="flip-card-inner" id="flipCardInner">
+                <div class="panel-inner" id="panelInner">
 
-                    <div class="flip-card-front" id="flipCardFront">
+                    <div class="panel-front" id="panelFront">
                         <div style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #f2f2f7;">
                             <div>
                                 <h1 id="panel-title" style="margin:0; font-size: 24px; letter-spacing: -0.5px; color: var(--ios-blue);">Analysis</h1>
@@ -769,79 +429,12 @@
                         </div>
 
                         <div class="health-grid">
-                            <div class="chart-box">
-                                <div style="font-size: 11px; font-weight: bold; color: #666; margin-bottom: 10px;">MONTHLY AVERAGE: ACTUAL VS PLANNED (RM)</div>
-                                <canvas id="healthChart"></canvas>
-                            </div>
                             <div style="display: flex; flex-direction: column; overflow: hidden;">
                                 <div style="display:flex; justify-content:space-between; align-items:center; flex-shrink: 0; margin-bottom: 8px;">
                                     <h3 style="margin:0; font-size: 16px;">Sections</h3>
                                     
                                 </div>
                                 <div id="selectedSectionContainer"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="flip-card-back" id="flipCardBack">
-                        <div class="usage-embed" id="usageEmbedRoot">
-
-                            <div class="u-lifecycle">
-                                <div class="u-step u-step-award">
-                                    <div class="u-dot"><i class="fa fa-check"></i></div>
-                                    <span>AWARD</span>
-                                </div>
-
-                                <div class="u-connector"></div>
-
-                                <div class="u-branch-group">
-                                    <div class="u-step u-step-wo">
-                                        <div class="u-dot u-count-dot" id="uwWoCount">0</div>
-                                        <span>ONGOING</span>
-                                    </div>
-                                    
-                                </div>
-
-                                <div class="u-connector"></div>
-
-                                <div class="u-step u-step-cpc">
-                                    <div class="u-dot"><i class="fa fa-clock"></i></div>
-                                    <span>CPC</span>
-                                </div>
-
-                                <div class="u-connector"></div>
-
-                                <div class="u-step u-step-cmgd">
-                                    <div class="u-dot"><i class="fa fa-clock"></i></div>
-                                    <span>CMGD</span>
-                                </div>
-
-                                <div class="u-connector"></div>
-
-                                <div class="u-step u-step-sfa">
-                                    <div class="u-dot"><i class="fa fa-clock"></i></div>
-                                    <span>SFA</span>
-                                </div>
-                            </div>
-
-                            <div class="u-summary">
-                                <div class="u-card"><div class="u-label">INDENT VALUE</div><div class="u-value" id="uwContractValue">RM 0.00</div></div>
-                                <div class="u-card"><div class="u-label">USED</div><div class="u-value" id="uwUsedValue">RM 0.00</div></div>
-                                <div class="u-card"><div class="u-label">BALANCE</div><div class="u-value" id="uwBalanceValue">RM 0.00</div></div>
-                                <div class="u-card"><div class="u-label">PROGRESS</div><div class="u-value" id="uwProgressValue">0%</div></div>
-                            </div>
-
-                            <div class="u-chartBox">
-                                <canvas id="uwChart"></canvas>
-                            </div>
-
-                            <div class="u-tableWrap">
-                                <table>
-                                    <thead>
-                                        <tr><th>Month</th><th>Planned</th><th>Actual</th><th>Variance</th></tr>
-                                    </thead>
-                                    <tbody id="uwTableBody"></tbody>
-                                </table>
                             </div>
                         </div>
                     </div>
@@ -855,8 +448,6 @@
     var API_URL = 'https://me-connect-api.mech-elec-ranhill.workers.dev';
     const headers = { 'Content-Type': 'application/json' };
 
-    let myChart = null;
-    let usageChartInstance = null;
     let currentContract = null;
     let currentWO = [];
     let currentInterims = [];
@@ -865,7 +456,6 @@
 
     const cacheContracts = {};
     const cacheAnalysis = {};
-    let usageLoadedContractId = null;
 
     function updateAdminUI() {
     const isGuest = localStorage.getItem("role") === "guest";
@@ -878,9 +468,6 @@
 }
 
     window.onload = () => {
-        if (typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') {
-            Chart.register(ChartDataLabels);
-        }
         updateAdminUI();
         fetchUnits();
  
@@ -962,13 +549,11 @@
 
         const panel = document.getElementById('analysis-panel');
         panel.style.display = 'none';
-        panel.classList.remove('flipped');
 
         currentContract = null;
         currentWO = [];
         currentInterims = [];
         selectedSections = [];
-        usageLoadedContractId = null;
 
         document.getElementById('panel-title').innerText = 'Analisis';
         document.getElementById('panel-vendor').innerText = '';
@@ -997,7 +582,7 @@
                 const sum = Number(i.indent_sum || 0);
                 return {
                     ...i,
-                    contract_code: i.indent_code, contract_name: i.indent_name,
+                    contract_code: i.contract_code || i.indent_code || '', contract_name: i.indent_name || '',
                     contract_start: i.indent_start, contract_end: i.indent_end,
                     contract_sum: sum, selected_sections: [], _single: !sec,
                     contract_sections_breakdown: sec || { TOTAL: { desc: 'JUMLAH INDENT', amt: sum } }
@@ -1067,26 +652,11 @@
         return { wo, interims: [] };
     }
 
-    // Fungsi untuk kesan pusingan kecil (subtle peek) sekali sahaja
-    function triggerSubtlePeek() {
-        const panel = document.getElementById('analysis-panel');
-        if (!panel) return;
-        panel.classList.remove('flipped');
-        panel.classList.remove('peeking');
-        void panel.offsetWidth;
-        panel.classList.add('peeking');
-        setTimeout(() => {
-            panel.classList.remove('peeking');
-        }, 600);
-    }
-
     async function openAnalysis(contract) {
         const mobileBtn = document.getElementById('mobileUsageBtn');
         if (mobileBtn) mobileBtn.classList.remove('expanded');
 
         const panel = document.getElementById('analysis-panel');
-        panel.classList.remove('flipped');
-        usageLoadedContractId = null;
 
         document.body.classList.add('analysis-active');
         panel.style.display = 'block';
@@ -1094,9 +664,6 @@
         document.getElementById('panel-title').innerText = contract.contract_code;
         document.getElementById('panel-vendor').innerText = contract.contract_name;
         currentContract = contract;
-
-        // Cetuskan kesan pusingan kecil (subtle peek) sekali sahaja
-        triggerSubtlePeek();
 
         if (cacheAnalysis[contract.id]) {
             currentWO = cacheAnalysis[contract.id].wo;
@@ -1164,10 +731,6 @@
                 }
             });
 
-            let labels = [];
-            let targetAvgData = [];
-            let actualAvgData = [];
-
             selectedSections.sort().forEach(s => {
                 if (!sections[s]) return;
 
@@ -1182,10 +745,6 @@
 
                 const color = used > plannedTotalToDate ? 'var(--ios-red)' : 'var(--ios-green)';
                 const progressPercent = budget ? (used / budget) * 100 : 0;
-
-                labels.push(s);
-                targetAvgData.push((budget / totalMonths).toFixed(2));
-                actualAvgData.push((used / monthsElapsed).toFixed(2));
 
                 htmlBuilder += `
                     <div class="section-row">
@@ -1210,7 +769,6 @@
             });
 
             mainContainer.innerHTML = htmlBuilder;
-            updateChartDirect(labels, targetAvgData, actualAvgData);
 
             requestAnimationFrame(() => {
                 document.querySelectorAll('.prog-bar-fill').forEach(bar => {
@@ -1220,52 +778,6 @@
         } catch (error) {
             console.error("Error processing UI:", error);
         }
-    }
-
-    function updateChartDirect(labels, targetAvgData, actualAvgData) {
-        const trimmedLabels = labels.map(label => label.replace(/^section\s*/i, ''));
-
-        if (myChart) {
-            myChart.data.labels = trimmedLabels;
-            myChart.data.datasets[0].data = targetAvgData;
-            myChart.data.datasets[1].data = actualAvgData;
-            myChart.update('none');
-            return;
-        }
-
-        const canvas = document.getElementById('healthChart');
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-
-        myChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: trimmedLabels,
-                datasets: [
-                    { label: 'Planned', data: targetAvgData, backgroundColor: 'rgba(200, 200, 205, 0.5)', borderRadius: 5 },
-                    { label: 'Actual', data: actualAvgData, backgroundColor: '#007AFF', borderRadius: 5 }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: { duration: 150 },
-                layout: { padding: { bottom: 15, top: 15 } },
-                plugins: {
-                    legend: { position: 'top', labels: { font: { size: 10, weight: 'bold' } } },
-                    datalabels: {
-                        anchor: 'end',
-                        align: 'top',
-                        font: { size: 9, weight: 'bold' },
-                        formatter: (v) => v > 0 ? `RM${Math.round(v).toLocaleString()}` : ''
-                    }
-                },
-                scales: {
-                    y: { beginAtZero: true },
-                    x: { ticks: { font: { size: 10, weight: 'bold' }, maxRotation: 0, minRotation: 0 } }
-                }
-            }
-        });
     }
 
     function updateChart(currentInterimsData = currentInterims) {
@@ -1324,279 +836,6 @@
 
         if (diff > 0 && activeIndex < units.length - 1) units[activeIndex + 1].click();
         if (diff < 0 && activeIndex > 0) units[activeIndex - 1].click();
-    }
-
-    const analysisPanel = document.getElementById('analysis-panel');
-    if (analysisPanel) {
-        analysisPanel.addEventListener('click', function(e) {
-            if (e.target.closest('#mobileUsageBtn') || e.target.closest('#manageBtn') || e.target.closest('#sectionSelector')) {
-                return;
-            }
-
-            const panel = document.getElementById('analysis-panel');
-            const isFlippingToBack = !panel.classList.contains('flipped');
-
-            panel.classList.toggle('flipped');
-
-            if (isFlippingToBack) {
-                loadUsageEmbedded();
-            }
-        });
-    }
-
-    function formatRM(value) {
-        return "RM " + Number(value || 0).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-
-    async function loadUsageEmbedded() {
-        if (!currentContract) return;
-        const contractId = currentContract.id;
-
-        if (usageLoadedContractId === contractId) return;
-
-        try {
-            const contract = currentContract;
-            const validWorkOrders = currentWO;
-            const safeInterims = currentInterims;
-
-            document.getElementById('uwWoCount').innerText = validWorkOrders.length.toLocaleString('en-MY');
-
-            const contractValue = Number(contract.contract_sum || 0);
-
-            const claimedAmount = safeInterims.reduce(
-                (sum, row) => sum + Number(row.net_amount || row.claim_amount || 0),
-                0
-            );
-
-            const pendingAmount = validWorkOrders.reduce(
-                (sum, wo) => {
-                    if (!wo.interim_no && wo.section_category) {
-                        const sectionTotal = Object.values(wo.section_category).reduce(
-                            (s, sec) => s + Number((sec && sec.amt) || 0),
-                            0
-                        );
-                        return sum + sectionTotal;
-                    }
-                    return sum;
-                },
-                0
-            );
-
-            const totalUsed = claimedAmount + pendingAmount;
-            const balance = contractValue - totalUsed;
-            const progress = contractValue ? ((totalUsed / contractValue) * 100).toFixed(1) : 0;
-
-            document.getElementById('uwContractValue').innerText = formatRM(contractValue);
-            document.getElementById('uwUsedValue').innerText = formatRM(totalUsed);
-            document.getElementById('uwBalanceValue').innerText = formatRM(balance);
-            document.getElementById('uwProgressValue').innerText = progress + '%';
-
-            const monthlyMap = {};
-            safeInterims.forEach(item => {
-                if (!item.claim_date) return;
-                const date = new Date(item.claim_date);
-                if (isNaN(date.getTime())) return;
-                const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                monthlyMap[monthKey] = (monthlyMap[monthKey] || 0) + Number(item.net_amount || item.claim_amount || 0);
-            });
-
-            const startDate = new Date(contract.contract_start);
-            const endDate = new Date(contract.contract_end);
-            let totalContractMonths = 1;
-
-            if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-                totalContractMonths = Math.max(
-                    1,
-                    ((endDate.getFullYear() - startDate.getFullYear()) * 12) + (endDate.getMonth() - startDate.getMonth()) + 1
-                );
-            }
-
-            const base = isNaN(startDate.getTime()) ? new Date() : startDate;
-            const months = [];
-            const cur = new Date(base.getFullYear(), base.getMonth(), 1);
-            for (let i = 0; i < totalContractMonths; i++) {
-                months.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`);
-                cur.setMonth(cur.getMonth() + 1);
-            }
-
-            const monthlyPlanned = contractValue / totalContractMonths;
-            const planned = months.map((_, i) => monthlyPlanned * (i + 1));
-
-            const keyOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            const idxOf = v => {
-                const d = new Date(v);
-                if (isNaN(d.getTime())) return null;
-                const k = keyOf(d);
-                let i = months.indexOf(k);
-                if (i === -1) i = k < months[0] ? 0 : months.length - 1;
-                return i;
-            };
-
-            const woAmt = wo => Object.values(wo.section_category || {}).reduce((s, x) => s + Number((x && x.amt) || 0), 0);
-
-            const claimDelta = months.map(() => 0);
-            const interimIdx = {};
-            safeInterims.forEach(it => {
-                const i = idxOf(it.claim_date);
-                if (i === null) return;
-                claimDelta[i] += Number(it.net_amount || it.claim_amount || 0);
-                if (it.interim_no != null) interimIdx[it.interim_no] = i;
-            });
-
-            const woDelta = months.map(() => 0);
-            validWorkOrders.forEach(wo => {
-                const i = idxOf(wo.qpb_date || wo.blueform_created_at || wo.created_at);
-                if (i === null) return;
-                const amt = woAmt(wo);
-
-                if (!wo.interim_no) {
-                    woDelta[i] += amt;
-                } else if (interimIdx[wo.interim_no] !== undefined) {
-                    const j = interimIdx[wo.interim_no];
-                    woDelta[i] += amt;
-                    woDelta[Math.max(i, j)] -= amt;
-                }
-            });
-
-            const now = new Date();
-            const nowKey = keyOf(now);
-            const lastIdx = nowKey < months[0] ? -1 : nowKey > months[months.length - 1] ? months.length - 1 : months.indexOf(nowKey);
-            let run = 0;
-            const actual = months.map((_, i) => {
-                run += claimDelta[i] + woDelta[i];
-                return i <= lastIdx ? run : null;
-            });
-
-            buildUsageChart(months, planned, actual);
-            buildUsageTable(months, planned, actual, false);
-            updateUsageLifecycle(contract, safeInterims, validWorkOrders);
-
-            [['.u-step-wo', validWorkOrders.length], ['.u-step-interim', safeInterims.length]].forEach(([sel, n]) => {
-                const dot = document.querySelector('#flipCardBack ' + sel + ' .u-dot');
-                if (dot) dot.textContent = n.toLocaleString('en-MY');
-            });
-
-            usageLoadedContractId = contractId;
-        } catch (err) {
-            console.error('Ralat usage embed:', err);
-        }
-    }
-
-    function buildUsageChart(months, planned, actual) {
-        const ctx = document.getElementById('uwChart');
-        if (!ctx) return;
-
-        if (usageChartInstance) {
-            usageChartInstance.destroy();
-            usageChartInstance = null;
-        }
-
-        usageChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: months,
-                datasets: [
-                    { label: 'Planned', data: planned, borderColor: '#8e8e93', borderDash: [6, 4], fill: false, tension: 0, pointRadius: 2 },
-                    { label: 'Actual', data: actual, borderColor: '#007AFF', backgroundColor: 'rgba(0,122,255,0.15)', fill: true, tension: 0.35, pointRadius: 3, spanGaps: false }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'top', labels: { font: { size: 9, weight: 'bold' } } },
-                    datalabels: { display: false }
-                },
-                scales: {
-                    y: { beginAtZero: true, ticks: { font: { size: 8 } } },
-                    x: {
-                        ticks: {
-                            font: { size: 8 },
-                            maxRotation: 45,
-                            autoSkip: true,
-                            callback(v) { return formatUsageMonth(this.getLabelForValue(v)); }
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-    function buildUsageTable(months, planned, actual, noRecords = false) {
-        const body = document.getElementById('uwTableBody');
-        if (!body) return;
-        body.innerHTML = '';
-
-        if (noRecords) {
-            body.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#8e8e93;">Tiada rekod tuntutan interim</td></tr>`;
-            return;
-        }
-
-        months.forEach((m, i) => {
-            const hasActual = actual[i] !== null && actual[i] !== undefined;
-            const variance = hasActual ? actual[i] - (planned[i] || 0) : null;
-            const color = variance !== null && variance > 0 ? '#FF3B30' : '#34C759';
-
-            body.innerHTML += `
-                <tr>
-                    <td>${formatUsageMonth(m)}</td>
-                    <td>${formatRM(planned[i])}</td>
-                    <td>${hasActual ? formatRM(actual[i]) : '-'}</td>
-                    <td style="color:${color}; font-weight:700;">${variance !== null ? formatRM(variance) : '-'}</td>
-                </tr>
-            `;
-        });
-    }
-
-    function formatUsageMonth(value) {
-        if (typeof value === 'string' && /^\d{4}-\d{2}$/.test(value)) {
-            const [year, month] = value.split('-');
-            const date = new Date(Number(year), Number(month) - 1, 1);
-            return date.toLocaleString('en-MY', { month: 'short', year: 'numeric' });
-        }
-        return value;
-    }
-
-    function updateUsageLifecycle(contract, interims, validWorkOrders = []) {
-        const root = document.getElementById('flipCardBack');
-        if (!root) return;
-
-        const nodes = {};
-        ['award', 'wo', 'cpc', 'cmgd', 'sfa'].forEach(k => { nodes[k] = root.querySelector('.u-step-' + k); });
-
-        const check = '<i class="fa fa-check"></i>';
-        const clock = '<i class="fa fa-clock"></i>';
-        const setCur = k => { if (nodes[k]) nodes[k].classList.add('u-current'); };
-        const setDone = k => {
-            const n = nodes[k];
-            if (!n) return;
-            n.classList.remove('u-current');
-            n.classList.add('u-done');
-            if (k !== 'wo') n.querySelector('.u-dot').innerHTML = check; // ONGOING kekal papar bilangan ID
-        };
-
-        Object.keys(nodes).forEach(k => {
-            const n = nodes[k];
-            if (!n) return;
-            n.classList.remove('u-done', 'u-current');
-            if (k !== 'wo') n.querySelector('.u-dot').innerHTML = clock;
-        });
-
-        if (!contract) return;
-
-        // AWARD -> ONGOING -> CPC -> CMGD (+6 bulan) -> SFA (+18 bulan)
-        setDone('award');
-        setCur('wo');
-
-        const end = new Date(contract.contract_end);
-        if (isNaN(end.getTime())) return;
-
-        const today = new Date();
-        const after = m => { const d = new Date(end); d.setMonth(d.getMonth() + m); return d; };
-
-        if (today > end) { setDone('wo'); setCur('cpc'); }
-        if (today >= after(6)) { setDone('cpc'); setCur('cmgd'); }
-        if (today >= after(18)) { setDone('cmgd'); setCur('sfa'); }
     }
 </script>
 </body>
