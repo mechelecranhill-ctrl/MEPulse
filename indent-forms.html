@@ -577,7 +577,7 @@ async function openPicker() {
   box.innerHTML = '<div class="empty">Loading...</div>';
 
   const rows = ids.length
-    ? await api(`work_orders?contract_id=in.(${ids.join(',')})&indent_id=is.null&status=not.in.(CLAIMED,CANCEL,QUOTATION,QUO-REJ)&select=id,contract_id,work_id,status,description,amount_spent&order=work_id.asc`)
+    ? await api(`work_orders?contract_id=in.(${ids.join(',')})&indent_id=is.null&status=not.in.(CLAIMED,CANCEL,QUOTATION,QUO-REJ,INDENT,%22INDENT%20APPROVED%22)&select=id,contract_id,work_id,status,description,amount_spent&order=work_id.asc`)
     : [];
 
   window._pickRows = rows || [];
@@ -681,6 +681,7 @@ async function lookupExistingWorkId(rawQ) {
       return `already in indent <b>${ind ? esc(ind.contract_code || ind.indent_code) : '(other)'}</b>`;
     }
     if (['QUOTATION', 'QUO-REJ'].includes(w.status)) return 'waiting for QUO-APP';
+    if (['INDENT', 'INDENT APPROVED'].includes(w.status)) return 'already at indent stage';
     return 'cannot be added';
   };
 
