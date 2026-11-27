@@ -350,11 +350,8 @@
         .chart-box { padding: 10px; background: #f9f9fb; border-radius: 15px; flex: 1; position: relative; min-height: 0; display: flex; flex-direction: column; transform: translateZ(0); }
 
         .section-row { background: #fff; border: 1px solid var(--ios-blue); border-radius: 12px; padding: 10px; margin-bottom: 8px; }
-        .prog-bar-bg { width: 100%; height: 8px; background: #eee; border-radius: 4px; margin-top: 5px; overflow: hidden; }
-
-        .prog-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease-out !important; width: 0 !important; will-change: width;}
         .avg-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 5px; }
-        .avg-item { font-size: 9px; font-weight: 600; color: #666; }
+        .avg-item { font-size: 10px; font-weight: 700; color: #48484a; }
         .manage-btn { background: #f2f2f7; border: none; padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; color: var(--ios-blue); cursor: pointer; }
         #selectedSectionContainer { flex: 1; overflow-y: auto; padding-right: 5px; }
         .sel-chip { display: inline-block; padding: 4px 10px; border-radius: 12px; background: #e5e5ea; margin: 3px; font-size: 10px; cursor: pointer; font-weight: 600; }
@@ -908,6 +905,25 @@
         }
     }
 
+    function parseCodeOrder(code) {
+        const str = String(code || '').trim();
+        const match = str.match(/\/(\d+)\/(\d+)\s*$/);
+        if (match) {
+            return {
+                hasPattern: true,
+                num: parseInt(match[1], 10),
+                year: parseInt(match[2], 10),
+                raw: str
+            };
+        }
+        return {
+            hasPattern: false,
+            num: Number.MAX_SAFE_INTEGER,
+            year: Number.MAX_SAFE_INTEGER,
+            raw: str
+        };
+    }
+
     async function fetchContracts(unitId, btn) {
         document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
         btn.classList.add('active');
@@ -961,9 +977,17 @@
             });
 
             data.sort((a, b) => {
-                const dateDiff = new Date(a.contract_start) - new Date(b.contract_start);
-                if (dateDiff !== 0) return dateDiff;
-                return a.contract_code.localeCompare(b.contract_code, undefined, { numeric: true, sensitivity: "base" });
+                const pa = parseCodeOrder(a.contract_code);
+                const pb = parseCodeOrder(b.contract_code);
+
+                if (pa.hasPattern && pb.hasPattern) {
+                    if (pa.year !== pb.year) return pa.year - pb.year;
+                    if (pa.num !== pb.num) return pa.num - pb.num;
+                } else if (pa.hasPattern !== pb.hasPattern) {
+                    return pa.hasPattern ? -1 : 1;
+                }
+
+                return pa.raw.localeCompare(pb.raw, undefined, { numeric: true, sensitivity: "base" });
             });
 
             cacheContracts[unitId] = data;
@@ -1077,49 +1101,13 @@
             updateAdminUI();
 
             const sections = currentContract.contract_sections_breakdown || {};
-            const start = new Date(currentContract.contract_start);
-            const end = new Date(currentContract.contract_end);
-            const today = new Date();
-
-            const totalMonths = Math.max(1, ((end.getFullYear() - start.getFullYear()) * 12) + (end.getMonth() - start.getMonth()));
-            let monthsElapsed = ((today.getFullYear() - start.getFullYear()) * 12) + (today.getMonth() - start.getMonth()) + 1;
-            monthsElapsed = Math.min(totalMonths, Math.max(1, monthsElapsed));
-
-            
             const mainContainer = document.getElementById('selectedSectionContainer');
             let htmlBuilder = '';
-
-            const interimMap = {};
-            (interimsData || []).forEach(int => {
-                if (!int.claim_breakdown) return;
-                Object.keys(int.claim_breakdown).forEach(s => {
-                    interimMap[s] = (interimMap[s] || 0) + (int.claim_breakdown[s].amt || 0);
-                });
-            });
-
-            const woMap = {};
-            currentWO.forEach(wo => {
-                if (!wo.interim_no && wo.section_category) {
-                    Object.keys(wo.section_category).forEach(s => {
-                        woMap[s] = (woMap[s] || 0) + (wo.section_category[s].amt || 0);
-                    });
-                }
-            });
 
             selectedSections.sort().forEach(s => {
                 if (!sections[s]) return;
 
-                const totalInterimClaim = interimMap[s] || 0;
-                const totalPendingWO = woMap[s] || 0;
-                const used = totalInterimClaim + totalPendingWO;
                 const budget = sections[s].amt || 0;
-
-                const plannedTotalToDate = (budget / totalMonths) * monthsElapsed;
-                const variance = used - plannedTotalToDate;
-                const variancePercent = plannedTotalToDate ? (variance / plannedTotalToDate) * 100 : 0;
-
-                const color = used > plannedTotalToDate ? 'var(--ios-red)' : 'var(--ios-green)';
-                const progressPercent = budget ? (used / budget) * 100 : 0;
 
                 htmlBuilder += `
                     <div class="section-row">
@@ -1130,26 +1118,12 @@
                         </div>
                         <div class="avg-stats">
                             <div class="avg-item">BUDGET: RM ${budget.toLocaleString()}</div>
-                            <div class="avg-item" style="color:#8e8e93;">PLANNED: RM ${plannedTotalToDate.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
-                        </div>
-                        <div class="avg-stats">
-                            <div class="avg-item">ACTUAL: RM ${used.toLocaleString()}</div>
-                            <div class="avg-item" style="color:${color};">VARIANCE: ${variancePercent > 0 ? '+' : ''}${variancePercent.toFixed(1)}%</div>
-                        </div>
-                        <div class="prog-bar-bg">
-                            <div class="prog-bar-fill" data-width="${Math.min(100, progressPercent)}%" style="background:${color}"></div>
                         </div>
                     </div>
                 `;
             });
 
             mainContainer.innerHTML = htmlBuilder;
-
-            requestAnimationFrame(() => {
-                document.querySelectorAll('.prog-bar-fill').forEach(bar => {
-                    bar.style.setProperty('width', bar.getAttribute('data-width'), 'important');
-                });
-            });
         } catch (error) {
             console.error("Error processing UI:", error);
         }
@@ -1368,7 +1342,7 @@
             if (!n) return;
             n.classList.remove('u-current');
             n.classList.add('u-done');
-            if (k !== 'wo') n.querySelector('.u-dot').innerHTML = check; // ONGOING kekal papar bilangan ID
+            if (k !== 'wo') n.querySelector('.u-dot').innerHTML = check;
         };
 
         Object.keys(nodes).forEach(k => {
@@ -1380,7 +1354,6 @@
 
         if (!contract) return;
 
-        // AWARD -> ONGOING -> CPC -> CMGD (+6 bulan) -> SFA (+18 bulan)
         setDone('award');
         setCur('wo');
 
