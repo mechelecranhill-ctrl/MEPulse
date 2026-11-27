@@ -1291,6 +1291,17 @@ async function loadSingleContract(id){
     }
 }
 
+/* Status INDENT / INDENT APPROVED: read-only & diabaikan dari kiraan */
+function isIndentStatus(st){
+    const n = String(st || '').toUpperCase().replace(/[^A-Z]/g, '');
+    return n === 'INDENT' || n === 'INDENTAPPROVED';
+}
+function statusCls(st){
+    return isIndentStatus(st)
+        ? String(st).toLowerCase().replace(/[^a-z]/g, '')
+        : String(st).toLowerCase().replace(/\s+/g, '');
+}
+
 function renderTable(data, showArea = true){
     if(typeof closeSecPop === 'function') closeSecPop();
     currentTableData = data;
@@ -1324,6 +1335,8 @@ function renderTable(data, showArea = true){
 
         const currentStatus = w.interim_no ? 'CLAIMED' : (w.status || 'BLUEFORM');
         
+        const locked = !!w.interim_no || isIndentStatus(currentStatus);
+
         let actionHtml = '';
         let checkboxHtml = '';
 
@@ -1347,10 +1360,10 @@ function renderTable(data, showArea = true){
         }
 
         html += `
-        <tr class="status-${currentStatus.toLowerCase().replace(/\s+/g,'')}">
+        <tr class="status-${statusCls(currentStatus)}">
             <td>
-                <select onchange="updateStatus(${w.id}, this.value)" ${w.interim_no ? 'disabled' : ''}
-                    style="width:100%;max-width:140px;padding:6px 8px;border-radius:10px;border:1px solid #ddd;font-size:12px;font-weight:700;background:${w.interim_no ? '#f1f1f1' : 'white'};box-sizing:border-box;">
+                <select onchange="updateStatus(${w.id}, this.value)" ${locked ? 'disabled' : ''}
+                    style="width:100%;max-width:140px;padding:6px 8px;border-radius:10px;border:1px solid #ddd;font-size:12px;font-weight:700;background:${locked ? '#f1f1f1' : 'white'};box-sizing:border-box;">
                     <option value="BLUEFORM"        ${currentStatus === 'BLUEFORM'        ? 'selected' : ''}>BLUEFORM</option>
                     <option value="APP-EXEC"        ${currentStatus === 'APP-EXEC'        ? 'selected' : ''}>APP-EXEC</option>
                     <option value="EXEC-REJ"        ${currentStatus === 'EXEC-REJ'        ? 'selected' : ''}>EXEC-REJ</option>
@@ -1361,6 +1374,8 @@ function renderTable(data, showArea = true){
                     <option value="APPROVED"        ${currentStatus === 'APPROVED'        ? 'selected' : ''}>APPROVED</option>
                     <option value="CANCEL"          ${currentStatus === 'CANCEL'          ? 'selected' : ''}>CANCEL</option>
                     <option value="CLAIMED"         ${currentStatus === 'CLAIMED'         ? 'selected' : ''}>CLAIMED</option>
+                    <option value="INDENT"          disabled ${isIndentStatus(currentStatus) && currentStatus.toUpperCase().replace(/[^A-Z]/g,'') === 'INDENT' ? 'selected' : ''}>INDENT</option>
+                    <option value="INDENT APPROVED" disabled ${currentStatus.toUpperCase().replace(/[^A-Z]/g,'') === 'INDENTAPPROVED' ? 'selected' : ''}>INDENT APPROVED</option>
                 </select>
             </td>
             <td><strong>${seq || '-'}</strong></td>
@@ -1417,7 +1432,7 @@ function renderMobileCards(data){
                     <div class="mobile-title">
                         <strong>${seq}</strong> <span style="font-size:12px; color:#555;">(${w.work_id})</span>
                     </div>
-                    <span class="tag ${currentStatus.toLowerCase().replace(/\s+/g,'')}">${currentStatus}</span>
+                    <span class="tag ${statusCls(currentStatus)}">${currentStatus}</span>
                 </div>
                 <div class="mobile-sub" style="font-weight:600; color:#334155;">ID Kerja: ${w.work_id}</div>
                 <div class="mobile-sub">${w.description || '-'}</div>
@@ -1444,7 +1459,7 @@ function renderMobileCards(data){
             <div class="mobile-card">
                 <div class="mobile-card-header">
                     <div class="mobile-title">${w.work_id || '-'}</div>
-                    <span class="tag ${currentStatus.toLowerCase().replace(/\s+/g,'')}">${currentStatus}</span>
+                    <span class="tag ${statusCls(currentStatus)}">${currentStatus}</span>
                 </div>
                 <div class="mobile-sub">${w.description || '-'}</div>
                 <div class="mobile-sub" style="color:var(--ios-orange);"><i class="fa fa-map-pin"></i> ${w.location || 'N/A'}</div>
@@ -1717,6 +1732,7 @@ function buildInterimMatrix(contract, interims, workorders, voBreakdown = {}) {
     const st = (w.status || '').toUpperCase().trim();
     if (st === 'CLAIMED' || w.interim_no) return false;
     if (st === 'CANCEL') return false;
+    if (isIndentStatus(st)) return false;
     if (st.includes('REJ')) return false;
     if (st === 'QUOTATION' || st === 'QUO-APP') return false;
     return true;
@@ -1999,6 +2015,8 @@ function downloadCsv(){
 
 async function updateStatus(id, status){
         if (IS_GUEST) return;
+    const cur = allWorks.find(w => Number(w.id) === Number(id));
+    if (isIndentStatus(status) || (cur && isIndentStatus(cur.status))) return; // read-only
     try{
         await fetch(`${API_URL}/rest/v1/work_orders?id=eq.${id}`,{
             method:'PATCH', headers,
@@ -2015,6 +2033,7 @@ async function updateStatus(id, status){
 async function updateStatusGroup(idsStr, status){
         if (IS_GUEST) return;
     const ids = idsStr.split(',').map(id => id.trim());
+    if (isIndentStatus(status) || ids.some(id => { const r = allWorks.find(w => Number(w.id) === Number(id)); return r && isIndentStatus(r.status); })) return; // read-only
     try{
         await Promise.all(ids.map(id =>
             fetch(`${API_URL}/rest/v1/work_orders?id=eq.${id}`,{
