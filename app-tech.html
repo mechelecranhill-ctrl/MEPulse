@@ -1511,11 +1511,6 @@
                     closeQuotationModal();
                     resetQuotationModalForm();
                     fetchTechnicianDashboard();
-                    if (window.__returnTo) {
-                        const back = window.__returnTo;
-                        window.__returnTo = null;
-                        setTimeout(() => { location.href = back; }, 900);
-                    }
                 } else {
                     let errBody = null;
                     try { errBody = await res.json(); } catch(_) { }
@@ -3536,46 +3531,9 @@
             woAutoDetectWork();
         }
 
-        async function handleDeepLink() {
-            const q = new URLSearchParams(location.search);
-            if (q.get('newQuotation') !== '1') return;
-
-            window.__returnTo = q.get('return') || null;
-
-            if (!window.__techPerm?.canManageTech) {
-                showAppToast('Anda tiada kebenaran untuk sediakan quotation.', 'error');
-                return;
-            }
-
-            if (!quotationModalInitialized) {
-                quotationModalInitialized = true;
-                await tqFetchUnits();
-            }
-            openQuotationModal();
-
-            const unitSel = document.getElementById('tq_unit_id');
-            unitSel.value = q.get('unit') || '';
-            if (unitSel.value) {
-                await tqLoadContracts();
-                const cSel = document.getElementById('tq_contract_id');
-                cSel.value = q.get('contract') || '';
-                if (cSel.value) tqOnContractSelect();
-            }
-
-            const m = (q.get('work_id') || '').toUpperCase().match(/^([CK])(\d+)([A-Z]?)$/);
-            if (m) {
-                document.getElementById('tq_id_prefix').value = m[1];
-                document.getElementById('tq_id_num').value = m[2];
-                tqAutoDetectWork();
-            }
-
-            history.replaceState(null, '', location.pathname);
-        }
-
         window.onload = async () => {
             if (!(await AccessGuard.requireAllowedSection())) return;
-            await fetchTechnicianDashboard();
-            handleDeepLink();
+            fetchTechnicianDashboard();
         };
 
         document.addEventListener('input', function (e) {
