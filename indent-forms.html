@@ -196,8 +196,50 @@ input[type=checkbox]{width:18px!important;height:18px;padding:0;margin:2px 0 0;f
 .detail > .empty b{font-size:16px;font-weight:800}
 .detail > .empty span{font-size:12.5px;opacity:.8}
 
+/* ---- toast system ---- */
+.toast-stack{
+  position:fixed;right:18px;bottom:18px;z-index:9999;
+  display:flex;flex-direction:column;gap:10px;max-width:380px;width:calc(100vw - 36px);
+  pointer-events:none;
+}
+.toast{
+  pointer-events:auto;
+  display:flex;flex-direction:column;gap:10px;
+  padding:13px 15px;border-radius:16px;
+  background:rgba(255,255,255,.97);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  border:1px solid rgba(255,255,255,.85);
+  box-shadow:0 16px 38px rgba(8,40,110,.28);
+  color:var(--ink);font-size:12.5px;line-height:1.45;
+  animation:toastIn .22s cubic-bezier(.22,1,.36,1);
+}
+.toast-row{display:flex;align-items:flex-start;gap:10px}
+.toast-ico{
+  width:24px;height:24px;border-radius:999px;flex-shrink:0;
+  display:inline-flex;align-items:center;justify-content:center;font-size:12px;margin-top:1px;
+}
+.toast.info .toast-ico{background:#007AFF1f;color:var(--ios-blue)}
+.toast.success .toast-ico{background:#34C75924;color:#1f8a3b}
+.toast.warn .toast-ico{background:#FF950024;color:#b56a00}
+.toast.error .toast-ico{background:#FF3B3022;color:var(--ios-red)}
+.toast-msg{flex:1;font-weight:600;white-space:pre-line;word-break:break-word}
+.toast-close{
+  border:0;background:transparent;color:#8ea1b6;cursor:pointer;
+  padding:2px 4px;font-size:14px;line-height:1;border-radius:6px;
+}
+.toast-close:hover{color:var(--ink);background:#eef6fd}
+.toast-actions{display:flex;justify-content:flex-end;gap:8px;padding-left:34px}
+.toast-actions .btn{padding:6px 12px;font-size:11.5px;border-radius:10px}
+@keyframes toastIn{
+  from{opacity:0;transform:translateY(10px) scale(.97)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes toastOut{
+  to{opacity:0;transform:translateY(6px) scale(.97)}
+}
+
 body.is-guest .admin{display:none!important}
-@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media(max-width:768px){
   .main{flex-direction:column;gap:12px;padding:12px 12px 14px}
   .side{width:100%;flex-shrink:0}
@@ -207,6 +249,7 @@ body.is-guest .admin{display:none!important}
   .panel{padding:16px;border-radius:20px}
   .panel .ph-title{font-size:22px}
   .grid{grid-template-columns:1fr}
+  .toast-stack{right:12px;bottom:12px;width:calc(100vw - 24px)}
 }
 </style>
 </head>
@@ -220,6 +263,7 @@ body.is-guest .admin{display:none!important}
   </div>
   <div class="detail" id="detail"><div class="empty"><i class="fa-regular fa-file-lines"></i><b>Select an indent</b><span>or create a new one.</span></div></div>
 </div>
+<div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
 
 <script>
 var API_URL = 'https://me-connect-api.mech-elec-ranhill.workers.dev';
@@ -239,6 +283,61 @@ const rm = n => 'RM ' + Number(n || 0).toLocaleString(undefined, { minimumFracti
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB') : '-';
 const rowAmt = w => Number(w.amount_spent || 0);
 const sumRows = rows => rows.filter(w => w.status !== 'CANCEL').reduce((a, w) => a + rowAmt(w), 0);
+
+/* ---- toast helpers ---- */
+function showToast(message, type = 'info', duration = 3800) {
+  const stack = document.getElementById('toastStack');
+  const icons = {
+    info: 'fa-circle-info',
+    success: 'fa-circle-check',
+    warn: 'fa-triangle-exclamation',
+    error: 'fa-circle-xmark'
+  };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `
+    <div class="toast-row">
+      <span class="toast-ico"><i class="fa ${icons[type] || icons.info}"></i></span>
+      <div class="toast-msg">${esc(message)}</div>
+      <button type="button" class="toast-close" aria-label="Close">×</button>
+    </div>`;
+  const dismiss = () => {
+    if (!el.parentNode) return;
+    el.style.animation = 'toastOut .18s ease forwards';
+    setTimeout(() => el.remove(), 180);
+  };
+  el.querySelector('.toast-close').onclick = dismiss;
+  stack.appendChild(el);
+  if (duration > 0) setTimeout(dismiss, duration);
+}
+
+function confirmToast(message, confirmLabel = 'Continue', cancelLabel = 'Cancel') {
+  return new Promise(resolve => {
+    const stack = document.getElementById('toastStack');
+    const el = document.createElement('div');
+    el.className = 'toast warn';
+    el.innerHTML = `
+      <div class="toast-row">
+        <span class="toast-ico"><i class="fa fa-triangle-exclamation"></i></span>
+        <div class="toast-msg">${esc(message)}</div>
+      </div>
+      <div class="toast-actions">
+        <button type="button" class="btn ghost" data-act="cancel">${esc(cancelLabel)}</button>
+        <button type="button" class="btn" data-act="ok">${esc(confirmLabel)}</button>
+      </div>`;
+    let settled = false;
+    const finish = val => {
+      if (settled) return;
+      settled = true;
+      el.style.animation = 'toastOut .18s ease forwards';
+      setTimeout(() => el.remove(), 180);
+      resolve(val);
+    };
+    el.querySelector('[data-act="cancel"]').onclick = () => finish(false);
+    el.querySelector('[data-act="ok"]').onclick = () => finish(true);
+    stack.appendChild(el);
+  });
+}
 
 async function api(path, opt) {
   const r = await fetch(API_URL + '/rest/v1/' + path, { headers, ...opt });
@@ -361,14 +460,17 @@ function pickTotal() {
 async function assign() {
   if (IS_GUEST) return;
   const ids = [...document.querySelectorAll('.pk:checked')].map(c => c.value);
-  if (!ids.length) return;
+  if (!ids.length) return showToast('Select at least one ID.', 'warn');
   const add = window._pickRows.filter(w => ids.includes(String(w.id))).reduce((a, w) => a + rowAmt(w), 0);
-  if (sumRows(members) + add > current.indent_sum &&
-      !confirm('Total will exceed indent value. Continue?')) return;
+  if (sumRows(members) + add > current.indent_sum) {
+    const ok = await confirmToast('Total will exceed indent value. Continue?');
+    if (!ok) return;
+  }
   try {
     await api(`work_orders?id=in.(${ids.join(',')})`, { method: 'PATCH', body: JSON.stringify({ indent_id: current.id }) });
     await openIndent(current.id);
-  } catch (e) { console.error(e); alert('Failed to add IDs to indent.'); }
+    showToast('IDs added to indent.', 'success');
+  } catch (e) { console.error(e); showToast('Failed to add IDs to indent.', 'error'); }
 }
 
 async function unassign(id) {
@@ -378,12 +480,14 @@ async function unassign(id) {
   const msg = own
     ? 'This ID is registered solely for this indent and has no contract. Deleting will permanently remove this ID. Continue?'
     : 'Remove this ID from the indent? It will be counted back under the contract budget with its original status.';
-  if (!confirm(msg)) return;
+  const ok = await confirmToast(msg, own ? 'Delete' : 'Remove');
+  if (!ok) return;
   try {
     if (own) await api(`work_orders?id=eq.${id}`, { method: 'DELETE' });
     else await api(`work_orders?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ indent_id: null }) });
     await openIndent(current.id);
-  } catch (e) { console.error(e); alert('Failed to remove ID.'); }
+    showToast(own ? 'ID deleted.' : 'ID removed from indent.', 'success');
+  } catch (e) { console.error(e); showToast('Failed to remove ID.', 'error'); }
 }
 
 async function setStage(id, status) {
@@ -392,7 +496,8 @@ async function setStage(id, status) {
     await api(`work_orders?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
     const r = members.find(w => w.id === id); if (r) r.status = status;
     usedOf[current.id] = sumRows(members); renderList(); renderDetail();
-  } catch (e) { console.error(e); alert('Failed to update stage.'); }
+    showToast(`Status updated to ${status}.`, 'success', 2400);
+  } catch (e) { console.error(e); showToast('Failed to update stage.', 'error'); }
 }
 
 function getSecs(i) {
@@ -419,14 +524,21 @@ async function saveNewId() {
   if (IS_GUEST) return;
   const v = id => (document.getElementById(id)?.value || '').trim();
   const wid = v('rId').toUpperCase(), amt = Number(v('rAmt') || 0);
-  if (!/^[CK]\d+[A-Z]?$/.test(wid)) return alert('Invalid Work ID format (e.g. C123 or K45A).');
-  if (!(amt >= 0)) return alert('Invalid amount.');
-  if (sumRows(members) + amt > current.indent_sum && !confirm('Total will exceed indent value. Continue?')) return;
+  if (!/^[CK]\d+[A-Z]?$/.test(wid)) return showToast('Invalid Work ID format (e.g. C123 or K45A).', 'warn');
+  if (!(amt >= 0)) return showToast('Invalid amount.', 'warn');
+  if (sumRows(members) + amt > current.indent_sum) {
+    const ok = await confirmToast('Total will exceed indent value. Continue?');
+    if (!ok) return;
+  }
   try {
     const dup = await api(`work_orders?work_id=eq.${encodeURIComponent(wid)}&select=id,contract_id,indent_id`);
     if (dup && dup.length) {
-      return alert(`Work ID ${wid} already exists${dup[0].indent_id ? ' in an indent' : dup[0].contract_id ? ' in a contract' : ''}.` +
-        (dup[0].indent_id ? '' : ' Use "Add ID" to assign it to this indent.'));
+      return showToast(
+        `Work ID ${wid} already exists${dup[0].indent_id ? ' in an indent' : dup[0].contract_id ? ' in a contract' : ''}.` +
+        (dup[0].indent_id ? '' : ' Use "Add ID" to assign it to this indent.'),
+        'warn',
+        5000
+      );
     }
     const sec = v('rSec');
     const body = { work_id: wid, indent_id: current.id, status: v('rStage') || 'PLANNING',
@@ -435,9 +547,10 @@ async function saveNewId() {
     if (v('rDate')) body.qpb_date = v('rDate');
     await api('work_orders', { method: 'POST', body: JSON.stringify(body) });
     await openIndent(current.id);
+    showToast(`Work ID ${wid} registered.`, 'success');
   } catch (e) {
     console.error(e);
-    alert('Failed to register ID. If the error mentions contract_id NOT NULL, that column needs to allow NULL (see indent-backend.md).');
+    showToast('Failed to register ID. If the error mentions contract_id NOT NULL, that column needs to allow NULL (see indent-backend.md).', 'error', 6000);
   }
 }
 
@@ -590,10 +703,13 @@ async function saveIndent() {
   const hasSec = Object.keys(secs).length > 0;
   const sum = computeGrandTotal();
 
-  if (!v('nCode') || !v('nName')) return alert('Code and name are required.');
-  if (!(sum > 0) || sum > MAX_SUM) return alert('Indent value must be between RM 1 and RM 300,000.');
-  if (v('nStart') && v('nEnd') && v('nEnd') < v('nStart')) return alert('End date cannot be earlier than start date.');
-  if (editingId && sum < (usedOf[editingId] || 0) && !confirm('New indent value is lower than amount used. Continue?')) return;
+  if (!v('nCode') || !v('nName')) return showToast('Indent code and name are required.', 'warn');
+  if (!(sum > 0) || sum > MAX_SUM) return showToast('Indent value must be between RM 1 and RM 300,000.', 'warn');
+  if (v('nStart') && v('nEnd') && v('nEnd') < v('nStart')) return showToast('End date cannot be earlier than start date.', 'warn');
+  if (editingId && sum < (usedOf[editingId] || 0)) {
+    const ok = await confirmToast('New indent value is lower than amount used. Continue?');
+    if (!ok) return;
+  }
 
   const body = {
     unit_id: targetUnitId,
@@ -617,10 +733,14 @@ async function saveIndent() {
     const keep = editingId;
     await selectUnit(targetUnitId);
     if (keep) openIndent(keep);
-  } catch (e) { console.error(e); alert('Failed to save indent.\n\n' + errMsg(e)); }
+    showToast(keep ? 'Indent updated.' : 'Indent registered.', 'success');
+  } catch (e) { console.error(e); showToast('Failed to save indent.\n' + errMsg(e), 'error', 5500); }
 }
 
-window.onload = () => fetchUnits().catch(e => console.error('Error units:', e));
+window.onload = () => fetchUnits().catch(e => {
+  console.error('Error units:', e);
+  showToast('Failed to load units.', 'error');
+});
 </script>
 </body>
 </html>
