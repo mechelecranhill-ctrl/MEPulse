@@ -9,6 +9,7 @@
 <script src="api-auth.js"></script>
 <script src="session.js" defer></script>
 <script src="sidebar.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <style>
 :root{
   --ios-blue:#007AFF;--ios-green:#34C759;--ios-orange:#FF9500;--ios-red:#FF3B30;
@@ -260,6 +261,45 @@ body.is-guest .admin{display:none!important}
   .grid{grid-template-columns:1fr}
   .toast-stack{right:12px;bottom:12px;width:calc(100vw - 24px)}
 }
+
+/* ---- Quotation modal (register new Work ID) ---- */
+.hidden{display:none!important}
+.qm-overlay{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(8,28,70,.5);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+.qm-box{width:100%;max-width:460px;max-height:90vh;overflow-y:auto;background:#fff;border-radius:22px;box-shadow:0 24px 60px rgba(8,40,110,.4)}
+.qm-head{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;padding:16px 20px;background:#fff;border-bottom:1px solid var(--line);border-radius:22px 22px 0 0}
+.qm-head h3{margin:0;font-size:15px;font-weight:800;color:var(--ink)}
+.qm-x{border:0;background:transparent;color:#8ea1b6;font-size:18px;cursor:pointer;padding:4px 6px}
+.qm-x:hover{color:var(--ink)}
+.qm-form{padding:18px 20px 20px;display:flex;flex-direction:column;gap:12px}
+.qm-form .lbl{margin-bottom:4px;font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#8ea1b6}
+.qm-row{display:flex;gap:8px;align-items:center}
+.qm-form input[type=text],.qm-form textarea{text-transform:uppercase}
+.qm-form textarea{width:100%;padding:10px 12px;border:1.5px solid #dbe6f2;border-radius:12px;background:#fff;color:var(--ink);font-family:inherit;font-size:13px;resize:vertical}
+.qm-form textarea:focus{outline:0;border-color:var(--brand);box-shadow:0 0 0 4px rgba(0,119,182,.14)}
+.qm-form select:disabled,.qm-form input:disabled{background-color:#f3f6fa;color:#6b7a8c;cursor:not-allowed}
+.qm-badge{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:38px;padding:0 10px;border-radius:12px;background:#eef6fd;border:1.5px solid #d9eaf8;color:var(--brand-deep);font-weight:800}
+.qm-sec{padding:9px 10px;border:1px solid var(--line);border-radius:12px;background:#fbfdff}
+.qm-sec .lbl{margin-bottom:0}
+.qm-sec input{margin-top:5px}
+.qm-total{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-radius:14px;background:#ecfbf0;border:1px solid #c9efd4}
+.qm-total b{font-size:13px;color:var(--ink)}
+.qm-total span{font-size:14px;font-weight:800;color:#1f8a3b;font-variant-numeric:tabular-nums}
+.qm-drop{border:2px dashed #cbd8e6;border-radius:16px;padding:14px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.qm-drop:hover,.qm-drop.over{border-color:var(--ios-green);background:#f3fcf6}
+.qm-drop .big{display:block;font-size:24px;color:#c0ccd9;margin-bottom:4px}
+.qm-drop p{margin:0;font-size:12px;font-weight:800;color:#1f8a3b}
+.qm-drop small{font-size:10px;color:#9aa9ba}
+#tq_file_preview{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-radius:12px;background:#ecfbf0;border:1px solid #c9efd4;text-align:left}
+#tq_file_preview.hidden{display:none!important}
+#tq_file_name{margin:0;font-size:12px;font-weight:800;color:var(--ink);overflow-wrap:anywhere}
+#tq_file_size{margin:0;font-size:10px;color:#9aa9ba}
+#tq_upload_status{padding:8px 10px;border-radius:10px;background:#eef6fd;color:var(--brand);font-size:12px;font-weight:700}
+.btn.green{background:linear-gradient(135deg,#34C759,#1f8a3b);box-shadow:0 6px 14px rgba(52,199,89,.3)}
+.toast-body{padding-left:34px}
+.toast-actions{flex-wrap:wrap}
+.dt-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.dt-row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #f0f4f9;font-size:11px}
+.dt-row:last-child{border-bottom:0}
 </style>
 </head>
 <body>
@@ -271,6 +311,81 @@ body.is-guest .admin{display:none!important}
     <div id="list"></div>
   </div>
   <div class="detail" id="detail"><div class="empty"><i class="fa-regular fa-file-lines"></i><b>Select an indent</b><span>or create a new one.</span></div></div>
+</div>
+<div id="quotationModalOverlay" class="qm-overlay hidden">
+  <div class="qm-box">
+    <div class="qm-head">
+      <h3><i class="fa-solid fa-file-lines" style="color:var(--ios-green);margin-right:8px"></i>Quotation</h3>
+      <button type="button" class="qm-x" onclick="closeQuotationModal()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="techQuotationForm" class="qm-form">
+      <div>
+        <div class="lbl">Unit</div>
+        <select id="tq_unit_id" disabled></select>
+      </div>
+      <div>
+        <div class="lbl">Contract</div>
+        <select id="tq_contract_id" required><option value="">Choose Contract</option></select>
+      </div>
+      <div>
+        <div class="lbl">Work Order Id</div>
+        <div class="qm-row">
+          <select id="tq_id_prefix" style="width:80px;flex-shrink:0"><option value="C">C</option><option value="K">K</option></select>
+          <input type="text" id="tq_id_num" placeholder="123456" required inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,''); tqAutoDetectWork();">
+          <span id="tq_id_suffix_badge" class="qm-badge hidden"></span>
+        </div>
+      </div>
+      <div>
+        <div class="lbl">Quotation Date</div>
+        <input type="date" id="tq_qpb_date" required>
+      </div>
+      <div>
+        <div class="lbl">District</div>
+        <select id="tq_dist" required><option value="">Choose Contract First</option></select>
+      </div>
+      <div>
+        <div class="lbl">Location</div>
+        <div class="qm-row">
+          <select id="tq_location_prefix" style="width:120px;flex-shrink:0">
+            <option value="LRA">LRA</option><option value="BPH">BPH</option><option value="RESERVOIR">RESERVOIR</option>
+          </select>
+          <input type="text" id="tq_location_text" placeholder="Location">
+        </div>
+      </div>
+      <div>
+        <div class="lbl">Work Description</div>
+        <textarea id="tq_description" rows="2" placeholder="Work Description"></textarea>
+      </div>
+      <div>
+        <div class="lbl">Cost Breakdown</div>
+        <div id="tq_breakdown_container" style="display:grid;gap:8px;margin-top:4px">
+          <p class="meta" style="margin:0;font-style:italic">Choose Contract to load cost breakdown sections.</p>
+        </div>
+      </div>
+      <div class="qm-total"><b>Total:</b><span id="tq_total_display">RM 0.00</span></div>
+      <div>
+        <div class="lbl">Upload Document (PDF)</div>
+        <div id="tq_dropzone" class="qm-drop" onclick="document.getElementById('tq_pdf_file').click()">
+          <input type="file" id="tq_pdf_file" accept="application/pdf" class="hidden" onclick="event.stopPropagation()">
+          <div id="tq_file_empty_state">
+            <i class="fa-solid fa-file-arrow-up big"></i>
+            <p>Select PDF File</p>
+            <small>or drag &amp; drop the file</small>
+          </div>
+          <div id="tq_file_preview" class="hidden">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <i class="fa-solid fa-file-pdf" style="color:var(--ios-red);font-size:18px"></i>
+              <div style="min-width:0"><p id="tq_file_name"></p><p id="tq_file_size"></p></div>
+            </div>
+            <button type="button" class="qm-x" onclick="event.stopPropagation(); clearSelectedFile()" title="Remove file"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        </div>
+      </div>
+      <input type="hidden" id="tq_pdf_url">
+      <div id="tq_upload_status" class="hidden"></div>
+      <button type="submit" class="btn green" style="width:100%;padding:12px">Register Quotation</button>
+    </form>
+  </div>
 </div>
 <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
 
@@ -382,24 +497,7 @@ async function fetchUnits() {
 
   document.getElementById('unitNav').innerHTML = allUnits.map(u =>
     `<button class="unit-pill" id="unit-${u.id}" onclick="selectUnit(${u.id})">${esc(u.unit_name)}</button>`).join('');
-  if (allUnits.length) {
-    const qp = new URLSearchParams(location.search);
-    const u = Number(qp.get('unit')) || allUnits[0].id;
-    await selectUnit(u);
-    const ind = Number(qp.get('indent'));
-    if (ind && indents.some(i => i.id === ind)) await openIndent(ind);
-  }
-}
-
-function goRegisterQuotation(workId = '') {
-  const p = new URLSearchParams({ newQuotation: '1', unit: unitId });
-  if (workId) p.set('work_id', workId);
-
-  const hit = Object.entries(contracts).find(([, code]) => code === current.contract_code);
-  if (hit) p.set('contract', hit[0]);
-
-  p.set('return', `indent-forms.html?unit=${unitId}&indent=${current.id}`);
-  location.href = 'app-tech.html?' + p.toString();
+  if (allUnits.length) selectUnit(allUnits[0].id);
 }
 
 async function selectUnit(id) {
@@ -549,7 +647,7 @@ function filterPicker() {
     listEl.innerHTML = `
       <div class="empty" style="padding:20px">
         <div style="margin-bottom:10px"><b>No Work IDs Available</b>${q ? ` matching "${esc(rawQ)}"` : ''}</div>
-        <button type="button" class="btn" onclick="goRegisterQuotation('${esc(candidateId)}')">
+        <button type="button" class="btn" onclick="openQuotationModal('${esc(candidateId)}')">
           <i class="fa fa-file-circle-plus"></i> Register New Work ID${candidateId ? ` (${esc(candidateId)})` : ''}
         </button>
       </div>`;
@@ -858,10 +956,776 @@ async function saveIndent() {
   } catch (e) { console.error(e); showToast('Failed to save indent.\n' + errMsg(e), 'error', 5500); }
 }
 
-window.onload = () => fetchUnits().catch(e => {
-  console.error('Error units:', e);
-  showToast('Failed to load units.', 'error');
-});
+
+/* =====================================================================
+   Quotation modal (Register New Work ID) - ported from app-tech.html
+   ===================================================================== */
+const qHeaders = headers;
+const TECH_ROLES = ['JURUTEKNIK', 'JURUTEKNIK KANAN', 'EKSEKUTIF', 'EKSEKUTIF KANAN'];
+
+let tqCurrentContractSections = {};
+let tqCurrentSelectedSections = [];
+let tqDetectTimer = null;
+let tqPendingDetect = null;
+let tqOverwriteMode = false;
+let tqModeSaveAsNew = false;
+let tqLastWorkIdNum = '';
+let tqPendingSubmitEvent = null;
+let tqCurrentSuffix = '';
+let tqOriginalRowForSaveAsNew = null;
+let tqDetectToast = null;
+let tqDateToast = null;
+
+/* ---- shims so the ported code (and uploader.js) can keep its original calls ---- */
+function showAppToast(message, type = 'success', duration) {
+  showToast(String(message).replace(/<[^>]+>/g, ''), type, duration);
+}
+
+function showAppToastChoice({ type = 'warn', title = '', message = '', html = '', actions = [], onDismiss = null } = {}) {
+  const stack = document.getElementById('toastStack');
+  const icons = { error: 'fa-circle-xmark', warn: 'fa-triangle-exclamation', info: 'fa-circle-info', success: 'fa-circle-check' };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `
+    <div class="toast-row">
+      <span class="toast-ico"><i class="fa ${icons[type] || icons.warn}"></i></span>
+      <div class="toast-msg"><b>${esc(title)}</b>${message ? `<div style="font-weight:500;margin-top:3px">${message}</div>` : ''}</div>
+      <button type="button" class="toast-close" aria-label="Close">×</button>
+    </div>
+    ${html ? `<div class="toast-body">${html}</div>` : ''}
+    <div class="toast-actions"></div>`;
+  let closed = false;
+  const close = dismissed => {
+    if (closed) return;
+    closed = true;
+    el.style.animation = 'toastOut .18s ease forwards';
+    setTimeout(() => el.remove(), 180);
+    if (dismissed && typeof onDismiss === 'function') onDismiss();
+  };
+  el.querySelector('.toast-close').onclick = () => close(true);
+  const wrap = el.querySelector('.toast-actions');
+  actions.forEach(a => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn' + (a.cls === 'gray' ? ' ghost' : '');
+    b.innerHTML = (a.icon ? `<i class="fa-solid ${a.icon}"></i>` : '') + '<span></span>';
+    b.querySelector('span').textContent = a.label;
+    b.onclick = () => { try { if (a.onClick) a.onClick(); } finally { close(false); } };
+    wrap.appendChild(b);
+  });
+  if (!actions.length) wrap.remove();
+  stack.appendChild(el);
+  return { close: () => close(false), el };
+}
+
+/* ---- permission (same rule as app-tech: admin or TECH positions) ---- */
+async function getTechPerm() {
+  if (window.__techPerm) return window.__techPerm;
+  const isAdmin = localStorage.getItem('userId') === '@dm1n' || localStorage.getItem('role') === 'admin';
+  let canManageTech = isAdmin;
+  if (!isAdmin) {
+    try {
+      const raw = localStorage.getItem('staff_id');
+      const staffId = raw !== null ? Number(raw) : NaN;
+      if (!Number.isNaN(staffId)) {
+        const r = await api(`staff?id=eq.${staffId}&select=position`);
+        const pos = ((r && r[0] && r[0].position) || '').trim().toUpperCase();
+        canManageTech = TECH_ROLES.includes(pos);
+      }
+    } catch (e) { console.error('Permission check failed:', e); }
+  }
+  window.__techPerm = { isAdmin, canManageTech };
+  return window.__techPerm;
+}
+
+/* ---- helpers ---- */
+function normalizeWorkId(raw) {
+  raw = (raw || '').trim().toUpperCase();
+  const m = raw.match(/^([CK])?\s*(\d+)\s*([A-Z]?)$/);
+  if (!m) return '';
+  return `${m[1] || 'C'}${m[2]}${m[3] || ''}`;
+}
+
+function getOrderedSectionKeys(availableKeys, selectedSectionsOrder) {
+  const allKeys = Array.from(new Set(availableKeys));
+  let allowList = null;
+  if (Array.isArray(selectedSectionsOrder) && selectedSectionsOrder.length > 0) allowList = selectedSectionsOrder;
+  else if (selectedSectionsOrder && typeof selectedSectionsOrder === 'object' && Object.keys(selectedSectionsOrder).length > 0) allowList = Object.keys(selectedSectionsOrder);
+  if (allowList) return allKeys.filter(k => allowList.includes(k)).sort();
+  return allKeys.sort();
+}
+
+function splitLocationPreset(raw) {
+  raw = (raw || '').trim().toUpperCase();
+  for (const p of ['RESERVOIR', 'BPH', 'LRA']) {
+    if (raw.startsWith(p)) return { prefix: p, rest: raw.substring(p.length).trim().replace(/^[:\-,]?\s*/, '') };
+  }
+  return { prefix: 'LRA', rest: raw };
+}
+
+function joinLocationPreset(prefix, rest) {
+  rest = (rest || '').trim();
+  return rest ? `${prefix} ${rest}` : prefix;
+}
+
+function tqFormatCurrencyInput(input) {
+  let digits = input.value.replace(/\D/g, '');
+  if (!digits) digits = '0';
+  const val = parseInt(digits, 10) / 100;
+  input.value = val.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  input.dataset.rawValue = val.toFixed(2);
+}
+
+function assignFileToInput(inputEl, file) {
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  inputEl.files = dt.files;
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+function showFilePreview(file) {
+  document.getElementById('tq_file_name').textContent = file.name;
+  document.getElementById('tq_file_size').textContent = formatFileSize(file.size);
+  document.getElementById('tq_file_empty_state').classList.add('hidden');
+  document.getElementById('tq_file_preview').classList.remove('hidden');
+}
+
+function clearSelectedFile() {
+  document.getElementById('tq_pdf_file').value = '';
+  document.getElementById('tq_file_empty_state').classList.remove('hidden');
+  document.getElementById('tq_file_preview').classList.add('hidden');
+}
+
+/* ---- open / close / reset ---- */
+function tqResetDetectState() {
+  clearTimeout(tqDetectTimer);
+  tqPendingDetect = null;
+  tqOverwriteMode = false;
+  tqModeSaveAsNew = false;
+  tqLastWorkIdNum = '';
+  tqPendingSubmitEvent = null;
+  tqCurrentSuffix = '';
+  tqOriginalRowForSaveAsNew = null;
+  const dateInput = document.getElementById('tq_qpb_date');
+  if (dateInput) {
+    dateInput.removeAttribute('disabled');
+    delete dateInput.dataset.originalDate;
+    dateInput.title = '';
+  }
+  const badge = document.getElementById('tq_id_suffix_badge');
+  if (badge) { badge.textContent = ''; badge.classList.add('hidden'); }
+}
+
+function resetQuotationModalForm() {
+  document.getElementById('techQuotationForm').reset();
+  document.getElementById('tq_contract_id').innerHTML = '<option value="">Choose Contract</option>';
+  document.getElementById('tq_dist').innerHTML = '<option value="">Choose Contract First</option>';
+  document.getElementById('tq_pdf_url').value = '';
+  tqCurrentContractSections = {};
+  tqCurrentSelectedSections = [];
+  tqRenderBreakdown();
+  clearSelectedFile();
+  document.getElementById('tq_upload_status').classList.add('hidden');
+  tqResetDetectState();
+}
+
+function closeQuotationModal() {
+  document.getElementById('quotationModalOverlay').classList.add('hidden');
+  if (tqDetectToast) { tqDetectToast.close(); tqDetectToast = null; }
+  if (tqDateToast) { tqDateToast.close(); tqDateToast = null; }
+  tqResetDetectState();
+}
+
+async function openQuotationModal(prefillWorkId = '') {
+  if (IS_GUEST) return;
+  const perm = await getTechPerm();
+  if (!perm.canManageTech) { showToast('Anda tiada kebenaran untuk sediakan quotation.', 'error'); return; }
+
+  resetQuotationModalForm();
+  const unitSel = document.getElementById('tq_unit_id');
+  unitSel.innerHTML = `<option value="${unitId}">${esc((unitMap[unitId] || {}).unit_name || '')}</option>`;
+  unitSel.value = String(unitId);
+  document.getElementById('quotationModalOverlay').classList.remove('hidden');
+
+  await tqLoadContracts();
+
+  // pre-select the same contract as the current indent (if it has one)
+  const code = String((current && current.contract_code) || '').trim().toUpperCase();
+  const cSel = document.getElementById('tq_contract_id');
+  const hit = code && Array.from(cSel.options).find(o => o.value && o.textContent.trim().toUpperCase() === code);
+  if (hit) { cSel.value = hit.value; tqOnContractSelect(); }
+
+  const m = String(prefillWorkId || '').toUpperCase().match(/^([CK])(\d+)([A-Z]?)$/);
+  if (m) {
+    document.getElementById('tq_id_prefix').value = m[1];
+    document.getElementById('tq_id_num').value = m[2];
+    tqAutoDetectWork();
+  }
+}
+
+/* ---- contracts / breakdown ---- */
+async function tqLoadContracts() {
+  const uid = document.getElementById('tq_unit_id').value;
+  const sel = document.getElementById('tq_contract_id');
+  if (!uid) { sel.innerHTML = '<option value="">Choose Contract</option>'; return; }
+  sel.innerHTML = '<option value="">Loading...</option>';
+  try {
+    const data = await api(`contract?select=id,contract_code,district,contract_sections_breakdown,contract_start,selected_sections&unit_id=eq.${uid}`) || [];
+    data.sort((a, b) => {
+      const da = a.contract_start ? new Date(a.contract_start).getTime() : 0;
+      const db = b.contract_start ? new Date(b.contract_start).getTime() : 0;
+      if (da !== db) return da - db;
+      return (a.contract_code || '').localeCompare(b.contract_code || '', undefined, { numeric: true, sensitivity: 'base' });
+    });
+    sel.innerHTML = '<option value="">Choose Contract</option>';
+    data.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id; opt.text = c.contract_code;
+      opt.dataset.b = JSON.stringify(c.contract_sections_breakdown);
+      opt.dataset.dist = (c.district || '').toUpperCase();
+      opt.dataset.selSections = JSON.stringify(c.selected_sections || []);
+      sel.appendChild(opt);
+    });
+  } catch (e) { console.error(e); showToast('Failed to load contracts.', 'error'); }
+}
+
+function tqOnContractSelect() {
+  const opt = document.getElementById('tq_contract_id').selectedOptions[0];
+  const dSel = document.getElementById('tq_dist');
+  dSel.innerHTML = '<option value="">Choose District</option>';
+  if (opt && opt.dataset.dist) {
+    opt.dataset.dist.split(',').forEach(d => {
+      const district = d.trim();
+      if (district) dSel.innerHTML += `<option value="${esc(district)}">${esc(district)}</option>`;
+    });
+  }
+  const parse = (s, fb) => { try { return JSON.parse(s) || fb; } catch (_) { return fb; } };
+  tqCurrentContractSections = (opt && opt.dataset.b) ? parse(opt.dataset.b, {}) : {};
+  tqCurrentSelectedSections = (opt && opt.dataset.selSections) ? parse(opt.dataset.selSections, []) : [];
+  tqRenderBreakdown();
+  tqResetDetectState();
+}
+
+function tqRenderBreakdown(saved = {}) {
+  const container = document.getElementById('tq_breakdown_container');
+  if (!container) return;
+  const sections = Object.keys(tqCurrentContractSections || {});
+  if (sections.length === 0) {
+    container.innerHTML = '<p class="meta" style="margin:0;font-style:italic">Choose Contract to load cost breakdown sections.</p>';
+    tqCalcTotal();
+    return;
+  }
+  const fmt = n => n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  let html = '';
+  getOrderedSectionKeys(sections, tqCurrentSelectedSections).forEach(sec => {
+    const desc = tqCurrentContractSections[sec].desc || '';
+    const data = saved[sec] || {};
+    const amt = Number(data.amt || 0);
+    const extra = Number(data.extra || 0);
+    html += `<div class="qm-sec">
+      <div class="lbl">${esc(sec)}</div>
+      <div class="meta">${esc(desc)}</div>
+      <input type="text" class="tq_sec_amt" data-sec="${esc(sec)}" data-raw-value="${amt}" value="${fmt(amt)}" oninput="tqFormatCurrencyInput(this); tqCalcTotal();">
+      ${desc.toUpperCase().includes('PROVISIONAL') ? `<input type="text" class="tq_sec_extra" data-sec="${esc(sec)}" data-raw-value="${extra}" value="${fmt(extra)}" oninput="tqFormatCurrencyInput(this); tqCalcTotal();">` : ''}
+    </div>`;
+  });
+  container.innerHTML = html;
+  tqCalcTotal();
+}
+
+function tqCalcTotal() {
+  let total = 0;
+  document.querySelectorAll('#tq_breakdown_container .tq_sec_amt').forEach(i => { total += parseFloat(i.dataset.rawValue || 0); });
+  document.querySelectorAll('#tq_breakdown_container .tq_sec_extra').forEach(i => { total += parseFloat(i.dataset.rawValue || 0); });
+  const el = document.getElementById('tq_total_display');
+  if (el) el.innerText = `RM ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+}
+
+/* ---- detect existing quotation ---- */
+function tqAutoDetectWork() {
+  const contractId = document.getElementById('tq_contract_id').value;
+  const prefix = document.getElementById('tq_id_prefix').value;
+  const num = document.getElementById('tq_id_num').value.trim();
+  if (!contractId || !num) return;
+
+  const workId = normalizeWorkId(`${prefix}${num}`);
+  if (workId === tqLastWorkIdNum) return;
+  tqLastWorkIdNum = workId;
+
+  tqOverwriteMode = false;
+  tqModeSaveAsNew = false;
+  tqOriginalRowForSaveAsNew = null;
+  tqCurrentSuffix = '';
+  const badge = document.getElementById('tq_id_suffix_badge');
+  if (badge) { badge.textContent = ''; badge.classList.add('hidden'); }
+
+  const dateInput = document.getElementById('tq_qpb_date');
+  if (dateInput) {
+    dateInput.removeAttribute('disabled');
+    delete dateInput.dataset.originalDate;
+    dateInput.title = '';
+  }
+
+  clearTimeout(tqDetectTimer);
+  tqDetectTimer = setTimeout(async () => {
+    try {
+      const rows = await api(`work_orders?contract_id=eq.${contractId}&work_id=eq.${encodeURIComponent(workId)}&status=in.(QUOTATION,QUO-APP,QUO-REJ)&select=*`);
+      if (!Array.isArray(rows) || rows.length === 0) return;
+      tqPendingDetect = rows[0];
+      tqShowDetectModal(rows[0]);
+    } catch (err) { console.error(err); }
+  }, 400);
+}
+
+function tqShowDetectModal(row) {
+  const breakdown = row.section_category || {};
+  const fmt = n => n.toLocaleString('en-MY', { minimumFractionDigits: 2 });
+  let html = `<div class="dt-head"><span class="tag QUOTATION">${esc(row.work_id)}</span><span class="meta">${esc(row.location || '')}</span></div>`;
+  getOrderedSectionKeys(Object.keys(breakdown), tqCurrentSelectedSections).forEach(sec => {
+    const desc = (tqCurrentContractSections[sec] && tqCurrentContractSections[sec].desc) || '';
+    const amt = Number(breakdown[sec].amt || 0);
+    const extra = Number(breakdown[sec].extra || 0);
+    html += `<div class="dt-row">
+      <div><b>${esc(sec)}</b><div class="meta">${esc(desc)}</div></div>
+      <div style="text-align:right"><b>RM ${fmt(amt)}</b>${extra ? `<div class="meta">+RM ${fmt(extra)} prov.</div>` : ''}</div>
+    </div>`;
+  });
+  if (tqDetectToast) tqDetectToast.close();
+  tqDetectToast = showAppToastChoice({
+    type: 'warn',
+    title: 'Existing Quotation Detected',
+    message: 'This Work Order ID already exists with existing data:',
+    html,
+    actions: [
+      { label: 'Overwrite Data', icon: 'fa-rotate', onClick: () => tqConfirmOverwrite() },
+      { label: 'Save as New', icon: 'fa-file-circle-plus', onClick: () => tqConfirmSaveAsNew() },
+      { label: 'Additional Works', icon: 'fa-plus-circle', onClick: () => tqConfirmAdditionalWorks() }
+    ],
+    onDismiss: () => tqCancelDetectModal()
+  });
+}
+
+function tqFillFromRow(row) {
+  const locSplit = splitLocationPreset(row.location || '');
+  document.getElementById('tq_location_prefix').value = locSplit.prefix;
+  document.getElementById('tq_location_text').value = locSplit.rest;
+  document.getElementById('tq_description').value = row.description || '';
+  tqRenderBreakdown(row.section_category || {});
+  const distSel = document.getElementById('tq_dist');
+  if (row.district) {
+    const target = row.district.trim().toUpperCase();
+    const matchOpt = Array.from(distSel.options).find(o => o.value.trim().toUpperCase() === target);
+    if (matchOpt) distSel.value = matchOpt.value;
+  }
+}
+
+function tqConfirmOverwrite() {
+  if (!tqPendingDetect) return;
+  const row = tqPendingDetect;
+  tqOverwriteMode = true;
+  tqModeSaveAsNew = false;
+  tqFillFromRow(row);
+  const dateInput = document.getElementById('tq_qpb_date');
+  dateInput.value = row.qpd_date || '';
+  dateInput.dataset.originalDate = row.qpd_date || '';
+  dateInput.setAttribute('disabled', 'disabled');
+  dateInput.title = "Date cannot be changed in Overwrite mode. Use 'Save as New' if date needs to be changed.";
+  tqCloseDetectModal();
+}
+
+function tqConfirmSaveAsNew() {
+  if (!tqPendingDetect) { tqCloseDetectModal(); return; }
+  const row = tqPendingDetect;
+  tqOriginalRowForSaveAsNew = row;
+  tqOverwriteMode = false;
+  tqModeSaveAsNew = true;
+  const dateInput = document.getElementById('tq_qpb_date');
+  dateInput.removeAttribute('disabled');
+  dateInput.value = '';
+  delete dateInput.dataset.originalDate;
+  dateInput.title = '';
+  tqFillFromRow(row);
+  tqCloseDetectModal();
+}
+
+async function tqGetNextSuffixLetter(contractId, prefix, num) {
+  try {
+    const rows = await api(`work_orders?contract_id=eq.${contractId}&select=work_id`);
+    const base = `${prefix}${num}`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`^${base}([A-Z])$`);
+    const used = [];
+    (rows || []).forEach(r => {
+      const m = (r.work_id || '').trim().toUpperCase().match(pattern);
+      if (m) used.push(m[1]);
+    });
+    for (let i = 0; i < 26; i++) {
+      const letter = String.fromCharCode(65 + i);
+      if (!used.includes(letter)) return letter;
+    }
+    return 'Z';
+  } catch (e) {
+    console.error('Failed to determine next suffix (quotation):', e);
+    return 'A';
+  }
+}
+
+async function tqConfirmAdditionalWorks() {
+  if (!tqPendingDetect) { tqCloseDetectModal(); return; }
+  const contractId = document.getElementById('tq_contract_id').value;
+  const prefix = document.getElementById('tq_id_prefix').value;
+  const num = document.getElementById('tq_id_num').value.trim();
+  tqOverwriteMode = false;
+  tqModeSaveAsNew = false;
+  const letter = await tqGetNextSuffixLetter(contractId, prefix, num);
+  tqCurrentSuffix = letter;
+  const badge = document.getElementById('tq_id_suffix_badge');
+  if (badge) { badge.textContent = letter; badge.classList.remove('hidden'); }
+  const dateInput = document.getElementById('tq_qpb_date');
+  dateInput.removeAttribute('disabled');
+  delete dateInput.dataset.originalDate;
+  dateInput.title = '';
+  tqCloseDetectModal();
+}
+
+function tqCancelDetectModal() {
+  if (tqPendingDetect) {
+    document.getElementById('tq_id_num').value = '';
+    tqLastWorkIdNum = '';
+  }
+  tqCloseDetectModal();
+}
+
+function tqCloseDetectModal() {
+  if (tqDetectToast) { tqDetectToast.close(); tqDetectToast = null; }
+  tqPendingDetect = null;
+}
+
+/* ---- stale rejected / archive ---- */
+async function tqCancelStaleRejectedWorkOrder(workId) {
+  try {
+    const rows = await api(`work_orders?work_id=eq.${encodeURIComponent(workId)}&select=*`);
+    if (!rows || rows.length === 0) return;
+    for (const rec of rows) {
+      if (!['EXEC-REJ', 'HOS-REJ', 'HOD-REJ'].includes(rec.status)) continue;
+      const zeroed = {};
+      Object.keys(rec.section_category || {}).forEach(sec => { zeroed[sec] = { amt: 0, extra: 0 }; });
+      await api(`work_orders?id=eq.${rec.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ work_id: `${rec.work_id}-CNX`, status: 'CANCEL', section_category: zeroed, additional: 0, amount_spent: 0 })
+      });
+    }
+  } catch (err) { console.error('Failed to cancel stale rejected work_order for quotation resubmission:', err); }
+}
+
+async function archiveRejectedQuotation(workId, actionDate) {
+  try {
+    const rows = await api(`work_orders?work_id=eq.${encodeURIComponent(workId)}&status=eq.QUO-REJ`);
+    if (rows && rows.length > 0) {
+      const row = rows[0];
+      await api('quotations_history', {
+        method: 'POST',
+        body: JSON.stringify({
+          work_id: row.work_id, contract_id: row.contract_id, status: row.status,
+          pdf_url: row.pdf_url, reject_reason: row.reject_reason, action_date: actionDate || row.action_date
+        })
+      });
+    }
+  } catch (err) { console.error('Failed to archive rejected quotation:', err); }
+}
+
+/* ---- DITERIMA stamp ---- */
+const STAMP_MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+
+function formatStampDate(dateStr) {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return `${String(d).padStart(2, '0')} ${STAMP_MONTHS[m - 1]} ${y}`;
+}
+
+function drawStampTextSpaced(ctx, text, x, y, spacingPx) {
+  if (!spacingPx) { ctx.fillText(text, x, y); return; }
+  const chars = text.split('');
+  const widths = chars.map(c => ctx.measureText(c).width);
+  const totalWidth = widths.reduce((a, b) => a + b, 0) + spacingPx * (chars.length - 1);
+  const prevAlign = ctx.textAlign;
+  ctx.textAlign = 'left';
+  let cursorX = x - totalWidth / 2;
+  chars.forEach((c, i) => { ctx.fillText(c, cursorX, y); cursorX += widths[i] + spacingPx; });
+  ctx.textAlign = prevAlign;
+}
+
+async function renderStampPng(dateStr) {
+  const PPM = 12, SIZE_MM = 41;
+  const CANVAS_PX = Math.round(SIZE_MM * PPM);
+  const mm = v => v * PPM;
+  const ptToPx = pt => pt * 0.3528 * PPM;
+  const letterSpacingPx = 0.2 * (PPM / 3.7795);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = CANVAS_PX; canvas.height = CANVAS_PX;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, CANVAS_PX, CANVAS_PX);
+
+  const cx = CANVAS_PX / 2, cy = CANVAS_PX / 2;
+  const radius = CANVAS_PX / 2 - mm(1);
+  const color = '#0000CC';
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = mm(0.53);
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+
+  let cursorY = cy - radius + mm(5);
+
+  const titleFontPx = ptToPx(16);
+  cursorY += titleFontPx;
+  ctx.save();
+  ctx.translate(cx, cursorY);
+  ctx.scale(1, 1.3);
+  ctx.font = `bold ${titleFontPx}px Arial, sans-serif`;
+  drawStampTextSpaced(ctx, 'DITERIMA', 0, 0, letterSpacingPx);
+  ctx.restore();
+  cursorY += mm(5);
+
+  const dateFontPx = ptToPx(13);
+  cursorY += dateFontPx;
+  ctx.save();
+  ctx.translate(cx, cursorY);
+  ctx.scale(1, 1.25);
+  ctx.font = `bold ${dateFontPx}px Arial, sans-serif`;
+  drawStampTextSpaced(ctx, formatStampDate(dateStr), 0, 0, letterSpacingPx);
+  ctx.restore();
+  cursorY += mm(4);
+
+  const footerFontPx = ptToPx(9.2);
+  ctx.font = `bold ${footerFontPx}px 'Arial Narrow', Arial, sans-serif`;
+  cursorY += footerFontPx;
+  drawStampTextSpaced(ctx, 'JABATAN M&E', cx, cursorY, letterSpacingPx);
+  cursorY += footerFontPx + mm(0.5);
+  drawStampTextSpaced(ctx, 'RANHILL SAJ SDN BHD', cx, cursorY, letterSpacingPx);
+
+  return canvas.toDataURL('image/png');
+}
+
+async function stampQuotationPdf(file, qpdDateStr) {
+  if (!window.PDFLib) { console.warn('pdf-lib belum dimuat, skip stamping.'); return file; }
+  try {
+    const stampPngDataUrl = await renderStampPng(qpdDateStr);
+    const stampPngBytes = await (await fetch(stampPngDataUrl)).arrayBuffer();
+    const { PDFDocument } = window.PDFLib;
+    const pdfDoc = await PDFDocument.load(await file.arrayBuffer());
+    const pngImage = await pdfDoc.embedPng(stampPngBytes);
+    const firstPage = pdfDoc.getPages()[0];
+    const { width: pageW, height: pageH } = firstPage.getSize();
+
+    const A4_W_MM = 210, A4_H_MM = 297;
+    const stampLeftMM = 30, stampTopMM = 240, stampSizeMM = 41;
+    const stampWidthPt = (stampSizeMM / A4_W_MM) * pageW;
+    const stampHeightPt = (stampSizeMM / A4_H_MM) * pageH;
+    const stampXPt = (stampLeftMM / A4_W_MM) * pageW;
+    const stampYPt = pageH - ((stampTopMM / A4_H_MM) * pageH) - stampHeightPt;
+
+    firstPage.drawImage(pngImage, { x: stampXPt, y: stampYPt, width: stampWidthPt, height: stampHeightPt });
+    const stampedBytes = await pdfDoc.save();
+    return new File([stampedBytes], file.name, { type: 'application/pdf' });
+  } catch (err) {
+    console.error('Gagal burn cop DITERIMA pada quotation:', err);
+    return file;
+  }
+}
+
+/* ---- submit ---- */
+async function tqSubmitQuotation(e) {
+  e.preventDefault();
+  if (!window.__techPerm || !window.__techPerm.canManageTech) { showToast('Anda tiada kebenaran untuk sediakan quotation.', 'error'); return; }
+
+  const dateInput = document.getElementById('tq_qpb_date');
+  const originalDate = dateInput.dataset.originalDate || '';
+  if (tqOverwriteMode && originalDate && originalDate !== dateInput.value) {
+    tqPendingSubmitEvent = e;
+    tqShowDateChangeToast();
+    return;
+  }
+  await tqDoSubmit(e);
+}
+
+function tqShowDateChangeToast() {
+  tqHideDateChangeToast();
+  tqDateToast = showAppToastChoice({
+    type: 'warn',
+    title: 'Date Change Not Allowed in Overwrite Mode',
+    message: 'You are in Overwrite mode. Changing the date is not permitted. If you wish to change the date, please use the <strong>Save as New</strong> option instead.',
+    actions: [
+      { label: 'Revert to Original Date & Overwrite', icon: 'fa-rotate-left', onClick: () => tqRevertDateAndProceed() },
+      { label: 'Cancel', cls: 'gray', onClick: () => tqCancelDateChange() }
+    ],
+    onDismiss: () => { tqPendingSubmitEvent = null; }
+  });
+}
+function tqHideDateChangeToast() { if (tqDateToast) { tqDateToast.close(); tqDateToast = null; } }
+function tqCancelDateChange() { tqHideDateChangeToast(); tqPendingSubmitEvent = null; }
+
+async function tqRevertDateAndProceed() {
+  tqHideDateChangeToast();
+  const dateInput = document.getElementById('tq_qpb_date');
+  if (dateInput.dataset.originalDate) dateInput.value = dateInput.dataset.originalDate;
+  const e = tqPendingSubmitEvent;
+  tqPendingSubmitEvent = null;
+  if (e) await tqDoSubmit(e);
+}
+
+async function tqDoSubmit(e) {
+  const contractId = document.getElementById('tq_contract_id').value;
+  const prefix = document.getElementById('tq_id_prefix').value;
+  const num = document.getElementById('tq_id_num').value.trim();
+  if (!num) { showToast('Please enter a Work Order ID!', 'error'); return; }
+  if (!contractId) { showToast('Please select a Contract!', 'error'); return; }
+  if (!document.getElementById('tq_pdf_file').files[0]) { showToast('Please select a quotation PDF.', 'error'); return; }
+  const primaryWorkId = normalizeWorkId(`${prefix}${num}`) + tqCurrentSuffix;
+
+  const unitSelect = document.getElementById('tq_unit_id');
+  const unitText = (unitSelect.options[unitSelect.selectedIndex] || {}).text || '';
+
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalBtnText = submitBtn.innerHTML;
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+
+  try {
+    await tqCancelStaleRejectedWorkOrder(primaryWorkId);
+
+    if (!tqOverwriteMode) {
+      try {
+        const rejRows = await api(`work_orders?work_id=eq.${encodeURIComponent(primaryWorkId)}&status=eq.QUO-REJ&select=*`);
+        for (const rejRow of (rejRows || [])) {
+          await archiveRejectedQuotation(primaryWorkId, rejRow.action_date || new Date().toISOString());
+        }
+      } catch (archiveErr) { console.error('Failed to archive old rejected quotation:', archiveErr); }
+    }
+
+    try {
+      const originalFile = document.getElementById('tq_pdf_file').files[0];
+      const qpdDateVal = document.getElementById('tq_qpb_date').value;
+      if (originalFile && qpdDateVal) {
+        const stamped = await stampQuotationPdf(originalFile, qpdDateVal);
+        assignFileToInput(document.getElementById('tq_pdf_file'), stamped);
+      }
+    } catch (stampErr) { console.error('Gagal proses cop DITERIMA:', stampErr); }
+
+    await uploadQuotationToR2('tq_pdf_file', primaryWorkId, unitText, 'tq_upload_status', 'tq_pdf_url');
+
+    const generatedPdfUrl = document.getElementById('tq_pdf_url').value;
+    if (!generatedPdfUrl) { showToast('Upload failed. The quotation was not saved.', 'error'); return; }
+
+    const tqLocation = joinLocationPreset(
+      document.getElementById('tq_location_prefix').value,
+      (document.getElementById('tq_location_text').value || '').trim()
+    ).toUpperCase();
+
+    const tqBreakdown = {};
+    let tqTotalAmount = 0, tqAdditionalTotal = 0;
+    document.querySelectorAll('#tq_breakdown_container .tq_sec_amt').forEach(i => {
+      const sec = i.dataset.sec;
+      const base = parseFloat(i.dataset.rawValue || 0);
+      const extraInput = document.querySelector(`#tq_breakdown_container .tq_sec_extra[data-sec="${sec}"]`);
+      const extra = parseFloat((extraInput && extraInput.dataset.rawValue) || 0);
+      tqBreakdown[sec] = { amt: base, extra };
+      tqTotalAmount += base; tqAdditionalTotal += extra;
+    });
+
+    const payload = {
+      work_id: primaryWorkId,
+      contract_id: contractId,
+      status: 'QUOTATION',
+      pdf_url: generatedPdfUrl,
+      qpd_date: document.getElementById('tq_qpb_date').value || null,
+      district: document.getElementById('tq_dist').value,
+      location: tqLocation,
+      description: (document.getElementById('tq_description').value || '').toUpperCase(),
+      section_category: tqBreakdown,
+      additional: tqAdditionalTotal,
+      amount_spent: tqTotalAmount + tqAdditionalTotal,
+      reject_reason: null,
+      action_date: new Date().toISOString()
+    };
+
+    const res = await fetch(`${API_URL}/rest/v1/work_orders?on_conflict=work_id`, {
+      method: 'POST',
+      headers: { ...qHeaders, 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      showToast('Quotation saved successfully!', 'success');
+      closeQuotationModal();
+      resetQuotationModalForm();
+      await afterQuotationSaved(primaryWorkId);
+    } else {
+      let errBody = null;
+      try { errBody = await res.json(); } catch (_) {}
+      console.error('Insert error:', errBody);
+      showToast('Failed to save quotation: ' + ((errBody && (errBody.message || errBody.hint)) || `HTTP ${res.status}`), 'error');
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('Error while processing quotation: ' + err.message, 'error');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalBtnText;
+  }
+}
+
+/* reload the picker and tick the Work ID that was just registered */
+async function afterQuotationSaved(workId) {
+  if (!current || !document.getElementById('picker')) return;
+  await openPicker();
+  const row = (window._pickRows || []).find(w => w.work_id === workId);
+  if (row) {
+    window._pickSel.add(row.id);
+    const s = document.getElementById('pickSearch');
+    if (s) s.value = workId;
+    filterPicker();
+  }
+}
+
+function initQuotationModal() {
+  document.getElementById('tq_contract_id').addEventListener('change', () => { tqOnContractSelect(); tqAutoDetectWork(); });
+  document.getElementById('tq_id_prefix').addEventListener('change', tqAutoDetectWork);
+  const fileInput = document.getElementById('tq_pdf_file');
+  fileInput.addEventListener('change', e => { if (e.target.files[0]) showFilePreview(e.target.files[0]); });
+  document.getElementById('techQuotationForm').addEventListener('submit', tqSubmitQuotation);
+
+  const dz = document.getElementById('tq_dropzone');
+  ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('over'); }));
+  dz.addEventListener('drop', e => {
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!f) return;
+    if (f.type !== 'application/pdf') { showToast('Please drop PDF files only.', 'error'); return; }
+    assignFileToInput(fileInput, f);
+    showFilePreview(f);
+  });
+}
+
+window.onload = () => {
+  initQuotationModal();
+  fetchUnits().catch(e => {
+    console.error('Error units:', e);
+    showToast('Failed to load units.', 'error');
+  });
+};
 </script>
+<script src="uploader.js"></script>
 </body>
 </html>
