@@ -382,7 +382,24 @@ async function fetchUnits() {
 
   document.getElementById('unitNav').innerHTML = allUnits.map(u =>
     `<button class="unit-pill" id="unit-${u.id}" onclick="selectUnit(${u.id})">${esc(u.unit_name)}</button>`).join('');
-  if (allUnits.length) selectUnit(allUnits[0].id);
+  if (allUnits.length) {
+    const qp = new URLSearchParams(location.search);
+    const u = Number(qp.get('unit')) || allUnits[0].id;
+    await selectUnit(u);
+    const ind = Number(qp.get('indent'));
+    if (ind && indents.some(i => i.id === ind)) await openIndent(ind);
+  }
+}
+
+function goRegisterQuotation(workId = '') {
+  const p = new URLSearchParams({ newQuotation: '1', unit: unitId });
+  if (workId) p.set('work_id', workId);
+
+  const hit = Object.entries(contracts).find(([, code]) => code === current.contract_code);
+  if (hit) p.set('contract', hit[0]);
+
+  p.set('return', `indent-forms.html?unit=${unitId}&indent=${current.id}`);
+  location.href = 'app-tech.html?' + p.toString();
 }
 
 async function selectUnit(id) {
@@ -532,7 +549,7 @@ function filterPicker() {
     listEl.innerHTML = `
       <div class="empty" style="padding:20px">
         <div style="margin-bottom:10px"><b>No Work IDs Available</b>${q ? ` matching "${esc(rawQ)}"` : ''}</div>
-        <button type="button" class="btn" onclick="renderRegisterForm('${esc(candidateId)}')">
+        <button type="button" class="btn" onclick="goRegisterQuotation('${esc(candidateId)}')">
           <i class="fa fa-file-circle-plus"></i> Register New Work ID${candidateId ? ` (${esc(candidateId)})` : ''}
         </button>
       </div>`;
