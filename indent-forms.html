@@ -126,7 +126,7 @@ tbody tr:last-child td{border-bottom:0}
 .tag{display:inline-block;padding:3px 10px;border-radius:999px;background:#8E8E9320;color:#636366;font-size:10px;font-weight:800;letter-spacing:.3px}
 .tag.APPROVED,.tag.APP-HOD,.tag.CLAIMED{background:#34C75920;color:#1f8a3b}
 .tag.BLUEFORM{background:#007AFF20;color:#0060d0}
-.tag.QUOTATION,.tag.QUO-APP{background:#FF950020;color:#b56a00}
+.tag.QUOTATION,.tag.QUO-APP,.tag.INDENT{background:#FF950020;color:#b56a00}
 
 /* ---- buttons & forms ---- */
 .btn{
@@ -177,13 +177,21 @@ input[type=checkbox]{width:18px!important;height:18px;padding:0;margin:2px 0 0;f
   font-size:20px;font-weight:800;color:var(--brand-deep);font-variant-numeric:tabular-nums;
 }
 
-/* ---- ID picker ---- */
+/* ---- Work ID picker ---- */
 #picker:not(:empty){margin-bottom:14px;padding:14px;border-radius:16px;background:linear-gradient(180deg,#f6faff,#eef5fc);border:1px dashed #b9d4ec}
 .picker{max-height:300px;overflow-y:auto;margin-top:10px;border:1px solid var(--line);border-radius:14px;background:#fff}
 .picker label{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-bottom:1px solid #f0f4f9;font-size:12px;cursor:pointer;transition:background .15s}
 .picker label:last-child{border-bottom:0}
 .picker label:hover{background:#f6faff}
 .picker label:has(input:checked){background:#eff6ff}
+.register-box{
+  margin-top:12px;padding:14px;border-radius:14px;
+  background:#fff;border:1px solid #cfe3f6;
+}
+.register-head{
+  display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;
+  margin-bottom:10px;
+}
 
 /* ---- empty ---- */
 .empty{padding:30px;text-align:center;color:var(--muted);font-size:12.5px}
@@ -271,7 +279,7 @@ const headers = { 'Content-Type': 'application/json' };
 const IS_GUEST = localStorage.getItem('role') === 'guest';
 if (IS_GUEST) document.body.classList.add('is-guest');
 const MAX_SUM = 300000;
-const STAGES = ['PLANNING', 'QUOTATION', 'BLUEFORM', 'APPROVED'];
+const STAGES = ['PLANNING', 'QUOTATION', 'BLUEFORM', 'APPROVED', 'INDENT'];
 
 let editingId = null, editingHadSec = false;
 let allUnits = [], unitMap = {};
@@ -426,13 +434,13 @@ function renderDetail() {
     </div>
     <div class="stats">
       <div class="stat"><small><i class="fa fa-wallet"></i> Indent Value</small><b>${rm(i.indent_sum)}</b></div>
-      <div class="stat"><small><i class="fa fa-list-ol"></i> Total IDs</small><b>${members.length}</b></div>
+      <div class="stat"><small><i class="fa fa-list-ol"></i> Total Work IDs</small><b>${members.length}</b></div>
     </div>
   </div>
   <div class="panel">
     <div class="sec-head">
-      <h3 class="sec-title">IDs in indent <span class="count">${members.length}</span></h3>
-      <span class="admin" style="display:flex;gap:6px"><button class="btn ghost" onclick="openNewId()"><i class="fa fa-file-circle-plus"></i> New ID</button><button class="btn" onclick="openPicker()"><i class="fa fa-plus"></i> Add ID</button></span>
+      <h3 class="sec-title">Work IDs in indent <span class="count">${members.length}</span></h3>
+      <span class="admin" style="display:flex;gap:6px"><button class="btn" onclick="openPicker()"><i class="fa fa-plus"></i> Add ID</button></span>
     </div>
     <div id="picker"></div>
     ${members.length ? `<div class="tbl-wrap"><table><thead><tr><th>Work ID</th><th>Contract</th><th>Description</th><th>Status</th><th>Amount</th><th class="admin"></th></tr></thead><tbody>
@@ -440,48 +448,107 @@ function renderDetail() {
         <td>${esc(w.description)}<div class="meta">${esc(w.location)}</div></td>
         <td>${w.contract_id ? `<span class="tag ${esc(w.status)}">${esc(w.status)}</span>` : `<select ${IS_GUEST ? 'disabled' : ''} style="width:auto" onchange="setStage(${w.id}, this.value)">${[...new Set([...STAGES, w.status])].map(x => `<option ${x === w.status ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`}</td><td><b>${rm(rowAmt(w))}</b></td>
         <td class="admin"><button class="btn red" onclick="unassign(${w.id})">${w.contract_id ? '<i class="fa fa-arrow-rotate-left"></i> Remove' : '<i class="fa fa-trash"></i> Delete'}</button></td></tr>`).join('')}
-    </tbody></table></div>` : '<div class="empty">No IDs in this indent yet.</div>'}
+    </tbody></table></div>` : '<div class="empty">No Work IDs in this indent yet.</div>'}
   </div>`;
 }
 
 async function openPicker() {
   const ids = Object.keys(contracts);
   const box = document.getElementById('picker');
-  if (!ids.length) { box.innerHTML = '<div class="empty">No contracts in this unit.</div>'; return; }
   box.innerHTML = '<div class="empty">Loading...</div>';
-  const rows = await api(`work_orders?contract_id=in.(${ids.join(',')})&indent_id=is.null&status=not.in.(CLAIMED,CANCEL)&select=id,contract_id,work_id,status,description,amount_spent&order=work_id.asc`);
-  window._pickRows = rows;
-  box.innerHTML = `<input id="pickSearch" placeholder="Search Work ID / description" oninput="filterPicker()">
+
+  const rows = ids.length
+    ? await api(`work_orders?contract_id=in.(${ids.join(',')})&indent_id=is.null&status=not.in.(CLAIMED,CANCEL)&select=id,contract_id,work_id,status,description,amount_spent&order=work_id.asc`)
+    : [];
+
+  window._pickRows = rows || [];
+  box.innerHTML = `
+    <input id="pickSearch" placeholder="Search Work ID / description (or type new Work ID to register)" oninput="filterPicker()">
     <div class="picker" id="pickList"></div>
-    <div style="display:flex;gap:8px;align-items:center;margin:8px 0 12px"><button class="btn" onclick="assign()">Add to Indent</button>
-    <button class="btn ghost" onclick="document.getElementById('picker').innerHTML=''">Cancel</button><span class="meta" id="pickTotal"></span></div>`;
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0 6px">
+      <button class="btn" id="btnAddSelected" onclick="assign()">Add to Indent</button>
+      <button class="btn ghost" onclick="document.getElementById('picker').innerHTML=''">Cancel</button>
+      <span class="meta" id="pickTotal"></span>
+    </div>
+    <div id="registerBox"></div>`;
   filterPicker();
 }
 
+function renderRegisterForm(prefillWorkId = '') {
+  const secs = getSecs(current);
+  const cleanId = String(prefillWorkId || '').trim().toUpperCase();
+  const regBox = document.getElementById('registerBox');
+  if (!regBox) return;
+
+  regBox.innerHTML = `
+    <div class="register-box">
+      <div class="register-head">
+        <div>
+          <b style="font-size:12.5px;color:var(--brand-deep)"><i class="fa fa-file-circle-plus"></i> Register New Work ID</b>
+          <div class="meta">Not found in existing table — will be saved with status <b>INDENT</b>.</div>
+        </div>
+      </div>
+      <div class="grid">
+        <input id="rId" placeholder="Work ID (e.g. C123 / K45A)" value="${esc(cleanId)}">
+        <input type="text" value="INDENT" disabled style="background:#f3f8fd;font-weight:800;color:#b56a00">
+        <input id="rDesc" class="full" placeholder="Description">
+        <input id="rLoc" placeholder="Location">
+        <input id="rAmt" type="number" min="0" step="0.01" placeholder="Amount (RM)">
+        ${secs ? `<select id="rSec" class="full">${Object.entries(secs).map(([k, x]) => `<option value="${esc(k)}">${esc(k)}: ${esc(x.desc)}</option>`).join('')}</select>` : ''}
+        <div class="full"><div class="meta">Date (optional, for monthly chart)</div><input id="rDate" type="date"></div>
+        <div class="full" style="display:flex;gap:8px">
+          <button class="btn" onclick="saveNewId()">Register Work ID</button>
+          <button class="btn ghost" type="button" onclick="document.getElementById('registerBox').innerHTML=''">Hide Form</button>
+        </div>
+      </div>
+    </div>`;
+}
+
 function filterPicker() {
-  const q = (document.getElementById('pickSearch').value || '').toLowerCase();
+  const rawQ = (document.getElementById('pickSearch')?.value || '').trim();
+  const q = rawQ.toLowerCase();
   const checked = new Set([...document.querySelectorAll('.pk:checked')].map(c => c.value));
-  const rows = window._pickRows.filter(w => !q || (w.work_id + ' ' + (w.description || '')).toLowerCase().includes(q));
-  document.getElementById('pickList').innerHTML = rows.length ? rows.map(w => `<label>
-    <input type="checkbox" class="pk" style="width:auto" value="${w.id}" ${checked.has(String(w.id)) ? 'checked' : ''} onchange="pickTotal()">
-    <span><b>${esc(w.work_id)}</b> <span class="tag ${esc(w.status)}">${esc(w.status)}</span> ${rm(rowAmt(w))}
-    <div class="meta">${esc(contracts[w.contract_id] || '')} · ${esc(w.description)}</div></span></label>`).join('') : '<div class="empty">No IDs available.</div>';
+  const rows = (window._pickRows || []).filter(w => !q || (w.work_id + ' ' + (w.description || '')).toLowerCase().includes(q));
+  const listEl = document.getElementById('pickList');
+  const addBtn = document.getElementById('btnAddSelected');
+  const regBox = document.getElementById('registerBox');
+
+  if (rows.length) {
+    if (addBtn) addBtn.style.display = '';
+    if (regBox) regBox.innerHTML = '';
+    listEl.innerHTML = rows.map(w => `<label>
+      <input type="checkbox" class="pk" style="width:auto" value="${w.id}" ${checked.has(String(w.id)) ? 'checked' : ''} onchange="pickTotal()">
+      <span><b>${esc(w.work_id)}</b> <span class="tag ${esc(w.status)}">${esc(w.status)}</span> ${rm(rowAmt(w))}
+      <div class="meta">${esc(contracts[w.contract_id] || 'INDENT ONLY')} · ${esc(w.description || '-')}</div></span></label>`).join('');
+  } else {
+    if (addBtn) addBtn.style.display = 'none';
+    const candidateId = /^[CK]\d+[A-Z]?$/i.test(rawQ) ? rawQ.toUpperCase() : '';
+    listEl.innerHTML = `
+      <div class="empty" style="padding:20px">
+        <div style="margin-bottom:10px"><b>No Work IDs Available</b>${q ? ` matching "${esc(rawQ)}"` : ''}</div>
+        <button type="button" class="btn" onclick="renderRegisterForm('${esc(candidateId)}')">
+          <i class="fa fa-file-circle-plus"></i> Register New Work ID${candidateId ? ` (${esc(candidateId)})` : ''}
+        </button>
+      </div>`;
+  }
   pickTotal();
 }
 
 function pickTotal() {
   const sel = new Set([...document.querySelectorAll('.pk:checked')].map(c => Number(c.value)));
-  const add = window._pickRows.filter(w => sel.has(w.id)).reduce((a, w) => a + rowAmt(w), 0);
+  const add = (window._pickRows || []).filter(w => sel.has(w.id)).reduce((a, w) => a + rowAmt(w), 0);
   const after = sumRows(members) + add, over = after > current.indent_sum;
-  document.getElementById('pickTotal').innerHTML = sel.size
+  const el = document.getElementById('pickTotal');
+  if (!el) return;
+  el.innerHTML = sel.size
     ? `${sel.size} selected (+${rm(add)}) → ${rm(after)}${over ? ' <b style="color:var(--ios-red)">exceeds indent value</b>' : ''}` : '';
 }
 
 async function assign() {
   if (IS_GUEST) return;
   const ids = [...document.querySelectorAll('.pk:checked')].map(c => c.value);
-  if (!ids.length) return showToast('Select at least one ID.', 'warn');
-  const add = window._pickRows.filter(w => ids.includes(String(w.id))).reduce((a, w) => a + rowAmt(w), 0);
+  if (!ids.length) return showToast('Select at least one Work ID.', 'warn');
+  const add = (window._pickRows || []).filter(w => ids.includes(String(w.id))).reduce((a, w) => a + rowAmt(w), 0);
   if (sumRows(members) + add > current.indent_sum) {
     const ok = await confirmToast('Total will exceed indent value. Continue?');
     if (!ok) return;
@@ -489,8 +556,8 @@ async function assign() {
   try {
     await api(`work_orders?id=in.(${ids.join(',')})`, { method: 'PATCH', body: JSON.stringify({ indent_id: current.id }) });
     await openIndent(current.id);
-    showToast('IDs added to indent.', 'success');
-  } catch (e) { console.error(e); showToast('Failed to add IDs to indent.', 'error'); }
+    showToast('Work IDs added to indent.', 'success');
+  } catch (e) { console.error(e); showToast('Failed to add Work IDs to indent.', 'error'); }
 }
 
 async function unassign(id) {
@@ -498,16 +565,16 @@ async function unassign(id) {
   const row = members.find(w => w.id === id);
   const own = row && !row.contract_id;
   const msg = own
-    ? 'This ID is registered solely for this indent and has no contract. Deleting will permanently remove this ID. Continue?'
-    : 'Remove this ID from the indent? It will be counted back under the contract budget with its original status.';
+    ? 'This Work ID is registered solely for this indent and has no contract. Deleting will permanently remove this Work ID. Continue?'
+    : 'Remove this Work ID from the indent? It will be counted back under the contract budget with its original status.';
   const ok = await confirmToast(msg, own ? 'Delete' : 'Remove');
   if (!ok) return;
   try {
     if (own) await api(`work_orders?id=eq.${id}`, { method: 'DELETE' });
     else await api(`work_orders?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ indent_id: null }) });
     await openIndent(current.id);
-    showToast(own ? 'ID deleted.' : 'ID removed from indent.', 'success');
-  } catch (e) { console.error(e); showToast('Failed to remove ID.', 'error'); }
+    showToast(own ? 'Work ID deleted.' : 'Work ID removed from indent.', 'success');
+  } catch (e) { console.error(e); showToast('Failed to remove Work ID.', 'error'); }
 }
 
 async function setStage(id, status) {
@@ -524,20 +591,6 @@ function getSecs(i) {
   let x = i.indent_sections_breakdown;
   if (typeof x === 'string') { try { x = JSON.parse(x); } catch (_) { x = null; } }
   return x && Object.keys(x).length ? x : null;
-}
-
-function openNewId() {
-  const secs = getSecs(current);
-  document.getElementById('picker').innerHTML = `<div class="grid" style="margin:8px 0 14px">
-    <input id="rId" placeholder="Work ID (e.g. C123 / K45A)">
-    <select id="rStage">${STAGES.map(x => `<option>${x}</option>`).join('')}</select>
-    <input id="rDesc" class="full" placeholder="Description">
-    <input id="rLoc" placeholder="Location">
-    <input id="rAmt" type="number" min="0" step="0.01" placeholder="Amount (RM)">
-    ${secs ? `<select id="rSec" class="full">${Object.entries(secs).map(([k, x]) => `<option value="${esc(k)}">${esc(k)}: ${esc(x.desc)}</option>`).join('')}</select>` : ''}
-    <div class="full"><div class="meta">Date (optional, for monthly chart)</div><input id="rDate" type="date"></div>
-    <div class="full" style="display:flex;gap:8px"><button class="btn" onclick="saveNewId()">Register ID</button>
-      <button class="btn ghost" onclick="document.getElementById('picker').innerHTML=''">Cancel</button></div></div>`;
 }
 
 async function saveNewId() {
@@ -561,16 +614,23 @@ async function saveNewId() {
       );
     }
     const sec = v('rSec');
-    const body = { work_id: wid, indent_id: current.id, status: v('rStage') || 'PLANNING',
-      description: v('rDesc').toUpperCase(), location: v('rLoc').toUpperCase(), amount_spent: amt, additional: 0 };
+    const body = {
+      work_id: wid,
+      indent_id: current.id,
+      status: 'INDENT',
+      description: v('rDesc').toUpperCase(),
+      location: v('rLoc').toUpperCase(),
+      amount_spent: amt,
+      additional: 0
+    };
     if (sec) body.section_category = { [sec]: { amt, extra: 0 } };
     if (v('rDate')) body.qpb_date = v('rDate');
     await api('work_orders', { method: 'POST', body: JSON.stringify(body) });
     await openIndent(current.id);
-    showToast(`Work ID ${wid} registered.`, 'success');
+    showToast(`Work ID ${wid} registered with status INDENT.`, 'success');
   } catch (e) {
     console.error(e);
-    showToast('Failed to register ID. If the error mentions contract_id NOT NULL, that column needs to allow NULL (see indent-backend.md).', 'error', 6000);
+    showToast('Failed to register Work ID. If the error mentions contract_id NOT NULL, that column needs to allow NULL (see indent-backend.md).', 'error', 6000);
   }
 }
 
