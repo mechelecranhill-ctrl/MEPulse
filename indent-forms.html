@@ -123,10 +123,11 @@ td{padding:11px 12px;border-bottom:1px solid #f0f4f9;vertical-align:top;font-var
 tbody tr:nth-child(even) td{background:#fafcfe}
 tbody tr:hover td{background:#f1f7fd}
 tbody tr:last-child td{border-bottom:0}
-.tag{display:inline-block;padding:3px 10px;border-radius:999px;background:#8E8E9320;color:#636366;font-size:10px;font-weight:800;letter-spacing:.3px}
-.tag.APPROVED,.tag.APP-HOD,.tag.CLAIMED{background:#34C75920;color:#1f8a3b}
+.tag{display:inline-block;padding:3px 10px;border-radius:999px;background:#8E8E9324;color:#636366;font-size:10px;font-weight:800;letter-spacing:.3px}
+.tag.APPROVED,.tag.APP-HOD,.tag.CLAIMED,.tag.INDENT-APPROVED{background:#34C75920;color:#1f8a3b}
 .tag.BLUEFORM{background:#007AFF20;color:#0060d0}
-.tag.QUOTATION,.tag.QUO-APP,.tag.INDENT{background:#FF950020;color:#b56a00}
+.tag.QUOTATION,.tag.QUO-APP{background:#FF950020;color:#b56a00}
+.tag.INDENT{background:#8E8E9324;color:#636366}
 
 /* ---- buttons & forms ---- */
 .btn{
@@ -279,7 +280,7 @@ const headers = { 'Content-Type': 'application/json' };
 const IS_GUEST = localStorage.getItem('role') === 'guest';
 if (IS_GUEST) document.body.classList.add('is-guest');
 const MAX_SUM = 300000;
-const STAGES = ['PLANNING', 'QUOTATION', 'BLUEFORM', 'APPROVED', 'INDENT'];
+const STAGES = ['PLANNING', 'QUOTATION', 'BLUEFORM', 'APPROVED', 'INDENT', 'INDENT APPROVED'];
 
 let editingId = null, editingHadSec = false;
 let allUnits = [], unitMap = {};
@@ -287,6 +288,7 @@ let unitId = null, indents = [], contracts = {}, current = null, members = [];
 const usedOf = {};
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const tagCls = s => String(s ?? '').trim().toUpperCase().replace(/[^A-Z0-9-]+/g, '-');
 const rm = n => 'RM ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB') : '-';
 const rowAmt = w => Number(w.amount_spent || 0);
@@ -446,7 +448,7 @@ function renderDetail() {
     ${members.length ? `<div class="tbl-wrap"><table><thead><tr><th>Work ID</th><th>Contract</th><th>Description</th><th>Status</th><th>Amount</th><th class="admin"></th></tr></thead><tbody>
       ${members.map(w => `<tr><td><b>${esc(w.work_id)}</b></td><td>${esc(w.contract_id ? (contracts[w.contract_id] || '-') : 'INDENT ONLY')}</td>
         <td>${esc(w.description)}<div class="meta">${esc(w.location)}</div></td>
-        <td>${w.contract_id ? `<span class="tag ${esc(w.status)}">${esc(w.status)}</span>` : `<select ${IS_GUEST ? 'disabled' : ''} style="width:auto" onchange="setStage(${w.id}, this.value)">${[...new Set([...STAGES, w.status])].map(x => `<option ${x === w.status ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`}</td><td><b>${rm(rowAmt(w))}</b></td>
+        <td>${w.contract_id ? `<span class="tag ${tagCls(w.status)}">${esc(w.status)}</span>` : `<select ${IS_GUEST ? 'disabled' : ''} style="width:auto" onchange="setStage(${w.id}, this.value)">${[...new Set([...STAGES, w.status])].map(x => `<option ${x === w.status ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`}</td><td><b>${rm(rowAmt(w))}</b></td>
         <td class="admin"><button class="btn red" onclick="unassign(${w.id})">${w.contract_id ? '<i class="fa fa-arrow-rotate-left"></i> Remove' : '<i class="fa fa-trash"></i> Delete'}</button></td></tr>`).join('')}
     </tbody></table></div>` : '<div class="empty">No Work IDs in this indent yet.</div>'}
   </div>`;
@@ -490,7 +492,7 @@ function renderRegisterForm(prefillWorkId = '') {
       </div>
       <div class="grid">
         <input id="rId" placeholder="Work ID (e.g. C123 / K45A)" value="${esc(cleanId)}">
-        <input type="text" value="INDENT" disabled style="background:#f3f8fd;font-weight:800;color:#b56a00">
+        <input type="text" value="INDENT" disabled style="background:#8E8E9324;font-weight:800;color:#636366">
         <input id="rDesc" class="full" placeholder="Description">
         <input id="rLoc" placeholder="Location">
         <input id="rAmt" type="number" min="0" step="0.01" placeholder="Amount (RM)">
@@ -518,7 +520,7 @@ function filterPicker() {
     if (regBox) regBox.innerHTML = '';
     listEl.innerHTML = rows.map(w => `<label>
       <input type="checkbox" class="pk" style="width:auto" value="${w.id}" ${checked.has(String(w.id)) ? 'checked' : ''} onchange="pickTotal()">
-      <span><b>${esc(w.work_id)}</b> <span class="tag ${esc(w.status)}">${esc(w.status)}</span> ${rm(rowAmt(w))}
+      <span><b>${esc(w.work_id)}</b> <span class="tag ${tagCls(w.status)}">${esc(w.status)}</span> ${rm(rowAmt(w))}
       <div class="meta">${esc(contracts[w.contract_id] || 'INDENT ONLY')} · ${esc(w.description || '-')}</div></span></label>`).join('');
   } else {
     if (addBtn) addBtn.style.display = 'none';
