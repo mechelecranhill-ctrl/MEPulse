@@ -638,6 +638,51 @@
             text-overflow: ellipsis;
         }
 
+        .u-timeline-box {
+            background: #f9f9fb;
+            padding: 12px 14px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            flex-shrink: 0;
+        }
+
+        .u-timeline-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: #3a3a3c;
+            margin-bottom: 6px;
+            gap: 8px;
+        }
+
+        .u-timeline-track {
+            width: 100%;
+            height: 8px;
+            background: #e5e5ea;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .u-timeline-fill {
+            height: 100%;
+            background: var(--ios-blue);
+            border-radius: 999px;
+            transition: width 0.35s ease;
+            width: 0%;
+        }
+
+        .u-timeline-foot {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            font-weight: 600;
+            color: #8e8e93;
+            margin-top: 6px;
+            gap: 8px;
+        }
+
         .usage-embed .u-chartBox {
             background: #f9f9fb;
             padding: 12px;
@@ -735,6 +780,7 @@
                                 <h1 id="panel-title" style="margin:0; font-size: 24px; letter-spacing: -0.5px; color: var(--ios-blue);">Analysis</h1>
                                 <p id="panel-vendor" style="margin:2px 0 0 0; color: #8e8e93; font-size: 13px; font-weight: 500;"></p>
                                 <p id="panel-indent" style="margin:4px 0 0 0; color: #3a3a3c; font-size: 12px; font-weight: 700;"></p>
+                                <p id="panel-dates" style="margin:4px 0 0 0; color: var(--ios-blue); font-size: 12px; font-weight: 600;"></p>
                             </div>
                             <div style="display: flex; gap: 8px; align-items: center;">
                                 
@@ -787,6 +833,20 @@
                                 <div class="u-card"><div class="u-label">USED</div><div class="u-value" id="uwUsedValue">RM 0.00</div></div>
                                 <div class="u-card"><div class="u-label">BALANCE</div><div class="u-value" id="uwBalanceValue">RM 0.00</div></div>
                                 <div class="u-card"><div class="u-label">PROGRESS</div><div class="u-value" id="uwProgressValue">0%</div></div>
+                            </div>
+
+                            <div class="u-timeline-box">
+                                <div class="u-timeline-head">
+                                    <span id="uwDateRange">Tarikh: -</span>
+                                    <span id="uwTimeStatus" style="color: var(--ios-blue);">0% Tempoh</span>
+                                </div>
+                                <div class="u-timeline-track">
+                                    <div class="u-timeline-fill" id="uwTimelineFill"></div>
+                                </div>
+                                <div class="u-timeline-foot">
+                                    <span id="uwElapsedText">-</span>
+                                    <span id="uwRemainingText">-</span>
+                                </div>
                             </div>
 
                         </div>
@@ -924,6 +984,78 @@
         };
     }
 
+    function formatDateMY(dateStr) {
+        if (!dateStr) return '-';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    function renderTimeTimeline(contract) {
+        const dateRangeEl = document.getElementById('uwDateRange');
+        const statusEl = document.getElementById('uwTimeStatus');
+        const fillEl = document.getElementById('uwTimelineFill');
+        const elapsedEl = document.getElementById('uwElapsedText');
+        const remainingEl = document.getElementById('uwRemainingText');
+        const panelDatesEl = document.getElementById('panel-dates');
+
+        if (!contract || !contract.contract_start || !contract.contract_end) {
+            if (panelDatesEl) panelDatesEl.innerText = '';
+            if (dateRangeEl) dateRangeEl.innerText = 'Tempoh: Tidak ditetapkan';
+            if (statusEl) statusEl.innerText = '-';
+            if (fillEl) { fillEl.style.width = '0%'; fillEl.style.background = 'var(--ios-blue)'; }
+            if (elapsedEl) elapsedEl.innerText = '-';
+            if (remainingEl) remainingEl.innerText = '-';
+            return;
+        }
+
+        const start = new Date(contract.contract_start);
+        const end = new Date(contract.contract_end);
+        const today = new Date();
+
+        start.setHours(0, 0, 0, 0);
+        end.setHours(0, 0, 0, 0);
+        today.setHours(0, 0, 0, 0);
+
+        const startLabel = formatDateMY(contract.contract_start);
+        const endLabel = formatDateMY(contract.contract_end);
+        const rangeText = `${startLabel} – ${endLabel}`;
+
+        if (panelDatesEl) panelDatesEl.innerHTML = `<i class="fa fa-calendar"></i> ${rangeText}`;
+        if (dateRangeEl) dateRangeEl.innerText = rangeText;
+
+        const msPerDay = 1000 * 60 * 60 * 24;
+        const totalDays = Math.max(1, Math.round((end - start) / msPerDay));
+        const elapsedDays = Math.round((today - start) / msPerDay);
+        const remainingDays = Math.round((end - today) / msPerDay);
+
+        let pct = 0;
+        let barColor = 'var(--ios-blue)';
+
+        if (today < start) {
+            pct = 0;
+            statusEl.innerText = 'Belum Mula';
+            elapsedEl.innerText = '0 hari berlalu';
+            remainingEl.innerText = `Mula dalam ${Math.abs(elapsedDays)} hari`;
+        } else if (today > end) {
+            pct = 100;
+            barColor = 'var(--ios-green)';
+            statusEl.innerText = '100% Tamat';
+            elapsedEl.innerText = `${totalDays} / ${totalDays} hari`;
+            remainingEl.innerText = `Tamat ${Math.abs(remainingDays)} hari lalu`;
+        } else {
+            pct = Math.min(100, Math.max(0, (elapsedDays / totalDays) * 100));
+            barColor = pct >= 85 ? 'var(--ios-orange)' : 'var(--ios-blue)';
+            statusEl.innerText = `${pct.toFixed(1)}% Tempoh`;
+            elapsedEl.innerText = `Berlalu: ${elapsedDays} hari`;
+            remainingEl.innerText = `Baki: ${remainingDays} hari`;
+        }
+
+        statusEl.style.color = barColor;
+        fillEl.style.background = barColor;
+        fillEl.style.width = `${pct}%`;
+    }
+
     async function fetchContracts(unitId, btn) {
         document.querySelectorAll('.unit-pill').forEach(p => p.classList.remove('active'));
         btn.classList.add('active');
@@ -944,6 +1076,7 @@
         document.getElementById('panel-title').innerText = 'Analisis';
         document.getElementById('panel-vendor').innerText = '';
         document.getElementById('panel-indent').innerText = '';
+        document.getElementById('panel-dates').innerText = '';
 
         if (cacheContracts[unitId]) {
             renderContractList(cacheContracts[unitId]);
@@ -1060,6 +1193,7 @@
         document.getElementById('panel-title').innerText = contract.contract_code;
         document.getElementById('panel-vendor').innerText = contract.contract_name;
         document.getElementById('panel-indent').innerText = contract.indent_code ? `Indent Code: ${contract.indent_code}` : '';
+        renderTimeTimeline(contract);
         currentContract = contract;
 
         if (cacheAnalysis[contract.id]) {
@@ -1068,7 +1202,7 @@
             selectedSections = (currentContract.selected_sections && currentContract.selected_sections.length > 0)
                 ? [...currentContract.selected_sections]
                 : Object.keys(currentContract.contract_sections_breakdown || {});
-            renderUI(currentInterims);
+            renderUI();
             loadUsageEmbedded();
             return;
         }
@@ -1087,14 +1221,14 @@
                 ? [...currentContract.selected_sections]
                 : Object.keys(currentContract.contract_sections_breakdown || {});
 
-            renderUI(currentInterims);
+            renderUI();
             loadUsageEmbedded();
         } catch (error) {
             console.error("Error fetching analysis data:", error);
         }
     }
 
-    async function renderUI(interimsData = currentInterims) {
+    async function renderUI() {
         if (!currentContract) return;
 
         try {
@@ -1102,14 +1236,12 @@
 
             const sections = currentContract.contract_sections_breakdown || {};
             const mainContainer = document.getElementById('selectedSectionContainer');
-            let htmlBuilder = '';
 
-            selectedSections.sort().forEach(s => {
-                if (!sections[s]) return;
+            mainContainer.innerHTML = selectedSections.sort().map(s => {
+                if (!sections[s]) return '';
+                const budget = Number(sections[s].amt || 0);
 
-                const budget = sections[s].amt || 0;
-
-                htmlBuilder += `
+                return `
                     <div class="section-row">
                         <div style="display:flex; justify-content:space-between; align-items:start;">
                             <div style="font-weight:bold; font-size:13px; color:var(--ios-blue);">
@@ -1121,9 +1253,7 @@
                         </div>
                     </div>
                 `;
-            });
-
-            mainContainer.innerHTML = htmlBuilder;
+            }).join('');
         } catch (error) {
             console.error("Error processing UI:", error);
         }
