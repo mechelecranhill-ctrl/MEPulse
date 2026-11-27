@@ -464,9 +464,11 @@ async function openPicker() {
     : [];
 
   window._pickRows = rows || [];
+  window._pickSel = new Set();
   box.innerHTML = `
     <input id="pickSearch" placeholder="Search Work ID / description (or type new Work ID to register)" oninput="filterPicker()">
     <div class="picker" id="pickList"></div>
+    <div id="pickChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0 6px">
       <button class="btn" id="btnAddSelected" onclick="assign()">Add to Indent</button>
       <button class="btn ghost" onclick="document.getElementById('picker').innerHTML=''">Cancel</button>
@@ -509,7 +511,7 @@ function renderRegisterForm(prefillWorkId = '') {
 function filterPicker() {
   const rawQ = (document.getElementById('pickSearch')?.value || '').trim();
   const q = rawQ.toLowerCase();
-  const checked = new Set([...document.querySelectorAll('.pk:checked')].map(c => c.value));
+  const checked = window._pickSel || (window._pickSel = new Set());
   const rows = (window._pickRows || []).filter(w => !q || (w.work_id + ' ' + (w.description || '')).toLowerCase().includes(q));
   const listEl = document.getElementById('pickList');
   const addBtn = document.getElementById('btnAddSelected');
@@ -519,11 +521,11 @@ function filterPicker() {
     if (addBtn) addBtn.style.display = '';
     if (regBox) regBox.innerHTML = '';
     listEl.innerHTML = rows.map(w => `<label>
-      <input type="checkbox" class="pk" style="width:auto" value="${w.id}" ${checked.has(String(w.id)) ? 'checked' : ''} onchange="pickTotal()">
+      <input type="checkbox" class="pk" style="width:auto" value="${w.id}" ${checked.has(w.id) ? 'checked' : ''} onchange="togglePick(this)">
       <span><b>${esc(w.work_id)}</b> <span class="tag ${tagCls(w.status)}">${esc(w.status)}</span> ${rm(rowAmt(w))}
       <div class="meta">${esc(contracts[w.contract_id] || 'INDENT ONLY')} · ${esc(w.description || '-')}</div></span></label>`).join('');
   } else {
-    if (addBtn) addBtn.style.display = 'none';
+    if (addBtn) addBtn.style.display = checked.size ? '' : 'none';
     const candidateId = /^[CK]\d+[A-Z]?$/i.test(rawQ) ? rawQ.toUpperCase() : '';
     listEl.innerHTML = `
       <div class="empty" style="padding:20px">
@@ -536,19 +538,37 @@ function filterPicker() {
   pickTotal();
 }
 
+function togglePick(cb) {
+  const id = Number(cb.value);
+  if (!window._pickSel) window._pickSel = new Set();
+  if (cb.checked) window._pickSel.add(id); else window._pickSel.delete(id);
+  pickTotal();
+}
+
+function unpick(id) {
+  window._pickSel.delete(id);
+  const cb = document.querySelector(`.pk[value="${id}"]`);
+  if (cb) cb.checked = false;
+  pickTotal();
+}
+
 function pickTotal() {
-  const sel = new Set([...document.querySelectorAll('.pk:checked')].map(c => Number(c.value)));
+  const sel = window._pickSel || new Set();
   const add = (window._pickRows || []).filter(w => sel.has(w.id)).reduce((a, w) => a + rowAmt(w), 0);
   const after = sumRows(members) + add, over = after > current.indent_sum;
   const el = document.getElementById('pickTotal');
   if (!el) return;
   el.innerHTML = sel.size
     ? `${sel.size} selected (+${rm(add)}) → ${rm(after)}${over ? ' <b style="color:var(--ios-red)">exceeds indent value</b>' : ''}` : '';
+  const chips = document.getElementById('pickChips');
+  if (chips) chips.innerHTML = (window._pickRows || []).filter(w => sel.has(w.id)).map(w =>
+    `<span class="tag BLUEFORM" style="display:inline-flex;align-items:center;gap:6px">${esc(w.work_id)}
+      <i class="fa fa-xmark" style="cursor:pointer" onclick="unpick(${w.id})"></i></span>`).join('');
 }
 
 async function assign() {
   if (IS_GUEST) return;
-  const ids = [...document.querySelectorAll('.pk:checked')].map(c => c.value);
+  const ids = [...(window._pickSel || [])].map(String);
   if (!ids.length) return showToast('Select at least one Work ID.', 'warn');
   const add = (window._pickRows || []).filter(w => ids.includes(String(w.id))).reduce((a, w) => a + rowAmt(w), 0);
   if (sumRows(members) + add > current.indent_sum) {
@@ -556,7 +576,7 @@ async function assign() {
     if (!ok) return;
   }
   try {
-    await api(`work_orders?id=in.(${ids.join(',')})`, { method: 'PATCH', body: JSON.stringify({ indent_id: current.id }) });
+    await api(`work_orders?id=in.(${ids.join(',')})`, { method: 'PATCH', body: JSON.stringify({ indent_id: current.id, status: 'INDENT' }) });
     await openIndent(current.id);
     showToast('Work IDs added to indent.', 'success');
   } catch (e) { console.error(e); showToast('Failed to add Work IDs to indent.', 'error'); }
@@ -568,12 +588,12 @@ async function unassign(id) {
   const own = row && !row.contract_id;
   const msg = own
     ? 'This Work ID is registered solely for this indent and has no contract. Deleting will permanently remove this Work ID. Continue?'
-    : 'Remove this Work ID from the indent? It will be counted back under the contract budget with its original status.';
+    : 'Remove this Work ID from the indent? Its status will go back to BLUEFORM and it will be counted under the contract budget again.';
   const ok = await confirmToast(msg, own ? 'Delete' : 'Remove');
   if (!ok) return;
   try {
     if (own) await api(`work_orders?id=eq.${id}`, { method: 'DELETE' });
-    else await api(`work_orders?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ indent_id: null }) });
+    else await api(`work_orders?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ indent_id: null, status: 'BLUEFORM' }) });
     await openIndent(current.id);
     showToast(own ? 'Work ID deleted.' : 'Work ID removed from indent.', 'success');
   } catch (e) { console.error(e); showToast('Failed to remove Work ID.', 'error'); }
