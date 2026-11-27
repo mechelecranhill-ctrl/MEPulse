@@ -227,7 +227,6 @@
         .tag.blueform{ background:#007AFF20; color:#007AFF; }
         .tag.approved{ background:#34C75920; color:#34C759; }
         .tag.indent{ background:#00000020; color:#000; }
-        .tag.indentapproved{ background:#00000020; color:#000; }
         .tag.cancel{ background:#FF3B3020; color:#FF3B30; }
         .tag.claimed{ background:#34C75920; color:#34C759; }
 
@@ -254,18 +253,17 @@
         tr.status-rej-hos td strong,
         tr.status-hod-rej td strong { color: #FF3B30; }
 
-        tr.status-indent td,
-        tr.status-indentapproved td { background-color: rgba(142, 142, 147, 0.15) !important; }
+        tr.status-indent td { background-color: rgba(142, 142, 147, 0.15) !important; }
+        tr.status-indent td strong { color: #636366; }
 
-        tr.status-indent td strong,
-        tr.status-indentapproved td strong { color: #636366; }
+        tr.status-approved td,
+        tr.status-indentapproved td { background-color: rgba(0, 168, 107, 0.10) !important; }
+        tr.status-approved td strong,
+        tr.status-indentapproved td strong { color: #00A86B; }
 
-        tr.status-approved td { background-color: rgba(0, 168, 107, 0.10) !important; }
-        tr.status-approved td strong { color: #00A86B; }
-
-        .tag.approved{ background:#00A86B20; color:#00A86B; }
+        .tag.approved,
+        .tag.indentapproved{ background:#00A86B20; color:#00A86B; }
         .tag.indent{ background:#8E8E9320; color:#636366; }
-        .tag.indentapproved{ background:#8E8E9320; color:#636366; }
 
         .tag.app-exec, .tag.app-hos, .tag.app-hod { background:#FFCC0030; color:#B8860B; }
         .tag.exec-rej, .tag.rej-hos, .tag.hod-rej { background:#FFCC0030; color:#FF3B30; }
@@ -1302,6 +1300,16 @@ function statusCls(st){
         : String(st).toLowerCase().replace(/\s+/g, '');
 }
 
+/* Dropdown view only: boleh dibuka untuk lihat senarai, tapi hanya status semasa yang boleh "dipilih" */
+const STATUS_LIST = ['BLUEFORM','APP-EXEC','EXEC-REJ','APP-HOS','REJ-HOS','APP-HOD','HOD-REJ','APPROVED','CANCEL','CLAIMED','INDENT','INDENT APPROVED'];
+function statusOptionsHtml(cur){
+    const key = v => String(v || '').toUpperCase().replace(/[^A-Z]/g, '');
+    const list = STATUS_LIST.some(o => key(o) === key(cur)) ? STATUS_LIST : [...STATUS_LIST, cur];
+    return list.map(o => key(o) === key(cur)
+        ? `<option value="${o}" selected>${o}</option>`
+        : `<option value="${o}" disabled>${o}</option>`).join('');
+}
+
 function renderTable(data, showArea = true){
     if(typeof closeSecPop === 'function') closeSecPop();
     currentTableData = data;
@@ -1335,8 +1343,6 @@ function renderTable(data, showArea = true){
 
         const currentStatus = w.interim_no ? 'CLAIMED' : (w.status || 'BLUEFORM');
         
-        const locked = !!w.interim_no || isIndentStatus(currentStatus);
-
         let actionHtml = '';
         let checkboxHtml = '';
 
@@ -1362,20 +1368,9 @@ function renderTable(data, showArea = true){
         html += `
         <tr class="status-${statusCls(currentStatus)}">
             <td>
-                <select onchange="updateStatus(${w.id}, this.value)" ${locked ? 'disabled' : ''}
-                    style="width:100%;max-width:140px;padding:6px 8px;border-radius:10px;border:1px solid #ddd;font-size:12px;font-weight:700;background:${locked ? '#f1f1f1' : 'white'};box-sizing:border-box;">
-                    <option value="BLUEFORM"        ${currentStatus === 'BLUEFORM'        ? 'selected' : ''}>BLUEFORM</option>
-                    <option value="APP-EXEC"        ${currentStatus === 'APP-EXEC'        ? 'selected' : ''}>APP-EXEC</option>
-                    <option value="EXEC-REJ"        ${currentStatus === 'EXEC-REJ'        ? 'selected' : ''}>EXEC-REJ</option>
-                    <option value="APP-HOS"         ${currentStatus === 'APP-HOS'         ? 'selected' : ''}>APP-HOS</option>
-                    <option value="REJ-HOS"         ${currentStatus === 'REJ-HOS'         ? 'selected' : ''}>REJ-HOS</option>
-                    <option value="APP-HOD"         ${currentStatus === 'APP-HOD'         ? 'selected' : ''}>APP-HOD</option>
-                    <option value="HOD-REJ"         ${currentStatus === 'HOD-REJ'         ? 'selected' : ''}>HOD-REJ</option>
-                    <option value="APPROVED"        ${currentStatus === 'APPROVED'        ? 'selected' : ''}>APPROVED</option>
-                    <option value="CANCEL"          ${currentStatus === 'CANCEL'          ? 'selected' : ''}>CANCEL</option>
-                    <option value="CLAIMED"         ${currentStatus === 'CLAIMED'         ? 'selected' : ''}>CLAIMED</option>
-                    <option value="INDENT"          disabled ${isIndentStatus(currentStatus) && currentStatus.toUpperCase().replace(/[^A-Z]/g,'') === 'INDENT' ? 'selected' : ''}>INDENT</option>
-                    <option value="INDENT APPROVED" disabled ${currentStatus.toUpperCase().replace(/[^A-Z]/g,'') === 'INDENTAPPROVED' ? 'selected' : ''}>INDENT APPROVED</option>
+                <select onchange="this.value=this.dataset.current" data-current="${currentStatus}" title="View only"
+                    style="width:100%;max-width:140px;padding:6px 8px;border-radius:10px;border:1px solid #ddd;font-size:12px;font-weight:700;background:#f1f1f1;box-sizing:border-box;cursor:pointer;">
+                    ${statusOptionsHtml(currentStatus)}
                 </select>
             </td>
             <td><strong>${seq || '-'}</strong></td>
@@ -2015,8 +2010,7 @@ function downloadCsv(){
 
 async function updateStatus(id, status){
         if (IS_GUEST) return;
-    const cur = allWorks.find(w => Number(w.id) === Number(id));
-    if (isIndentStatus(status) || (cur && isIndentStatus(cur.status))) return; // read-only
+    return; // semua status view only
     try{
         await fetch(`${API_URL}/rest/v1/work_orders?id=eq.${id}`,{
             method:'PATCH', headers,
@@ -2033,7 +2027,7 @@ async function updateStatus(id, status){
 async function updateStatusGroup(idsStr, status){
         if (IS_GUEST) return;
     const ids = idsStr.split(',').map(id => id.trim());
-    if (isIndentStatus(status) || ids.some(id => { const r = allWorks.find(w => Number(w.id) === Number(id)); return r && isIndentStatus(r.status); })) return; // read-only
+    return; // semua status view only
     try{
         await Promise.all(ids.map(id =>
             fetch(`${API_URL}/rest/v1/work_orders?id=eq.${id}`,{
