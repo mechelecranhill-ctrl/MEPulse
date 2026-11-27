@@ -284,6 +284,25 @@ const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB') : '-';
 const rowAmt = w => Number(w.amount_spent || 0);
 const sumRows = rows => rows.filter(w => w.status !== 'CANCEL').reduce((a, w) => a + rowAmt(w), 0);
 
+function parseIndentRef(item) {
+  const code = String(item.contract_code || item.indent_code || '').trim().toUpperCase();
+  const m = code.match(/\/(\d+)\/(\d{2,4})\s*$/);
+  if (m) {
+    let yr = Number(m[2]);
+    if (yr < 100) yr += 2000;
+    return { valid: true, year: yr, seq: Number(m[1]), code };
+  }
+  return { valid: false, year: Number.MAX_SAFE_INTEGER, seq: Number.MAX_SAFE_INTEGER, code };
+}
+
+function compareIndents(a, b) {
+  const pa = parseIndentRef(a);
+  const pb = parseIndentRef(b);
+  if (pa.year !== pb.year) return pa.year - pb.year;
+  if (pa.seq !== pb.seq) return pa.seq - pb.seq;
+  return pa.code.localeCompare(pb.code, undefined, { numeric: true });
+}
+
 /* ---- toast helpers ---- */
 function showToast(message, type = 'info', duration = 3800) {
   const stack = document.getElementById('toastStack');
@@ -362,10 +381,10 @@ async function selectUnit(id) {
   document.getElementById('detail').innerHTML = '<div class="empty"><i class="fa-regular fa-file-lines"></i><b>Select an indent</b><span>or create a new one.</span></div>';
   const [cs, ins] = await Promise.all([
     api(`contract?unit_id=eq.${id}&select=id,contract_code`),
-    api(`indents?unit_id=eq.${id}&order=indent_start.desc&select=*`)
+    api(`indents?unit_id=eq.${id}&select=*`)
   ]);
   contracts = {}; cs.forEach(c => contracts[c.id] = c.contract_code);
-  indents = ins;
+  indents = (ins || []).slice().sort(compareIndents);
   const all = indents.length ? await api(`work_orders?indent_id=in.(${indents.map(i => i.id).join(',')})&select=indent_id,status,amount_spent`) : [];
   Object.keys(usedOf).forEach(k => delete usedOf[k]);
   all.forEach(w => { if (w.status !== 'CANCEL') usedOf[w.indent_id] = (usedOf[w.indent_id] || 0) + rowAmt(w); });
@@ -375,7 +394,8 @@ async function selectUnit(id) {
 function renderList() {
   const el = document.getElementById('list');
   if (!indents.length) { el.innerHTML = '<div class="empty">No indents.</div>'; return; }
-  el.innerHTML = indents.map(i => {
+  const sorted = indents.slice().sort(compareIndents);
+  el.innerHTML = sorted.map(i => {
     const used = usedOf[i.id] || 0, pct = Math.min(100, used / i.indent_sum * 100);
     const cls = used > i.indent_sum ? 'over' : pct >= 90 ? 'warn' : '';
     return `<div class="c-card ${current && current.id === i.id ? 'active' : ''}" onclick="openIndent(${i.id})">
