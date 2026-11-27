@@ -651,8 +651,38 @@ function filterPicker() {
           <i class="fa fa-file-circle-plus"></i> Register New Work ID${candidateId ? ` (${esc(candidateId)})` : ''}
         </button>
       </div>`;
+    if (candidateId) checkExistingWorkId(candidateId);
   }
   pickTotal();
+}
+
+let _existTok = 0;
+async function checkExistingWorkId(wid) {
+  const tok = ++_existTok;
+  const listEl = document.getElementById('pickList');
+  if (listEl) listEl.innerHTML = '<div class="empty" style="padding:20px">Checking Work ID...</div>';
+  let rows = [];
+  try { rows = await api(`work_orders?work_id=eq.${encodeURIComponent(wid)}&select=id,work_id,status,indent_id,contract_id`) || []; }
+  catch (e) { console.error(e); }
+  if (tok !== _existTok) return;                       // user kept typing
+  const el = document.getElementById('pickList');
+  const q = (document.getElementById('pickSearch')?.value || '').trim().toUpperCase();
+  if (!el || q !== wid) return;
+
+  const w = rows[0];
+  const regBtn = `<button type="button" class="btn" onclick="openQuotationModal('${esc(wid)}')"><i class="fa fa-file-circle-plus"></i> Register New Work ID (${esc(wid)})</button>`;
+  let msg, canRegister = false;
+  if (!w) { canRegister = true; msg = `<b>No Work IDs Available</b> matching "${esc(wid)}"`; }
+  else if (w.indent_id) {
+    const ind = indents.find(i => i.id === w.indent_id);
+    msg = `<b>${esc(wid)}</b> is already in ${ind ? 'indent <b>' + esc(ind.contract_code || ind.indent_code) + '</b>' : 'another indent'}.`;
+  } else if (['QUOTATION', 'QUO-REJ'].includes(w.status)) {
+    canRegister = true;
+    msg = `<b>${esc(wid)}</b> is still <span class="tag ${tagCls(w.status)}">${esc(w.status)}</span>. It can only be added to an indent after QUO-APP.`;
+  } else {
+    msg = `<b>${esc(wid)}</b> exists with status <span class="tag ${tagCls(w.status)}">${esc(w.status)}</span> and cannot be added.`;
+  }
+  el.innerHTML = `<div class="empty" style="padding:20px"><div style="margin-bottom:${canRegister ? 10 : 0}px">${msg}</div>${canRegister ? regBtn : ''}</div>`;
 }
 
 function togglePick(cb) {
@@ -1593,6 +1623,15 @@ async function tqDoSubmit(e) {
   if (!contractId) { showToast('Please select a Contract!', 'error'); return; }
   if (!document.getElementById('tq_pdf_file').files[0]) { showToast('Please select a quotation PDF.', 'error'); return; }
   const primaryWorkId = normalizeWorkId(`${prefix}${num}`) + tqCurrentSuffix;
+
+  try {
+    const ex = await api(`work_orders?work_id=eq.${encodeURIComponent(primaryWorkId)}&select=status,indent_id`) || [];
+    const locked = ex.find(r => r.indent_id || !['QUOTATION', 'QUO-APP', 'QUO-REJ', 'EXEC-REJ', 'HOS-REJ', 'HOD-REJ'].includes(r.status));
+    if (locked) {
+      showToast(`Work ID ${primaryWorkId} already exists${locked.indent_id ? ' in an indent' : ' with status ' + locked.status} and cannot be re-registered.`, 'error', 5500);
+      return;
+    }
+  } catch (err) { console.error(err); showToast('Failed to verify Work ID. Please try again.', 'error'); return; }
 
   const unitSelect = document.getElementById('tq_unit_id');
   const unitText = (unitSelect.options[unitSelect.selectedIndex] || {}).text || '';
